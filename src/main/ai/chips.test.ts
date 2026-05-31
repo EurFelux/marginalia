@@ -1,6 +1,6 @@
 // src/main/ai/chips.test.ts
 import { describe, expect, it } from "vitest";
-import { buildChips, dedupeParagraph } from "@main/ai/chips";
+import { buildChips, dedupeParagraph, toContextChips } from "@main/ai/chips";
 
 describe("buildChips", () => {
   it("builds a selection chip and a paragraph chip", () => {
@@ -62,5 +62,15 @@ describe("dedupeParagraph", () => {
   it("keeps the paragraph chip when content differs", () => {
     const result = dedupeParagraph(sample, "a different paragraph");
     expect(result.map((c) => c.id)).toEqual(["selection", "paragraph"]);
+  });
+});
+
+describe("toContextChips", () => {
+  it("projects live chips to the persisted snapshot shape (drops labelKey/required/enabled)", () => {
+    const chips = buildChips({ selection: "sel", paragraphCurrent: "para" });
+    expect(toContextChips(chips)).toEqual([
+      { id: "selection", content: "sel", tokenCount: chips[0].tokenCount },
+      { id: "paragraph", content: "para", tokenCount: chips[1].tokenCount },
+    ]);
   });
 });
