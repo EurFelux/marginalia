@@ -4,6 +4,14 @@ import { z } from "zod";
 export const IPC = {
   appGetInfo: "app:get-info",
   ping: "ping",
+  libraryImport: "library:import",
+  libraryList: "library:list",
+  libraryGet: "library:get",
+  progressGet: "progress:get",
+  progressSave: "progress:save",
+  contentToc: "content:toc",
+  contentChapterText: "content:chapter-text",
+  contentChapterSummary: "content:chapter-summary",
 } as const;
 
 /** ping —— 演示"带入参且经 Zod 校验"的往返 */
