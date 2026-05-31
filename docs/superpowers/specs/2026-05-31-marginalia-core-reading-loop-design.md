@@ -36,22 +36,23 @@ Marginalia 是一个 Electron + React 的桌面 ePub 阅读器，核心差异化
 
 ## 2. 技术栈
 
-| 层             | 选择                                                                            |
-| -------------- | ------------------------------------------------------------------------------- |
-| Shell          | Electron（electron-forge + Vite）                                               |
-| 语言           | TypeScript 6                                                                    |
-| UI             | React 19                                                                        |
-| 样式           | Tailwind CSS + **shadcn/ui（优先 Base UI 基底，避免 Radix 版本）**              |
-| AI 对话 UI     | **Vercel AI SDK v6 · UI**（`useChat` 等 hooks）+ 自定义 IPC transport 桥接 main |
-| i18n           | i18next（UI 文案全部走 key，组件不写死字符串）                                  |
-| ePub 渲染      | epub.js（`flow: "scrolled"`, `spread: "none"`）                                 |
-| 数据层         | **Drizzle ORM** + better-sqlite3 驱动（同步，跑在 main）                        |
-| 迁移           | drizzle-kit 生成 SQL，应用启动时在 main 执行                                    |
-| AI SDK（main） | **Vercel AI SDK v6**（`streamText` + tools + 多步 agent 循环）                  |
-| 渲染层状态     | Zustand（**仅 UI 状态**）                                                       |
-| 测试           | vitest                                                                          |
-| Lint / Format  | oxlint + oxfmt（prek 预提交）                                                   |
-| 原生模块       | electron-rebuild **从第一天接入**（better-sqlite3）                             |
+| 层             | 选择                                                                                                                 |
+| -------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Shell          | Electron（electron-forge + Vite）                                                                                    |
+| 语言           | TypeScript 6                                                                                                         |
+| UI             | React 19                                                                                                             |
+| 样式           | Tailwind CSS + **shadcn/ui（优先 Base UI 基底，避免 Radix 版本）**                                                   |
+| AI 对话 UI     | **Vercel AI SDK v6 · UI**（`useChat` 等 hooks）+ 自定义 IPC transport 桥接 main                                      |
+| i18n           | i18next（UI 文案全部走 key，组件不写死字符串）                                                                       |
+| ePub 渲染      | epub.js（`flow: "scrolled"`, `spread: "none"`）                                                                      |
+| 数据层         | **Drizzle ORM** + better-sqlite3 驱动（同步，跑在 main）                                                             |
+| 迁移           | drizzle-kit 生成 SQL，应用启动时在 main 执行                                                                         |
+| AI SDK（main） | **Vercel AI SDK v6**（`streamText` + tools + 多步 agent 循环）                                                       |
+| 渲染层状态     | Zustand（**仅 UI 状态**）                                                                                            |
+| 测试           | vitest                                                                                                               |
+| Lint / Format  | oxlint + oxfmt（prek 预提交）                                                                                        |
+| 运行时校验     | **Zod**（IPC 边界 / AI 工具入参 / 表单 / DB JSON 列校验；TS 类型经 `z.infer` 派生，`drizzle-zod` 由表生成行 schema） |
+| 原生模块       | electron-rebuild **从第一天接入**（better-sqlite3）                                                                  |
 
 ---
 
@@ -62,6 +63,7 @@ Marginalia 是一个 Electron + React 的桌面 ePub 阅读器，核心差异化
 - **main（厚）**：DB（Drizzle）、prompt 组装、provider 调用与流式、agent 循环与工具执行、密钥加解密、ePub 解析与原文读取、章节摘要生成队列。
 - **renderer（薄）**：epub.js 渲染、选区/段落**原始文本**提取（唯一允许碰 DOM 之处，因只有渲染层有 DOM）、全部 UI、Zustand UI 状态。
 - 二者通过 `contextBridge` 暴露的**类型化 `window.api`** 通信：请求/响应用 `ipcRenderer.invoke`，token / 工具步骤流用事件通道按 `streamId` 推回。
+- **运行时校验（Zod）**：IPC 边界把来自 renderer 的入参视为**不可信**——main 全部经 Zod 解析后再处理，校验失败即拒绝并回结构化错误；AI 工具入参用 Zod `inputSchema`（AI SDK v6 原生）；表单与 DB JSON 列亦用 Zod 校验。schema 集中在 `shared/` 作单一事实源，TS 类型经 `z.infer` 派生。
 - **AI 对话 UI**：renderer 用 **Vercel AI SDK UI** 的 `useChat`，配一个**自定义 IPC transport**——`useChat` 不走 HTTP，而是经 `window.api.ai.send` 发起、订阅 `ai.stream` 事件接收 **UI message stream**。main 用 `streamText(...).toUIMessageStream()` 产出，经 IPC 逐块推回。消息/分段格式端到端统一为 AI SDK UI 格式（`messages.content` 亦按此存储）。
 
 > 边界说明：选区与周围段落的**原始文本提取**必须在 renderer（DOM 操作），但提取后**立即把原始文本交给 main**；token 计数、截断、chip 组装、prompt 拼接、agent 循环与工具执行等业务全部在 main，符合原则。renderer 的 `useChat` 只做 UI 状态与渲染，不含业务。
@@ -91,7 +93,7 @@ src/
 │   │   └── Settings/  # Provider 配置、默认 Assistant 编辑、阅读偏好
 │   ├── store/         # Zustand（仅 UI 状态）
 │   └── api/           # window.api 的类型化封装
-└── shared/            # main↔renderer 共享 TS 类型（Chip、IPC 契约、行类型）
+└── shared/            # main↔renderer 共享：Zod schema(单一事实源)+z.infer 派生类型（Chip、IPC 契约、行类型）
 ```
 
 ---
@@ -228,6 +230,7 @@ getChapterSummary(chapterId): string                 // 取任意章摘要（懒
 
 - **大章节防爆**：`readChapterText` 用 char-offset 分块返回 `hasMore` / `nextOffset`，agent 需更多时带 offset 续读。
 - **「章节」单位定义**：= **spine item**。epub.js 当前位置取自 `currentLocation().start.href`（spine 项），与 `chapters.id` 对齐。TOC 仅用于侧栏导航；逻辑章节有时跨多个 spine 项，但摘要与会话归属一律以 spine 项为单位（最稳定）。
+- **工具入参校验**：每个工具用 Zod `inputSchema` 定义参数（AI SDK v6 原生），main 执行前自动校验、非法即拒。
 
 > 红利：本 Phase 已建好「工具注册表 + agent 循环」基础设施，后续加文件系统工具只需往注册表加函数，零返工。
 
@@ -341,14 +344,15 @@ reader.getPrefs() / setPrefs(...)   // 字号、行高、最大宽度（注入 e
 
 - 纯函数单测：prompt 组装、段落去重、章节解析（href→id）、`readChapterText` 分页边界、Drizzle 迁移升级。
 - DOM 提取逻辑抽成可测函数（jsdom + fixture）。
-- IPC 契约靠 `shared/` 类型在编译期兜底。
+- IPC 契约靠 `shared/` 类型在编译期兜底；运行期靠 Zod 校验。
+- Zod schema 单测：IPC 入参、工具 `inputSchema`、JSON 列的合法/非法边界用例。
 
 ---
 
 ## 18. 工具链与依赖
 
 - **electron-rebuild 从第一天接入**（better-sqlite3 原生模块，避免打包期踩坑）。
-- 待装：`drizzle-orm` + `better-sqlite3` + `drizzle-kit`、`epub.js`、**AI SDK v6**（`ai@6` + `@ai-sdk/react` + provider 包 `@ai-sdk/openai`/`@ai-sdk/anthropic`/`@ai-sdk/google`）、`zustand`、`tailwindcss` + shadcn/ui（Base UI 基底）依赖。`react` / `i18next` / `vitest` / `oxlint` / `oxfmt` 已在。
+- 待装：`drizzle-orm` + `better-sqlite3` + `drizzle-kit`、`epub.js`、**AI SDK v6**（`ai@6` + `@ai-sdk/react` + provider 包 `@ai-sdk/openai`/`@ai-sdk/anthropic`/`@ai-sdk/google`）、`zustand`、`zod` + `drizzle-zod`、`tailwindcss` + shadcn/ui（Base UI 基底）依赖。`react` / `i18next` / `vitest` / `oxlint` / `oxfmt` 已在。
 
 ---
 
