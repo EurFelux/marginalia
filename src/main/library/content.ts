@@ -1,5 +1,9 @@
 import { and, eq } from "drizzle-orm";
-import { extractChapterText, type ChapterTextSlice } from "@marginalia/epub-parser";
+import {
+  extractChapterText,
+  type ChapterTextSlice,
+  type ReadOptions,
+} from "@marginalia/epub-parser";
 import type { DB } from "@main/db/client";
 import { books, chapters } from "@main/db/schema";
 import { tocNodeSchema, type TocNode } from "@shared/types";
@@ -33,7 +37,7 @@ export function readChapterText(
   bytes: Uint8Array,
   bookId: string,
   chapterId: string,
-  opts: { offset?: number; maxChars?: number },
+  opts: ReadOptions,
 ): ChapterTextSlice {
   const ch = db
     .select({ href: chapters.href })

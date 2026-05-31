@@ -40,6 +40,11 @@ describe("content service", () => {
     expect(() => getChapterSummary(db, book.id, "nonexistent-id")).toThrow(/not found/);
   });
 
+  it("readChapterText throws for an unknown chapterId", () => {
+    const { db, bytes, book } = setup();
+    expect(() => readChapterText(db, bytes, book.id, "nonexistent-id", {})).toThrow(/not found/);
+  });
+
   it("readChapterText respects offset and maxChars", () => {
     const { db, bytes, book } = setup();
     const ch1 = resolveChapterByHref(db, book.id, "OEBPS/ch1.xhtml")!;

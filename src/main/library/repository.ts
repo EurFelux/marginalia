@@ -21,11 +21,10 @@ function tocLabelByHref(toc: TocNode[], acc = new Map<string, string>()): Map<st
 
 export function importBook(db: DB, input: ImportInput): BookRow {
   const parsed = parseEpub(input.bytes);
-  const id = parsed.uid || createHash("sha256").update(input.bytes).digest("hex");
+  const id = parsed.uid ?? createHash("sha256").update(input.bytes).digest("hex");
 
-  // 幂等：已在库则直接返回，不重新解析、不动 chapters（零 churn）。
-  // "显式刷新/重新导入"留后续里程碑：届时按 (book_id, href) 稳定 upsert，
-  // 保 chapter id 不变，供 MA4 章节绑定会话存活。
+  // 幂等：已在库则直接返回，不写入 books/chapters（零 DB churn）。注：parseEpub 在幂等检查前已执行（id 派生需要它）。
+  // "显式刷新/重新导入"留后续里程碑（按 (book_id, href) 稳定 upsert 保 chapter id）。
   const existing = db.select().from(books).where(eq(books.id, id)).get();
   if (existing) return existing;
 

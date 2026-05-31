@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { createDb, runMigrations } from "@main/db/client";
@@ -33,9 +32,14 @@ describe("library repository", () => {
     );
   });
 
-  it("uses a content hash id when uid is absent (sanity of fallback math)", () => {
-    const bytes = makeFixtureEpub();
-    expect(createHash("sha256").update(bytes).digest("hex")).toHaveLength(64);
+  it("falls back to a content-hash id when the epub has no identifier", () => {
+    const db = freshDb();
+    const book = importBook(db, {
+      bytes: makeFixtureEpub({ identifier: null }),
+      filePath: "/no-id.epub",
+    });
+    expect(book.id).toMatch(/^[0-9a-f]{64}$/);
+    expect(getBook(db, book.id)).toBeDefined();
   });
 
   it("idempotent import: re-importing the same epub does not create duplicate books or change chapter ids", () => {

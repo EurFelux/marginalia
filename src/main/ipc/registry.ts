@@ -8,8 +8,13 @@ export function handle<I, O>(
   inputSchema: z.ZodType<I>,
   handler: (input: I) => O | Promise<O>,
 ): void {
-  ipcMain.handle(channel, (_event, raw: unknown) => {
-    const input = validateInput(channel, inputSchema, raw);
-    return handler(input);
+  ipcMain.handle(channel, async (_event, raw: unknown) => {
+    try {
+      const input = validateInput(channel, inputSchema, raw);
+      return await handler(input);
+    } catch (err) {
+      console.error(`[ipc] ${channel} failed:`, err);
+      throw err;
+    }
   });
 }
