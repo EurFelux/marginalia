@@ -7,7 +7,8 @@ const xml = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: "@_",
   removeNSPrefix: true,
-  isArray: (name) => ["item", "itemref", "navPoint"].includes(name),
+  parseTagValue: false,
+  isArray: (name) => ["item", "itemref", "navPoint", "rootfile"].includes(name),
 });
 
 function resolveHref(baseDir: string, href: string): string {
@@ -45,7 +46,9 @@ export function parseEpub(bytes: Uint8Array): ParsedEpub {
   };
 
   const container = xml.parse(text("META-INF/container.xml"));
-  const opfPath: string | undefined = container?.container?.rootfiles?.rootfile?.["@_full-path"];
+  const opfPath: string | undefined = asArray(container?.container?.rootfiles?.rootfile)[0]?.[
+    "@_full-path"
+  ];
   if (!opfPath) throw new Error("epub: cannot locate OPF rootfile");
   const opfDir = dirOf(opfPath);
 
@@ -78,8 +81,9 @@ export function parseEpub(bytes: Uint8Array): ParsedEpub {
     .filter((s): s is SpineItem => s !== undefined);
 
   let coverHref: string | undefined;
-  for (const [, m] of manifest)
-    if (m.properties.split(/\s+/).includes("cover-image")) coverHref = m.href;
+  coverHref = manifest
+    .values()
+    .find((m) => m.properties.split(/\s+/).includes("cover-image"))?.href;
   if (!coverHref) {
     const coverId = asArray(meta.meta).find((m) => m?.["@_name"] === "cover")?.["@_content"];
     if (coverId) coverHref = manifest.get(coverId)?.href;
@@ -110,6 +114,7 @@ function readToc(
           .querySelectorAll("li")
           .filter((li) => li.parentNode === listEl)
           .map((li) => {
+            // 已知限制：<li><span>分组</span><ol>…</ol></li> 这类无 <a> 的分组节点会取到嵌套后代的 <a>；当前只支持 <a> 直接子节点的常见结构。
             const a = li.querySelector("a");
             const childOls = li.querySelectorAll("ol");
             const childOl = childOls.find((o) => o.parentNode === li) ?? null;
@@ -150,7 +155,9 @@ function readToc(
       if (kids.length) node.children = kids;
       return node;
     };
-    return asArray(doc.ncx?.navMap?.navPoint).map(toNode);
+    return asArray(doc.ncx?.navMap?.navPoint)
+      .map(toNode)
+      .filter((n) => n.label || n.href);
   }
   return [];
 }
