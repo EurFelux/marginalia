@@ -29,33 +29,35 @@ export function importBook(db: DB, input: ImportInput): BookRow {
   const existing = db.select().from(books).where(eq(books.id, id)).get();
   if (existing) return existing;
 
-  db.insert(books)
-    .values({
-      id,
-      path: input.filePath,
-      title: parsed.title ?? null,
-      author: parsed.author ?? null,
-      cover: parsed.cover ? Buffer.from(parsed.cover) : null,
-      toc: parsed.toc,
-    })
-    .run();
-
-  const labels = tocLabelByHref(parsed.toc);
-  parsed.spine.forEach((item, index) => {
-    db.insert(chapters)
+  return db.transaction((tx) => {
+    tx.insert(books)
       .values({
-        bookId: id,
-        href: item.href,
-        orderIndex: index,
-        title: labels.get(item.href) ?? null,
-        summaryStatus: "pending",
+        id,
+        path: input.filePath,
+        title: parsed.title ?? null,
+        author: parsed.author ?? null,
+        cover: parsed.cover ? Buffer.from(parsed.cover) : null,
+        toc: parsed.toc,
       })
       .run();
-  });
 
-  const row = db.select().from(books).where(eq(books.id, id)).get();
-  if (!row) throw new Error("importBook: book row missing after insert");
-  return row;
+    const labels = tocLabelByHref(parsed.toc);
+    parsed.spine.forEach((item, index) => {
+      tx.insert(chapters)
+        .values({
+          bookId: id,
+          href: item.href,
+          orderIndex: index,
+          title: labels.get(item.href) ?? null,
+          summaryStatus: "pending",
+        })
+        .run();
+    });
+
+    const row = tx.select().from(books).where(eq(books.id, id)).get();
+    if (!row) throw new Error("importBook: book row missing after insert");
+    return row;
+  });
 }
 
 export function listBooks(db: DB): BookRow[] {
