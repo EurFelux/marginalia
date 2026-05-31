@@ -23,10 +23,12 @@ CREATE TABLE `chapters` (
 	`book_id` text NOT NULL,
 	`title` text,
 	`order_index` integer,
-	`href` text,
+	`href` text NOT NULL,
 	`summary` text,
 	`summary_status` text DEFAULT 'pending' NOT NULL,
-	CONSTRAINT `fk_chapters_book_id_books_id_fk` FOREIGN KEY (`book_id`) REFERENCES `books`(`id`)
+	CONSTRAINT `fk_chapters_book_id_books_id_fk` FOREIGN KEY (`book_id`) REFERENCES `books`(`id`),
+	CONSTRAINT `chapters_book_id_href_unique` UNIQUE(`book_id`,`href`),
+	CONSTRAINT "chapters_summary_status_check" CHECK("summary_status" in ('pending','generating','ready','unavailable'))
 );
 --> statement-breakpoint
 CREATE TABLE `conversations` (
@@ -50,7 +52,8 @@ CREATE TABLE `messages` (
 	`metadata` text,
 	`seq` integer NOT NULL,
 	`created_at` integer NOT NULL,
-	CONSTRAINT `fk_messages_conversation_id_conversations_id_fk` FOREIGN KEY (`conversation_id`) REFERENCES `conversations`(`id`)
+	CONSTRAINT `fk_messages_conversation_id_conversations_id_fk` FOREIGN KEY (`conversation_id`) REFERENCES `conversations`(`id`),
+	CONSTRAINT "messages_role_check" CHECK("role" in ('system','user','assistant'))
 );
 --> statement-breakpoint
 CREATE TABLE `progress` (
@@ -66,5 +69,6 @@ CREATE TABLE `providers` (
 	`label` text,
 	`base_url` text,
 	`api_key_encrypted` blob,
-	`created_at` integer NOT NULL
+	`created_at` integer NOT NULL,
+	CONSTRAINT "providers_type_check" CHECK("type" in ('openai','anthropic','google','openai-compatible'))
 );

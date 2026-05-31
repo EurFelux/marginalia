@@ -102,7 +102,7 @@ src/
 
 > schema 用 TS 定义，drizzle-kit 生成迁移。下面用 SQL 语义表达，便于审阅。
 >
-> **ID 策略**：app 生成的主键（`providers` / `assistants` / `conversations` / `messages`）一律用 **uuidv7**（时间有序，需 `uuid` 包；Node 内置 `randomUUID` 只产 v4）。`books.id`（ePub 唯一标识，回退文件哈希）与 `chapters.id`（spine item id）是 **ePub 自然键**，不生成。`messages` 仍保留 `seq` 保证同毫秒内会话级严格顺序。
+> **ID 策略**：app 生成的主键（`providers` / `assistants` / `chapters` / `conversations` / `messages`）一律用 **uuidv7**（时间有序，需 `uuid` 包；Node 内置 `randomUUID` 只产 v4）。`chapters` 虽对应 spine 项，但用 uuidv7 **代理键** + `UNIQUE(book_id, href)`（spine id 跨书不唯一）。仅 `books.id`（ePub 唯一标识，回退文件哈希）是 **ePub 自然键**，不生成。`messages` 仍保留 `seq` 保证同毫秒内会话级严格顺序。
 
 ```ts
 // providers —— 新增
@@ -138,13 +138,14 @@ books {
 
 // chapters —— 结构性拉回，含懒生成摘要
 chapters {
-  id: text PK                    // = spine item id（见 §8 章节定义）
+  id: text PK                    // uuidv7 代理键（spine id 跨书不唯一）
   bookId: text NOT NULL → books.id
   title: text
   orderIndex: integer
-  href: text                     // spine 项 href，用于 CFI→章节解析
+  href: text NOT NULL            // spine 项 href，用于 CFI→章节解析；书内唯一
   summary: text
-  summaryStatus: text DEFAULT 'pending'   // pending|generating|ready|unavailable
+  summaryStatus: text DEFAULT 'pending'   // pending|generating|ready|unavailable（DB CHECK）
+  UNIQUE(book_id, href)
 }
 
 progress {
@@ -235,7 +236,7 @@ getChapterSummary(chapterId): string                 // 取任意章摘要（懒
 ```
 
 - **大章节防爆**：`readChapterText` 用 char-offset 分块返回 `hasMore` / `nextOffset`，agent 需更多时带 offset 续读。
-- **「章节」单位定义**：= **spine item**。epub.js 当前位置取自 `currentLocation().start.href`（spine 项），与 `chapters.id` 对齐。TOC 仅用于侧栏导航；逻辑章节有时跨多个 spine 项，但摘要与会话归属一律以 spine 项为单位（最稳定）。
+- **「章节」单位定义**：一个章节 = 一个 **spine item**，但 `chapters.id` 用 uuidv7 **代理键**（spine id 跨书不唯一），书内由 `UNIQUE(book_id, href)` 唯一定位。epub.js 当前位置取自 `currentLocation().start.href`，经 `(bookId, href)` 解析到 `chapters.id`。AI 工具的 `chapterId` 即该代理 uuid（由 `getToc` 等返回）。TOC 仅用于侧栏导航；逻辑章节有时跨多个 spine 项，但摘要与会话归属一律以 spine 项为单位（最稳定）。
 - **工具入参校验**：每个工具用 Zod `inputSchema` 定义参数（AI SDK v6 原生），main 执行前自动校验、非法即拒。
 
 > 红利：本 Phase 已建好「工具注册表 + agent 循环」基础设施，后续加文件系统工具只需往注册表加函数，零返工。
