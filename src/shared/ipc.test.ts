@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { appGetInfoResult, IPC, pingInput } from "@shared/ipc";
+import { appGetInfoResult, IPC, pingInput, pingResult } from "@shared/ipc";
 
 describe("ipc schemas", () => {
   it("exposes channel names", () => {
@@ -10,6 +10,11 @@ describe("ipc schemas", () => {
   it("ping input rejects non-string msg", () => {
     expect(pingInput.safeParse({ msg: 123 }).success).toBe(false);
     expect(pingInput.safeParse({ msg: "hi" }).success).toBe(true);
+    expect(pingInput.safeParse({ msg: "" }).success).toBe(false);
+  });
+
+  it("ping result accepts an echo string", () => {
+    expect(pingResult.safeParse({ echo: "hello" }).success).toBe(true);
   });
 
   it("app info result requires version + bookCount", () => {
