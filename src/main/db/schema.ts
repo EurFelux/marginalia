@@ -1,4 +1,4 @@
-import { blob, check, integer, sqliteTable, text, unique } from "drizzle-orm/sqlite-core";
+import { blob, check, index, integer, sqliteTable, text, unique } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 import { v7 as uuidv7 } from "uuid";
 import type { UIMessage } from "ai";
@@ -43,7 +43,7 @@ export const assistants = sqliteTable("assistants", {
 });
 
 export const books = sqliteTable("books", {
-  id: text("id").primaryKey(), // ePub 自然键（缺失回退文件哈希）
+  id: text("id").primaryKey(), // ePub 自然键，由导入流程提供（标识符缺失时回退文件哈希）
   path: text("path").notNull(),
   title: text("title"),
   author: text("author"),
@@ -77,6 +77,7 @@ export const chapters = sqliteTable(
       "chapters_summary_status_check",
       sql`${t.summaryStatus} in ('pending','generating','ready','unavailable')`,
     ),
+    index("chapters_book_id_idx").on(t.bookId),
   ],
 );
 
@@ -90,17 +91,21 @@ export const progress = sqliteTable("progress", {
     .$defaultFn(() => Date.now()),
 });
 
-export const conversations = sqliteTable("conversations", {
-  id: pkUuid(),
-  bookId: text("book_id").references(() => books.id),
-  chapterId: text("chapter_id").references(() => chapters.id), // NULL = 独立会话
-  assistantId: text("assistant_id").references(() => assistants.id),
-  title: text("title"),
-  createdAt: nowMs(),
-  updatedAt: integer("updated_at")
-    .notNull()
-    .$defaultFn(() => Date.now()),
-});
+export const conversations = sqliteTable(
+  "conversations",
+  {
+    id: pkUuid(),
+    bookId: text("book_id").references(() => books.id),
+    chapterId: text("chapter_id").references(() => chapters.id), // NULL = 独立会话
+    assistantId: text("assistant_id").references(() => assistants.id),
+    title: text("title"),
+    createdAt: nowMs(),
+    updatedAt: integer("updated_at")
+      .notNull()
+      .$defaultFn(() => Date.now()),
+  },
+  (t) => [index("conversations_book_id_idx").on(t.bookId)],
+);
 
 export const messages = sqliteTable(
   "messages",
@@ -115,5 +120,9 @@ export const messages = sqliteTable(
     seq: integer("seq").notNull(),
     createdAt: nowMs(),
   },
-  (t) => [check("messages_role_check", sql`${t.role} in ('system','user','assistant')`)],
+  (t) => [
+    check("messages_role_check", sql`${t.role} in ('system','user','assistant')`),
+    unique("messages_conversation_seq_unique").on(t.conversationId, t.seq),
+    index("messages_conversation_id_idx").on(t.conversationId),
+  ],
 );

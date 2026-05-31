@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "c156b443-6ddc-40c3-a44b-6d92fb3edca0",
+  "id": "1b4000f1-b763-4cff-8ade-769feb5affd8",
   "prevIds": ["00000000-0000-0000-0000-000000000000"],
   "ddl": [
     {
@@ -589,11 +589,60 @@
       "entityType": "pks"
     },
     {
+      "columns": [
+        {
+          "value": "book_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "chapters_book_id_idx",
+      "entityType": "indexes",
+      "table": "chapters"
+    },
+    {
+      "columns": [
+        {
+          "value": "book_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "conversations_book_id_idx",
+      "entityType": "indexes",
+      "table": "conversations"
+    },
+    {
+      "columns": [
+        {
+          "value": "conversation_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "messages_conversation_id_idx",
+      "entityType": "indexes",
+      "table": "messages"
+    },
+    {
       "columns": ["book_id", "href"],
       "nameExplicit": false,
       "name": "chapters_book_id_href_unique",
       "entityType": "uniques",
       "table": "chapters"
+    },
+    {
+      "columns": ["conversation_id", "seq"],
+      "nameExplicit": true,
+      "name": "messages_conversation_seq_unique",
+      "entityType": "uniques",
+      "table": "messages"
     },
     {
       "value": "\"summary_status\" in ('pending','generating','ready','unavailable')",

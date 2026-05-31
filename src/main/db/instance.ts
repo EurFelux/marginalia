@@ -9,12 +9,13 @@ export function initDb(): DB {
   const dbPath = path.join(app.getPath("userData"), "marginalia.db");
   // 开发期迁移目录在源码树。
   // TODO(MA-packaging): 打包期 __dirname 在 asar 内、迁移 SQL 未被 Vite 打进产物，
-  // 需在打包里程碑加入 asset-copy（或 extraResource / 内联 SQL）。下面的 prod 分支是未验证的占位。
+  // 需在打包里程碑加入 asset-copy（参考 electron-forge extraResources 把迁移目录复制到 resources/）。下面的 prod 分支是未验证的占位。
   const migrationsFolder = MAIN_WINDOW_VITE_DEV_SERVER_URL
     ? path.resolve(process.cwd(), "src/main/db/migrations")
     : path.join(__dirname, "db/migrations");
-  db = createDb(dbPath);
-  runMigrations(db, migrationsFolder);
+  const candidate = createDb(dbPath);
+  runMigrations(candidate, migrationsFolder);
+  db = candidate;
   return db;
 }
 
