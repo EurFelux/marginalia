@@ -6,7 +6,7 @@ const CJK = /[\u3000-\u303f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef]
 
 /**
  * 粗略 token 估算（无 tokenizer 依赖，仅供 chip 信息展示）。
- * CJK 字符按 ~1 token；其余按 ~4 字符 / token。后续如需精确再换真 tokenizer。
+ * CJK 字符计 1、其余字符计 0.25，求和后向上取整（Math.ceil 作用于总和）。后续如需精确再换真 tokenizer。
  */
 export function estimateTokens(text: string): number {
   let cjk = 0;

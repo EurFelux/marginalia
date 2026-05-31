@@ -1,14 +1,16 @@
 // src/shared/chat.ts
 import { z } from "zod";
 import type { UIMessage } from "ai";
-import type { MessageMetadata } from "@shared/types";
+import { chipIdSchema } from "@shared/types";
+import type { MessageMetadata, MessageRole } from "@shared/types";
 
 /** 上下文 chip（live 形态，供 renderer 渲染；持久化快照只取 {id,content,tokenCount}，见 messageMetadataSchema） */
 export const chipSchema = z.object({
-  id: z.enum(["selection", "paragraph"]),
+  id: chipIdSchema,
   labelKey: z.string(),
   content: z.string(),
   tokenCount: z.number().int().nonnegative(),
+  // TODO(MA5): required/enabled 当前无读取方；UI toggle 落地时收敛为闭合联合（参见 ProviderDto 三态 follow-up）
   required: z.boolean(),
   enabled: z.boolean(),
 });
@@ -51,7 +53,7 @@ export interface ConversationDto {
 export interface MessageDto {
   id: string;
   conversationId: string;
-  role: "system" | "user" | "assistant";
+  role: MessageRole;
   parts: UIMessage["parts"];
   metadata: MessageMetadata | null;
   seq: number;

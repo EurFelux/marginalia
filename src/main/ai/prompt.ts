@@ -1,13 +1,8 @@
 // src/main/ai/prompt.ts
 import type { ModelMessage, UIMessage } from "ai";
-import type { Chip } from "@shared/chat";
-import type { MessageMetadata } from "@shared/types";
+import type { Chip, MessageDto } from "@shared/chat";
 
-export interface PromptHistoryMessage {
-  role: "system" | "user" | "assistant";
-  parts: UIMessage["parts"];
-  metadata: MessageMetadata | null;
-}
+export type PromptHistoryMessage = Pick<MessageDto, "role" | "parts" | "metadata">;
 
 export interface AssemblePromptParams {
   systemPrompt: string | null;
@@ -20,6 +15,7 @@ export interface AssemblePromptParams {
 
 function textOfParts(parts: UIMessage["parts"]): string {
   let s = "";
+  // 仅保留 text part；MA4 assistant 消息仅含 text，工具/推理 part 待 MA5 处理
   for (const p of parts) if (p.type === "text") s += p.text;
   return s;
 }
@@ -55,6 +51,7 @@ export function assemblePrompt(params: AssemblePromptParams): ModelMessage[] {
   if (params.systemPrompt) out.push({ role: "system", content: params.systemPrompt });
 
   for (const h of params.history) {
+    // 历史里的 system 消息丢弃：系统提示词由当前 Assistant 重新注入，避免重复/冲突
     if (h.role === "system") continue;
     if (h.role === "assistant") {
       out.push({ role: "assistant", content: textOfParts(h.parts) });
