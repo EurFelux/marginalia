@@ -101,6 +101,8 @@ src/
 ## 5. 数据模型（Drizzle schema）
 
 > schema 用 TS 定义，drizzle-kit 生成迁移。下面用 SQL 语义表达，便于审阅。
+>
+> **ID 策略**：app 生成的主键（`providers` / `assistants` / `conversations` / `messages`）一律用 **uuidv7**（时间有序，需 `uuid` 包；Node 内置 `randomUUID` 只产 v4）。`books.id`（ePub 唯一标识，回退文件哈希）与 `chapters.id`（spine item id）是 **ePub 自然键**，不生成。`messages` 仍保留 `seq` 保证同毫秒内会话级严格顺序。
 
 ```ts
 // providers —— 新增
@@ -356,7 +358,7 @@ reader.getPrefs() / setPrefs(...)   // 字号、行高、最大宽度（注入 e
 ## 18. 工具链与依赖
 
 - **electron-rebuild 从第一天接入**（better-sqlite3 原生模块，避免打包期踩坑）。
-- 待装：`drizzle-orm` + `better-sqlite3` + `drizzle-kit`、`epub.js`、**AI SDK v6**（`ai@6` + `@ai-sdk/react` + provider 包 `@ai-sdk/openai`/`@ai-sdk/anthropic`/`@ai-sdk/google`）、`zustand`、`zod` + `drizzle-zod`、`tailwindcss` + shadcn/ui（Base UI 基底）依赖。`react` / `i18next` / `vitest` / `oxlint` / `oxfmt` 已在。
+- 待装：`drizzle-orm` + `better-sqlite3` + `drizzle-kit`、`epub.js`、**AI SDK v6**（`ai@6` + `@ai-sdk/react` + provider 包 `@ai-sdk/openai`/`@ai-sdk/anthropic`/`@ai-sdk/google`）、`zustand`、`uuid`(v7)、`zod` + `drizzle-zod`、`tailwindcss` + shadcn/ui（Base UI 基底）依赖。`react` / `i18next` / `vitest` / `oxlint` / `oxfmt` 已在。
 
 ---
 
