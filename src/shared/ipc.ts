@@ -19,6 +19,11 @@ export const IPC = {
   providersRemove: "providers:remove",
   assistantGetDefault: "assistant:get-default",
   assistantUpdate: "assistant:update",
+  conversationsListByBook: "conversations:list-by-book",
+  conversationsCreate: "conversations:create",
+  conversationsGet: "conversations:get",
+  messagesListByConversation: "messages:list-by-conversation",
+  aiBuildChips: "ai:build-chips",
 } as const;
 
 /** ping —— 演示"带入参且经 Zod 校验"的往返 */
