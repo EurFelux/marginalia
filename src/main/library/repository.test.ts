@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { createDb, runMigrations } from "@main/db/client";
+import { chapters } from "@main/db/schema";
 import { getBook, importBook, listBooks, resolveChapterByHref } from "@main/library/repository";
 import { makeFixtureEpub } from "@marginalia/epub-parser";
 
@@ -51,5 +52,13 @@ describe("library repository", () => {
     expect(listBooks(db)).toHaveLength(1);
     const ch1AfterSecond = resolveChapterByHref(db, book2.id, "OEBPS/ch1.xhtml");
     expect(ch1AfterSecond?.id).toBe(ch1Id);
+    // Chapter rows must not double up (fixture has 2 spine items)
+    expect(db.select().from(chapters).all()).toHaveLength(2);
+  });
+
+  it("resolveChapterByHref returns undefined for a missing href", () => {
+    const db = freshDb();
+    const book = importBook(db, { bytes: makeFixtureEpub(), filePath: "/books/fixture.epub" });
+    expect(resolveChapterByHref(db, book.id, "OEBPS/nonexistent.xhtml")).toBeUndefined();
   });
 });
