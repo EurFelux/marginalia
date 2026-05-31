@@ -22,6 +22,9 @@
     "format:check": "oxfmt --check"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.81",
+    "@ai-sdk/react": "^3.0.195",
+    "ai": "^6.0.193",
     "electron-squirrel-startup": "^1.0.1",
     "i18next": "^26.3.0",
     "react": "^19.2.6",
