@@ -34,4 +34,18 @@ describe("content service", () => {
     const ch1 = resolveChapterByHref(db, book.id, "OEBPS/ch1.xhtml")!;
     expect(getChapterSummary(db, book.id, ch1.id)).toEqual({ status: "pending", summary: null });
   });
+
+  it("getChapterSummary throws for an unknown chapterId", () => {
+    const { db, book } = setup();
+    expect(() => getChapterSummary(db, book.id, "nonexistent-id")).toThrow(/not found/);
+  });
+
+  it("readChapterText respects offset and maxChars", () => {
+    const { db, bytes, book } = setup();
+    const ch1 = resolveChapterByHref(db, book.id, "OEBPS/ch1.xhtml")!;
+    const r = readChapterText(db, bytes, book.id, ch1.id, { offset: 0, maxChars: 5 });
+    expect(r.text.length).toBe(5);
+    expect(r.hasMore).toBe(true);
+    expect(r.nextOffset).toBe(5);
+  });
 });

@@ -12,6 +12,9 @@ export interface ChapterSummary {
 export function getToc(db: DB, bookId: string): TocNode[] {
   const row = db.select({ toc: books.toc }).from(books).where(eq(books.id, bookId)).get();
   // parse-on-read：DB JSON 列做一次 Zod 校验（防 JSON 漂移）
+  // Because tocNodeSchema is recursive, a node whose *any* descendant fails validation causes the
+  // entire top-level entry to be dropped — intentional defensive degradation for now; surgical
+  // subtree pruning is a future follow-up.
   return (row?.toc ?? []).filter((n) => tocNodeSchema.safeParse(n).success);
 }
 
