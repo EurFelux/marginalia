@@ -1,13 +1,22 @@
 {
   "compilerOptions": {
     "target": "ESNext",
-    "module": "commonjs",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "allowJs": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
+    "strict": true,
     "noImplicitAny": true,
     "sourceMap": true,
-    "outDir": "dist",
-    "resolveJsonModule": true
-  }
+    "resolveJsonModule": true,
+    "noEmit": true,
+    "paths": {
+      "@shared/*": ["./src/shared/*"],
+      "@main/*": ["./src/main/*"]
+    },
+    "types": ["node"]
+  },
+  "include": ["src", "*.config.ts", "forge.config.ts", "forge.env.d.ts"]
 }

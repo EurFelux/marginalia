@@ -19,7 +19,9 @@
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "format": "oxfmt",
-    "format:check": "oxfmt --check"
+    "format:check": "oxfmt --check",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.81",
@@ -29,7 +31,8 @@
     "electron-squirrel-startup": "^1.0.1",
     "i18next": "^26.3.0",
     "react": "^19.2.6",
-    "react-dom": "^19.2.6"
+    "react-dom": "^19.2.6",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@electron-forge/cli": "^7.11.2",
@@ -43,6 +46,7 @@
     "@electron/fuses": "^1.8.0",
     "@j178/prek": "^0.4.3",
     "@types/electron-squirrel-startup": "^1.0.2",
+    "@types/node": "^25.9.1",
     "electron": "42.3.0",
     "oxfmt": "^0.52.0",
     "oxlint": "^1.67.0",
