@@ -8,22 +8,24 @@ A cross-platform desktop ePub reader built with Electron + React, featuring a co
 
 ## Tech Stack
 
-| Layer | Choice | Rationale |
-|---|---|---|
-| Shell | Electron | Mature ecosystem, consistent Chromium rendering, native Node.js FS access |
-| UI Framework | React + TypeScript | Ecosystem maturity, broad community examples |
-| Styling | Tailwind CSS | Utility-first, fast iteration |
-| ePub Rendering | epub.js (`flow: "scrolled"`) | Best-in-class scrolled ePub support |
-| Database | better-sqlite3 | Sync API, single-file DB, no ORM needed for this scale |
-| AI SDK | Vercel AI SDK | Multi-provider support, streaming, native tool call support |
-| Build / Package | electron-builder | Cross-platform packaging |
+| Layer           | Choice                       | Rationale                                                                 |
+| --------------- | ---------------------------- | ------------------------------------------------------------------------- |
+| Shell           | Electron                     | Mature ecosystem, consistent Chromium rendering, native Node.js FS access |
+| UI Framework    | React + TypeScript           | Ecosystem maturity, broad community examples                              |
+| Styling         | Tailwind CSS                 | Utility-first, fast iteration                                             |
+| ePub Rendering  | epub.js (`flow: "scrolled"`) | Best-in-class scrolled ePub support                                       |
+| Database        | better-sqlite3               | Sync API, single-file DB, no ORM needed for this scale                    |
+| AI SDK          | Vercel AI SDK                | Multi-provider support, streaming, native tool call support               |
+| Build / Package | electron-builder             | Cross-platform packaging                                                  |
 
 ---
 
 ## Core Concepts
 
 ### Assistant
+
 Inspired by Cherry Studio's assistant model. An Assistant is a named configuration consisting of:
+
 - System prompt
 - Model + provider configuration
 - Default context chip preferences (`includeGlobal`, `includeChapter`)
@@ -31,19 +33,22 @@ Inspired by Cherry Studio's assistant model. An Assistant is a named configurati
 Users can create multiple Assistants (e.g. "Literary Analysis", "Language Learning", "Philosophy Discussion") and select which one to use per conversation. Assistants are stored in SQLite.
 
 ### Context Chips
+
 When the user triggers an AI action after selecting text, the input bar is pre-populated with context chips. Each chip is a discrete, labeled piece of context that the user can inspect and toggle.
 
-| Chip | Content | Required | Default |
-|---|---|---|---|
-| `selection` | The exact selected text | ✅ Yes | Always on |
-| `paragraph` | Selected paragraph + 1–2 surrounding paragraphs (verbatim) | ✅ Yes | Always on |
-| `chapter` | AI-generated chapter summary | No | Configurable per Assistant |
-| `global` | AI-generated book summary + TOC | No | Configurable per Assistant |
+| Chip        | Content                                                    | Required | Default                    |
+| ----------- | ---------------------------------------------------------- | -------- | -------------------------- |
+| `selection` | The exact selected text                                    | ✅ Yes   | Always on                  |
+| `paragraph` | Selected paragraph + 1–2 surrounding paragraphs (verbatim) | ✅ Yes   | Always on                  |
+| `chapter`   | AI-generated chapter summary                               | No       | Configurable per Assistant |
+| `global`    | AI-generated book summary + TOC                            | No       | Configurable per Assistant |
 
 Chips that are not required can be toggled on/off by the user in the input bar. Each chip displays an estimated token count. The `chapter` and `global` chips are only available if the summaries have been successfully generated (see Context Generation below).
 
 ### Context Generation
+
 Upon book import, the app optionally generates AI summaries for global and chapter contexts:
+
 - **TOC / outline**: parsed directly from ePub NCX/OPF — no AI needed
 - **Book summary**: AI-generated, covers themes, characters, structure
 - **Chapter summaries**: AI-generated per chapter, lazy but triggered at import time
@@ -157,6 +162,7 @@ The AI Panel can be collapsed. When collapsed, the selection toolbar still appea
 ## Key Interactions
 
 ### Book Import Flow
+
 1. User opens ePub file via file dialog
 2. App parses metadata and TOC from OPF/NCX (synchronous, fast)
 3. Book appears in library immediately
@@ -164,6 +170,7 @@ The AI Panel can be collapsed. When collapsed, the selection toolbar still appea
 5. Status indicators visible in library and AI panel chips
 
 ### Selection → AI Flow
+
 1. User selects text in epub.js rendition
 2. Floating toolbar appears near selection with actions: **Copy**, **AI Ask**, **Highlight** (future), **...more**
 3. User clicks **AI Ask**
@@ -174,6 +181,7 @@ The AI Panel can be collapsed. When collapsed, the selection toolbar still appea
 8. Conversation persisted to SQLite
 
 ### Context Chip Inspection
+
 Clicking a chip expands it inline (or in a popover) to show the full content that will be sent to the AI. This is important for transparency — users should always know what context is being included.
 
 ---

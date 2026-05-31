@@ -1,28 +1,31 @@
 {
   "name": "marginalia",
-  "productName": "marginalia",
   "version": "1.0.0",
-  "description": "My Electron application description",
-  "main": ".vite/build/main.js",
   "private": true,
+  "description": "My Electron application description",
+  "keywords": [],
+  "license": "MIT",
+  "author": {
+    "name": "icarus",
+    "email": "eurfelux@gmail.com"
+  },
+  "main": ".vite/build/main.js",
   "scripts": {
     "start": "electron-forge start",
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
-    "lint": "eslint --ext .ts,.tsx ."
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check"
   },
-  "keywords": [],
-  "author": {
-    "name": "icarus",
-    "email": "eurfelux@gmail.com"
-  },
-  "license": "MIT",
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "electron",
-      "electron-winstaller"
-    ]
+  "dependencies": {
+    "electron-squirrel-startup": "^1.0.1",
+    "i18next": "^26.3.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6"
   },
   "devDependencies": {
     "@electron-forge/cli": "^7.11.2",
@@ -34,16 +37,21 @@
     "@electron-forge/plugin-fuses": "^7.11.2",
     "@electron-forge/plugin-vite": "^7.11.2",
     "@electron/fuses": "^1.8.0",
+    "@j178/prek": "^0.4.3",
     "@types/electron-squirrel-startup": "^1.0.2",
-    "@typescript-eslint/eslint-plugin": "^5.62.0",
-    "@typescript-eslint/parser": "^5.62.0",
     "electron": "42.3.0",
-    "eslint": "^8.57.1",
-    "eslint-plugin-import": "^2.32.0",
-    "typescript": "~4.5.5",
-    "vite": "^5.4.21"
+    "oxfmt": "^0.52.0",
+    "oxlint": "^1.67.0",
+    "oxlint-tsgolint": "^0.23.0",
+    "typescript": "~6.0.3",
+    "vite": "^8.0.14",
+    "vitest": "^4.1.7"
   },
-  "dependencies": {
-    "electron-squirrel-startup": "^1.0.1"
-  }
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "electron-winstaller"
+    ]
+  },
+  "productName": "marginalia"
 }
