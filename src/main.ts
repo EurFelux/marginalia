@@ -4,6 +4,7 @@ import started from "electron-squirrel-startup";
 import { initDb } from "@main/db/instance";
 import { registerAppHandlers } from "@main/ipc/app-handlers";
 import { registerLibraryHandlers } from "@main/ipc/library-handlers";
+import { registerSettingsHandlers } from "@main/ipc/settings-handlers";
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -52,6 +53,7 @@ app.on("ready", () => {
   }
   registerAppHandlers();
   registerLibraryHandlers();
+  registerSettingsHandlers();
   createWindow();
 });
 
