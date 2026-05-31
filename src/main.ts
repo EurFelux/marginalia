@@ -3,6 +3,7 @@ import path from "node:path";
 import started from "electron-squirrel-startup";
 import { initDb } from "@main/db/instance";
 import { registerAppHandlers } from "@main/ipc/app-handlers";
+import { registerLibraryHandlers } from "@main/ipc/library-handlers";
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -50,6 +51,7 @@ app.on("ready", () => {
     return;
   }
   registerAppHandlers();
+  registerLibraryHandlers();
   createWindow();
 });
 
