@@ -64,7 +64,7 @@ Marginalia 是一个 Electron + React 的桌面 ePub 阅读器，核心差异化
 - **renderer（薄）**：epub.js 渲染、选区/段落**原始文本**提取（唯一允许碰 DOM 之处，因只有渲染层有 DOM）、全部 UI、Zustand UI 状态。
 - 二者通过 `contextBridge` 暴露的**类型化 `window.api`** 通信：请求/响应用 `ipcRenderer.invoke`，token / 工具步骤流用事件通道按 `streamId` 推回。
 - **运行时校验（Zod）**：IPC 边界把来自 renderer 的入参视为**不可信**——main 全部经 Zod 解析后再处理，校验失败即拒绝并回结构化错误；AI 工具入参用 Zod `inputSchema`（AI SDK v6 原生）；表单与 DB JSON 列亦用 Zod 校验。schema 集中在 `shared/` 作单一事实源，TS 类型经 `z.infer` 派生。
-- **AI 对话 UI**：renderer 用 **Vercel AI SDK UI** 的 `useChat`，配一个**自定义 IPC transport**——`useChat` 不走 HTTP，而是经 `window.api.ai.send` 发起、订阅 `ai.stream` 事件接收 **UI message stream**。main 用 `streamText(...).toUIMessageStream()` 产出，经 IPC 逐块推回。消息/分段格式端到端统一为 AI SDK UI 格式（`messages.content` 亦按此存储）。
+- **AI 对话 UI**：renderer 用 **Vercel AI SDK UI** 的 `useChat`，配一个**自定义 IPC transport**——`useChat` 不走 HTTP，而是经 `window.api.ai.send` 发起、订阅 `ai.stream` 事件接收 **UI message stream**。main 用 `streamText(...).toUIMessageStream()` 产出，经 IPC 逐块推回。消息/分段格式端到端统一为 AI SDK UI 格式（`messages` 行以 `parts`/`metadata` 镜像 `UIMessage` 存储，见 §5）。
 
 > 边界说明：选区与周围段落的**原始文本提取**必须在 renderer（DOM 操作），但提取后**立即把原始文本交给 main**；token 计数、截断、chip 组装、prompt 拼接、agent 循环与工具执行等业务全部在 main，符合原则。renderer 的 `useChat` 只做 UI 状态与渲染，不含业务。
 
@@ -160,15 +160,19 @@ conversations {
   createdAt, updatedAt: integer
 }
 
+// messages —— 直接镜像 AI SDK v6 UIMessage（id/role/parts/metadata）
 messages {
   id: text PK
   conversationId: text NOT NULL → conversations.id
-  role: text NOT NULL            // 'user' | 'assistant' | 'tool'
-  content: text NOT NULL         // JSON，支持多段 + tool-call / tool-result（AI SDK 格式）
-  contextChips: text             // JSON：发送时 chips 快照（含段落上下文）
+  role: text NOT NULL            // 'system' | 'user' | 'assistant'（无独立 'tool'：工具调用/结果是 parts 内 tool-* 段）
+  parts: text NOT NULL           // JSON: UIMessagePart[]（text|reasoning|tool-*|dynamic-tool|file|source-*|data-*|step-start）
+  metadata: text                 // JSON: UIMessage.metadata（Zod 校验）—— chips 快照 / token usage / 模型名
+  seq: integer NOT NULL          // 会话内单调序号，保证重建顺序
   createdAt: integer
 }
 ```
+
+> **持久化即 UIMessage**：`messages` 行直接镜像 AI SDK v6 `UIMessage`（`id`/`role`/`parts`/`metadata`）——加载会话可直接作为 `useChat` 的初始 `messages` 喂入，无需转换。发送给模型时 main 用 `convertToModelMessages()` 转 `ModelMessage`，并在 §10 注入 chip 上下文。`metadata` 用 Zod schema 校验（对接 §3 / AI SDK v6 `messageMetadataSchema`），存 chips 快照、token usage、模型名等。会话内顺序用单调 `seq`（或 `createdAt`）保证。`system` 角色一般不落库（系统提示来自 Assistant），保留于联合类型仅为忠实于 `UIMessage`。
 
 ---
 
@@ -243,7 +247,7 @@ getChapterSummary(chapterId): string                 // 取任意章摘要（懒
 3. 用户提交 → `api.ai.send({ conversationId, chips, userText, presetId })`（按 §6 路由确定/新建会话）。
 4. **main**：组装 prompt（§10）→ 解密取 key → `streamText` 流式调用（带工具，可多步）。
 5. **main** 经 `ai.stream`（按 `streamId`）推：token delta、工具调用步骤、完成、错误。renderer 实时渲染。
-6. **完成**：main 落库 user 消息（含 `contextChips` 快照）+ assistant 消息（含 tool 段）；更新 `conversations.updatedAt`。
+6. **完成**：main 落库为 UIMessage 行：user 消息（chips 快照入 `metadata`）+ assistant 消息（含 tool-\* parts）；更新 `conversations.updatedAt`。
 7. **出错**：main 推 error 事件，renderer 在该消息内联报错；**不把半截结果当成功落库**。
 
 ---
