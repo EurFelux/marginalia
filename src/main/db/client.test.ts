@@ -2,7 +2,7 @@ import path from "node:path";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { createDb, runMigrations } from "@main/db/client";
-import { assistants, providers } from "@main/db/schema";
+import { assistants, books, chapters, providers } from "@main/db/schema";
 
 const MIGRATIONS = path.resolve(__dirname, "migrations");
 
@@ -27,5 +27,30 @@ describe("db client", () => {
     expect(() =>
       db.insert(assistants).values({ name: "x", providerId: "nonexistent-id" }).run(),
     ).toThrow();
+  });
+
+  it("rejects an invalid enum value via CHECK constraint", () => {
+    const db = createDb(":memory:");
+    runMigrations(db, MIGRATIONS);
+    expect(() =>
+      // @ts-expect-error intentionally violating the type-level enum to test the SQL CHECK
+      db.insert(providers).values({ type: "bogus" }).run(),
+    ).toThrow();
+  });
+
+  it("rejects a chapter referencing a non-existent book (FK)", () => {
+    const db = createDb(":memory:");
+    runMigrations(db, MIGRATIONS);
+    expect(() =>
+      db.insert(chapters).values({ bookId: "no-such-book", href: "x.xhtml" }).run(),
+    ).toThrow(/FOREIGN KEY/i);
+  });
+
+  it("enforces UNIQUE(book_id, href) on chapters", () => {
+    const db = createDb(":memory:");
+    runMigrations(db, MIGRATIONS);
+    db.insert(books).values({ id: "b1", path: "/b.epub" }).run();
+    db.insert(chapters).values({ bookId: "b1", href: "ch1.xhtml" }).run();
+    expect(() => db.insert(chapters).values({ bookId: "b1", href: "ch1.xhtml" }).run()).toThrow();
   });
 });

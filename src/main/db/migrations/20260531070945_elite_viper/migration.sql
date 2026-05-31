@@ -53,6 +53,7 @@ CREATE TABLE `messages` (
 	`seq` integer NOT NULL,
 	`created_at` integer NOT NULL,
 	CONSTRAINT `fk_messages_conversation_id_conversations_id_fk` FOREIGN KEY (`conversation_id`) REFERENCES `conversations`(`id`),
+	CONSTRAINT `messages_conversation_seq_unique` UNIQUE(`conversation_id`,`seq`),
 	CONSTRAINT "messages_role_check" CHECK("role" in ('system','user','assistant'))
 );
 --> statement-breakpoint
@@ -72,3 +73,7 @@ CREATE TABLE `providers` (
 	`created_at` integer NOT NULL,
 	CONSTRAINT "providers_type_check" CHECK("type" in ('openai','anthropic','google','openai-compatible'))
 );
+--> statement-breakpoint
+CREATE INDEX `chapters_book_id_idx` ON `chapters` (`book_id`);--> statement-breakpoint
+CREATE INDEX `conversations_book_id_idx` ON `conversations` (`book_id`);--> statement-breakpoint
+CREATE INDEX `messages_conversation_id_idx` ON `messages` (`conversation_id`);

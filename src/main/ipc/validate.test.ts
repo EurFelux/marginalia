@@ -9,7 +9,12 @@ describe("validateInput", () => {
     expect(validateInput("ping", schema, { msg: "hi" })).toEqual({ msg: "hi" });
   });
 
-  it("throws a channel-tagged error on invalid input", () => {
-    expect(() => validateInput("ping", schema, { msg: 123 })).toThrow(/ping/);
+  it("throws a channel-tagged 'invalid input' error on invalid input", () => {
+    expect(() => validateInput("ping", schema, { msg: 123 })).toThrow(/IPC ping invalid input/);
+  });
+
+  it("rejects null and undefined raw input", () => {
+    expect(() => validateInput("ping", schema, undefined)).toThrow(/invalid input/);
+    expect(() => validateInput("ping", schema, null)).toThrow(/invalid input/);
   });
 });
