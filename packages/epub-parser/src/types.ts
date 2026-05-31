@@ -1,4 +1,7 @@
-/** ePub 目录树节点 */
+/**
+ * ePub 目录树节点。
+ * `label` and `href` are non-empty (parser-filtered); `href` is an intra-archive path.
+ */
 export interface TocNode {
   label: string;
   href: string;
@@ -13,7 +16,7 @@ export interface SpineItem {
 
 /** parseEpub 的产物 */
 export interface ParsedEpub {
-  uid: string; // dc:identifier；缺失时由消费方回退文件哈希
+  uid: string | null; // dc:identifier；null = no dc:identifier, consumer falls back to a content hash
   title?: string;
   author?: string;
   cover?: Uint8Array;

@@ -7,6 +7,7 @@ const xml = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: "@_",
   removeNSPrefix: true,
+  // Keep all tag values as strings — prevents '42'/'true' metadata being auto-coerced to numbers/booleans.
   parseTagValue: false,
   isArray: (name) => ["item", "itemref", "navPoint", "rootfile"].includes(name),
 });
@@ -53,6 +54,9 @@ export function parseEpub(bytes: Uint8Array): ParsedEpub {
   const opfDir = dirOf(opfPath);
 
   const pkg = xml.parse(text(opfPath)).package;
+  if (pkg === undefined || typeof pkg !== "object") {
+    throw new Error(`epub: OPF at "${opfPath}" has no <package> root element`);
+  }
   const meta = pkg.metadata ?? {};
   const uniqueId: string | undefined = pkg["@_unique-identifier"];
 
@@ -60,7 +64,7 @@ export function parseEpub(bytes: Uint8Array): ParsedEpub {
   const uid =
     textOf(identifiers.find((i) => typeof i === "object" && i?.["@_id"] === uniqueId)) ??
     textOf(identifiers[0]) ??
-    "";
+    null;
   const title = textOf(asArray(meta.title)[0]);
   const author = textOf(asArray(meta.creator)[0]);
 
@@ -103,7 +107,8 @@ function readToc(
   for (const [, m] of manifest) {
     if (m.properties.split(/\s+/).includes("nav")) {
       const root = parseHtml(text(m.href));
-      const navEl = root.querySelector("nav") ?? root;
+      const navs = root.querySelectorAll("nav");
+      const navEl = navs.find((n) => n.getAttribute("epub:type") === "toc") ?? navs[0] ?? root;
       const ol = navEl.querySelector("ol");
       const navDir = dirOf(m.href);
 
