@@ -8,7 +8,7 @@ import { handle } from "@main/ipc/registry";
 export function registerAppHandlers(): void {
   handle<{ msg: string }, PingResult>(IPC.ping, pingInput, ping);
 
-  handle<void, AppGetInfoResult>(IPC.appGetInfo, z.undefined() as unknown as z.ZodType<void>, () =>
+  handle<void, AppGetInfoResult>(IPC.appGetInfo, z.void(), () =>
     getAppInfo(getDb(), app.getVersion()),
   );
 }

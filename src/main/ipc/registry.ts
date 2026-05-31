@@ -2,7 +2,7 @@ import { ipcMain } from "electron";
 import type { z } from "zod";
 import { validateInput } from "@main/ipc/validate";
 
-/** 注册一个经 Zod 校验入参的 IPC handler。无入参时传 z.undefined()。 */
+/** 注册一个经 Zod 校验入参的 IPC handler。无入参时传 z.void()。 */
 export function handle<I, O>(
   channel: string,
   inputSchema: z.ZodType<I>,
