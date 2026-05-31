@@ -1,6 +1,7 @@
 // src/main/ai/chips.ts
 import { estimateTokens } from "@main/ai/tokens";
 import type { BuildChipsInput, Chip } from "@shared/chat";
+import type { MessageMetadata } from "@shared/types";
 
 /** 由 renderer 提取的原始文本构造 selection / paragraph chip（不含会话上下文；去重见 dedupeParagraph）。 */
 export function buildChips(input: BuildChipsInput): Chip[] {
@@ -38,4 +39,9 @@ export function buildChips(input: BuildChipsInput): Chip[] {
 export function dedupeParagraph(chips: Chip[], previousParagraph: string | null): Chip[] {
   if (previousParagraph == null) return chips;
   return chips.filter((c) => !(c.id === "paragraph" && c.content === previousParagraph));
+}
+
+/** 把 live chip 投影为持久化快照（落入 UIMessage.metadata.contextChips）。 */
+export function toContextChips(chips: Chip[]): NonNullable<MessageMetadata["contextChips"]> {
+  return chips.map((c) => ({ id: c.id, content: c.content, tokenCount: c.tokenCount }));
 }
