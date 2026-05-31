@@ -35,7 +35,13 @@ const createWindow = () => {
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.on("ready", () => {
-  initDb();
+  try {
+    initDb();
+  } catch (err) {
+    console.error("[db] failed to initialize:", err);
+    app.quit();
+    return;
+  }
   createWindow();
 });
 

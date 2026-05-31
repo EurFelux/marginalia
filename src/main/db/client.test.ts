@@ -2,7 +2,7 @@ import path from "node:path";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { createDb, runMigrations } from "@main/db/client";
-import { providers } from "@main/db/schema";
+import { assistants, providers } from "@main/db/schema";
 
 const MIGRATIONS = path.resolve(__dirname, "migrations");
 
@@ -19,5 +19,13 @@ describe("db client", () => {
     expect(rows[0].id).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
     );
+  });
+
+  it("enforces foreign key constraints", () => {
+    const db = createDb(":memory:");
+    runMigrations(db, MIGRATIONS);
+    expect(() =>
+      db.insert(assistants).values({ name: "x", providerId: "nonexistent-id" }).run(),
+    ).toThrow();
   });
 });

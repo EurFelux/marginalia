@@ -5,6 +5,7 @@ import { createDb, runMigrations, type DB } from "@main/db/client";
 let db: DB | undefined;
 
 export function initDb(): DB {
+  if (db) return db;
   const dbPath = path.join(app.getPath("userData"), "marginalia.db");
   // 开发期迁移目录在源码树；打包期目录解析放到打包里程碑处理。
   const migrationsFolder = MAIN_WINDOW_VITE_DEV_SERVER_URL
