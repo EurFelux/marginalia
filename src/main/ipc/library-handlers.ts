@@ -60,9 +60,11 @@ export function registerLibraryHandlers(): void {
     saveProgress(getDb(), input.bookId, input.cfi);
   });
 
-  handle<{ bookId: string }, TocNode[]>(IPC.contentToc, bookIdInput, (input) =>
-    getToc(getDb(), input.bookId),
-  );
+  handle<{ bookId: string }, TocNode[]>(IPC.contentToc, bookIdInput, (input) => {
+    const db = getDb();
+    if (!getBook(db, input.bookId)) throw new Error(`content: book ${input.bookId} not found`);
+    return getToc(db, input.bookId);
+  });
 
   handle<{ bookId: string; chapterId: string }, ChapterSummary>(
     IPC.contentChapterSummary,
