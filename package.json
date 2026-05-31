@@ -22,7 +22,7 @@
     "format:check": "oxfmt --check",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:all": "pnpm -r test",
+    "test:all": "pnpm -r --include-workspace-root test",
     "db:generate": "drizzle-kit generate",
     "db:rebuild:node": "pnpm rebuild better-sqlite3"
   },
