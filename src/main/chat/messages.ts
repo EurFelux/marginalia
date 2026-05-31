@@ -4,9 +4,18 @@ import type { UIMessage } from "ai";
 import type { DB } from "@main/db/client";
 import { conversations, messages } from "@main/db/schema";
 import type { MessageDto } from "@shared/chat";
-import type { MessageMetadata } from "@shared/types";
+import { messageMetadataSchema, type MessageMetadata, type MessageRole } from "@shared/types";
 
 type MessageRow = typeof messages.$inferSelect;
+
+/** DB JSON 列 parse-on-read：metadata 形状漂移（旧数据/外部写入）时记录并降级为 null，而非靠 ?. 静默吸收。 */
+function parseMetadata(raw: MessageRow["metadata"]): MessageMetadata | null {
+  if (raw == null) return null;
+  const parsed = messageMetadataSchema.safeParse(raw);
+  if (parsed.success) return parsed.data;
+  console.warn("[messages] invalid metadata json; degrading to null:", parsed.error.message);
+  return null;
+}
 
 function toDto(row: MessageRow): MessageDto {
   return {
@@ -14,7 +23,7 @@ function toDto(row: MessageRow): MessageDto {
     conversationId: row.conversationId,
     role: row.role,
     parts: row.parts,
-    metadata: row.metadata ?? null,
+    metadata: parseMetadata(row.metadata),
     seq: row.seq,
     createdAt: row.createdAt,
   };
@@ -22,7 +31,7 @@ function toDto(row: MessageRow): MessageDto {
 
 export interface AppendMessageInput {
   conversationId: string;
-  role: "system" | "user" | "assistant";
+  role: MessageRole;
   parts: UIMessage["parts"];
   metadata?: MessageMetadata | null;
 }
@@ -35,6 +44,7 @@ export function appendMessage(db: DB, input: AppendMessageInput): MessageDto {
       .from(messages)
       .where(eq(messages.conversationId, input.conversationId))
       .get();
+    // 空会话起始 seq = 0（max 不存在时 -1 + 1）
     const nextSeq = (top?.m ?? -1) + 1;
 
     const inserted = tx
@@ -79,7 +89,8 @@ export function getLastParagraphContent(db: DB, conversationId: string): string 
     .all();
   for (const r of rows) {
     if (r.role !== "user") continue;
-    const para = r.metadata?.contextChips?.find((c) => c.id === "paragraph");
+    const meta = parseMetadata(r.metadata);
+    const para = meta?.contextChips?.find((c) => c.id === "paragraph");
     if (para) return para.content;
   }
   return null;

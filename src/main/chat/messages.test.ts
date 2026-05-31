@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { createDb, runMigrations } from "@main/db/client";
 import { books, conversations } from "@main/db/schema";
 import { appendMessage, getLastParagraphContent, listMessages } from "@main/chat/messages";
+import { buildChips, dedupeParagraph } from "@main/ai/chips";
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
 
@@ -64,30 +65,50 @@ describe("appendMessage / listMessages", () => {
     });
   });
 
-  it("bumps conversations.updatedAt on append", () => {
+  it("bumps conversations.updatedAt to a fresh timestamp on append", () => {
     const db = freshDb();
     const cid = seedConversation(db);
-    const before = db
-      .select()
-      .from(conversations)
-      .all()
-      .find((c) => c.id === cid)!.updatedAt;
-    // 直接改回一个更早的时间，确保 append 会推进它
-    db.update(conversations)
-      .set({ updatedAt: before - 10_000 })
-      .where(eq(conversations.id, cid))
-      .run();
+    db.update(conversations).set({ updatedAt: 1 }).where(eq(conversations.id, cid)).run();
+    const t0 = Date.now();
     appendMessage(db, {
       conversationId: cid,
       role: "user",
       parts: [{ type: "text", text: "x" }],
     });
-    const after = db
-      .select()
-      .from(conversations)
-      .all()
-      .find((c) => c.id === cid)!.updatedAt;
-    expect(after).toBeGreaterThan(before - 10_000);
+    const after = db.select().from(conversations).where(eq(conversations.id, cid)).get()!.updatedAt;
+    expect(after).toBeGreaterThanOrEqual(t0);
+  });
+
+  it("keeps seq independent per conversation", () => {
+    const db = freshDb();
+    db.insert(books).values({ id: "book-1", path: "/tmp/a.epub" }).run();
+    const a = db
+      .insert(conversations)
+      .values({ bookId: "book-1", chapterId: null, assistantId: null })
+      .returning()
+      .get();
+    const b = db
+      .insert(conversations)
+      .values({ bookId: "book-1", chapterId: null, assistantId: null })
+      .returning()
+      .get();
+    appendMessage(db, {
+      conversationId: a.id,
+      role: "user",
+      parts: [{ type: "text", text: "a0" }],
+    });
+    appendMessage(db, {
+      conversationId: b.id,
+      role: "user",
+      parts: [{ type: "text", text: "b0" }],
+    });
+    appendMessage(db, {
+      conversationId: a.id,
+      role: "user",
+      parts: [{ type: "text", text: "a1" }],
+    });
+    expect(listMessages(db, a.id).map((m) => m.seq)).toEqual([0, 1]);
+    expect(listMessages(db, b.id).map((m) => m.seq)).toEqual([0]);
   });
 });
 
@@ -125,5 +146,45 @@ describe("getLastParagraphContent", () => {
       metadata: { contextChips: [{ id: "selection", content: "sel", tokenCount: 1 }] },
     });
     expect(getLastParagraphContent(db, cid)).toBe("para A");
+  });
+
+  it("returns the higher-seq paragraph when multiple user turns carry one", () => {
+    const db = freshDb();
+    const cid = seedConversation(db);
+    appendMessage(db, {
+      conversationId: cid,
+      role: "user",
+      parts: [{ type: "text", text: "a" }],
+      metadata: { contextChips: [{ id: "paragraph", content: "para A", tokenCount: 1 }] },
+    });
+    appendMessage(db, {
+      conversationId: cid,
+      role: "user",
+      parts: [{ type: "text", text: "b" }],
+      metadata: { contextChips: [{ id: "paragraph", content: "para B", tokenCount: 1 }] },
+    });
+    expect(getLastParagraphContent(db, cid)).toBe("para B");
+  });
+
+  it("dedupes a freshly built paragraph against the stored snapshot (format round-trip)", () => {
+    const db = freshDb();
+    const cid = seedConversation(db);
+    const input = { selection: "sel", paragraphCurrent: "shared para" };
+    const built = buildChips(input);
+    appendMessage(db, {
+      conversationId: cid,
+      role: "user",
+      parts: [{ type: "text", text: "q" }],
+      // 持久化快照：Chip → {id, content, tokenCount}
+      metadata: {
+        contextChips: built.map((c) => ({
+          id: c.id,
+          content: c.content,
+          tokenCount: c.tokenCount,
+        })),
+      },
+    });
+    const deduped = dedupeParagraph(buildChips(input), getLastParagraphContent(db, cid));
+    expect(deduped.map((c) => c.id)).toEqual(["selection"]);
   });
 });
