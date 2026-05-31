@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "dfb9aa04-3824-4148-8565-8e9ba428a6e8",
+  "id": "c156b443-6ddc-40c3-a44b-6d92fb3edca0",
   "prevIds": ["00000000-0000-0000-0000-000000000000"],
   "ddl": [
     {
@@ -204,7 +204,7 @@
     },
     {
       "type": "text",
-      "notNull": false,
+      "notNull": true,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -587,6 +587,31 @@
       "name": "providers_pk",
       "table": "providers",
       "entityType": "pks"
+    },
+    {
+      "columns": ["book_id", "href"],
+      "nameExplicit": false,
+      "name": "chapters_book_id_href_unique",
+      "entityType": "uniques",
+      "table": "chapters"
+    },
+    {
+      "value": "\"summary_status\" in ('pending','generating','ready','unavailable')",
+      "name": "chapters_summary_status_check",
+      "entityType": "checks",
+      "table": "chapters"
+    },
+    {
+      "value": "\"role\" in ('system','user','assistant')",
+      "name": "messages_role_check",
+      "entityType": "checks",
+      "table": "messages"
+    },
+    {
+      "value": "\"type\" in ('openai','anthropic','google','openai-compatible')",
+      "name": "providers_type_check",
+      "entityType": "checks",
+      "table": "providers"
     }
   ],
   "renames": []
