@@ -1,21 +1,36 @@
 import { strToU8, zipSync } from "fflate";
 
 /** 构造最小但结构合法的 EPUB3 字节流，供解析/内容测试与消费方复用。 */
-export function makeFixtureEpub(): Uint8Array {
+export function makeFixtureEpub(opts?: {
+  identifier?: string | null;
+  coverViaMeta?: boolean;
+}): Uint8Array {
+  const identifier = opts?.identifier === undefined ? "urn:uuid:fixture-001" : opts.identifier;
+  const coverViaMeta = opts?.coverViaMeta ?? false;
+
   const container = `<?xml version="1.0"?>
 <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
   <rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>
 </container>`;
+
+  const identifierEl =
+    identifier !== null ? `\n    <dc:identifier id="bookid">${identifier}</dc:identifier>` : "";
+  const uniqueIdentifierAttr = identifier !== null ? ` unique-identifier="bookid"` : "";
+
+  const coverManifestItem = coverViaMeta
+    ? `<item id="cover-img" href="cover.png" media-type="image/png"/>`
+    : `<item id="cover-img" href="cover.png" media-type="image/png" properties="cover-image"/>`;
+  const coverMetaEl = coverViaMeta ? `\n    <meta name="cover" content="cover-img"/>` : "";
+
   const opf = `<?xml version="1.0" encoding="utf-8"?>
-<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid">
-  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
-    <dc:identifier id="bookid">urn:uuid:fixture-001</dc:identifier>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0"${uniqueIdentifierAttr}>
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">${identifierEl}
     <dc:title>Fixture Book</dc:title>
-    <dc:creator>Test Author</dc:creator>
+    <dc:creator>Test Author</dc:creator>${coverMetaEl}
   </metadata>
   <manifest>
     <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
-    <item id="cover-img" href="cover.png" media-type="image/png" properties="cover-image"/>
+    ${coverManifestItem}
     <item id="ch1" href="ch1.xhtml" media-type="application/xhtml+xml"/>
     <item id="ch2" href="ch2.xhtml" media-type="application/xhtml+xml"/>
   </manifest>

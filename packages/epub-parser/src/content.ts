@@ -45,7 +45,7 @@ export function htmlToText(xhtml: string): string {
   function isNestedInsideBlock(el: ReturnType<typeof body.querySelectorAll>[number]): boolean {
     let node = el.parentNode;
     while (node) {
-      // rawTagName is lowercase in node-html-parser v7
+      // .toLowerCase() makes the check robust regardless of the node-html-parser version's rawTagName casing.
       if (node.rawTagName && BLOCK_TAGS.has(node.rawTagName.toLowerCase())) return true;
       node = node.parentNode;
     }
