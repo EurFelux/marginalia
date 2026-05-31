@@ -15,7 +15,8 @@ export interface AssemblePromptParams {
 
 function textOfParts(parts: UIMessage["parts"]): string {
   let s = "";
-  // 仅保留 text part；MA4 assistant 消息仅含 text，工具/推理 part 待 MA5 处理
+  // 仅保留 text part 进历史：assistant 的 tool-*/reasoning part 已持久化供 UI 渲染，
+  // 但有意不回放进模型历史（最终文本已概括，避免重放工具调用膨胀上下文）——Phase 1 选择。
   for (const p of parts) if (p.type === "text") s += p.text;
   return s;
 }
