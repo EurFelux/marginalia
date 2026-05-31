@@ -22,12 +22,14 @@
     "format:check": "oxfmt --check",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:all": "pnpm -r test",
     "db:generate": "drizzle-kit generate",
     "db:rebuild:node": "pnpm rebuild better-sqlite3"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.81",
     "@ai-sdk/react": "^3.0.195",
+    "@marginalia/epub-parser": "workspace:*",
     "ai": "^6.0.193",
     "better-sqlite3": "^12.10.0",
     "drizzle-orm": "1.0.0-rc.3",
