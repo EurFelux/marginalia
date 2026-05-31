@@ -1,6 +1,7 @@
 import path from "node:path";
 import { app } from "electron";
 import { createDb, runMigrations, type DB } from "@main/db/client";
+import { resetStuckSummaries } from "@main/ai/summary";
 
 let db: DB | undefined;
 
@@ -15,6 +16,7 @@ export function initDb(): DB {
     : path.join(__dirname, "db/migrations");
   const candidate = createDb(dbPath);
   runMigrations(candidate, migrationsFolder);
+  resetStuckSummaries(candidate); // 复位上次崩溃残留的 "generating" 章节摘要
   db = candidate;
   return db;
 }
