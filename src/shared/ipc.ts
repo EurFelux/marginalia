@@ -12,6 +12,13 @@ export const IPC = {
   contentToc: "content:toc",
   contentChapterText: "content:chapter-text",
   contentChapterSummary: "content:chapter-summary",
+  providersList: "providers:list",
+  providersUpsert: "providers:upsert",
+  providersReveal: "providers:reveal",
+  providersTest: "providers:test",
+  providersRemove: "providers:remove",
+  assistantGetDefault: "assistant:get-default",
+  assistantUpdate: "assistant:update",
 } as const;
 
 /** ping —— 演示"带入参且经 Zod 校验"的往返 */
