@@ -54,4 +54,13 @@ describe("default assistant", () => {
     expect(updateDefaultAssistant(db, { providerId: prov.id }).providerId).toBe(prov.id);
     expect(updateDefaultAssistant(db, { providerId: null }).providerId).toBeNull();
   });
+
+  it("updateDefaultAssistant materializes the default row when called before any read", () => {
+    const db = freshDb();
+    const a = updateDefaultAssistant(db, { name: "Materialized" });
+    expect(a.name).toBe("Materialized");
+    expect(a.id).toMatch(UUID_V7_RE);
+    // 后续读取应拿到同一条记录
+    expect(getDefaultAssistant(db).id).toBe(a.id);
+  });
 });

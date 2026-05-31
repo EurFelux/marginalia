@@ -1,4 +1,4 @@
-import { generateText } from "ai";
+import { APICallError, LoadAPIKeyError, generateText } from "ai";
 import { resolveLanguageModel, type ChatModel } from "@main/ai/model-factory";
 import type { ProviderTestParams, ProviderTester } from "@main/secrets/tester";
 import type { TestResult } from "@shared/providers";
@@ -12,15 +12,12 @@ const realProbe: GenerateProbe = async (model) => {
   await generateText({ model, prompt: "ping", maxOutputTokens: 1, maxRetries: 0 });
 };
 
-/** 把异常映射为 TestResult（读 statusCode；AI SDK APICallError 即带此字段）。 */
+/** 把异常映射为 TestResult。优先用 AI SDK 的错误类型守卫，避免 duck-typing 把非 SDK 错误误判。 */
 export function mapTestError(err: unknown): TestResult {
-  const status =
-    typeof err === "object" &&
-    err !== null &&
-    "statusCode" in err &&
-    typeof (err as { statusCode: unknown }).statusCode === "number"
-      ? (err as { statusCode: number }).statusCode
-      : undefined;
+  if (LoadAPIKeyError.isInstance(err)) {
+    return { ok: false, message: "API key is missing or invalid" };
+  }
+  const status = APICallError.isInstance(err) ? err.statusCode : undefined;
   if (status === 401 || status === 403) return { ok: false, status, message: "Invalid API key" };
   if (status === 404) return { ok: false, status, message: "Model or endpoint not found" };
   if (status !== undefined)
@@ -37,6 +34,7 @@ export function createAiSdkTester(probe: GenerateProbe = realProbe): ProviderTes
       try {
         model = resolveLanguageModel(params);
       } catch (err) {
+        console.warn("[providers] testProvider: model resolution failed:", err);
         return { ok: false, message: err instanceof Error ? err.message : String(err) };
       }
       try {

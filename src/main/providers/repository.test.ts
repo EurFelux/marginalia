@@ -59,6 +59,10 @@ describe("provider repository", () => {
     const row = getProviderRow(db, dto.id);
     expect(row?.apiKeyEncrypted).toBeInstanceOf(Buffer);
     expect(row?.apiKeyEncrypted?.toString("utf8")).toBe("sk-abcdefghij");
+    // DTO 绝不暴露密文或明文字段
+    expect(dto).not.toHaveProperty("apiKeyEncrypted");
+    expect(dto).not.toHaveProperty("apiKey");
+    expect(dto.createdAt).toBeGreaterThan(0);
   });
 
   it("creates a provider without a key", () => {
@@ -79,6 +83,23 @@ describe("provider repository", () => {
     });
     expect(updated.label).toBe("Renamed");
     expect(revealProviderKey(db, fakeEncryptor, created.id)).toBe("sk-original99");
+  });
+
+  it("update preserves baseUrl/label when those fields are omitted", () => {
+    const db = freshDb();
+    const created = upsertProvider(db, fakeEncryptor, {
+      type: "openai",
+      baseUrl: "https://custom.example/v1",
+      label: "Original",
+      apiKey: "sk-abcdefghij",
+    });
+    const updated = upsertProvider(db, fakeEncryptor, {
+      id: created.id,
+      type: "openai",
+      label: "Renamed",
+    });
+    expect(updated.label).toBe("Renamed");
+    expect(updated.baseUrl).toBe("https://custom.example/v1"); // 未传入 baseUrl，不应被覆盖
   });
 
   it("update with apiKey replaces the key", () => {
@@ -135,6 +156,17 @@ describe("provider repository", () => {
     expect(() => removeProvider(db, "nope")).toThrow(/not found/i);
   });
 
+  it("removeProvider only clears assistant refs to the removed provider", () => {
+    const db = freshDb();
+    const provA = upsertProvider(db, fakeEncryptor, { type: "openai", apiKey: "sk-aaaaaaaa11" });
+    const provB = upsertProvider(db, fakeEncryptor, { type: "anthropic", apiKey: "sk-bbbbbbbb22" });
+    getDefaultAssistant(db);
+    updateDefaultAssistant(db, { providerId: provA.id });
+    removeProvider(db, provB.id);
+    expect(getDefaultAssistant(db).providerId).toBe(provA.id); // A 的绑定不受影响
+    expect(getProviderRow(db, provB.id)).toBeUndefined();
+  });
+
   describe("testProvider", () => {
     it("throws when the provider does not exist", async () => {
       const db = freshDb();
@@ -154,22 +186,40 @@ describe("provider repository", () => {
       const db = freshDb();
       const p = upsertProvider(db, fakeEncryptor, { type: "openai", apiKey: "sk-abcdefghij" });
       const r = await testProvider(db, brokenDecryptEncryptor, okTester, p.id, "gpt-4o-mini");
-      expect(r.ok).toBe(false);
+      expect(r).toEqual({
+        ok: false,
+        message: "Stored API key cannot be decrypted on this machine",
+      });
     });
 
-    it("delegates to the tester with the decrypted key + model when valid", async () => {
+    it("delegates to the tester with the full provider config + model, and the result leaks no plaintext", async () => {
       const db = freshDb();
-      const p = upsertProvider(db, fakeEncryptor, { type: "openai", apiKey: "sk-abcdefghij" });
-      let seen: { apiKey: string; model: string } | undefined;
+      const p = upsertProvider(db, fakeEncryptor, {
+        type: "openai-compatible",
+        baseUrl: "http://localhost:1234/v1",
+        apiKey: "sk-abcdefghij",
+      });
+      let seen: { type: string; baseUrl: string | null; apiKey: string; model: string } | undefined;
       const spyTester: ProviderTester = {
         test: async (params) => {
-          seen = { apiKey: params.apiKey, model: params.model };
+          seen = {
+            type: params.type,
+            baseUrl: params.baseUrl,
+            apiKey: params.apiKey,
+            model: params.model,
+          };
           return { ok: true };
         },
       };
-      const r = await testProvider(db, fakeEncryptor, spyTester, p.id, "gpt-4o-mini");
+      const r = await testProvider(db, fakeEncryptor, spyTester, p.id, "llama-3.2");
       expect(r).toEqual({ ok: true });
-      expect(seen).toEqual({ apiKey: "sk-abcdefghij", model: "gpt-4o-mini" });
+      expect(seen).toEqual({
+        type: "openai-compatible",
+        baseUrl: "http://localhost:1234/v1",
+        apiKey: "sk-abcdefghij",
+        model: "llama-3.2",
+      });
+      expect(JSON.stringify(r)).not.toContain("sk-abcdefghij"); // 结果不得携带明文
     });
   });
 });
