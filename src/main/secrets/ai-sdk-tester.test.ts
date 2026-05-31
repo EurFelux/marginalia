@@ -1,33 +1,49 @@
+import { APICallError, LoadAPIKeyError } from "ai";
 import { describe, expect, it } from "vitest";
 import { createAiSdkTester, mapTestError, type GenerateProbe } from "@main/secrets/ai-sdk-tester";
 
+// 构造真实的 APICallError 实例，避免 duck-typing 绕过类型守卫。
+const apiErr = (statusCode?: number) =>
+  new APICallError({
+    message: "boom",
+    url: "https://api.test/v1",
+    requestBodyValues: {},
+    statusCode,
+  });
+
 describe("mapTestError", () => {
   it("401 → invalid key", () => {
-    expect(mapTestError({ statusCode: 401 })).toEqual({
+    expect(mapTestError(apiErr(401))).toEqual({
       ok: false,
       status: 401,
       message: "Invalid API key",
     });
   });
   it("403 → invalid key (same as 401)", () => {
-    expect(mapTestError({ statusCode: 403 })).toEqual({
+    expect(mapTestError(apiErr(403))).toEqual({
       ok: false,
       status: 403,
       message: "Invalid API key",
     });
   });
   it("404 → model/endpoint not found", () => {
-    expect(mapTestError({ statusCode: 404 })).toEqual({
+    expect(mapTestError(apiErr(404))).toEqual({
       ok: false,
       status: 404,
       message: "Model or endpoint not found",
     });
   });
   it("500 → generic http error", () => {
-    expect(mapTestError({ statusCode: 500 })).toEqual({
+    expect(mapTestError(apiErr(500))).toEqual({
       ok: false,
       status: 500,
       message: "Provider returned HTTP 500",
+    });
+  });
+  it("LoadAPIKeyError → API key is missing or invalid", () => {
+    expect(mapTestError(new LoadAPIKeyError({ message: "no key" }))).toEqual({
+      ok: false,
+      message: "API key is missing or invalid",
     });
   });
   it("non-http error → connection failed", () => {
@@ -53,7 +69,7 @@ describe("createAiSdkTester", () => {
 
   it("maps a probe rejection through mapTestError", async () => {
     const probe: GenerateProbe = async () => {
-      throw Object.assign(new Error("unauthorized"), { statusCode: 401 });
+      throw apiErr(401);
     };
     const tester = createAiSdkTester(probe);
     const r = await tester.test({

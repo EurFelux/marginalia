@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import type { DB } from "@main/db/client";
 import { assistants, providers } from "@main/db/schema";
 import type { Encryptor } from "@main/secrets/encryptor";
@@ -43,6 +43,7 @@ export function listProviders(db: DB, encryptor: Encryptor): ProviderDto[] {
   return db
     .select()
     .from(providers)
+    .orderBy(asc(providers.createdAt))
     .all()
     .map((r) => toDto(r, encryptor));
 }
@@ -53,6 +54,7 @@ export function upsertProvider(
   input: UpsertProviderInput,
 ): ProviderDto {
   // 仅当传入新明文 key 时加密；省略 apiKey = 保留既有密钥。
+  // label / baseUrl 同理：省略=保留，显式 null=清空（两态；新建时 ?? null 回退正确）。
   let encrypted: Buffer | undefined;
   if (input.apiKey !== undefined) {
     if (!encryptor.isAvailable()) {
@@ -66,8 +68,8 @@ export function upsertProvider(
       .update(providers)
       .set({
         type: input.type,
-        label: input.label ?? null,
-        baseUrl: input.baseUrl ?? null,
+        ...(input.label !== undefined ? { label: input.label } : {}),
+        ...(input.baseUrl !== undefined ? { baseUrl: input.baseUrl } : {}),
         ...(encrypted !== undefined ? { apiKeyEncrypted: encrypted } : {}),
       })
       .where(eq(providers.id, input.id))

@@ -13,10 +13,10 @@ export type TestProviderInput = z.infer<typeof testProviderInput>;
 
 /**
  * 新建（无 id）或更新（带 id）一个 provider。
- * apiKey 三态语义：
+ * apiKey 两态语义（schema 仅允许这两态）：
  *  - 省略（undefined）→ 更新时保留既有密钥；新建时无密钥。
  *  - 提供非空字符串 → 加密后替换。
- * 不支持把 key 清空为 null（YAGNI；如需移除整条记录用 remove）。
+ * 不支持把 key 清空为 null（schema 拒 null/空串；如需移除整条记录用 remove）。
  */
 export const upsertProviderInput = z
   .object({
@@ -42,7 +42,7 @@ export interface ProviderDto {
   keyMask: string | null;
   /** 是否存有密钥（密文存在）。 */
   hasKey: boolean;
-  /** 存有密钥但本机无法解密时为 false（如跨机器迁移 / safeStorage 不可用）。 */
+  /** 存有密钥但本机无法解密时为 false（如跨机器迁移 / safeStorage 不可用）。无密钥时亦为 false——应配合 hasKey 一同判断。 */
   keyDecryptable: boolean;
   createdAt: number;
 }
