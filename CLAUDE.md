@@ -1,6 +1,6 @@
-# CLAUDE.md
+# Repository Agent Guide
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to coding agents working in this repository. It is shared by `CLAUDE.md` and the `AGENTS.md` symlink.
 
 ## 项目简介
 
@@ -38,6 +38,8 @@ pnpm db:rebuild:node  # 将 better-sqlite3 重新编译为 Node ABI（每次运�
 **better-sqlite3 ABI 双轨制**：`pnpm start` 将 better-sqlite3 编译为 **Electron ABI**；vitest 在 **Node ABI** 下运行。运行过应用后，必须执行 `pnpm db:rebuild:node` 才能再跑测试，否则会出现 ABI 不匹配错误。
 
 **pre-commit hook（prek）**：`git commit` 触发 `lint:fix` + `format`，这两个步骤可能修改暂存文件并以"files were modified by this hook"中止提交。遇到时，重新 `git add` 被修改的文件，再执行一次相同的 commit 命令即可（第二次会通过）。
+
+**提交信息**：使用 Conventional Commits 格式，例如 `docs: add shared agent guide`、`feat: add epub parser`、`fix: handle missing book metadata`。
 
 **drizzle-kit 与 drizzle-orm 版本锁定**：两者均固定为 `1.0.0-rc.3`，最新稳定版 drizzle-kit 与当前版本不兼容，不能随意升级。
 
