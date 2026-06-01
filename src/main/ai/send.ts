@@ -12,6 +12,7 @@ import type { ResolvedModel } from "@main/ai/assistant-model";
 import { routeConversation } from "@main/chat/conversations";
 import { appendMessage, getLastParagraphContent, listMessages } from "@main/chat/messages";
 import { type SendInput } from "@shared/chat";
+export type { SendInput };
 
 export interface SendDeps {
   db: DB;
