@@ -1,9 +1,9 @@
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { extractChapterText, type ReadOptions } from "@marginalia/epub-parser";
 import type { DB } from "@main/db/client";
 import { books, chapters } from "@main/db/schema";
 import { tocNodeSchema, type TocNode } from "@shared/types";
-import type { ChapterTextSlice } from "@shared/library";
+import type { ChapterRefDto, ChapterTextSlice } from "@shared/library";
 
 export interface ChapterSummary {
   status: "pending" | "generating" | "ready" | "unavailable";
@@ -43,4 +43,20 @@ export function readChapterText(
     .get();
   if (!ch) throw new Error(`content: chapter ${chapterId} not found in book ${bookId}`);
   return extractChapterText(bytes, ch.href, opts);
+}
+
+/** 按 spine 顺序（orderIndex）列出某书全部章节引用。title 可能为 null（TOC 无对应 label 时）。 */
+export function listChapters(db: DB, bookId: string): ChapterRefDto[] {
+  return db
+    .select({
+      id: chapters.id,
+      title: chapters.title,
+      href: chapters.href,
+      orderIndex: chapters.orderIndex,
+    })
+    .from(chapters)
+    .where(eq(chapters.bookId, bookId))
+    .orderBy(asc(chapters.orderIndex))
+    .all()
+    .map((c) => ({ id: c.id, title: c.title, href: c.href, orderIndex: c.orderIndex ?? 0 }));
 }

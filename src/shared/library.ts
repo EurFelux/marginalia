@@ -33,3 +33,11 @@ export interface BookSummaryDto {
  * 这里 re-export 供 renderer/preload 消费——与 `@shared/types` re-export `TocNode` 同一模式，避免重复定义漂移。
  */
 export type { ChapterTextSlice } from "@marginalia/epub-parser";
+
+/** 章节导航引用：渲染层据此列章 / 取 surrogate id 喂 content.chapterText。 */
+export interface ChapterRefDto {
+  id: string;
+  title: string | null;
+  href: string;
+  orderIndex: number;
+}

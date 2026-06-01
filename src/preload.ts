@@ -3,6 +3,7 @@ import { IPC, type AppGetInfoResult, type PingInput, type PingResult } from "@sh
 import type {
   BookIdInput,
   BookSummaryDto,
+  ChapterRefDto,
   ChapterTextSlice,
   ImportBookInput,
   ReadChapterTextInput,
@@ -44,6 +45,8 @@ const api = {
 
   content: {
     toc: (input: BookIdInput): Promise<TocNode[]> => ipcRenderer.invoke(IPC.contentToc, input),
+    chapters: (input: BookIdInput): Promise<ChapterRefDto[]> =>
+      ipcRenderer.invoke(IPC.contentChapters, input),
     chapterText: (input: ReadChapterTextInput): Promise<ChapterTextSlice> =>
       ipcRenderer.invoke(IPC.contentChapterText, input),
   },
