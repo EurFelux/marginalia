@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, X } from "lucide-react";
 import { qk } from "@renderer/query/keys";
@@ -27,6 +27,12 @@ export function SettingsPanel() {
   const [model, setModel] = useState("claude-3-5-haiku-latest");
   // 有 key 时默认展示掩码（只读）；点「编辑」才切到输入框换新 key。
   const [editingKey, setEditingKey] = useState(false);
+
+  // 回填已保存的默认模型，避免每次打开都被重置成占位默认。
+  // 用户改后、保存前不会被覆盖：assistant.data 仅在 save 成功失效后才重取。
+  useEffect(() => {
+    if (assistant.data) setModel(assistant.data.model ?? "claude-3-5-haiku-latest");
+  }, [assistant.data]);
 
   const save = useMutation({
     mutationFn: async () => {
