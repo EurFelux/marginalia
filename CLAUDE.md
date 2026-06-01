@@ -9,8 +9,8 @@ Marginalia 是一个基于 Electron + React 的桌面 ePub AI 阅读器。当前
 ## 常用命令
 
 ```bash
-# 开发与构建（Electron GUI，会重建 better-sqlite3 为 Electron ABI）
-pnpm start          # 启动 Electron 开发模式（会阻塞 + 改 ABI，勿在需要跑测试前用）
+# 开发与构建（Electron GUI）
+pnpm start          # 启动 Electron 开发模式（会阻塞）
 pnpm package        # 打包
 pnpm make           # 制作分发包
 pnpm publish        # 发布
@@ -22,7 +22,7 @@ pnpm lint:fix       # oxlint --fix（pre-commit hook 会自动执行）
 pnpm format         # oxfmt（pre-commit hook 会自动执行）
 pnpm format:check   # oxfmt --check
 
-# 测试（Node ABI，headless）
+# 测试（headless；vitest 跑在 Electron 运行时，与 app 同 ABI，无需翻转）
 pnpm test           # vitest run（一次性跑完）
 pnpm test:watch     # vitest（监视模式）
 pnpm test src/main/app-service.test.ts   # 运行单个文件
@@ -30,12 +30,12 @@ pnpm test -t "getAppInfo counts"         # 按测试名称过滤
 
 # 数据库
 pnpm db:generate    # drizzle-kit generate（修改 schema 后生成迁移）
-pnpm db:rebuild:node  # 将 better-sqlite3 重新编译为 Node ABI（每次运行过 pnpm start 后必须执行）
+pnpm db:rebuild:electron  # 将 better-sqlite3 编译为 Electron ABI（仅 pnpm install 后执行一次）
 ```
 
 ## 关键注意事项（坑）
 
-**better-sqlite3 ABI 双轨制**：`pnpm start` 将 better-sqlite3 编译为 **Electron ABI**；vitest 在 **Node ABI** 下运行。运行过应用后，必须执行 `pnpm db:rebuild:node` 才能再跑测试，否则会出现 ABI 不匹配错误。
+**better-sqlite3 单一 ABI（Electron）+ vitest 跑在 Electron 运行时**：原生模块的 `NODE_MODULE_VERSION` 跟的是 **V8 版本**而非 Node 版本号。Electron 41 内置 Chromium 的 V8（14.6，`-electron`，ABI **145**），独立 Node 24 自带的是 V8 13.6（`-node`，ABI **137**）——同为「Node 24」但 ABI 不同，为一方编的 `.node` 在另一方加载不了。为免来回翻转，`pnpm test` 通过 **`ELECTRON_RUN_AS_NODE=1 electron node_modules/vitest/vitest.mjs`** 让 vitest 跑在 **Electron 运行时**，与 `pnpm start` 共用 Electron ABI（145）。因此 better-sqlite3 **始终编为 Electron ABI**，app 与测试都用它，**无需 `db:rebuild:node` 之类翻转**。唯一例外：`pnpm install`（含增删依赖）会按系统 Node 把它重编为 137——装完跑一次 **`pnpm db:rebuild:electron`** 翻回 145 即可，之后保持不变。（脚本用 `ELECTRON_RUN_AS_NODE=` 前缀，Windows 下需 `cross-env`；当前按 macOS/Linux 开发。排障提示：`node -e "require('better-sqlite3')"` 会因 `bindings` 在 ABI 不匹配时回退试别的副本而**误报成功**，别拿它判 ABI——以 `pnpm test` 或 `ELECTRON_RUN_AS_NODE=1 electron -e "require('better-sqlite3')"` 为准。)
 
 **Electron 锁定在 41.x（勿升 42）**：Electron 42 带 V8 14.8，其 `v8::External::New/Value` 强制要求 `ExternalPointerTypeTag` 参数，而最新的 better-sqlite3（12.10.0）源码仍用旧签名，对 Electron 42 ABI 编译失败（`pnpm start` 在 `@electron/rebuild` 阶段报 `node-gyp failed to rebuild better-sqlite3`）。上游已主动撤回 Electron 42 支持（rollback PR <https://github.com/WiseLibs/better-sqlite3/pull/1470>，确认 issue <https://github.com/WiseLibs/better-sqlite3/issues/1474>：41.5.2 可用、42.0.1 起全挂），修复 PR <https://github.com/WiseLibs/better-sqlite3/pull/1475> 截至 2026-06-01 仍 OPEN、未合并发版；本地 Node 24 的 V8 13.6 仍是旧签名，故无头 vitest 不受影响、长期掩盖了此问题。在 better-sqlite3 发布支持 Electron 42 的新版前，`electron` 固定 `41.7.1`（Electron 41 有 better-sqlite3 prebuilt，连编译都省）。
 
