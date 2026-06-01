@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { z } from "zod";
+import { BrowserWindow, dialog } from "electron";
 import { IPC } from "@shared/ipc";
 import {
   bookIdInput,
@@ -48,6 +49,16 @@ export function registerLibraryHandlers(): void {
       return toDto(importBook(getDb(), { bytes, filePath: input.filePath }));
     },
   );
+
+  handle<void, string | null>(IPC.libraryPickEpub, z.void(), async () => {
+    const win = BrowserWindow.getFocusedWindow();
+    const opts = {
+      properties: ["openFile" as const],
+      filters: [{ name: "EPUB", extensions: ["epub"] }],
+    };
+    const r = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts);
+    return r.canceled || r.filePaths.length === 0 ? null : r.filePaths[0];
+  });
 
   handle<void, BookSummaryDto[]>(IPC.libraryList, z.void(), () => listBooks(getDb()).map(toDto));
 

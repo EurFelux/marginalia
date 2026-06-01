@@ -38,6 +38,7 @@ const api = {
   library: {
     import: (input: ImportBookInput): Promise<BookSummaryDto> =>
       ipcRenderer.invoke(IPC.libraryImport, input),
+    pickEpub: (): Promise<string | null> => ipcRenderer.invoke(IPC.libraryPickEpub),
     list: (): Promise<BookSummaryDto[]> => ipcRenderer.invoke(IPC.libraryList),
     get: (input: BookIdInput): Promise<BookSummaryDto | null> =>
       ipcRenderer.invoke(IPC.libraryGet, input),
