@@ -1,5 +1,5 @@
 // src/main/ai/send.ts
-import { stepCountIs, streamText, type ModelMessage } from "ai";
+import { stepCountIs, streamText, type ModelMessage, type UIMessageChunk } from "ai";
 import { and, eq } from "drizzle-orm";
 import type { DB } from "@main/db/client";
 import { chapters } from "@main/db/schema";
@@ -25,7 +25,10 @@ export interface SendDeps {
   db: DB;
   loadBytes: LoadBytes;
   resolveModel: () => ResolvedModel;
-  /** 触发本章摘要懒生成（fire-and-forget；通常传 ensureChapterSummary 的偏函数）。 */
+  /**
+   * 触发本章摘要懒生成（fire-and-forget；通常传 ensureChapterSummary 的偏函数）。
+   * 端口为 `=> void`：实现必须自含全部 reject（不让 Promise 逃逸为 unhandledRejection）。
+   */
   ensureSummary: (bookId: string, chapterId: string) => void;
   /** agent 多步上限（默认 5）。 */
   stepLimit?: number;
@@ -37,8 +40,8 @@ export type SendResult =
       conversationId: string;
       created: boolean;
       switchedFromActive: boolean;
-      // TODO(UI 轨): 暴露具体 chunk 类型（UIMessageChunk）而非 unknown，省去 transport 侧盲 cast
-      stream: AsyncIterable<unknown>;
+      /** UI message stream（chunk 为 UIMessageChunk）供 UI 轨 IPC 订阅推送。 */
+      stream: AsyncIterable<UIMessageChunk>;
       finished: Promise<void>;
     }
   | { ok: false; reason: string };
@@ -143,6 +146,7 @@ export function runSend(deps: SendDeps, input: SendInput): SendResult {
   const uiStream = result.toUIMessageStream({
     onError: (err) => {
       streamHadError = true;
+      console.warn("[send] stream/model error:", err);
       // onError 要求返回 string（作为 error chunk 的 errorText）
       return err instanceof Error ? err.message : String(err);
     },

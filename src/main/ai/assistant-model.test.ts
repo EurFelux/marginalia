@@ -57,7 +57,7 @@ describe("resolveAssistantModel", () => {
     const db = freshDb();
     getDefaultAssistant(db); // seed default assistant (no provider/model)
     const r = resolveAssistantModel(db, fakeEncryptor);
-    expect(r).toMatchObject({ ok: false });
+    expect(r).toMatchObject({ ok: false, reason: expect.stringContaining("provider") });
   });
 
   it("fails when the assistant has a provider but no model", () => {
@@ -65,7 +65,7 @@ describe("resolveAssistantModel", () => {
     const provider = upsertProvider(db, fakeEncryptor, { type: "openai", apiKey: "sk" });
     updateDefaultAssistant(db, { providerId: provider.id });
     const r = resolveAssistantModel(db, fakeEncryptor);
-    expect(r).toMatchObject({ ok: false });
+    expect(r).toMatchObject({ ok: false, reason: expect.stringContaining("model") });
   });
 
   it("fails when the provider has no API key", () => {
@@ -73,14 +73,14 @@ describe("resolveAssistantModel", () => {
     const provider = upsertProvider(db, fakeEncryptor, { type: "openai" });
     updateDefaultAssistant(db, { providerId: provider.id, model: "gpt-4o-mini" });
     const r = resolveAssistantModel(db, fakeEncryptor);
-    expect(r).toMatchObject({ ok: false });
+    expect(r).toMatchObject({ ok: false, reason: expect.stringContaining("API key") });
   });
 
   it("fails when the stored key cannot be decrypted on this machine", () => {
     const db = freshDb();
     configure(db);
     const r = resolveAssistantModel(db, brokenDecrypt);
-    expect(r).toMatchObject({ ok: false });
+    expect(r).toMatchObject({ ok: false, reason: expect.stringContaining("decrypt") });
   });
 
   it("fails when secure storage is unavailable", () => {

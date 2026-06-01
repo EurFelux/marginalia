@@ -10,7 +10,7 @@ import type { LoadBytes } from "@main/ai/tools";
 export const SUMMARY_SYSTEM =
   "You summarize a single book chapter for a reading assistant. Produce a concise, faithful summary (a few sentences) capturing the chapter's key events, ideas, and terms. Output only the summary, no preamble.";
 
-const SUMMARY_INPUT_MAX_CHARS = 12_000; // 截断喂模型的章节正文（~3k tokens），避免爆上下文
+const SUMMARY_INPUT_MAX_CHARS = 12_000; // 截断喂模型的章节正文（拉丁文约 3k tokens、CJK 最多约 12k），避免爆上下文
 
 export interface SummaryDeps {
   db: DB;
@@ -28,21 +28,24 @@ export async function ensureChapterSummary(
   chapterId: string,
 ): Promise<void> {
   const { db, loadBytes, resolveModel } = deps;
-
-  const row = db
-    .select({ status: chapters.summaryStatus })
-    .from(chapters)
-    .where(and(eq(chapters.bookId, bookId), eq(chapters.id, chapterId)))
-    .get();
-  if (!row || row.status !== "pending") return; // 仅从 pending 生成
-  if (inFlight.has(chapterId)) return; // 并发去重
-
-  const resolved = resolveModel();
-  if (!resolved.ok) return; // 模型未配置 → 保持 pending，配置后重试
-
-  inFlight.add(chapterId);
-  db.update(chapters).set({ summaryStatus: "generating" }).where(eq(chapters.id, chapterId)).run();
+  let claimed = false;
   try {
+    const row = db
+      .select({ status: chapters.summaryStatus })
+      .from(chapters)
+      .where(and(eq(chapters.bookId, bookId), eq(chapters.id, chapterId)))
+      .get();
+    if (!row || row.status !== "pending") return; // 仅从 pending 生成
+    if (inFlight.has(chapterId)) return; // 并发去重
+    const resolved = resolveModel();
+    if (!resolved.ok) return; // 模型未配置 → 保持 pending，配置后重试
+
+    inFlight.add(chapterId);
+    claimed = true;
+    db.update(chapters)
+      .set({ summaryStatus: "generating" })
+      .where(eq(chapters.id, chapterId))
+      .run();
     const bytes = await loadBytes(bookId);
     const slice = readChapterText(db, bytes, bookId, chapterId, {
       maxChars: SUMMARY_INPUT_MAX_CHARS,
@@ -59,13 +62,20 @@ export async function ensureChapterSummary(
       .where(eq(chapters.id, chapterId))
       .run();
   } catch (err) {
-    console.warn(`[summary] chapter ${chapterId} generation failed:`, err);
-    db.update(chapters)
-      .set({ summaryStatus: "unavailable" })
-      .where(eq(chapters.id, chapterId))
-      .run();
+    // 自含全部 reject（fire-and-forget 端口为 => void）。已 claim 的标记 unavailable；标记本身也防御性 guard。
+    console.warn(`[summary] chapter ${chapterId} ensure failed:`, err);
+    if (claimed) {
+      try {
+        db.update(chapters)
+          .set({ summaryStatus: "unavailable" })
+          .where(eq(chapters.id, chapterId))
+          .run();
+      } catch (markErr) {
+        console.warn(`[summary] chapter ${chapterId} could not be marked unavailable:`, markErr);
+      }
+    }
   } finally {
-    inFlight.delete(chapterId);
+    if (claimed) inFlight.delete(chapterId);
   }
 }
 
