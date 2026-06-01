@@ -91,6 +91,12 @@ Drizzle ORM over better-sqlite3，Schema 定义在 `src/main/db/schema.ts`。
 - **枚举列**：文本枚举列均附带 SQL `CHECK` 约束，在 DB 层强制合法值。
 - **消息存储**：`messages` 表持久化 AI SDK v6 的 `UIMessage`（存 `parts` 字段）；每次请求按需派生 `ModelMessage`，不持久化。
 
+## 代码规范（UI 样式）
+
+- **优先 Tailwind 工具类；非必要禁止内联 CSS（`style={{}}`）**。静态的尺寸 / 颜色 / 间距 / 字体一律用类（如 `w-80`、`max-h-40`、`bg-popover`、`font-sans`）。
+- **内联 `style` 仅允许承载运行时计算值**——无法用静态类表达者，例如：浮层的计算定位（`left/top/bottom`）、自绘滚动条 thumb 的 `height/top/opacity`、随用户偏好变化的 `maxWidth/fontSize/lineHeight`。
+- 字体走类：`font-sans` = Manrope（UI 文案），`font-serif` = Fraunces（阅读正文）；勿内联 `fontFamily`。
+
 ## 技术栈
 
 | 层          | 技术                                                           |

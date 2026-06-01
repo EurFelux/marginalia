@@ -1,0 +1,91 @@
+import type { Translation } from "#/locales/zh";
+
+// 德语普遍偏长，用来压界面布局（侧栏标签、摘要 pill、按钮等）。
+export const de: Translation = {
+  app: { badge: "UI-Prototyp" },
+  nav: {
+    collapseSidebar: "Seitenleiste einklappen",
+    expandSidebar: "Seitenleiste ausklappen",
+    collapsePanel: "KI-Panel einklappen",
+    expandPanel: "KI-Panel ausklappen",
+    collapseHeader: "Kopfzeile einklappen",
+    expandHeader: "Kopfzeile ausklappen",
+    toggleTheme: "Thema wechseln",
+  },
+  lang: { switch: "Sprache" },
+  settings: {
+    title: "Leseeinstellungen",
+    fontSize: "Schriftgröße",
+    lineHeight: "Zeilenhöhe",
+    width: "Breite",
+    decrease: "{{label}} verringern",
+    increase: "{{label}} erhöhen",
+  },
+  sidebar: {
+    viewBookSummary: "Buchübersicht ansehen",
+    bookSummary: "Buchübersicht",
+    tabToc: "Inhalt",
+    tabNotes: "Markierungen",
+    tabConversations: "Unterhaltungen",
+    newIndependent: "Neue eigenständige Unterhaltung",
+    independent: "Eigenständig",
+    notesEmpty:
+      "Noch keine Markierungen. Text im Buch auswählen → Farbe wählen oder „Notiz“ tippen.",
+  },
+  reader: { end: "— Ende —" },
+  toolbar: {
+    copy: "Kopieren",
+    aiAsk: "KI fragen",
+    note: "Notiz",
+    highlight: "Markierung {{color}}",
+  },
+  preset: { explain: "Erklären", translate: "Übersetzen", summarize: "Zusammenfassen" },
+  color: { yellow: "Gelb", green: "Grün", blue: "Blau", pink: "Rosa", purple: "Lila" },
+  highlight: { addNote: "Notiz hinzufügen…", colorAria: "Markierungsfarbe {{color}}" },
+  annotation: { delete: "Markierung löschen" },
+  chip: {
+    selection: "Ausgewählter Text",
+    paragraph: "Umgebender Text",
+    willSend: "{{label}} · wird mit dieser Nachricht gesendet",
+    requiredNote: "In dieser Phase erforderlich; nicht abschaltbar.",
+    requiredTitle: "In dieser Phase erforderlicher Kontext",
+  },
+  composer: {
+    placeholder: "Etwas fragen… (Auswahl / Absatz automatisch angehängt)",
+    stop: "Generierung stoppen",
+    send: "Senden",
+  },
+  messages: {
+    empty:
+      "Wähle links im Text eine Passage aus und tippe in der Symbolleiste auf „KI fragen“, um zu beginnen.",
+    reading: "Wird gelesen…",
+    read: "Gelesen",
+    incomplete: "Generierung unvollständig",
+    contextTitle: "Mitgesendeter Kontext",
+  },
+  panel: {
+    assistant: "KI-Assistent",
+    independent: "Eigenständige Unterhaltung",
+    conversationSuffix: "{{title}} · Unterhaltung",
+    crossScope: "über {{chapters}}",
+    crossNotice:
+      "✦ Eigenständige Unterhaltung für diese kapitelübergreifende Auswahl geöffnet ({{chapters}}) · nur fertige Zusammenfassungen werden kombiniert",
+    newConversation: "Neue Unterhaltung",
+  },
+  summary: {
+    pending: "Zusammenfassung ausstehend",
+    generating: "Wird zusammengefasst…",
+    ready: "Zusammenfassung bereit",
+    unavailable: "Zusammenfassung nicht verfügbar",
+    placeholderPending: "Zusammenfassung noch nicht erstellt.",
+    placeholderGenerating: "Zusammenfassung wird erstellt…",
+    placeholderUnavailable: "Zusammenfassung nicht verfügbar (fehlgeschlagen).",
+    chapterTitle: "Kapitelzusammenfassung · {{title}}",
+    demoCycle: "Demo: Status wechseln →",
+    viewChapter: "Kapitelzusammenfassung ansehen",
+    cross: "Kapitelübergreifend {{ready}}/{{total}}",
+    crossTitle: "Kombinierte Zusammenfassung · best-effort",
+    viewCross: "Kombinierte Zusammenfassung ansehen",
+    notReady: "(nicht bereit; nicht einbezogen)",
+  },
+};

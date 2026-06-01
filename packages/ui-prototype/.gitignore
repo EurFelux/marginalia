@@ -11,3 +11,6 @@ dist-ssr
 .vinxi
 __unconfig*
 todos.json
+
+# TanStack Router 生成物（dev/build 自动重建）
+src/routeTree.gen.ts

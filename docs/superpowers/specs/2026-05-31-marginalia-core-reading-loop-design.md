@@ -22,12 +22,13 @@ Marginalia 是一个 Electron + React 的桌面 ePub 阅读器，核心差异化
 - AI 工具系统：原文只读工具 + agent 多步循环（tool-calling）
 - 单个可编辑的默认 Assistant
 - 最小 Provider 配置（密钥加密、掩码预览、按需揭示、测试连接）
+- **标注与笔记**：多色高亮 + 段内笔记 + 标注列表（阅读器核心功能；2026-06-01 由原 SPEC「Out of Scope (MVP)」提入 Phase 1，见「标注与笔记」节）
+- **全书 / 章节摘要查看**：章节摘要经 AI 面板摘要 pill 弹卡查看正文；**全书 / global 摘要纳入 Phase 1**（`books.summary`），经侧栏书卡查看（2026-06-01 由延后提入）
 
 ### 延后（后续 Phase，结构上预留扩展位）
 
 | 延后项                                     | 预留方式                                                  |
 | ------------------------------------------ | --------------------------------------------------------- |
-| 全书 / global 摘要 chip                    | `books` 预留 `global_summary` 相关列（本 Phase 不建）     |
 | 文件系统工具（read/write/delete 授权目录） | 工具注册表 + agent 循环已在本 Phase 建好，后续只加函数    |
 | 多 Assistant CRUD                          | `assistants` 表与 `conversations.assistant_id` 绑定已就位 |
 | 全书检索 `searchBook`                      | 工具集预留扩展位                                          |
@@ -132,8 +133,9 @@ books {
   title, author: text
   cover: blob
   toc: text                      // JSON，来自 NCX/OPF
+  summary: text                  // 全书 / global 摘要正文（2026-06-01 纳入 Phase 1，解冻）
+  summaryStatus: text DEFAULT 'pending'   // pending|generating|ready|unavailable（DB CHECK）
   addedAt: integer
-  // global_summary* 冻结
 }
 
 // chapters —— 结构性拉回，含懒生成摘要
@@ -173,6 +175,19 @@ messages {
   seq: integer NOT NULL          // 会话内单调序号，保证重建顺序
   createdAt: integer
 }
+
+// annotations —— 标注 / 笔记（高亮 + 可选便签）；2026-06-01 由 MVP 之外提入 Phase 1
+annotations {
+  id: text PK                    // uuidv7
+  bookId: text NOT NULL → books.id
+  chapterId: text → chapters.id  // 起始章（跨段取首段所在章）；可空
+  color: text NOT NULL           // 'yellow'|'green'|'blue'|'pink'|'purple'（DB CHECK）
+  note: text                     // 便签正文；NULL/'' = 仅高亮
+  selectedText: text NOT NULL    // 高亮原文快照（列表展示 + CFI 失效时定位回退）
+  locator: text NOT NULL         // JSON：epub.js CFI 区间 {cfiStart, cfiEnd}（原型用段内字符偏移近似）
+  createdAt: integer
+  updatedAt: integer
+}
 ```
 
 > **持久化用 UIMessage（AI SDK 最佳实践）**：`messages` 行镜像 AI SDK v6 `UIMessage`（`id`/`role`/`parts`/`metadata`），保留完整渲染保真度（reasoning / sources / 工具 I/O / 自定义 `data-*` 段）。`UIMessage` 类型置于 `shared/`（**非 renderer 私有**，main 与 renderer 共用的协议类型），故 main 持久化它不违背"业务在 main"原则；`ModelMessage` 仅是**每次请求的临时派生**，不落库。流程：① **加载会话**——存储的 `UIMessage[]` 直接作为 `useChat` 初始 `messages`，无需转换；② **发送**——main 用 `convertToModelMessages()` 派生 `ModelMessage[]`、在 §10 注入 chip 上下文后喂 `streamText`；③ **生成中**——`toUIMessageStream()` 经 IPC 推回 renderer 渲染，结束后把完整 UIMessage 落库。`metadata` 用 Zod `messageMetadataSchema` 校验，存 chips 快照 / token usage / 模型名。会话内顺序用单调 `seq`；`system` 角色一般不落库（系统提示来自 Assistant）。
@@ -193,9 +208,23 @@ messages {
 
 1. 当前**活动会话**是**独立会话** 或 **绑定 X 章** → 追加进去。
 2. 活动会话绑定**别的章**（归属不可变、章节摘要不匹配）→ 自动切到/新建 **X 章**的会话，并明确提示用户「已为《第 N 章》开启会话」。
-3. **独立会话 = 跨章工作区**：无章节摘要，可接纳任意章节的段落上下文；通过显式「＋独立会话」入口创建（不经选区）。
+3. **独立会话 = 跨章工作区**：无单一章节摘要，可接纳任意章节的段落上下文；可由显式「＋独立会话」入口创建，**亦可由跨章选区自动触发**（见下「跨章选区」）。
 
-> 语义自洽：章节绑定会话共享该章摘要，因此不接纳他章段落；独立会话无章节摘要，故可跨章。
+> 语义自洽：章节绑定会话共享该章摘要，因此不接纳他章段落；独立会话无单一章节摘要，故可跨章。
+
+### 跨章选区（单次选区跨越多个章节）
+
+> 决策于 2026-06-01（UP1 UI 原型期间）确认。上面的"X 章"路由规则隐含"选区归属单一章"，此处补全选区本身跨章的情形。
+
+选区可能一次跨越多个章节（如从第 N 章末尾拖选到第 N+1 章开头）。按选区触及的章节数分流：
+
+1. **单章选区**：选区落在单一章节内 → "X 章" = 该章，按上面的路由规则处理。
+2. **跨章选区**：选区触及 ≥2 个章节 → 视为**跨章意图**，路由到 / 新建**独立会话**（`chapterId = NULL`，跨章工作区），并明确提示「已为跨章选择开启独立会话」。选区与周围段落上下文**完整保留**（含所有被触及章节的段落），不裁剪、不静默丢弃他章那部分。
+3. **跨章独立会话的摘要**：独立会话本无单一章节摘要；对跨章选区采用 **best-effort 组合**——把所触及章节中已 `ready` 的摘要拼为上下文，未就绪 / 不可用者直接省略（优雅降级）。
+
+> 据此，独立会话有两个入口：显式「＋独立会话」（不经选区）与**跨章选区**（经选区、自动触发）。
+>
+> **实现说明**：MA4 的 `routeConversation` 现按单 `chapterId` 入参，尚未实现跨章选区分流；落地时需扩展为接收 `chapterIds[]` 并在 ≥2 时走独立会话 + 组合摘要。属待补项（见记忆轨）。
 
 ---
 
@@ -289,6 +318,25 @@ main 后台队列，**不阻塞**阅读与对话：
 
 > 摘要生成默认用 Assistant 配置的 provider/model；独立「摘要模型」设置留作后续。
 
+> **全书 / global 摘要（2026-06-01 纳入 Phase 1）**：与章节摘要同机制——`books.summaryStatus` 懒生成（导入后台队列），覆盖全书主题 / 人物 / 结构。
+
+> **查看摘要（2026-06-01 决策）**：① 章节摘要——AI 面板会话头**摘要 pill 点开弹卡**看正文；未就绪态显示占位 / 状态。② 全书摘要——**侧栏书卡点开**看。③ 跨章独立会话——`跨章摘要 N/M` pill 点开列各章摘要（best-effort，仅就绪者计入）。
+
+---
+
+## 11.5 标注与笔记（核心阅读功能）
+
+> 2026-06-01 确认：高亮 / 笔记是阅读器**核心功能**，由原 SPEC「Out of Scope (MVP)」提入 Phase 1。UP1 UI 原型已落 UI/UX；**主进程持久化 + IPC 尚未实现**（见 §21 待补）。
+
+- **高亮**：选区 → 浮动工具栏选色，**5 色**（yellow / green / blue / pink / purple）。
+- **笔记**：高亮可附一段**便签**文本；有笔记的高亮在正文带视觉标记（✎ + 虚线下划）。
+- **编辑**：点击已有高亮 → 弹出编辑卡（换色 / 改笔记 / 删除）。
+- **标注列表**：侧栏「标注」标签页汇总全书高亮 + 笔记，按章 / 段 / 位置排序，点击跳转回正文。
+- **跨段 / 跨章**：一条标注可含多段区间；定位以段为单位。
+- **持久化（主进程）**：`annotations` 表（见 §5）。**定位锚点**：渲染层用 epub.js **CFI 区间** `{cfiStart, cfiEnd}` 锚定，另存 `selectedText` 快照作展示与 CFI 失效时的回退；原型用段内字符偏移近似。
+- **IPC**：`annotations.{listByBook, create, update, delete}`（见 §15）。
+- **降级**：CFI 失效（书源更新）→ 以 `selectedText` 尽力重定位；失败则在列表标「位置失效」，**不丢笔记内容**。
+
 ---
 
 ## 12. Provider 与密钥安全
@@ -332,6 +380,7 @@ ai.stream(streamId)         // 事件流：UI message stream chunk（AI SDK UI �
 providers.list() / upsert(...) / reveal(id) / test(id)
 assistant.getDefault() / update(...)
 reader.getPrefs() / setPrefs(...)   // 字号、行高、最大宽度（注入 epub.js CSS）
+annotations.listByBook(bookId) / create(...) / update(...) / delete(id)   // 标注 / 笔记
 ```
 
 ---
@@ -389,7 +438,8 @@ AI 面板可折叠；折叠时选区工具栏仍出现，点 AI 动作会展开�
 
 ## 21. 后续 Phase（预告，非本次范围）
 
-- 全书 / global 摘要 chip
+> **Phase 1 待补（已定为核心、主进程尚未实现）**：标注 / 笔记的持久化（`annotations` 表）、IPC（`annotations.*`）与渲染层 CFI 锚定——UP1 原型已验证 UI/UX，待接主进程（MA1–MA5 未含此项）。
+
 - 文件系统工具（沙箱化 read/write/delete + 授权目录）
 - 多 Assistant CRUD + 会话切换
 - 全书检索工具 `searchBook`

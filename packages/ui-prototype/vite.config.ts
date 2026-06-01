@@ -12,7 +12,8 @@ const config = defineConfig({
   plugins: [
     devtools(),
     tailwindcss(),
-    tanstackStart(),
+    // 原型为纯前端 UI，不需要 SSR：开 SPA 模式（应用内容纯客户端渲染，规避水合不匹配）
+    tanstackStart({ spa: { enabled: true } }),
     viteReact(),
     babel({ presets: [reactCompilerPreset()] }),
   ],

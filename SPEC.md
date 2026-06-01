@@ -278,7 +278,8 @@ Context is ordered macro → micro. Disabled or unavailable chips are omitted en
 
 ## Out of Scope (MVP)
 
-- Highlights and annotations persistence
+> 更新（2026-06-01）：**标注与笔记（高亮 + 便签）已重新归为阅读器核心功能，移出本表、纳入 Phase 1**。详见 `docs/superpowers/specs/2026-05-31-marginalia-core-reading-loop-design.md` 的「标注与笔记」节。
+
 - Multi-device sync
 - DRM support
 - PDF support
