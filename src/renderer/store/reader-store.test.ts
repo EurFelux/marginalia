@@ -26,4 +26,11 @@ describe("reader-store", () => {
     expect(useReaderStore.getState().prefs.fontScale).toBe(1.2);
     expect(useReaderStore.getState().prefs.maxWidth).toBe(READER_INITIAL.prefs.maxWidth);
   });
+  it("openBook with only bookId leaves currentChapterId null", () => {
+    useReaderStore.getState().openBook("b1");
+    const s = useReaderStore.getState();
+    expect(s.view).toBe("reader");
+    expect(s.currentBookId).toBe("b1");
+    expect(s.currentChapterId).toBeNull();
+  });
 });
