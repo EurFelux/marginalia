@@ -6,8 +6,4 @@ declare global {
   }
 }
 
-// @fontsource 包是 side-effect CSS、无 TS 类型——声明为模块以过 typecheck。
-declare module "@fontsource-variable/manrope";
-declare module "@fontsource-variable/fraunces";
-
 export {};

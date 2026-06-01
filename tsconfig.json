@@ -12,12 +12,13 @@
     "sourceMap": true,
     "resolveJsonModule": true,
     "noEmit": true,
+    "jsx": "react-jsx",
     "paths": {
       "@shared/*": ["./src/shared/*"],
       "@main/*": ["./src/main/*"],
       "@renderer/*": ["./src/renderer/*"]
     },
-    "types": ["node"]
+    "types": ["node", "react", "react-dom"]
   },
   "include": ["src", "*.config.ts", "forge.config.ts", "forge.env.d.ts"]
 }
