@@ -25,6 +25,8 @@ export function SettingsPanel() {
   const anthropic = providers.data?.find((p) => p.type === "anthropic") ?? null;
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState("claude-3-5-haiku-latest");
+  // 有 key 时默认展示掩码（只读）；点「编辑」才切到输入框换新 key。
+  const [editingKey, setEditingKey] = useState(false);
 
   const save = useMutation({
     mutationFn: async () => {
@@ -37,6 +39,7 @@ export function SettingsPanel() {
     },
     onSuccess: () => {
       setApiKey("");
+      setEditingKey(false);
       setTestResult(null);
       void qc.invalidateQueries({ queryKey: qk.providers });
       void qc.invalidateQueries({ queryKey: qk.assistantDefault });
@@ -71,23 +74,45 @@ export function SettingsPanel() {
         </div>
 
         <div className="space-y-3">
-          <label className="block">
-            <span className="mb-1 block text-xs text-muted-foreground">
-              API Key
-              {anthropic?.hasKey && (
-                <span className="ml-2 text-[11px] text-primary">
-                  已配置（{anthropic.keyMask ?? "已加密"}）· 留空保留
-                </span>
-              )}
-            </span>
-            <input
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder={anthropic?.hasKey ? "（保持不变）" : "sk-ant-…"}
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
-            />
-          </label>
+          <div className="block">
+            <span className="mb-1 block text-xs text-muted-foreground">API Key</span>
+            {anthropic?.hasKey && !editingKey ? (
+              <div className="flex items-center gap-2">
+                <div className="min-w-0 flex-1 truncate rounded-md border border-border bg-muted/40 px-3 py-2 font-mono text-sm text-muted-foreground">
+                  {anthropic.keyMask ?? "已配置（本机无法解密）"}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingKey(true)}
+                  className="shrink-0 rounded-md border border-border px-3 py-2 text-sm hover:bg-muted"
+                >
+                  编辑
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <input
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder="sk-ant-…"
+                  className="min-w-0 flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
+                />
+                {anthropic?.hasKey && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingKey(false);
+                      setApiKey("");
+                    }}
+                    className="shrink-0 rounded-md border border-border px-3 py-2 text-sm hover:bg-muted"
+                  >
+                    取消
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
 
           <label className="block">
             <span className="mb-1 block text-xs text-muted-foreground">模型</span>
