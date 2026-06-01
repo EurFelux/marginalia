@@ -11,15 +11,7 @@ import { createReadingTools, type LoadBytes } from "@main/ai/tools";
 import type { ResolvedModel } from "@main/ai/assistant-model";
 import { routeConversation } from "@main/chat/conversations";
 import { appendMessage, getLastParagraphContent, listMessages } from "@main/chat/messages";
-import type { Chip } from "@shared/chat";
-
-export interface SendInput {
-  bookId: string;
-  currentChapterId: string;
-  activeConversationId: string | null;
-  chips: Chip[];
-  userText: string;
-}
+import { type SendInput } from "@shared/chat";
 
 export interface SendDeps {
   db: DB;
@@ -59,7 +51,11 @@ function getChapter(
 }
 
 /** 选区 → AI 发送编排（设计文档 §9）。 */
-export function runSend(deps: SendDeps, input: SendInput): SendResult {
+export function runSend(
+  deps: SendDeps,
+  input: SendInput,
+  opts?: { abortSignal?: AbortSignal },
+): SendResult {
   const { db, loadBytes, resolveModel, ensureSummary, stepLimit } = deps;
 
   // 1. 先解析模型——未配置即返回错误，不路由/不落库（避免孤儿会话，设计文档 §16）
@@ -129,6 +125,7 @@ export function runSend(deps: SendDeps, input: SendInput): SendResult {
     messages,
     tools,
     stopWhen: stepCountIs(stepLimit ?? 5),
+    abortSignal: opts?.abortSignal,
   });
 
   // 9. 完成时落 assistant 消息；出错不落半截
