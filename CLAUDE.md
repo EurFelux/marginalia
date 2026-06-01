@@ -37,6 +37,8 @@ pnpm db:rebuild:node  # 将 better-sqlite3 重新编译为 Node ABI（每次运�
 
 **better-sqlite3 ABI 双轨制**：`pnpm start` 将 better-sqlite3 编译为 **Electron ABI**；vitest 在 **Node ABI** 下运行。运行过应用后，必须执行 `pnpm db:rebuild:node` 才能再跑测试，否则会出现 ABI 不匹配错误。
 
+**pnpm 11 配置位置**：pnpm 11 不再读取 `package.json` 的 `pnpm` 字段，`.npmrc` 也仅保留 auth/registry；构建脚本白名单（`allowBuilds`，取代旧 `onlyBuiltDependencies`/`neverBuiltDependencies`）、`nodeLinker` 等设置一律写在 `pnpm-workspace.yaml`。pnpm 版本由 `package.json` 的 `packageManager` 字段（corepack）锁定。配置写错位置会让 `pnpm <script>` 在 deps 预检阶段误判依赖不一致、尝试清空重装 node_modules（无 TTY 时报 `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`），从而连带 prek 钩子失败。
+
 **pre-commit hook（prek）**：`git commit` 触发 `lint:fix` + `format`，这两个步骤可能修改暂存文件并以"files were modified by this hook"中止提交。遇到时，重新 `git add` 被修改的文件，再执行一次相同的 commit 命令即可（第二次会通过）。
 
 **提交信息**：使用 Conventional Commits 格式，例如 `docs: add shared agent guide`、`feat: add epub parser`、`fix: handle missing book metadata`。
@@ -111,7 +113,7 @@ Drizzle ORM over better-sqlite3，Schema 定义在 `src/main/db/schema.ts`。
 | 校验        | Zod 4                                                          |
 | 测试        | vitest 4（Node 环境）                                          |
 | Lint/Format | oxlint + oxfmt                                                 |
-| 包管理      | pnpm（`node-linker=hoisted`）                                  |
+| 包管理      | pnpm 11（默认 isolated linker；设置见 `pnpm-workspace.yaml`）  |
 
 ## 设计文档与路线图
 

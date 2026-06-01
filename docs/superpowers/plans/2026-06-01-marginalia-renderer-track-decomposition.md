@@ -39,20 +39,20 @@
 
 ## 3. 工作单元清单（全量 RA 轨 + 主进程补口 + 部署）
 
-| 代号    | 名称                       | 内容要点                                                                                                                                                               | 依赖现有主进程                     |
-| ------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
-| **M-a** | 流式 IPC transport         | 定义 `ai:send` IPC（+`SendInput` Zod），`runSend` 的 `streamText` 增量经 IPC 推到渲染层                                                                                | MA5 `runSend` ✅                   |
-| **M-b** | annotations 持久化 + IPC   | `annotations` schema/迁移 → repository → IPC（增删改查）+ CFI 锚定                                                                                                     | UP1 UI 决策 ✅                     |
-| **M-c** | 跨章 `routeConversation[]` | 路由扩展 `chapterIds[]` → 独立会话                                                                                                                                     | MA4 路由 ✅（单章）                |
-| **M-d** | `books.summary` 全书摘要   | `books.summary` / `summaryStatus` schema/迁移 → repository/状态机 → IPC；生成逻辑仿章节摘要                                                                            | MA5 章节摘要 ✅                    |
-| **M-p** | preload API 契约闭合       | 按领域暴露 `window.api.library/settings/chat/ai`，与 `shared/*` schema/DTO 对齐；RA 侧只消费 typed API，不直接手写 channel                                             | 现有 handlers ✅                   |
+| 代号    | 名称                       | 内容要点                                                                                                                                                                | 依赖现有主进程                     |
+| ------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| **M-a** | 流式 IPC transport         | 定义 `ai:send` IPC（+`SendInput` Zod），`runSend` 的 `streamText` 增量经 IPC 推到渲染层                                                                                 | MA5 `runSend` ✅                   |
+| **M-b** | annotations 持久化 + IPC   | `annotations` schema/迁移 → repository → IPC（增删改查）+ CFI 锚定                                                                                                      | UP1 UI 决策 ✅                     |
+| **M-c** | 跨章 `routeConversation[]` | 路由扩展 `chapterIds[]` → 独立会话                                                                                                                                      | MA4 路由 ✅（单章）                |
+| **M-d** | `books.summary` 全书摘要   | `books.summary` / `summaryStatus` schema/迁移 → repository/状态机 → IPC；生成逻辑仿章节摘要                                                                             | MA5 章节摘要 ✅                    |
+| **M-p** | preload API 契约闭合       | 按领域暴露 `window.api.library/settings/chat/ai`，与 `shared/*` schema/DTO 对齐；RA 侧只消费 typed API，不直接手写 channel                                              | 现有 handlers ✅                   |
 | **RA0** | 渲染层地基                 | Forge+Vite+React **重建**三栏 island shell（布局/主题/i18n/字体/Tailwind/typed `window.api`），替换桩。原型是 TanStack Start SPA，渲染层是 Electron——**移植适配非照搬** | M-p + shared/ipc 类型              |
 | **RA1** | 书库 + 阅读                | import/list/open + TOC + 进度；分 `RA1-min`（静态章节文本，无 epub.js/CFI）与 `RA1-full`（真实 ePub 渲染/分页/CFI）                                                     | MA2 ✅ + M-p                       |
-| **RA2** | 选区→AI + 流式聊天         | 渲染 ePub 上真实选区(**CFI**)→工具栏→chip→composer→send→流式                                                                                                           | MA4 `ai:build-chips` ✅ + M-a      |
-| **RA3** | 标注与笔记                 | 高亮/便签 UI ↔ 持久化                                                                                                                                                  | RA1(选区/CFI) + M-b                |
-| **RA4** | 摘要查看 + 跨章会话        | 章节/全书摘要弹卡 + 跨章独立会话                                                                                                                                       | M-c + M-d + RA2                    |
-| **RA5** | Provider / 设置 UI         | 加 provider + key + 连通测试 + 默认 assistant 编辑                                                                                                                     | MA3 `providers:*`/`assistant:*` ✅ |
-| **D1**  | 打包 / 迁移路径            | `electron-forge extraResources` 复制迁移 SQL（CLAUDE.md TODO）+ 首次真实启动联调                                                                                       | 全部                               |
+| **RA2** | 选区→AI + 流式聊天         | 渲染 ePub 上真实选区(**CFI**)→工具栏→chip→composer→send→流式                                                                                                            | MA4 `ai:build-chips` ✅ + M-a      |
+| **RA3** | 标注与笔记                 | 高亮/便签 UI ↔ 持久化                                                                                                                                                   | RA1(选区/CFI) + M-b                |
+| **RA4** | 摘要查看 + 跨章会话        | 章节/全书摘要弹卡 + 跨章独立会话                                                                                                                                        | M-c + M-d + RA2                    |
+| **RA5** | Provider / 设置 UI         | 加 provider + key + 连通测试 + 默认 assistant 编辑                                                                                                                      | MA3 `providers:*`/`assistant:*` ✅ |
+| **D1**  | 打包 / 迁移路径            | `electron-forge extraResources` 复制迁移 SQL（CLAUDE.md TODO）+ 首次真实启动联调                                                                                        | 全部                               |
 
 ---
 
@@ -111,15 +111,15 @@ graph TD
 
 竖切是上表若干工作单元的**最小子集**（取 M-p + RA0/RA1/RA2/RA5 的最小可用切面 + M-a）：
 
-| 代号       | 内容                                                                                                                    | 映射     | 验收                                        |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------- | -------- | ------------------------------------------- |
-| **M-p**    | preload / `window.api` 契约闭合：暴露竖切所需 library/settings/chat/ai API                                               | M-p      | renderer 不直接手写 channel                 |
-| **S1**     | 渲染层骨架：桩→React 挂载 + Tailwind + 最小两栏 + 消费 `window.api`                                                     | RA0 最小 | `pnpm start` 见空壳两栏                     |
+| 代号       | 内容                                                                                                                          | 映射     | 验收                                        |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------- | -------- | ------------------------------------------- |
+| **M-p**    | preload / `window.api` 契约闭合：暴露竖切所需 library/settings/chat/ai API                                                    | M-p      | renderer 不直接手写 channel                 |
+| **S1**     | 渲染层骨架：桩→React 挂载 + Tailwind + 最小两栏 + 消费 `window.api`                                                           | RA0 最小 | `pnpm start` 见空壳两栏                     |
 | **S2**     | 导入 + 读真实正文：`library:import` 样例书 + `content:toc` / `content:chapter-text`，**静态渲染抽取文本**（不上 epub.js/CFI） | RA1 最小 | 能导入并读到真实书某章文字                  |
-| **S3**     | 选区→工具栏→chip→composer：原型选区 + 浮动工具栏 + `ai:build-chips` 预填（**字符偏移**，不上 CFI）                      | RA2 最小 | 选词出工具栏；AI 问后面板出现 chips + 草稿  |
-| **S-prov** | Provider/设置 UI：加 provider + key + 连通测试 + 选默认 assistant                                                       | RA5 最小 | 配好后 `resolveAssistantModel` 能解出真模型 |
-| **M-a**    | 流式 IPC transport（主进程新件）                                                                                        | M-a      | 发送后逐字流式回来                          |
-| **S4**     | 打通发送（真模型）：composer→`ai:send`→M-a 流式→消息列表增量                                                            | RA2 最小 | **端到端**：导入→读→选→问→真流式回复        |
+| **S3**     | 选区→工具栏→chip→composer：原型选区 + 浮动工具栏 + `ai:build-chips` 预填（**字符偏移**，不上 CFI）                            | RA2 最小 | 选词出工具栏；AI 问后面板出现 chips + 草稿  |
+| **S-prov** | Provider/设置 UI：加 provider + key + 连通测试 + 选默认 assistant                                                             | RA5 最小 | 配好后 `resolveAssistantModel` 能解出真模型 |
+| **M-a**    | 流式 IPC transport（主进程新件）                                                                                              | M-a      | 发送后逐字流式回来                          |
+| **S4**     | 打通发送（真模型）：composer→`ai:send`→M-a 流式→消息列表增量                                                                  | RA2 最小 | **端到端**：导入→读→选→问→真流式回复        |
 
 ```mermaid
 graph LR
