@@ -16,7 +16,7 @@ interface ReaderState {
 }
 
 interface ReaderActions {
-  openBook: (bookId: string, chapterId: string) => void;
+  openBook: (bookId: string, chapterId?: string | null) => void;
   backToLibrary: () => void;
   setCurrentChapter: (chapterId: string) => void;
   setSelection: (selection: SelectionInfo | null) => void;
@@ -43,8 +43,13 @@ export const READER_INITIAL: ReaderState = {
 
 export const useReaderStore = create<ReaderState & ReaderActions>((set) => ({
   ...READER_INITIAL,
-  openBook: (currentBookId, currentChapterId) =>
-    set({ view: "reader", currentBookId, currentChapterId, activeConversationId: null }),
+  openBook: (bookId, chapterId = null) =>
+    set({
+      view: "reader",
+      currentBookId: bookId,
+      currentChapterId: chapterId,
+      activeConversationId: null,
+    }),
   backToLibrary: () => set({ view: "library" }),
   setCurrentChapter: (currentChapterId) => set({ currentChapterId }),
   setSelection: (selection) => set({ selection }),
