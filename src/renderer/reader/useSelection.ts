@@ -19,6 +19,7 @@ export function useSelection(
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
     const compute = () => {
       const sel = window.getSelection();
@@ -32,7 +33,11 @@ export function useSelection(
         return;
       }
       const range = sel.getRangeAt(0);
-      if (!container.contains(range.commonAncestorContainer)) return;
+      // 选区落在正文容器外（如在 AI 面板里另起选区）→ 清掉旧的 reader 选区，别留鬼影工具栏
+      if (!container.contains(range.commonAncestorContainer)) {
+        onSelect(null);
+        return;
+      }
 
       const startPara = paragraphOf(range.startContainer);
       const endPara = paragraphOf(range.endContainer);
@@ -66,8 +71,10 @@ export function useSelection(
       });
     };
 
-    // mouseup 后选区才稳定，下一帧再算
-    const onMouseUp = () => window.setTimeout(compute, 0);
+    // mouseup 后选区才稳定，下一帧再算（记下 timer，cleanup 时清，避免卸载后写入作废选区）
+    const onMouseUp = () => {
+      timer = setTimeout(compute, 0);
+    };
     // 选区被清空（点别处）→ 通知清空
     const onSelectionChange = () => {
       const sel = window.getSelection();
@@ -77,6 +84,7 @@ export function useSelection(
     document.addEventListener("mouseup", onMouseUp);
     document.addEventListener("selectionchange", onSelectionChange);
     return () => {
+      if (timer) clearTimeout(timer);
       document.removeEventListener("mouseup", onMouseUp);
       document.removeEventListener("selectionchange", onSelectionChange);
     };
