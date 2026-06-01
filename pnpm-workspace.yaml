@@ -5,6 +5,8 @@ packages:
 # pnpm 11+ 的设置新家（v11 不再读 package.json 的 "pnpm" 字段，也不读 .npmrc 的多数设置）。
 # allowBuilds：仅以下原生依赖允许在安装时运行其构建 / postinstall 脚本（true=允许）。
 # nodeLinker 未设 → 用默认 isolated。
+# blockExoticSubdeps: false 允许 @electron/node-gyp 等 git 子依赖。
+blockExoticSubdeps: false
 allowBuilds:
   electron: true
   electron-winstaller: true
