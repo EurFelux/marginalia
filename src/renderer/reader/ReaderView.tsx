@@ -1,18 +1,22 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Settings } from "lucide-react";
+import { ArrowLeft, MessageSquare, Settings } from "lucide-react";
 import { qk } from "@renderer/query/keys";
+import { cn } from "@renderer/lib/utils";
 import { useReaderStore } from "@renderer/store/reader-store";
 import { useSettingsStore } from "@renderer/store/settings-store";
 import { ChapterList } from "@renderer/reader/ChapterList";
 import { ReaderPane } from "@renderer/reader/ReaderPane";
 import { ReaderPrefs } from "@renderer/reader/ReaderPrefs";
+import { AIPanel } from "@renderer/ai/AIPanel";
 
 export function ReaderView() {
   const bookId = useReaderStore((s) => s.currentBookId);
   const chapterId = useReaderStore((s) => s.currentChapterId);
   const setCurrentChapter = useReaderStore((s) => s.setCurrentChapter);
   const backToLibrary = useReaderStore((s) => s.backToLibrary);
+  const panelOpen = useReaderStore((s) => s.panelOpen);
+  const setPanelOpen = useReaderStore((s) => s.setPanelOpen);
   const openSettings = useSettingsStore((s) => s.setOpen);
 
   const chapters = useQuery({
@@ -45,6 +49,16 @@ export function ReaderView() {
         <div className="flex items-center gap-1">
           <ReaderPrefs />
           <button
+            onClick={() => setPanelOpen(!panelOpen)}
+            aria-label="AI 面板"
+            className={cn(
+              "rounded-md p-2 hover:bg-muted",
+              panelOpen ? "text-primary" : "text-muted-foreground",
+            )}
+          >
+            <MessageSquare className="size-4" />
+          </button>
+          <button
             onClick={() => openSettings(true)}
             className="rounded-md p-2 text-muted-foreground hover:bg-muted"
             aria-label="设置"
@@ -66,6 +80,10 @@ export function ReaderView() {
             </p>
           )}
         </main>
+        {/* 始终挂载，用 hidden 切换可见——保住 useChat 对话状态在开合间存活。 */}
+        <aside className={cn("w-96 shrink-0 border-l border-border", !panelOpen && "hidden")}>
+          <AIPanel />
+        </aside>
       </div>
     </div>
   );
