@@ -4,7 +4,7 @@ This file provides guidance to coding agents working in this repository. It is s
 
 ## 项目简介
 
-Marginalia 是一个基于 Electron + React 的桌面 ePub AI 阅读器。当前状态：主进程基础（MA1）已完整实现并测试；渲染层仍为 Electron Forge 模板桩（`src/renderer.ts`），真实阅读器 / AI 界面尚未构建。
+Marginalia 是一个基于 Electron + React 的桌面 ePub AI 阅读器。当前状态：主进程里程碑 **MA1–MA5**（DB/IPC 脊柱、ePub 解析、Provider/密钥、会话/Prompt 组装、流式 Agent 循环）均已实现并 headless 测试；UI 原型 **UP1**（`packages/ui-prototype/`）已评审并入。渲染层（`src/renderer.ts`）仍为 Electron Forge 模板桩，真实阅读器 / AI 界面待按「渲染层轨（RA）」实装——分解见 `docs/superpowers/plans/2026-06-01-marginalia-renderer-track-decomposition.md`。
 
 ## 常用命令
 
@@ -115,7 +115,7 @@ Drizzle ORM over better-sqlite3，Schema 定义在 `src/main/db/schema.ts`。
 
 ## 设计文档与路线图
 
-- `docs/superpowers/specs/`：产品设计与技术决策的设计文档（ePub 阅读核心循环设计、MA1 基础架构规格等）
-- `docs/superpowers/plans/`：里程碑实现计划（MA1 = 主进程基础，已完成；MA2 = ePub 解析与内容，规划中）
+- `docs/superpowers/specs/`：产品设计与技术决策的设计文档（ePub 阅读核心循环设计、UP1 UI 原型设计等）
+- `docs/superpowers/plans/`：里程碑实现计划。**MA1–MA5 均已完成**（MA1 主进程基础 / MA2 ePub 解析与内容 / MA3 Provider 与密钥 / MA4 会话与 Prompt / MA5 流式编排）；后续渲染层工作见 `2026-06-01-marginalia-renderer-track-decomposition.md`（RA 轨任务分解 + DAG，当前焦点：最小可用竖切）。
 
 新功能开发前，优先阅读相关设计文档以了解产品意图和架构约束。
