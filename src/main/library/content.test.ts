@@ -2,7 +2,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { createDb, runMigrations } from "@main/db/client";
 import { importBook, resolveChapterByHref } from "@main/library/repository";
-import { getChapterSummary, getToc, readChapterText } from "@main/library/content";
+import { getChapterSummary, getToc, listChapters, readChapterText } from "@main/library/content";
 import { makeFixtureEpub } from "@marginalia/epub-parser";
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
@@ -52,5 +52,14 @@ describe("content service", () => {
     expect(r.text.length).toBe(5);
     expect(r.hasMore).toBe(true);
     expect(r.nextOffset).toBe(5);
+  });
+
+  it("listChapters returns chapters ordered by orderIndex with id/title/href", () => {
+    const { db, book } = setup();
+    const chs = listChapters(db, book.id);
+    expect(chs.map((c) => c.href)).toEqual(["OEBPS/ch1.xhtml", "OEBPS/ch2.xhtml"]);
+    expect(chs.map((c) => c.title)).toEqual(["Chapter One", "Chapter Two"]);
+    expect(chs.map((c) => c.orderIndex)).toEqual([0, 1]);
+    expect(chs.every((c) => typeof c.id === "string" && c.id.length > 0)).toBe(true);
   });
 });

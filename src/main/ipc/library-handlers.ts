@@ -8,6 +8,7 @@ import {
   readChapterTextInput,
   saveProgressInput,
   type BookSummaryDto,
+  type ChapterRefDto,
   type ChapterTextSlice,
 } from "@shared/library";
 import type { TocNode } from "@shared/types";
@@ -17,6 +18,7 @@ import { getProgress, saveProgress } from "@main/library/progress";
 import {
   getChapterSummary,
   getToc,
+  listChapters,
   readChapterText,
   type ChapterSummary,
 } from "@main/library/content";
@@ -70,6 +72,12 @@ export function registerLibraryHandlers(): void {
     const db = getDb();
     if (!getBook(db, input.bookId)) throw new Error(`content: book ${input.bookId} not found`);
     return getToc(db, input.bookId);
+  });
+
+  handle<{ bookId: string }, ChapterRefDto[]>(IPC.contentChapters, bookIdInput, (input) => {
+    const db = getDb();
+    if (!getBook(db, input.bookId)) throw new Error(`content: book ${input.bookId} not found`);
+    return listChapters(db, input.bookId);
   });
 
   handle<{ bookId: string; chapterId: string }, ChapterSummary>(
