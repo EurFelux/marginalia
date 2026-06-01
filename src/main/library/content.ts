@@ -1,12 +1,9 @@
 import { and, eq } from "drizzle-orm";
-import {
-  extractChapterText,
-  type ChapterTextSlice,
-  type ReadOptions,
-} from "@marginalia/epub-parser";
+import { extractChapterText, type ReadOptions } from "@marginalia/epub-parser";
 import type { DB } from "@main/db/client";
 import { books, chapters } from "@main/db/schema";
 import { tocNodeSchema, type TocNode } from "@shared/types";
+import type { ChapterTextSlice } from "@shared/library";
 
 export interface ChapterSummary {
   status: "pending" | "generating" | "ready" | "unavailable";

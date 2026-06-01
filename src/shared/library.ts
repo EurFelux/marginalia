@@ -27,3 +27,10 @@ export interface BookSummaryDto {
   author: string | null;
   path: string;
 }
+
+/** 章节文本分页切片（renderer 可消费的 DTO，单一来源在 shared）。 */
+export interface ChapterTextSlice {
+  text: string;
+  hasMore: boolean;
+  nextOffset: number;
+}
