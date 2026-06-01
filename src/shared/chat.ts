@@ -1,6 +1,6 @@
 // src/shared/chat.ts
 import { z } from "zod";
-import type { UIMessage } from "ai";
+import type { UIMessage, UIMessageChunk } from "ai";
 import { chipIdSchema } from "@shared/types";
 import type { MessageMetadata, MessageRole } from "@shared/types";
 
@@ -59,3 +59,39 @@ export interface MessageDto {
   seq: number;
   createdAt: number;
 }
+
+/** runSend 的业务入参（不含传输层 streamId）。取代 send.ts 中手写的 SendInput interface。 */
+export const sendInputSchema = z.object({
+  bookId: z.string().min(1),
+  currentChapterId: z.string().min(1),
+  activeConversationId: z.string().min(1).nullable(),
+  chips: z.array(chipSchema),
+  userText: z.string().min(1),
+});
+export type SendInput = z.infer<typeof sendInputSchema>;
+
+/** ai:send 入站载体 = 业务入参 + 渲染层铸的 streamId。 */
+export const sendRequest = sendInputSchema.extend({ streamId: z.string().min(1) });
+export type SendRequest = z.infer<typeof sendRequest>;
+
+/** ai:send invoke 的同步 ack（增量走 ai:chunk 事件流，故不含 stream/finished）。 */
+export const sendAck = z.discriminatedUnion("ok", [
+  z.object({
+    ok: z.literal(true),
+    conversationId: z.string(),
+    created: z.boolean(),
+    switchedFromActive: z.boolean(),
+  }),
+  z.object({ ok: z.literal(false), reason: z.string() }),
+]);
+export type SendAck = z.infer<typeof sendAck>;
+
+/** ai:abort 入参。 */
+export const abortInput = z.object({ streamId: z.string().min(1) });
+export type AbortInput = z.infer<typeof abortInput>;
+
+/** ai:chunk 出站事件（main→renderer，不 Zod；UIMessageChunk 为 AI SDK 复杂联合）。 */
+export type AiStreamEvent =
+  | { streamId: string; type: "chunk"; chunk: UIMessageChunk }
+  | { streamId: string; type: "finish" }
+  | { streamId: string; type: "error"; message: string };

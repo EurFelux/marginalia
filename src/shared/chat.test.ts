@@ -1,10 +1,13 @@
 // src/shared/chat.test.ts
 import { describe, expect, it } from "vitest";
 import {
+  abortInput,
   buildChipsInput,
   chipSchema,
   createConversationInput,
   messagesByConversationInput,
+  sendAck,
+  sendRequest,
 } from "@shared/chat";
 
 describe("chat schemas", () => {
@@ -57,5 +60,44 @@ describe("chat schemas", () => {
   it("messagesByConversationInput requires a non-empty conversationId", () => {
     expect(messagesByConversationInput.safeParse({ conversationId: "" }).success).toBe(false);
     expect(messagesByConversationInput.safeParse({ conversationId: "c" }).success).toBe(true);
+  });
+});
+
+describe("sendRequest", () => {
+  const base = {
+    streamId: "s1",
+    bookId: "b1",
+    currentChapterId: "c1",
+    activeConversationId: null,
+    chips: [],
+    userText: "hi",
+  };
+  it("accepts a valid request with empty chips and null conversation", () => {
+    expect(sendRequest.safeParse(base).success).toBe(true);
+  });
+  it("rejects empty userText", () => {
+    expect(sendRequest.safeParse({ ...base, userText: "" }).success).toBe(false);
+  });
+  it("rejects missing streamId", () => {
+    const { streamId: _omit, ...rest } = base;
+    expect(sendRequest.safeParse(rest).success).toBe(false);
+  });
+});
+
+describe("sendAck", () => {
+  it("accepts ok:true variant", () => {
+    expect(
+      sendAck.safeParse({ ok: true, conversationId: "c", created: true, switchedFromActive: false })
+        .success,
+    ).toBe(true);
+  });
+  it("accepts ok:false variant", () => {
+    expect(sendAck.safeParse({ ok: false, reason: "no key" }).success).toBe(true);
+  });
+});
+
+describe("abortInput", () => {
+  it("rejects empty streamId", () => {
+    expect(abortInput.safeParse({ streamId: "" }).success).toBe(false);
   });
 });

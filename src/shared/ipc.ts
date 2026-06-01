@@ -24,6 +24,9 @@ export const IPC = {
   conversationsGet: "conversations:get",
   messagesListByConversation: "messages:list-by-conversation",
   aiBuildChips: "ai:build-chips",
+  aiSend: "ai:send",
+  aiAbort: "ai:abort",
+  aiChunk: "ai:chunk",
 } as const;
 
 /** ping —— 演示"带入参且经 Zod 校验"的往返 */
