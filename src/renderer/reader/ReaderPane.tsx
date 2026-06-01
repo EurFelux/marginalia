@@ -1,6 +1,8 @@
+import { useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { qk } from "@renderer/query/keys";
 import { useReaderStore } from "@renderer/store/reader-store";
+import { useSelection } from "@renderer/reader/useSelection";
 
 interface Props {
   bookId: string;
@@ -10,6 +12,10 @@ interface Props {
 
 export function ReaderPane({ bookId, chapterId, title }: Props) {
   const prefs = useReaderStore((s) => s.prefs);
+  const setSelection = useReaderStore((s) => s.setSelection);
+  const containerRef = useRef<HTMLElement | null>(null);
+  useSelection(containerRef, setSelection);
+
   const chapter = useQuery({
     queryKey: qk.chapter(bookId, chapterId),
     queryFn: () => window.api.content.chapterText({ bookId, chapterId }),
@@ -20,6 +26,7 @@ export function ReaderPane({ bookId, chapterId, title }: Props) {
   return (
     <div className="h-full overflow-y-auto bg-background">
       <article
+        ref={containerRef}
         className="mx-auto px-10 py-14 font-serif text-foreground/90"
         style={{
           maxWidth: prefs.maxWidth,
@@ -42,7 +49,7 @@ export function ReaderPane({ bookId, chapterId, title }: Props) {
           <p className="text-sm text-muted-foreground">（本章无正文）</p>
         )}
         {paragraphs.map((p, i) => (
-          <p key={i} className="mb-6 text-justify">
+          <p key={i} data-paragraph data-pidx={i} className="mb-6 text-justify">
             {p}
           </p>
         ))}
