@@ -1,6 +1,7 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { createDb, runMigrations } from "@main/db/client";
+import { chapters } from "@main/db/schema";
 import { importBook, resolveChapterByHref } from "@main/library/repository";
 import { getChapterSummary, getToc, listChapters, readChapterText } from "@main/library/content";
 import { makeFixtureEpub } from "@marginalia/epub-parser";
@@ -54,12 +55,28 @@ describe("content service", () => {
     expect(r.nextOffset).toBe(5);
   });
 
-  it("listChapters returns chapters ordered by orderIndex with id/title/href", () => {
+  it("listChapters is TOC-driven: titled chapters with nesting level", () => {
     const { db, book } = setup();
     const chs = listChapters(db, book.id);
     expect(chs.map((c) => c.href)).toEqual(["OEBPS/ch1.xhtml", "OEBPS/ch2.xhtml"]);
     expect(chs.map((c) => c.title)).toEqual(["Chapter One", "Chapter Two"]);
     expect(chs.map((c) => c.orderIndex)).toEqual([0, 1]);
+    expect(chs.map((c) => c.level)).toEqual([0, 0]);
     expect(chs.every((c) => typeof c.id === "string" && c.id.length > 0)).toBe(true);
+  });
+
+  it("listChapters excludes spine items absent from the TOC (no title → not a chapter)", () => {
+    const { db, book } = setup();
+    // 模拟一个不在 TOC 里的 spine 项（封面 / 分隔页之类）
+    db.insert(chapters)
+      .values({
+        bookId: book.id,
+        href: "OEBPS/cover.xhtml",
+        orderIndex: 99,
+        summaryStatus: "pending",
+      })
+      .run();
+    const chs = listChapters(db, book.id);
+    expect(chs.map((c) => c.href)).toEqual(["OEBPS/ch1.xhtml", "OEBPS/ch2.xhtml"]);
   });
 });
