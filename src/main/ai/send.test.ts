@@ -213,6 +213,21 @@ describe("runSend", () => {
     expect(listConversationsByBook(db, otherBook.id)).toEqual([]);
   });
 
+  it("forwards a non-aborted signal without breaking the normal persist path", async () => {
+    const controller = new AbortController();
+    const { db, book, ch1, deps } = setup({
+      ok: true,
+      model: textStreamModel("hello"),
+      modelId: "mock",
+    });
+    const r = runSend(deps, input(book.id, ch1.id), { abortSignal: controller.signal });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    await r.finished;
+    // 正常路径：user + assistant 两条都落库
+    expect(listMessages(db, r.conversationId)).toHaveLength(2);
+  });
+
   it("omits the paragraph chip from the snapshot when it duplicates the conversation's last", async () => {
     const { db, book, ch1, deps } = setup({
       ok: true,
