@@ -28,9 +28,8 @@ export interface BookSummaryDto {
   path: string;
 }
 
-/** 章节文本分页切片（renderer 可消费的 DTO，单一来源在 shared）。 */
-export interface ChapterTextSlice {
-  text: string;
-  hasMore: boolean;
-  nextOffset: number;
-}
+/**
+ * 章节文本分页切片。单一来源在 `@marginalia/epub-parser`（`extractChapterText` 的产出形状），
+ * 这里 re-export 供 renderer/preload 消费——与 `@shared/types` re-export `TocNode` 同一模式，避免重复定义漂移。
+ */
+export type { ChapterTextSlice } from "@marginalia/epub-parser";
