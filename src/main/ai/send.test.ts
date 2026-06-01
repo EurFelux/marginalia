@@ -2,8 +2,10 @@
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { MockLanguageModelV3, simulateReadableStream } from "ai/test";
+import { eq } from "drizzle-orm";
 import { makeFixtureEpub } from "@marginalia/epub-parser";
 import { createDb, runMigrations } from "@main/db/client";
+import { chapters } from "@main/db/schema";
 import { importBook, resolveChapterByHref } from "@main/library/repository";
 import { listConversationsByBook } from "@main/chat/conversations";
 import { listMessages } from "@main/chat/messages";
@@ -37,6 +39,24 @@ function textStreamModel(text: string) {
         ],
       }),
     }),
+  });
+}
+
+function capturingStreamModel(text: string, capture: { prompt?: string }) {
+  return new MockLanguageModelV3({
+    doStream: async (options) => {
+      capture.prompt = JSON.stringify(options.prompt);
+      return {
+        stream: simulateReadableStream({
+          chunks: [
+            { type: "text-start", id: "t1" },
+            { type: "text-delta", id: "t1", delta: text },
+            { type: "text-end", id: "t1" },
+            finishChunk("stop"),
+          ],
+        }),
+      };
+    },
   });
 }
 
@@ -102,7 +122,7 @@ describe("runSend", () => {
   });
 
   it("persists the user message with a chip snapshot and the streamed assistant message", async () => {
-    const { db, book, ch1, deps } = setup({
+    const { db, book, ch1, deps, ensureSummary } = setup({
       ok: true,
       model: textStreamModel("It means hello."),
       modelId: "mock",
@@ -124,6 +144,7 @@ describe("runSend", () => {
       .join("");
     expect(assistantText).toContain("It means hello.");
     expect(r.created).toBe(true);
+    expect(ensureSummary).toHaveBeenCalledWith(book.id, ch1.id);
   });
 
   it("runs the tool-calling agent loop and persists tool parts in the assistant message", async () => {
@@ -141,6 +162,7 @@ describe("runSend", () => {
     const partTypes = assistant.parts.map((p) => p.type);
     expect(partTypes.some((t) => t.startsWith("tool-") || t === "dynamic-tool")).toBe(true);
     expect(partTypes).toContain("text");
+    expect(JSON.stringify(assistant.parts)).toContain("Chapter One");
   });
 
   it("does not persist an assistant message when streaming errors", async () => {
@@ -156,6 +178,25 @@ describe("runSend", () => {
     await r.finished;
     const roles = listMessages(db, r.conversationId).map((m) => m.role);
     expect(roles).toEqual(["user"]);
+  });
+
+  it("injects a ready chapter summary into the prompt and skips background generation", async () => {
+    const capture: { prompt?: string } = {};
+    const { db, book, ch1, deps, ensureSummary } = setup({
+      ok: true,
+      model: capturingStreamModel("ok", capture),
+      modelId: "mock",
+    });
+    db.update(chapters)
+      .set({ summaryStatus: "ready", summary: "CHAPTER-SUMMARY-XYZ" })
+      .where(eq(chapters.id, ch1.id))
+      .run();
+    const r = runSend(deps, input(book.id, ch1.id));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    await r.finished;
+    expect(capture.prompt).toContain("CHAPTER-SUMMARY-XYZ"); // 摘要进了模型输入
+    expect(ensureSummary).not.toHaveBeenCalled(); // 已 ready → 不再后台生成
   });
 
   it("returns an error without writing when the chapter belongs to a different book", () => {
