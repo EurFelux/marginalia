@@ -34,10 +34,15 @@ export interface BookSummaryDto {
  */
 export type { ChapterTextSlice } from "@marginalia/epub-parser";
 
-/** 章节导航引用：渲染层据此列章 / 取 surrogate id 喂 content.chapterText。 */
+/**
+ * 章节导航引用：渲染层据此列章 / 取 surrogate id 喂 content.chapterText。
+ * 章节以 TOC 为准（有标题的目录条目）；`level` 表达层级（0=章，1+=节，源自 TOC 嵌套）。
+ * 仅在 epub 无 TOC 的兜底路径里 title 可能为 null。
+ */
 export interface ChapterRefDto {
   id: string;
   title: string | null;
   href: string;
   orderIndex: number;
+  level: number;
 }
