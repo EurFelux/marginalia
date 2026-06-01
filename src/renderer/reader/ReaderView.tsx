@@ -8,6 +8,7 @@ import { useSettingsStore } from "@renderer/store/settings-store";
 import { ChapterList } from "@renderer/reader/ChapterList";
 import { ReaderPane } from "@renderer/reader/ReaderPane";
 import { ReaderPrefs } from "@renderer/reader/ReaderPrefs";
+import { SelectionToolbar } from "@renderer/reader/SelectionToolbar";
 import { AIPanel } from "@renderer/ai/AIPanel";
 
 export function ReaderView() {
@@ -85,6 +86,7 @@ export function ReaderView() {
           <AIPanel />
         </aside>
       </div>
+      <SelectionToolbar />
     </div>
   );
 }
