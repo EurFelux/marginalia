@@ -20,7 +20,7 @@ export function ChapterList({ bookId }: { bookId: string }) {
           key={ch.id}
           onClick={() => setCurrentChapter(ch.id)}
           className={cn(
-            "truncate rounded-md px-2 py-1.5 text-left text-sm transition-colors",
+            "shrink-0 truncate rounded-md px-2 py-1.5 text-left text-sm transition-colors",
             ch.id === currentChapterId
               ? "bg-primary/10 font-medium text-primary"
               : "text-foreground/80 hover:bg-muted",
