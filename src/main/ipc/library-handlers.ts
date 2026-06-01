@@ -8,6 +8,7 @@ import {
   readChapterTextInput,
   saveProgressInput,
   type BookSummaryDto,
+  type ChapterTextSlice,
 } from "@shared/library";
 import type { TocNode } from "@shared/types";
 import { getDb } from "@main/db/instance";
@@ -20,7 +21,6 @@ import {
   type ChapterSummary,
 } from "@main/library/content";
 import { handle } from "@main/ipc/registry";
-import type { ChapterTextSlice } from "@marginalia/epub-parser";
 
 const toDto = (b: {
   id: string;
