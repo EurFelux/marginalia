@@ -441,6 +441,12 @@ graph LR
 | 导入失败                       | `library.import` 抛可读错误 → mutation `onError` → UI toast                                                            |
 | 章节读取失败                   | `["chapter"]` query error → ReaderPane 显错误态，不静默空白                                                            |
 
+### 8.1 网络与代理
+
+- **默认走系统代理**：所有 AI 出站请求（连通测试 / `streamText`）由主进程经 Electron `net.fetch`（Chromium 网络栈，默认采用系统代理设置）发起，作为 `fetch` 注入 AI SDK 的 provider 工厂。动机：部分地区直连 `api.anthropic.com` 会被 **403「Request not allowed」按区域拦截**，须经系统代理出网。随 **S4 真模型联网**一并接线（`resolveLanguageModel` 接受注入的 `fetch`，model-factory 保持 headless 可测——测试不注入则回退全局 fetch）。
+- **错误如实透传（已落地）**：连通测试与流式错误**优先透传 provider 的真实 error message**（`getErrorMessage` 提取 `{error:{message}}` / `{error:"str"}` / `{message}` 等常见形状）；提取不到才退到 **HTTP 状态码的标准语义**并标注「可能方向」，**绝不虚构具体原因**（杜绝把 403 误报成「invalid API key」之类）。
+- **可配置代理设置（自定义代理地址 / PAC / 按 provider 覆盖）推迟出 MVP**——MVP 仅「默认系统代理」。见 §10。
+
 ---
 
 ## 9. 测试策略（headless 优先）
@@ -464,7 +470,7 @@ graph LR
 
 ## 10. 刻意推迟（不在竖切内）
 
-epub.js 真实分页 · CFI 锚定 · 标注与笔记(RA3) · 跨章会话(M-c/RA4) · 全书摘要(M-d) · i18n / 主题切换 · 打包与迁移路径(D1) · 多 provider 类型(google/openai/openai-compatible) · `reconnectToStream` 断线重连。
+epub.js 真实分页 · CFI 锚定 · 标注与笔记(RA3) · 跨章会话(M-c/RA4) · 全书摘要(M-d) · i18n / 主题切换 · 打包与迁移路径(D1) · 多 provider 类型(google/openai/openai-compatible) · `reconnectToStream` 断线重连 · 可配置代理设置（自定义代理地址 / PAC / 按 provider 覆盖；MVP 仅「默认系统代理」，见 §8.1）。
 
 > `S2` 仅完成 `RA1-min`（经 `content:toc`/`content:chapter-text` 静态渲染真实章节文本），**不代表 `RA1-full`**；真实 epub.js/CFI 渲染留给后续 `RA1-full`（亦为 RA3 标注锚定的前置）。
 
