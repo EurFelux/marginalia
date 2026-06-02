@@ -1,9 +1,12 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { SectionFrame, type SectionSelectEvent } from "./SectionFrame";
+import type { ViewportRect } from "./geometry";
 
 export interface VirtualDocsHandle {
   scrollToIndex: (index: number) => void;
+  /** 对所有在挂 section 重跑 decorate（标注增删改后调用）。 */
+  redecorate: () => void;
 }
 
 export interface VirtualDocsProps {
@@ -22,17 +25,31 @@ export interface VirtualDocsProps {
   onTopIndexChange?: (index: number) => void;
   onSelect?: (e: SectionSelectEvent) => void;
   onSelectionCleared?: () => void;
+  decorate?: (index: number, doc: Document) => void;
+  onHighlightClick?: (annoId: string, rect: ViewportRect) => void;
 }
 
 export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(function VirtualDocs(
-  { count, loadSection, styleCss, initialIndex, onTopIndexChange, onSelect, onSelectionCleared },
+  {
+    count,
+    loadSection,
+    styleCss,
+    initialIndex,
+    onTopIndexChange,
+    onSelect,
+    onSelectionCleared,
+    decorate,
+    onHighlightClick,
+  },
   ref,
 ) {
   const vRef = useRef<VirtuosoHandle | null>(null);
+  const [decorateNonce, setDecorateNonce] = useState(0);
   useImperativeHandle(
     ref,
     () => ({
       scrollToIndex: (index: number) => vRef.current?.scrollToIndex({ index, align: "start" }),
+      redecorate: () => setDecorateNonce((n) => n + 1),
     }),
     [],
   );
@@ -45,9 +62,20 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
         styleCss={styleCss}
         onSelect={onSelect}
         onSelectionCleared={onSelectionCleared}
+        decorate={decorate}
+        onHighlightClick={onHighlightClick}
+        decorateNonce={decorateNonce}
       />
     ),
-    [loadSection, styleCss, onSelect, onSelectionCleared],
+    [
+      loadSection,
+      styleCss,
+      onSelect,
+      onSelectionCleared,
+      decorate,
+      onHighlightClick,
+      decorateNonce,
+    ],
   );
 
   return (
@@ -68,12 +96,18 @@ function LazySection({
   styleCss,
   onSelect,
   onSelectionCleared,
+  decorate,
+  onHighlightClick,
+  decorateNonce,
 }: {
   index: number;
   loadSection: (index: number) => Promise<string>;
   styleCss?: string;
   onSelect?: (e: SectionSelectEvent) => void;
   onSelectionCleared?: () => void;
+  decorate?: (index: number, doc: Document) => void;
+  onHighlightClick?: (annoId: string, rect: ViewportRect) => void;
+  decorateNonce?: number;
 }) {
   const [html, setHtml] = useState<string | null>(null);
   useEffect(() => {
@@ -97,6 +131,9 @@ function LazySection({
       styleCss={styleCss}
       onSelect={onSelect}
       onSelectionCleared={onSelectionCleared}
+      decorate={decorate}
+      onHighlightClick={onHighlightClick}
+      decorateNonce={decorateNonce}
     />
   );
 }

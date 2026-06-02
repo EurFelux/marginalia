@@ -15,6 +15,12 @@ interface Props {
   styleCss?: string;
   onSelect?: (e: SectionSelectEvent) => void;
   onSelectionCleared?: () => void;
+  /** iframe 内容加载后（及 decorateNonce 变化时）回调，供消费方在文档上贴装饰（如高亮 mark）。 */
+  decorate?: (index: number, doc: Document) => void;
+  /** 点击带 data-anno-id 的装饰元素时回调（rect 为视口坐标）。 */
+  onHighlightClick?: (annoId: string, rect: ViewportRect) => void;
+  /** 变化即对已加载文档重跑 decorate（标注增删改后由 VirtualDocs 递增）。 */
+  decorateNonce?: number;
 }
 
 const STYLE_ID = "vd-style";
@@ -26,11 +32,21 @@ function buildSrcDoc(html: string, styleCss?: string): string {
   return `<!doctype html><html><head><meta charset="utf-8">${style}</head><body>${html}</body></html>`;
 }
 
-export function SectionFrame({ index, html, styleCss, onSelect, onSelectionCleared }: Props) {
+export function SectionFrame({
+  index,
+  html,
+  styleCss,
+  onSelect,
+  onSelectionCleared,
+  decorate,
+  onHighlightClick,
+  decorateNonce,
+}: Props) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   // 用 ref 持最新回调，避免回调身份变化触发 effect 重挂
-  const cbRef = useRef({ onSelect, onSelectionCleared });
-  cbRef.current = { onSelect, onSelectionCleared };
+  const cbRef = useRef({ onSelect, onSelectionCleared, decorate, onHighlightClick });
+  cbRef.current = { onSelect, onSelectionCleared, decorate, onHighlightClick };
+  const docRef = useRef<Document | null>(null);
 
   useEffect(() => {
     const iframe = iframeRef.current;
@@ -54,12 +70,24 @@ export function SectionFrame({ index, html, styleCss, onSelect, onSelectionClear
       const sel = doc.getSelection();
       if (!sel || sel.isCollapsed) cbRef.current.onSelectionCleared?.();
     };
+    const onAnnoClick = (e: MouseEvent) => {
+      if (!doc) return;
+      const el = (e.target as Element | null)?.closest?.("[data-anno-id]") as HTMLElement | null;
+      if (!el) return;
+      const id = el.getAttribute("data-anno-id");
+      if (!id) return;
+      const r = el.getBoundingClientRect();
+      const fr = iframe.getBoundingClientRect();
+      cbRef.current.onHighlightClick?.(id, toViewportRect(r, fr));
+    };
     const detach = () => {
       ro?.disconnect();
       ro = undefined;
       doc?.removeEventListener("mouseup", onMouseUp);
       doc?.removeEventListener("selectionchange", onSelChange);
+      doc?.removeEventListener("click", onAnnoClick);
       doc = null;
+      docRef.current = null;
     };
     const onLoad = () => {
       detach();
@@ -73,6 +101,9 @@ export function SectionFrame({ index, html, styleCss, onSelect, onSelectionClear
       ro.observe(doc.documentElement);
       doc.addEventListener("mouseup", onMouseUp);
       doc.addEventListener("selectionchange", onSelChange);
+      docRef.current = doc;
+      cbRef.current.decorate?.(index, doc);
+      doc.addEventListener("click", onAnnoClick);
     };
 
     iframe.addEventListener("load", onLoad);
@@ -81,6 +112,10 @@ export function SectionFrame({ index, html, styleCss, onSelect, onSelectionClear
       detach();
     };
   }, [index]);
+
+  useEffect(() => {
+    if (docRef.current) cbRef.current.decorate?.(index, docRef.current);
+  }, [decorateNonce, index]);
 
   const srcDoc = useMemo(() => buildSrcDoc(html, styleCss), [html, styleCss]);
 
