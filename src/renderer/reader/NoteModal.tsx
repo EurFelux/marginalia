@@ -85,6 +85,13 @@ export function NoteModal() {
           ref={taRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            // Cmd(macOS)/Ctrl(Win/Linux)+Enter 保存
+            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+              e.preventDefault();
+              save();
+            }
+          }}
           placeholder="写点想法…"
           rows={8}
           className="no-scrollbar w-full resize-none rounded-md border border-border bg-background px-3 py-2.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring"
