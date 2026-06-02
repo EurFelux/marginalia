@@ -40,15 +40,24 @@ export type ConversationIdInput = z.infer<typeof conversationIdInput>;
 export const messagesByConversationInput = z.object({ conversationId: z.string().min(1) });
 export type MessagesByConversationInput = z.infer<typeof messagesByConversationInput>;
 
-export interface ConversationDto {
+interface ConversationBase {
   id: string;
-  bookId: string | null;
-  chapterId: string | null;
-  assistantId: string | null;
+  bookId: string;
+  assistantId: string;
   title: string | null;
   createdAt: number;
   updatedAt: number;
 }
+
+/**
+ * 会话视图，按 chapterId 存在性判别（非法组合不可表示）：
+ *  - `chapter`：绑定具体章节（chapterId 非空）。
+ *  - `independent`：独立会话（chapterId 为 null）。
+ * bookId/assistantId 恒非空（列已 NOT NULL）。
+ */
+export type ConversationDto =
+  | (ConversationBase & { kind: "chapter"; chapterId: string })
+  | (ConversationBase & { kind: "independent"; chapterId: null });
 
 export interface MessageDto {
   id: string;

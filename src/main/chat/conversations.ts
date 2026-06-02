@@ -8,15 +8,17 @@ import type { ConversationDto, CreateConversationInput } from "@shared/chat";
 type ConversationRow = typeof conversations.$inferSelect;
 
 function toDto(row: ConversationRow): ConversationDto {
-  return {
+  const base = {
     id: row.id,
-    bookId: row.bookId ?? null,
-    chapterId: row.chapterId ?? null,
-    assistantId: row.assistantId ?? null,
+    bookId: row.bookId,
+    assistantId: row.assistantId,
     title: row.title ?? null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
+  return row.chapterId === null
+    ? { ...base, kind: "independent", chapterId: null }
+    : { ...base, kind: "chapter", chapterId: row.chapterId };
 }
 
 /** 创建会话（chapterId 传 null = 独立会话）；assistantId 取默认 Assistant（按需惰性播种）。 */

@@ -120,9 +120,13 @@ export const conversations = sqliteTable(
   "conversations",
   {
     id: pkUuid(),
-    bookId: text("book_id").references(() => books.id),
+    bookId: text("book_id")
+      .notNull()
+      .references(() => books.id),
     chapterId: text("chapter_id").references(() => chapters.id), // NULL = 独立会话
-    assistantId: text("assistant_id").references(() => assistants.id),
+    assistantId: text("assistant_id")
+      .notNull()
+      .references(() => assistants.id),
     title: text("title"),
     createdAt: nowMs(),
     updatedAt: integer("updated_at")

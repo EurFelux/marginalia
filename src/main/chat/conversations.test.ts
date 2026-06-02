@@ -39,6 +39,7 @@ describe("createConversation / getConversation / listConversationsByBook", () =>
     const db = freshDb();
     seedBookWithChapters(db);
     const convo = createConversation(db, { bookId: "book-1", chapterId: null });
+    expect(convo.kind).toBe("independent");
     expect(convo.bookId).toBe("book-1");
     expect(convo.chapterId).toBeNull();
     expect(convo.assistantId).not.toBeNull();
@@ -74,6 +75,7 @@ describe("routeConversation", () => {
     });
     expect(r.created).toBe(true);
     expect(r.switchedFromActive).toBe(false);
+    expect(getConversation(db, r.conversationId)?.kind).toBe("chapter");
     expect(getConversation(db, r.conversationId)?.chapterId).toBe(ch1);
   });
 
