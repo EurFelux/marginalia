@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { makeFixtureEpub, type ChapterTextSlice } from "@marginalia/epub-parser";
 import { createDb, runMigrations } from "@main/db/client";
 import { importBook, resolveChapterByHref } from "@main/library/repository";
-import { createReadingTools, type LoadBytes } from "@main/ai/tools";
+import { createReadingTools, resolveChapterRef, type LoadBytes } from "@main/ai/tools";
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
 
@@ -25,12 +25,16 @@ function setup() {
 const opts = { toolCallId: "test", messages: [] } as never;
 
 describe("createReadingTools", () => {
-  it("getToc returns the book's table of contents", async () => {
+  it("getToc returns chapters with ids and titles the read tools accept", async () => {
     const { tools } = setup();
-    expect(await tools.getToc.execute!({}, opts)).toEqual([
-      { label: "Chapter One", href: "OEBPS/ch1.xhtml" },
-      { label: "Chapter Two", href: "OEBPS/ch2.xhtml" },
-    ]);
+    const toc = (await tools.getToc.execute!({}, opts)) as Array<{
+      id: string;
+      title: string | null;
+      href: string;
+    }>;
+    expect(toc.map((c) => c.href)).toEqual(["OEBPS/ch1.xhtml", "OEBPS/ch2.xhtml"]);
+    expect(toc.map((c) => c.title)).toEqual(["Chapter One", "Chapter Two"]);
+    expect(toc.every((c) => typeof c.id === "string" && c.id.length > 0)).toBe(true);
   });
 
   it("readChapterText loads bytes via the port and returns verbatim text", async () => {
@@ -41,6 +45,15 @@ describe("createReadingTools", () => {
     )) as ChapterTextSlice;
     expect(slice.text).toContain("Hello world.");
     expect(slice.hasMore).toBe(false);
+  });
+
+  it("readChapterText accepts an href (as getToc returns) for chapterId", async () => {
+    const { tools } = setup();
+    const slice = (await tools.readChapterText.execute!(
+      { chapterId: "OEBPS/ch1.xhtml" },
+      opts,
+    )) as ChapterTextSlice;
+    expect(slice.text).toContain("Hello world.");
   });
 
   it("readChapterText forwards offset/maxChars for pagination", async () => {
@@ -80,5 +93,18 @@ describe("createReadingTools", () => {
     const { tools } = setup();
     const schema = tools.readChapterText.inputSchema as z.ZodType<unknown>;
     expect(schema.safeParse({ chapterId: "" }).success).toBe(false);
+  });
+});
+
+describe("resolveChapterRef", () => {
+  it("returns a valid id unchanged and resolves an href to that id", () => {
+    const { db, book, ch1 } = setup();
+    expect(resolveChapterRef(db, book.id, ch1.id)).toBe(ch1.id);
+    expect(resolveChapterRef(db, book.id, "OEBPS/ch1.xhtml")).toBe(ch1.id);
+  });
+
+  it("throws for a ref that is neither a known id nor href", () => {
+    const { db, book } = setup();
+    expect(() => resolveChapterRef(db, book.id, "night_3")).toThrow(/not found/);
   });
 });
