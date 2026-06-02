@@ -71,16 +71,16 @@ export function NoteModal() {
     >
       <div
         onMouseDown={(e) => e.stopPropagation()}
-        className="w-96 max-w-[90vw] rounded-xl border border-border bg-popover p-4 font-sans shadow-2xl"
+        className="w-[36rem] max-w-[90vw] rounded-xl border border-border bg-popover p-5 font-sans shadow-2xl"
       >
-        <h2 className="mb-2 text-sm font-medium">{editing ? "编辑笔记" : "添加笔记"}</h2>
+        <h2 className="mb-2.5 text-sm font-medium">{editing ? "编辑笔记" : "添加笔记"}</h2>
         <textarea
           ref={taRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="写点想法…"
-          rows={5}
-          className="no-scrollbar w-full resize-none rounded-md border border-border bg-background px-2.5 py-2 text-sm outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring"
+          rows={8}
+          className="no-scrollbar w-full resize-none rounded-md border border-border bg-background px-3 py-2.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring"
         />
         <div className="mt-3 flex justify-end gap-2">
           <button
