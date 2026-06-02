@@ -73,10 +73,9 @@ function AssistantBubble({ m, streaming }: { m: ChatUIMessage; streaming: boolea
         <ToolStepCard key={i} part={p} />
       ))}
       {showBubble && (
-        <div className="max-w-[88%] rounded-2xl rounded-bl-sm bg-muted px-3.5 py-2 text-sm">
-          <Streamdown className="prose prose-sm max-w-none dark:prose-invert prose-p:my-1.5 prose-pre:my-2 prose-headings:mb-1 prose-headings:mt-2">
-            {text}
-          </Streamdown>
+        <div className="max-w-[88%] rounded-2xl rounded-bl-sm bg-muted px-3.5 py-2 text-sm leading-relaxed text-foreground">
+          {/* Streamdown 自带 markdown 排版（经 @source 由 Tailwind 生成其类）；不叠 prose 以免边距打架 */}
+          <Streamdown>{text}</Streamdown>
           {streaming && text === "" && (
             <span className="inline-block animate-pulse text-primary">▍</span>
           )}
