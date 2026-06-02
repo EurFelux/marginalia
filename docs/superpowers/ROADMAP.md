@@ -12,12 +12,12 @@
 
 **最小可用竖切已交付并合并**（PR #6，2026-06-02）：导入 → 读 → 选 → 问 → **真模型流式回复**，端到端可用。
 
-**下一目标（待拍板）**，候选与理由：
+**已定下一目标：RA1-full**（epub.js 真实渲染 + CFI 锚定，RA3 标注前置）。拆成两个计划：
 
-- **RA1-full**：epub.js 真实渲染 / 分页 / CFI 锚定——是 RA3 标注锚定的前置，解锁面最大。
-- **RA3 + M-b**：标注与笔记（已核心化、UP1 有 UI；主进程 `annotations` 表 / IPC / CFI 待补）——依赖 RA1-full 的 CFI。
-- **RA4 收尾**：全书摘要（M-d）+ 跨章会话（M-c）。
-- **类型设计债清理**：趁渲染层刚接 preload、迁移成本最低（见 Backlog）。
+- **Plan A（✅ 已完成并合并）**：`@marginalia/virtual-docs` 包——react-virtuoso 薄封装 + 自适应高度 iframe + 选区事件，epub-agnostic。ui-prototype 合成数据验证通过（连续滚动 / 自适应高度 / 选区 rect / 跳转）。执行中清掉两个集成坑：ui-prototype 消费源码包的两份 React（vite `dedupe`）、react-virtuoso optional prop 不接受 `undefined`（边界 `?? 0`）。
+- **Plan B（🔴 下一步）**：RA1-full app 集成——`readEpubBytes` IPC + epub.js 胶水（`ePub`/`section.load`/`EpubCFI`）+ `EpubReader` 替换 ReaderPane + CFI 进度/跳章/当前章 + 偏好注入 + 选区桥（消费包 `onSelect`）。据 Plan A 验证过的真实 API 编写。
+
+其后候选：RA3 + M-b（标注，依赖 CFI）、RA4 收尾（M-d/M-c）、类型设计债清理。
 
 ---
 
@@ -38,16 +38,16 @@
 
 ### 渲染层（RA 轨）
 
-| 单元     | 名称                                            | 状态 | 备注                                         |
-| -------- | ----------------------------------------------- | ---- | -------------------------------------------- |
-| RA0      | 渲染层地基（三栏 / Tailwind / Query / zustand） | ✅   | 竖切重建，替换 Forge 模板桩                  |
-| RA1-min  | 书库导入 + 静态正文 + TOC 章节                  | ✅   |                                              |
-| RA1-full | epub.js 真实渲染 / 分页 / CFI                   | 🔴   | RA3 前置                                     |
-| RA2      | 选区 → 工具栏 → chip → 流式聊天                 | 🟡   | 字符偏移版 ✅；CFI 选区待 RA1-full           |
-| RA3      | 标注与笔记 UI                                   | 🔴   | 依赖 M-b + RA1-full                          |
-| RA4      | 摘要查看 + 跨章会话                             | 🟡   | 章节摘要 pill ✅；全书摘要 / 跨章 🔴         |
-| RA5      | Provider / 设置 UI                              | 🟡   | Anthropic ✅；多 provider 类型 🔴            |
-| D1       | 打包 / 迁移路径                                 | 🔴   | `electron-forge extraResources` 复制迁移 SQL |
+| 单元     | 名称                                            | 状态 | 备注                                            |
+| -------- | ----------------------------------------------- | ---- | ----------------------------------------------- |
+| RA0      | 渲染层地基（三栏 / Tailwind / Query / zustand） | ✅   | 竖切重建，替换 Forge 模板桩                     |
+| RA1-min  | 书库导入 + 静态正文 + TOC 章节                  | ✅   |                                                 |
+| RA1-full | epub.js 真实渲染 / 分页 / CFI                   | 🟡   | Plan A `virtual-docs` 包 ✅；Plan B app 集成 🔴 |
+| RA2      | 选区 → 工具栏 → chip → 流式聊天                 | 🟡   | 字符偏移版 ✅；CFI 选区待 RA1-full              |
+| RA3      | 标注与笔记 UI                                   | 🔴   | 依赖 M-b + RA1-full                             |
+| RA4      | 摘要查看 + 跨章会话                             | 🟡   | 章节摘要 pill ✅；全书摘要 / 跨章 🔴            |
+| RA5      | Provider / 设置 UI                              | 🟡   | Anthropic ✅；多 provider 类型 🔴               |
+| D1       | 打包 / 迁移路径                                 | 🔴   | `electron-forge extraResources` 复制迁移 SQL    |
 
 > 全量分解与依赖 DAG 见 [`renderer-track-decomposition`](plans/2026-06-01-marginalia-renderer-track-decomposition.md)。
 
@@ -83,14 +83,15 @@
 
 ### 接缝 / 小修
 
-| 项                                                               | 状态           | 来源            |
-| ---------------------------------------------------------------- | -------------- | --------------- |
-| 跨章选区 → 独立会话 + best-effort 组合摘要（M-c 的 UI 侧）       | 🔴             | ma4-deferred #8 |
-| `textOfParts` 历史回放丢弃 assistant 的 tool/reasoning part      | 🟡 Phase1 有意 | ma4 #5 / ma5 #9 |
-| `conversations:create` FK 友好预检（现抛原始 SQLITE_CONSTRAINT） | 🔴 cosmetic    | ma4-deferred #7 |
-| 嵌套 TOC 层级目录渲染（现 `content.chapters` 扁平）              | 🔴             | vslice p3       |
-| 章内完整分页（`hasMore` 续读 `nextOffset`）                      | 🔴             | vslice p3 / p4  |
-| 会话历史初值（重开会话载入 `messages.list-by-conversation`）     | 🔴             | vslice p4       |
+| 项                                                                                              | 状态           | 来源                                    |
+| ----------------------------------------------------------------------------------------------- | -------------- | --------------------------------------- |
+| 跨章选区 → 独立会话 + best-effort 组合摘要（M-c 的 UI 侧）                                      | 🔴             | ma4-deferred #8                         |
+| `textOfParts` 历史回放丢弃 assistant 的 tool/reasoning part                                     | 🟡 Phase1 有意 | ma4 #5 / ma5 #9                         |
+| `conversations:create` FK 友好预检（现抛原始 SQLITE_CONSTRAINT）                                | 🔴 cosmetic    | ma4-deferred #7                         |
+| 嵌套 TOC 层级目录渲染（现 `content.chapters` 扁平）                                             | 🔴             | vslice p3                               |
+| 章内完整分页（`hasMore` 续读 `nextOffset`）                                                     | 🔴             | vslice p3 / p4                          |
+| 会话历史初值（重开会话载入 `messages.list-by-conversation`）                                    | 🔴             | vslice p4                               |
+| 虚拟滚动高度稳定性（向上滚闪 + 图片 section 高度跳变/延时）→ 估高 / 缓存测高占位 / 图片尺寸策略 | 🔴             | RA1-a 手测；Plan B 真实 ePub 后针对性调 |
 
 ### 已由竖切解决（存档，勿重复开）
 
