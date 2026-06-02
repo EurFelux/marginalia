@@ -35,5 +35,8 @@ export const ANNO_IFRAME_CSS = [
   "mark.anno-pink { background: rgba(251,207,232,0.7); }",
   "mark.anno-purple { background: rgba(233,213,255,0.7); }",
   "mark.anno-underline { background: transparent; text-decoration: underline; text-decoration-color: rgba(120,120,120,0.9); text-decoration-thickness: 2px; }",
-  "mark.anno-noted { text-decoration: underline dotted; text-underline-offset: 3px; }",
+  // 用 longhand 而非 text-decoration 简写：简写会把 .anno-underline 设的 color/thickness 重置掉。
+  // 显式 line:underline 让色块填充类（无下划线）也能显示「有笔记」的虚线提示，
+  // 同时让下划线类的灰色/2px 经 cascade 保留。
+  "mark.anno-noted { text-decoration-line: underline; text-decoration-style: dotted; text-underline-offset: 3px; }",
 ].join("\n");
