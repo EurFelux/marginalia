@@ -4,6 +4,8 @@ import type {
   BookIdInput,
   BookSummaryDto,
   ChapterRefDto,
+  ChapterRefInput,
+  ChapterSummaryDto,
   ChapterTextSlice,
   ImportBookInput,
   ReadChapterTextInput,
@@ -50,6 +52,8 @@ const api = {
       ipcRenderer.invoke(IPC.contentChapters, input),
     chapterText: (input: ReadChapterTextInput): Promise<ChapterTextSlice> =>
       ipcRenderer.invoke(IPC.contentChapterText, input),
+    chapterSummary: (input: ChapterRefInput): Promise<ChapterSummaryDto> =>
+      ipcRenderer.invoke(IPC.contentChapterSummary, input),
   },
 
   settings: {
