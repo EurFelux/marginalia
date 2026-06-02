@@ -2,6 +2,15 @@ import { create } from "zustand";
 import type { Chip } from "@shared/chat";
 import type { ReaderPrefs, SelectionInfo } from "@renderer/types";
 
+export type AnnoTarget = { type: "create" } | { type: "edit"; annotationId: string };
+export interface StyleBarState {
+  rect: { x: number; y: number; width: number; height: number };
+  target: AnnoTarget;
+}
+export interface NoteModalState {
+  target: AnnoTarget;
+}
+
 interface ReaderState {
   view: "library" | "reader";
   currentBookId: string | null;
@@ -13,6 +22,9 @@ interface ReaderState {
   sidebarOpen: boolean;
   draftChips: Chip[];
   draftText: string;
+  styleBar: StyleBarState | null;
+  noteModal: NoteModalState | null;
+  scrollToCfi: { cfi: string; nonce: number } | null;
 }
 
 interface ReaderActions {
@@ -26,6 +38,11 @@ interface ReaderActions {
   setSidebarOpen: (open: boolean) => void;
   setDraftText: (text: string) => void;
   setDraftChips: (chips: Chip[]) => void;
+  openStyleBar: (s: StyleBarState) => void;
+  closeStyleBar: () => void;
+  openNoteModal: (s: NoteModalState) => void;
+  closeNoteModal: () => void;
+  requestScrollToCfi: (cfi: string) => void;
 }
 
 export const READER_INITIAL: ReaderState = {
@@ -39,6 +56,9 @@ export const READER_INITIAL: ReaderState = {
   sidebarOpen: true,
   draftChips: [],
   draftText: "",
+  styleBar: null,
+  noteModal: null,
+  scrollToCfi: null,
 };
 
 export const useReaderStore = create<ReaderState & ReaderActions>((set) => ({
@@ -59,4 +79,10 @@ export const useReaderStore = create<ReaderState & ReaderActions>((set) => ({
   setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
   setDraftText: (draftText) => set({ draftText }),
   setDraftChips: (draftChips) => set({ draftChips }),
+  openStyleBar: (styleBar) => set({ styleBar }),
+  closeStyleBar: () => set({ styleBar: null }),
+  openNoteModal: (noteModal) => set({ noteModal }),
+  closeNoteModal: () => set({ noteModal: null }),
+  requestScrollToCfi: (cfi) =>
+    set((s) => ({ scrollToCfi: { cfi, nonce: (s.scrollToCfi?.nonce ?? 0) + 1 } })),
 }));

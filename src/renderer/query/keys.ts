@@ -5,6 +5,7 @@ export const qk = {
   chapters: (bookId: string) => ["chapters", bookId] as const,
   epubBytes: (bookId: string) => ["epub-bytes", bookId] as const,
   progress: (bookId: string) => ["progress", bookId] as const,
+  annotations: (bookId: string) => ["annotations", bookId] as const,
   chapterSummary: (bookId: string, chapterId: string) =>
     ["chapter-summary", bookId, chapterId] as const,
   providers: ["providers"] as const,
