@@ -84,17 +84,18 @@
 
 ### 接缝 / 小修
 
-| 项                                                                                                                                                                       | 状态           | 来源                                                                  |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------- | --------------------------------------------------------------------- |
-| 跨章选区 → 独立会话 + best-effort 组合摘要（M-c 的 UI 侧）                                                                                                               | 🔴             | ma4-deferred #8                                                       |
-| `textOfParts` 历史回放丢弃 assistant 的 tool/reasoning part                                                                                                              | 🟡 Phase1 有意 | ma4 #5 / ma5 #9                                                       |
-| `conversations:create` FK 友好预检（现抛原始 SQLITE_CONSTRAINT）                                                                                                         | 🔴 cosmetic    | ma4-deferred #7                                                       |
-| 嵌套 TOC 层级目录渲染（现 `content.chapters` 扁平）                                                                                                                      | 🔴             | vslice p3                                                             |
-| 章内完整分页（`hasMore` 续读 `nextOffset`）                                                                                                                              | 🔴             | vslice p3 / p4                                                        |
-| 会话历史初值（重开会话载入 `messages.list-by-conversation`）                                                                                                             | 🔴             | vslice p4                                                             |
-| 虚拟滚动高度稳定性（向上滚闪 + 图片 section 高度跳变/延时）→ 估高 / 缓存测高占位 / 图片尺寸策略                                                                          | 🔴             | RA1-a 手测；Plan B 真实 ePub 后针对性调                               |
-| 当前章高亮滞后（用 react-virtuoso `rangeChanged.startIndex` 含 overscan、非视口顶 section；短章≈滞后一整章）→ VirtualDocs 加 IntersectionObserver 精确上报视口顶 section | 🔴             | Plan B T5 真书手测确认；并入「精度 pass」                             |
-| 长书 `section.document` 常驻内存（epub-book 解析后不 `unload` 以供 CFI，长书全程滚动后所有访问过的 section 文档常驻 JS 堆）→ 远离视口的节 `unload`、需要时重渲           | 🔴             | spec「长书内存有界」成功判据；Plan B 刻意推迟，并入「精度/内存 pass」 |
+| 项                                                                                                                                                                                    | 状态           | 来源                                                                  |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | --------------------------------------------------------------------- |
+| 跨章选区 → 独立会话 + best-effort 组合摘要（M-c 的 UI 侧）                                                                                                                            | 🔴             | ma4-deferred #8                                                       |
+| `textOfParts` 历史回放丢弃 assistant 的 tool/reasoning part                                                                                                                           | 🟡 Phase1 有意 | ma4 #5 / ma5 #9                                                       |
+| `conversations:create` FK 友好预检（现抛原始 SQLITE_CONSTRAINT）                                                                                                                      | 🔴 cosmetic    | ma4-deferred #7                                                       |
+| 嵌套 TOC 层级目录渲染（现 `content.chapters` 扁平）                                                                                                                                   | 🔴             | vslice p3                                                             |
+| 章内完整分页（`hasMore` 续读 `nextOffset`）                                                                                                                                           | 🔴             | vslice p3 / p4                                                        |
+| 会话历史初值（重开会话载入 `messages.list-by-conversation`）                                                                                                                          | 🔴             | vslice p4                                                             |
+| 虚拟滚动高度稳定性（向上滚闪 + 图片 section 高度跳变/延时）→ 估高 / 缓存测高占位 / 图片尺寸策略                                                                                       | 🔴             | RA1-a 手测；Plan B 真实 ePub 后针对性调                               |
+| 当前章高亮滞后（用 react-virtuoso `rangeChanged.startIndex` 含 overscan、非视口顶 section；短章≈滞后一整章）→ VirtualDocs 加 IntersectionObserver 精确上报视口顶 section              | 🔴             | Plan B T5 真书手测确认；并入「精度 pass」                             |
+| 长书 `section.document` 常驻内存（epub-book 解析后不 `unload` 以供 CFI，长书全程滚动后所有访问过的 section 文档常驻 JS 堆）→ 远离视口的节 `unload`、需要时重渲                        | 🔴             | spec「长书内存有界」成功判据；Plan B 刻意推迟，并入「精度/内存 pass」 |
+| 全 schema 级 FK `ON DELETE CASCADE` 策略（`chapters`/`progress`/`conversations`/`messages`/`annotations` 等所有 `references(books.id)` 均无 cascade；删书功能落地前统一定，免孤儿行） | 🔴             | RA3 T1 代码审查；删书 IPC 尚未实现，暂无孤儿                          |
 
 ### 已由竖切解决（存档，勿重复开）
 
