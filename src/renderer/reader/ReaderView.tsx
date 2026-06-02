@@ -4,6 +4,7 @@ import { ArrowLeft, MessageSquare, Settings } from "lucide-react";
 import { qk } from "@renderer/query/keys";
 import { cn } from "@renderer/lib/utils";
 import { Button } from "@renderer/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@renderer/components/ui/tooltip";
 import { useReaderStore } from "@renderer/store/reader-store";
 import { useSettingsStore } from "@renderer/store/settings-store";
 import { usePrefsStore } from "@renderer/store/prefs-store";
@@ -57,24 +58,38 @@ export function ReaderView() {
         </Button>
         <div className="flex items-center gap-1">
           <ReaderPrefs />
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setPanelOpen(!panelOpen)}
-            aria-label="AI 面板"
-            className={cn(panelOpen ? "text-primary" : "text-muted-foreground")}
-          >
-            <MessageSquare />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => openSettings(true)}
-            aria-label="设置"
-            className="text-muted-foreground"
-          >
-            <Settings />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setPanelOpen(!panelOpen)}
+                  aria-label="AI 面板"
+                  className={cn(panelOpen ? "text-primary" : "text-muted-foreground")}
+                />
+              }
+            >
+              <MessageSquare />
+            </TooltipTrigger>
+            <TooltipContent>AI 面板</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => openSettings(true)}
+                  aria-label="设置"
+                  className="text-muted-foreground"
+                />
+              }
+            >
+              <Settings />
+            </TooltipTrigger>
+            <TooltipContent>设置</TooltipContent>
+          </Tooltip>
         </div>
       </header>
       <div className="flex min-h-0 flex-1">
