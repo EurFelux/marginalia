@@ -2,7 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { SummaryStatus } from "@shared/library";
 import { qk } from "@renderer/query/keys";
 import { cn } from "@renderer/lib/utils";
-import { usePopover } from "@renderer/lib/use-popover";
+import { Button } from "@renderer/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@renderer/components/ui/popover";
 import { useReaderStore } from "@renderer/store/reader-store";
 
 const BADGE: Record<SummaryStatus, { label: string; cls: string }> = {
@@ -28,7 +29,6 @@ export function SummaryPill() {
   const bookId = useReaderStore((s) => s.currentBookId);
   const chapterId = useReaderStore((s) => s.currentChapterId);
   const panelOpen = useReaderStore((s) => s.panelOpen);
-  const { open, setOpen, ref } = usePopover();
   const qc = useQueryClient();
 
   const summary = useQuery({
@@ -53,38 +53,39 @@ export function SummaryPill() {
   const canGenerate = status === "pending" || status === "unavailable";
 
   return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        title="查看本章摘要"
-        className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", badge.cls)}
+    <Popover>
+      <PopoverTrigger
+        render={
+          <button
+            type="button"
+            title="查看本章摘要"
+            className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", badge.cls)}
+          />
+        }
       >
         {badge.label}
-      </button>
-      {open && (
-        <div className="absolute right-0 top-7 z-50 w-72 rounded-xl border border-border bg-popover p-3 text-left shadow-xl">
-          <div className="mb-1.5 flex items-center justify-between gap-2">
-            <span className="truncate text-xs font-semibold">本章摘要</span>
-            <span className={cn("shrink-0 rounded-full px-1.5 py-0.5 text-[10px]", badge.cls)}>
-              {badge.label}
-            </span>
-          </div>
-          <p className="whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">
-            {status === "ready" ? summary.data?.summary : PLACEHOLDER[status]}
-          </p>
-          {canGenerate && (
-            <button
-              type="button"
-              onClick={() => generate.mutate()}
-              disabled={generate.isPending}
-              className="mt-2 rounded-md bg-primary px-2.5 py-1 text-[11px] font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
-            >
-              {generate.isPending ? "生成中…" : "生成摘要"}
-            </button>
-          )}
+      </PopoverTrigger>
+      <PopoverContent align="end" sideOffset={6} className="w-72 text-left">
+        <div className="mb-1.5 flex items-center justify-between gap-2">
+          <span className="truncate text-xs font-semibold">本章摘要</span>
+          <span className={cn("shrink-0 rounded-full px-1.5 py-0.5 text-[10px]", badge.cls)}>
+            {badge.label}
+          </span>
         </div>
-      )}
-    </div>
+        <p className="whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">
+          {status === "ready" ? summary.data?.summary : PLACEHOLDER[status]}
+        </p>
+        {canGenerate && (
+          <Button
+            size="sm"
+            onClick={() => generate.mutate()}
+            disabled={generate.isPending}
+            className="mt-2"
+          >
+            {generate.isPending ? "生成中…" : "生成摘要"}
+          </Button>
+        )}
+      </PopoverContent>
+    </Popover>
   );
 }
