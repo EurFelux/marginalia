@@ -168,6 +168,17 @@ export function EpubReader({ bookId, chapters }: Props) {
     if (idx >= 0) vRef.current?.scrollToIndex(idx);
   }, [book, scrollToCfi]);
 
+  // 滚动即放弃：工具栏/样式栏锚定于选区视口坐标，滚动后位置失真，故关样式栏并清选区。
+  // 捕获阶段监听 document——scroll 不冒泡，但能捕获到 Virtuoso 滚动容器的滚动。
+  useEffect(() => {
+    const onScroll = () => {
+      closeStyleBar();
+      setSelection(null);
+    };
+    document.addEventListener("scroll", onScroll, true);
+    return () => document.removeEventListener("scroll", onScroll, true);
+  }, [closeStyleBar, setSelection]);
+
   if (bytes.isError) return <ReaderError message="无法读取此书的文件。" />;
   if (parseError) return <ReaderError message={`无法渲染此书：${parseError}`} />;
   // 等字节+进度都就绪再挂 VirtualDocs，使 initialIndex 一次到位（避免先 0 再跳）。
