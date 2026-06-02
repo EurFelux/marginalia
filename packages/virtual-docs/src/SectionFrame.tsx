@@ -89,7 +89,28 @@ export function SectionFrame({
       const fr = iframe.getBoundingClientRect();
       cbRef.current.onHighlightClick?.(id, toViewportRect(r, fr));
     };
-    const onContentDown = () => cbRef.current.onContentMouseDown?.();
+    const onContentDown = (e: MouseEvent) => {
+      if (!doc) return;
+      // 点在已有非塌缩选区内部：阻止默认塌缩、保留选区，让随后的 mouseup 照常触发 onSelect
+      // （滚动隐藏工具栏后，点回选区即在新位置重弹工具栏）。点在选区外则照常上报（关闭浮层）。
+      const sel = doc.getSelection();
+      if (sel && !sel.isCollapsed && sel.rangeCount > 0) {
+        try {
+          const caret = (
+            doc as Document & {
+              caretRangeFromPoint?(x: number, y: number): Range | null;
+            }
+          ).caretRangeFromPoint?.(e.clientX, e.clientY);
+          if (caret && sel.getRangeAt(0).isPointInRange(caret.startContainer, caret.startOffset)) {
+            e.preventDefault();
+            return;
+          }
+        } catch {
+          /* caretRangeFromPoint/isPointInRange 不可用则按选区外处理 */
+        }
+      }
+      cbRef.current.onContentMouseDown?.();
+    };
     const detach = () => {
       ro?.disconnect();
       ro = undefined;
