@@ -1,13 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CornerDownLeft } from "lucide-react";
-import { Kbd, KbdGroup } from "@renderer/components/ui/kbd";
+import { Kbd, KbdGroup, ModKey } from "@renderer/components/ui/kbd";
 import { qk } from "@renderer/query/keys";
 import { useReaderStore } from "@renderer/store/reader-store";
-
-// 保存快捷键的修饰键随平台显示：macOS ⌘，其余 Ctrl。
-const SAVE_MOD =
-  typeof navigator !== "undefined" && /Mac/i.test(navigator.userAgent) ? "⌘" : "Ctrl";
 
 /** 居中笔记 modal：create 来自选区（默认 yellow），edit 来自已有标注。 */
 export function NoteModal() {
@@ -117,9 +113,7 @@ export function NoteModal() {
           >
             保存
             <KbdGroup>
-              <Kbd className="border-transparent bg-primary-foreground/20 text-primary-foreground">
-                {SAVE_MOD}
-              </Kbd>
+              <ModKey className="border-transparent bg-primary-foreground/20 text-primary-foreground" />
               <Kbd className="border-transparent bg-primary-foreground/20 text-primary-foreground">
                 <CornerDownLeft className="size-3" />
               </Kbd>

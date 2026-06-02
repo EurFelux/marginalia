@@ -1,5 +1,6 @@
 import type { ComponentProps } from "react";
 import { cn } from "@renderer/lib/utils";
+import { modKeyLabel } from "@renderer/lib/platform";
 
 /** shadcn 风格的键位标签：展示单个按键（如 ⌘ / Ctrl / Enter）。 */
 export function Kbd({ className, ...props }: ComponentProps<"kbd">) {
@@ -17,4 +18,9 @@ export function Kbd({ className, ...props }: ComponentProps<"kbd">) {
 /** 多个 Kbd 的容器（横向、统一间距）。 */
 export function KbdGroup({ className, ...props }: ComponentProps<"span">) {
   return <span className={cn("inline-flex items-center gap-1", className)} {...props} />;
+}
+
+/** 平台主修饰键的 Kbd：macOS 显示 ⌘，其余显示 Ctrl。透传 className 等（如适配主色底）。 */
+export function ModKey(props: ComponentProps<"kbd">) {
+  return <Kbd {...props}>{modKeyLabel}</Kbd>;
 }
