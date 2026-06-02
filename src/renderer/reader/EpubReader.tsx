@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { VirtualDocs, type VirtualDocsHandle } from "@marginalia/virtual-docs";
 import type { ChapterRefDto } from "@shared/library";
 import { useReaderStore } from "../store/reader-store";
@@ -23,6 +23,7 @@ export function EpubReader({ bookId, chapters }: Props) {
   const currentChapterId = useReaderStore((s) => s.currentChapterId);
   const setCurrentChapter = useReaderStore((s) => s.setCurrentChapter);
   const prefs = useReaderStore((s) => s.prefs);
+  const qc = useQueryClient();
 
   // 防循环：记录最近一次「由滚动得出的顶部章 id」；跳章 effect 只在目标≠它时滚动。
   const topChapterIdRef = useRef<string | null>(null);
@@ -102,6 +103,9 @@ export function EpubReader({ bookId, chapters }: Props) {
       if (saveTimer.current) clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(() => {
         void window.api.progress.save({ bookId, cfi });
+        // 同步写入查询缓存：progress 查询 staleTime=Infinity，不写缓存的话重开书会读到首开时
+        // 的旧值（通常是 null）→ initialIndex 永远 0 → 回到开头。
+        qc.setQueryData(qk.progress(bookId), { cfi });
       }, SAVE_DEBOUNCE_MS);
     }
   };
