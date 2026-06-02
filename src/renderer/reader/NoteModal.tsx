@@ -9,8 +9,8 @@ import { useReaderStore } from "@renderer/store/reader-store";
 export function NoteModal() {
   const noteModal = useReaderStore((s) => s.noteModal);
   const closeNoteModal = useReaderStore((s) => s.closeNoteModal);
-  const selection = useReaderStore((s) => s.selection);
   const setSelection = useReaderStore((s) => s.setSelection);
+  const lastStyle = useReaderStore((s) => s.lastHighlightStyle);
   const bookId = useReaderStore((s) => s.currentBookId);
   const qc = useQueryClient();
   const taRef = useRef<HTMLTextAreaElement | null>(null);
@@ -24,8 +24,8 @@ export function NoteModal() {
 
   const editing = noteModal?.target.type === "edit" ? noteModal.target.annotationId : null;
   const current = editing ? annos.data?.find((a) => a.id === editing) : undefined;
-  // modal 内显示被标注/选中的原文引用（create 取当前选区，edit 取标注快照）。
-  const quote = editing ? current?.selectedText : selection?.selectionText;
+  // modal 内显示被标注/选中的原文引用（create 取打开时的锚点快照，edit 取标注快照）。
+  const quote = editing ? current?.selectedText : noteModal?.anchor?.selectedText;
 
   // 打开时初始化文本（edit 取现笔记，create 空）+ 聚焦。
   // 仅依赖 [noteModal, editing]：openNoteModal 每次都 set 全新对象，故每次打开 noteModal 引用必变、
@@ -51,14 +51,15 @@ export function NoteModal() {
 
   const save = () => {
     if (noteModal.target.type === "create") {
-      // 改②：连同 selectedText 一起守（CreateAnnotationInput 的 Zod 要求二者均 min(1)）。
-      if (!selection?.cfiRange || !selection.selectionText) return;
+      // 用打开时的选区锚点快照（而非易失的 store.selection），缺锚点则不建——防静默丢笔记。
+      const anchor = noteModal.anchor;
+      if (!anchor) return;
       createM.mutate({
         bookId,
-        style: "yellow",
+        style: lastStyle,
         note: text,
-        selectedText: selection.selectionText,
-        cfiRange: selection.cfiRange,
+        selectedText: anchor.selectedText,
+        cfiRange: anchor.cfiRange,
       });
       setSelection(null);
     } else {

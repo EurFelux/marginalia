@@ -57,6 +57,15 @@ export function SelectionToolbar() {
     setSelection(null);
   };
 
+  // 选「添加笔记」：把选区锚点（cfiRange/selectedText）快照进 modal，使 save 不依赖易失的 selection。
+  const addNote = () => {
+    if (!selection.cfiRange || !selection.selectionText) return;
+    openNoteModal({
+      target: { type: "create" },
+      anchor: { cfiRange: selection.cfiRange, selectedText: selection.selectionText },
+    });
+  };
+
   return (
     <div
       onMouseDown={(e) => e.preventDefault()}
@@ -68,11 +77,7 @@ export function SelectionToolbar() {
         icon={<Highlighter className="size-3.5" />}
         label="高亮标记"
       />
-      <ToolBtn
-        onClick={() => openNoteModal({ target: { type: "create" } })}
-        icon={<StickyNote className="size-3.5" />}
-        label="添加笔记"
-      />
+      <ToolBtn onClick={addNote} icon={<StickyNote className="size-3.5" />} label="添加笔记" />
       <span className="mx-0.5 h-5 w-px bg-border" />
       <ToolBtn
         primary
