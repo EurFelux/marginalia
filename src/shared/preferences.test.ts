@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { PREFERENCE_SCHEMAS, preferenceKey, readerPrefsSchema } from "@shared/preferences";
+import {
+  PREFERENCE_SCHEMAS,
+  preferenceKey,
+  readerPrefsSchema,
+  setPreferenceInput,
+} from "@shared/preferences";
 
 describe("preferences schemas", () => {
   it("readerPrefsSchema requires all three numeric fields", () => {
@@ -29,5 +34,21 @@ describe("preferences schemas", () => {
   it("lastHighlightStyle validates against the annotation style enum", () => {
     expect(PREFERENCE_SCHEMAS.lastHighlightStyle.safeParse("yellow").success).toBe(true);
     expect(PREFERENCE_SCHEMAS.lastHighlightStyle.safeParse("teal").success).toBe(false);
+  });
+
+  it("setPreferenceInput covers exactly the registered keys (no drift)", () => {
+    const unionKeys = setPreferenceInput.options.map((o) => o.shape.key.value).sort();
+    expect(unionKeys).toEqual(Object.keys(PREFERENCE_SCHEMAS).sort());
+  });
+
+  it("setPreferenceInput validates value per key at the boundary", () => {
+    expect(setPreferenceInput.safeParse({ key: "autoSummarize", value: true }).success).toBe(true);
+    expect(setPreferenceInput.safeParse({ key: "autoSummarize", value: "yes" }).success).toBe(
+      false,
+    );
+    expect(
+      setPreferenceInput.safeParse({ key: "readerPrefs", value: { fontScale: 1 } }).success,
+    ).toBe(false);
+    expect(setPreferenceInput.safeParse({ key: "unknownKey", value: 1 }).success).toBe(false);
   });
 });

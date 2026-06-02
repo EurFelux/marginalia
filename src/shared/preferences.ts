@@ -30,3 +30,14 @@ export const preferenceKey = z.enum(
 
 /** 全偏好快照（渲染层启动 hydrate 用）：仅含已存且校验通过的 key。 */
 export type PreferencesSnapshot = Partial<{ [K in PreferenceKey]: PreferenceValue<K> }>;
+
+/**
+ * `preferences:set` IPC 入参：按 key 判别校验 value（边界处即拒非法形状）。
+ * 每注册一个新 key，须在此补一条对应 arm（`preferences.test.ts` 校验与 PREFERENCE_SCHEMAS 同步）。
+ */
+export const setPreferenceInput = z.discriminatedUnion("key", [
+  z.object({ key: z.literal("readerPrefs"), value: readerPrefsSchema }),
+  z.object({ key: z.literal("lastHighlightStyle"), value: annotationStyle }),
+  z.object({ key: z.literal("autoSummarize"), value: z.boolean() }),
+]);
+export type SetPreferenceInput = z.infer<typeof setPreferenceInput>;

@@ -38,6 +38,7 @@ import type {
   CreateAnnotationInput,
   UpdateAnnotationInput,
 } from "@shared/annotations";
+import type { PreferencesSnapshot, SetPreferenceInput } from "@shared/preferences";
 
 const api = {
   app: {
@@ -87,6 +88,12 @@ const api = {
       ipcRenderer.invoke(IPC.annotationsUpdate, input),
     delete: (input: AnnotationIdInput): Promise<void> =>
       ipcRenderer.invoke(IPC.annotationsDelete, input),
+  },
+
+  preferences: {
+    getAll: (): Promise<PreferencesSnapshot> => ipcRenderer.invoke(IPC.preferencesGetAll),
+    set: (input: SetPreferenceInput): Promise<void> =>
+      ipcRenderer.invoke(IPC.preferencesSet, input),
   },
 
   settings: {

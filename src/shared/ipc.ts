@@ -37,6 +37,8 @@ export const IPC = {
   annotationsCreate: "annotations:create",
   annotationsUpdate: "annotations:update",
   annotationsDelete: "annotations:delete",
+  preferencesGetAll: "preferences:get-all",
+  preferencesSet: "preferences:set",
 } as const;
 
 /** ping —— 演示"带入参且经 Zod 校验"的往返 */
