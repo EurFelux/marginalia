@@ -15,6 +15,10 @@ const config = defineConfig({
     alias: {
       "@marginalia/virtual-docs": path.resolve(__dirname, "../virtual-docs/src/index.ts"),
     },
+    // virtual-docs 以源码别名引入，其 import "react" 会从 ../virtual-docs 向上解析到根 node_modules，
+    // 而 ui-prototype 用隔离 node_modules 的副本——两份 React 实例会让 hooks 崩（白屏）。
+    // dedupe 强制全页 react/react-dom 收敛到单一副本。
+    dedupe: ["react", "react-dom"],
   },
   plugins: [
     devtools(),
