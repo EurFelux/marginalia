@@ -31,6 +31,10 @@ export const IPC = {
   aiSend: "ai:send",
   aiAbort: "ai:abort",
   aiChunk: "ai:chunk",
+  annotationsListByBook: "annotations:list-by-book",
+  annotationsCreate: "annotations:create",
+  annotationsUpdate: "annotations:update",
+  annotationsDelete: "annotations:delete",
 } as const;
 
 /** ping —— 演示"带入参且经 Zod 校验"的往返 */
