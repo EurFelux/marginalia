@@ -18,11 +18,6 @@ export interface SendDeps {
   db: DB;
   loadBytes: LoadBytes;
   resolveModel: () => ResolvedModel;
-  /**
-   * 触发本章摘要懒生成（fire-and-forget；通常传 ensureChapterSummary 的偏函数）。
-   * 端口为 `=> void`：实现必须自含全部 reject（不让 Promise 逃逸为 unhandledRejection）。
-   */
-  ensureSummary: (bookId: string, chapterId: string) => void;
   /** agent 多步上限（默认 5）。 */
   stepLimit?: number;
 }
@@ -57,7 +52,7 @@ export function runSend(
   input: SendInput,
   opts?: { abortSignal?: AbortSignal },
 ): SendResult {
-  const { db, loadBytes, resolveModel, ensureSummary, stepLimit } = deps;
+  const { db, loadBytes, resolveModel, stepLimit } = deps;
 
   // 1. 先解析模型——未配置即返回错误，不路由/不落库（避免孤儿会话，设计文档 §16）
   const resolved = resolveModel();
@@ -90,13 +85,12 @@ export function runSend(
     metadata: { contextChips: toContextChips(deduped), model: resolved.modelId },
   });
 
-  // 6. 章节摘要：ready 注入当前轮；pending 后台触发（不阻塞）
+  // 6. 章节摘要：ready 则注入当前轮（生成由「开章自动/手动」触发，不再由发消息触发）
   const summary = getChapterSummary(db, input.bookId, input.currentChapterId);
   const chapter =
     summary.status === "ready" && summary.summary
       ? { title: chapterRow.title, summary: summary.summary }
       : null;
-  if (summary.status === "pending") ensureSummary(input.bookId, input.currentChapterId);
 
   // 7. 组装 prompt（system 来自默认 Assistant）
   const assistant = getDefaultAssistant(db);

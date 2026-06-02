@@ -13,6 +13,7 @@ export const IPC = {
   contentToc: "content:toc",
   contentChapterText: "content:chapter-text",
   contentChapterSummary: "content:chapter-summary",
+  contentGenerateChapterSummary: "content:generate-chapter-summary",
   contentChapters: "content:chapters",
   providersList: "providers:list",
   providersUpsert: "providers:upsert",

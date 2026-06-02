@@ -3,12 +3,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, X } from "lucide-react";
 import { qk } from "@renderer/query/keys";
 import { useSettingsStore } from "@renderer/store/settings-store";
+import { usePrefsStore } from "@renderer/store/prefs-store";
 
 export function SettingsPanel() {
   const open = useSettingsStore((s) => s.open);
   const setOpen = useSettingsStore((s) => s.setOpen);
   const testResult = useSettingsStore((s) => s.testResult);
   const setTestResult = useSettingsStore((s) => s.setTestResult);
+  const autoSummarize = usePrefsStore((s) => s.autoSummarize);
+  const setAutoSummarize = usePrefsStore((s) => s.setAutoSummarize);
   const qc = useQueryClient();
 
   const providers = useQuery({
@@ -69,7 +72,7 @@ export function SettingsPanel() {
     <div className="fixed inset-0 z-[100] grid place-items-center bg-black/30 p-4">
       <div className="w-[28rem] max-w-full rounded-2xl border border-border bg-card p-5 font-sans text-foreground shadow-2xl">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-serif text-lg font-semibold">设置 · Anthropic</h2>
+          <h2 className="font-serif text-lg font-semibold">设置</h2>
           <button
             onClick={() => setOpen(false)}
             className="rounded-md p-1.5 text-muted-foreground hover:bg-muted"
@@ -170,6 +173,22 @@ export function SettingsPanel() {
               {save.isPending ? "保存中…" : "保存"}
             </button>
           </div>
+
+          <label className="mt-1 flex cursor-pointer items-start justify-between gap-3 border-t border-border pt-3">
+            <span className="min-w-0">
+              <span className="block text-sm font-medium">开章自动生成本章摘要</span>
+              <span className="mt-0.5 block text-[11px] leading-relaxed text-muted-foreground">
+                打开 / 切换章节时后台生成本章摘要，就绪后随提问一并提供给
+                AI（会产生模型调用）。关闭时可在 AI 面板的摘要 pill 里手动生成。
+              </span>
+            </span>
+            <input
+              type="checkbox"
+              checked={autoSummarize}
+              onChange={(e) => setAutoSummarize(e.target.checked)}
+              className="mt-0.5 size-4 shrink-0 accent-primary"
+            />
+          </label>
         </div>
       </div>
     </div>

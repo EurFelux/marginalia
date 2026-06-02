@@ -1,6 +1,6 @@
 // src/main/ai/send.test.ts
 import path from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { MockLanguageModelV3, simulateReadableStream } from "ai/test";
 import { eq } from "drizzle-orm";
 import { makeFixtureEpub } from "@marginalia/epub-parser";
@@ -97,9 +97,8 @@ function setup(model: ResolvedModel) {
   const book = importBook(db, { bytes, filePath: "/b.epub" });
   const ch1 = resolveChapterByHref(db, book.id, "OEBPS/ch1.xhtml")!;
   const loadBytes: LoadBytes = async () => bytes;
-  const ensureSummary = vi.fn();
-  const deps: SendDeps = { db, loadBytes, resolveModel: () => model, ensureSummary };
-  return { db, book, ch1, deps, ensureSummary };
+  const deps: SendDeps = { db, loadBytes, resolveModel: () => model };
+  return { db, book, ch1, deps };
 }
 
 function input(bookId: string, chapterId: string, over: Partial<SendInput> = {}): SendInput {
@@ -122,7 +121,7 @@ describe("runSend", () => {
   });
 
   it("persists the user message with a chip snapshot and the streamed assistant message", async () => {
-    const { db, book, ch1, deps, ensureSummary } = setup({
+    const { db, book, ch1, deps } = setup({
       ok: true,
       model: textStreamModel("It means hello."),
       modelId: "mock",
@@ -144,7 +143,6 @@ describe("runSend", () => {
       .join("");
     expect(assistantText).toContain("It means hello.");
     expect(r.created).toBe(true);
-    expect(ensureSummary).toHaveBeenCalledWith(book.id, ch1.id);
   });
 
   it("runs the tool-calling agent loop and persists tool parts in the assistant message", async () => {
@@ -180,9 +178,9 @@ describe("runSend", () => {
     expect(roles).toEqual(["user"]);
   });
 
-  it("injects a ready chapter summary into the prompt and skips background generation", async () => {
+  it("injects a ready chapter summary into the prompt", async () => {
     const capture: { prompt?: string } = {};
-    const { db, book, ch1, deps, ensureSummary } = setup({
+    const { db, book, ch1, deps } = setup({
       ok: true,
       model: capturingStreamModel("ok", capture),
       modelId: "mock",
@@ -196,7 +194,6 @@ describe("runSend", () => {
     if (!r.ok) return;
     await r.finished;
     expect(capture.prompt).toContain("CHAPTER-SUMMARY-XYZ"); // 摘要进了模型输入
-    expect(ensureSummary).not.toHaveBeenCalled(); // 已 ready → 不再后台生成
   });
 
   it("returns an error without writing when the chapter belongs to a different book", () => {

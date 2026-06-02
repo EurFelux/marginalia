@@ -4,7 +4,7 @@ import { getDb } from "@main/db/instance";
 import { getBook } from "@main/library/repository";
 import { safeStorageEncryptor } from "@main/secrets/safe-storage-encryptor";
 import { resolveAssistantModel } from "@main/ai/assistant-model";
-import { ensureChapterSummary, type SummaryDeps } from "@main/ai/summary";
+import type { SummaryDeps } from "@main/ai/summary";
 import type { LoadBytes } from "@main/ai/tools";
 import type { SendDeps } from "@main/ai/send";
 
@@ -23,12 +23,15 @@ export function makeSendDeps(): SendDeps {
   const db = getDb();
   const loadBytes = createLoadBytes(db);
   const resolveModel = () => resolveAssistantModel(db, safeStorageEncryptor);
-  const summaryDeps: SummaryDeps = { db, loadBytes, resolveModel };
-  const ensureSummary = (bookId: string, chapterId: string): void => {
-    // fire-and-forget：自含 reject，杜绝 unhandledRejection
-    void ensureChapterSummary(summaryDeps, bookId, chapterId).catch((err) => {
-      console.warn("[send-deps] ensureChapterSummary failed:", err);
-    });
+  return { db, loadBytes, resolveModel };
+}
+
+/** 章摘懒生成所需依赖（供 content:generate-chapter-summary handler 用）。 */
+export function makeSummaryDeps(): SummaryDeps {
+  const db = getDb();
+  return {
+    db,
+    loadBytes: createLoadBytes(db),
+    resolveModel: () => resolveAssistantModel(db, safeStorageEncryptor),
   };
-  return { db, loadBytes, resolveModel, ensureSummary };
 }
