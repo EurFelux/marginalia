@@ -9,6 +9,7 @@ import type {
   ChapterTextSlice,
   ImportBookInput,
   ReadChapterTextInput,
+  SaveProgressInput,
 } from "@shared/library";
 import type { TocNode } from "@shared/types";
 import type {
@@ -44,6 +45,14 @@ const api = {
     list: (): Promise<BookSummaryDto[]> => ipcRenderer.invoke(IPC.libraryList),
     get: (input: BookIdInput): Promise<BookSummaryDto | null> =>
       ipcRenderer.invoke(IPC.libraryGet, input),
+    readEpubBytes: (input: BookIdInput): Promise<Uint8Array> =>
+      ipcRenderer.invoke(IPC.libraryReadEpubBytes, input),
+  },
+
+  progress: {
+    get: (input: BookIdInput): Promise<{ cfi: string } | null> =>
+      ipcRenderer.invoke(IPC.progressGet, input),
+    save: (input: SaveProgressInput): Promise<void> => ipcRenderer.invoke(IPC.progressSave, input),
   },
 
   content: {

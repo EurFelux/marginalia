@@ -15,6 +15,7 @@ import {
 import type { TocNode } from "@shared/types";
 import { getDb } from "@main/db/instance";
 import { getBook, importBook, listBooks } from "@main/library/repository";
+import { readBookBytes } from "@main/library/book-bytes";
 import { getProgress, saveProgress } from "@main/library/progress";
 import {
   getChapterSummary,
@@ -68,6 +69,10 @@ export function registerLibraryHandlers(): void {
     const b = getBook(getDb(), input.bookId);
     return b ? toDto(b) : null;
   });
+
+  handle<{ bookId: string }, Uint8Array>(IPC.libraryReadEpubBytes, bookIdInput, (input) =>
+    readBookBytes(getDb(), input.bookId),
+  );
 
   handle<{ bookId: string }, { cfi: string } | null>(IPC.progressGet, bookIdInput, (input) => {
     const p = getProgress(getDb(), input.bookId);
