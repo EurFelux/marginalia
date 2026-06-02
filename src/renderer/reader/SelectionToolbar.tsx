@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { BookOpen, FileText, Languages, Sparkles } from "lucide-react";
+import { BookOpen, FileText, Highlighter, Languages, Sparkles, StickyNote } from "lucide-react";
 import { cn } from "@renderer/lib/utils";
 import { useReaderStore } from "@renderer/store/reader-store";
 import { useAiActions, type PresetId } from "@renderer/ai/use-ai-actions";
@@ -12,11 +12,13 @@ const PRESETS: { id: PresetId; label: string; icon: typeof BookOpen }[] = [
 
 export function SelectionToolbar() {
   const selection = useReaderStore((s) => s.selection);
+  const openStyleBar = useReaderStore((s) => s.openStyleBar);
+  const openNoteModal = useReaderStore((s) => s.openNoteModal);
   const { startAiAction } = useAiActions();
   if (!selection || !selection.rect) return null;
 
   const { rect } = selection;
-  const PAD = 200;
+  const PAD = 220;
   const left = Math.min(Math.max(rect.x + rect.width / 2, PAD), window.innerWidth - PAD);
   const top = rect.y - 10;
 
@@ -26,6 +28,17 @@ export function SelectionToolbar() {
       style={{ position: "fixed", left, top, transform: "translate(-50%, -100%)", zIndex: 50 }}
       className="flex w-max items-center gap-0.5 whitespace-nowrap rounded-xl border border-border bg-popover/95 p-1 shadow-lg backdrop-blur"
     >
+      <ToolBtn
+        onClick={() => openStyleBar({ rect, target: { type: "create" } })}
+        icon={<Highlighter className="size-3.5" />}
+        label="高亮标记"
+      />
+      <ToolBtn
+        onClick={() => openNoteModal({ target: { type: "create" } })}
+        icon={<StickyNote className="size-3.5" />}
+        label="添加笔记"
+      />
+      <span className="mx-0.5 h-5 w-px bg-border" />
       <ToolBtn
         primary
         onClick={() => void startAiAction(null)}
