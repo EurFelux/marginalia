@@ -6,7 +6,10 @@ packages:
 # nodeLinker: hoisted —— Electron Forge 系统预检（@electron-forge/cli check-system.ts 跑
 #   `pnpm config get node-linker`）强制要求 hoisted；Electron 打包/原生模块需扁平 node_modules，
 #   isolated 的 symlink 布局不兼容（`pnpm start` 会被预检拦下）。
-# allowBuilds：仅以下原生依赖允许在安装时运行其构建 / postinstall 脚本（true=允许）。
+# allowBuilds：列出带构建 / postinstall 脚本的依赖并表态（true=允许运行，false=显式拒绝）。
+#   原生件（electron/better-sqlite3/esbuild）需编译故 true；core-js/es5-ext 的 postinstall
+#   只是募捐/广告信息（非功能必需），故 false——既挡掉无谓的第三方安装脚本，又消除 pnpm 的
+#   ERR_PNPM_IGNORED_BUILDS（epubjs 引入这两个传递依赖）。
 # blockExoticSubdeps: false 允许 @electron/node-gyp 等 git 子依赖。
 nodeLinker: hoisted
 blockExoticSubdeps: false
@@ -15,3 +18,5 @@ allowBuilds:
   electron-winstaller: true
   better-sqlite3: true
   esbuild: true
+  core-js: false
+  es5-ext: false
