@@ -21,6 +21,8 @@ interface Props {
   onHighlightClick?: (annoId: string, rect: ViewportRect) => void;
   /** 变化即对已加载文档重跑 decorate（标注增删改后由 VirtualDocs 递增）。 */
   decorateNonce?: number;
+  /** iframe 内任意 mousedown 时回调；同源 iframe 内部事件不冒泡到父文档，消费方借此关闭浮层。 */
+  onContentMouseDown?: () => void;
 }
 
 const STYLE_ID = "vd-style";
@@ -41,11 +43,18 @@ export function SectionFrame({
   decorate,
   onHighlightClick,
   decorateNonce,
+  onContentMouseDown,
 }: Props) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   // 用 ref 持最新回调，避免回调身份变化触发 effect 重挂
-  const cbRef = useRef({ onSelect, onSelectionCleared, decorate, onHighlightClick });
-  cbRef.current = { onSelect, onSelectionCleared, decorate, onHighlightClick };
+  const cbRef = useRef({
+    onSelect,
+    onSelectionCleared,
+    decorate,
+    onHighlightClick,
+    onContentMouseDown,
+  });
+  cbRef.current = { onSelect, onSelectionCleared, decorate, onHighlightClick, onContentMouseDown };
   const docRef = useRef<Document | null>(null);
 
   useEffect(() => {
@@ -80,12 +89,14 @@ export function SectionFrame({
       const fr = iframe.getBoundingClientRect();
       cbRef.current.onHighlightClick?.(id, toViewportRect(r, fr));
     };
+    const onContentDown = () => cbRef.current.onContentMouseDown?.();
     const detach = () => {
       ro?.disconnect();
       ro = undefined;
       doc?.removeEventListener("mouseup", onMouseUp);
       doc?.removeEventListener("selectionchange", onSelChange);
       doc?.removeEventListener("click", onAnnoClick);
+      doc?.removeEventListener("mousedown", onContentDown);
       doc = null;
       docRef.current = null;
     };
@@ -104,6 +115,7 @@ export function SectionFrame({
       docRef.current = doc;
       cbRef.current.decorate?.(index, doc);
       doc.addEventListener("click", onAnnoClick);
+      doc.addEventListener("mousedown", onContentDown);
     };
 
     iframe.addEventListener("load", onLoad);

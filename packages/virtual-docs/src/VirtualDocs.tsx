@@ -27,6 +27,7 @@ export interface VirtualDocsProps {
   onSelectionCleared?: () => void;
   decorate?: (index: number, doc: Document) => void;
   onHighlightClick?: (annoId: string, rect: ViewportRect) => void;
+  onContentMouseDown?: () => void;
 }
 
 export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(function VirtualDocs(
@@ -40,6 +41,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
     onSelectionCleared,
     decorate,
     onHighlightClick,
+    onContentMouseDown,
   },
   ref,
 ) {
@@ -65,6 +67,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
         decorate={decorate}
         onHighlightClick={onHighlightClick}
         decorateNonce={decorateNonce}
+        onContentMouseDown={onContentMouseDown}
       />
     ),
     [
@@ -75,6 +78,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
       decorate,
       onHighlightClick,
       decorateNonce,
+      onContentMouseDown,
     ],
   );
 
@@ -99,6 +103,7 @@ function LazySection({
   decorate,
   onHighlightClick,
   decorateNonce,
+  onContentMouseDown,
 }: {
   index: number;
   loadSection: (index: number) => Promise<string>;
@@ -108,6 +113,7 @@ function LazySection({
   decorate?: (index: number, doc: Document) => void;
   onHighlightClick?: (annoId: string, rect: ViewportRect) => void;
   decorateNonce?: number;
+  onContentMouseDown?: () => void;
 }) {
   const [html, setHtml] = useState<string | null>(null);
   useEffect(() => {
@@ -134,6 +140,7 @@ function LazySection({
       decorate={decorate}
       onHighlightClick={onHighlightClick}
       decorateNonce={decorateNonce}
+      onContentMouseDown={onContentMouseDown}
     />
   );
 }

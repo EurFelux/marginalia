@@ -32,6 +32,7 @@ export function EpubReader({ bookId, chapters }: Props) {
   const prefs = useReaderStore((s) => s.prefs);
   const setSelection = useReaderStore((s) => s.setSelection);
   const openStyleBar = useReaderStore((s) => s.openStyleBar);
+  const closeStyleBar = useReaderStore((s) => s.closeStyleBar);
   const scrollToCfi = useReaderStore((s) => s.scrollToCfi);
   const qc = useQueryClient();
 
@@ -183,6 +184,7 @@ export function EpubReader({ bookId, chapters }: Props) {
         onSelectionCleared={onSelectionCleared}
         decorate={decorate}
         onHighlightClick={onHighlightClick}
+        onContentMouseDown={closeStyleBar}
       />
     </div>
   );
