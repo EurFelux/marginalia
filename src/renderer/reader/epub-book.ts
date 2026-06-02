@@ -25,6 +25,12 @@ function firstBlock(doc: Document): Element {
   return doc.body?.firstElementChild ?? doc.documentElement;
 }
 
+/** 取 href 末段文件名（去 fragment/query），用于跨实现的 href 匹配兜底。 */
+function basenameOf(href: string): string {
+  const p = href.split("#")[0]!.split("?")[0]!;
+  return p.slice(p.lastIndexOf("/") + 1);
+}
+
 /**
  * 用 epubjs 解析 ePub 字节，暴露虚拟化渲染 + CFI 所需的最小接口。
  * 不使用 epubjs 的 Rendition/manager；仅作解析/资源/CFI 库。
@@ -66,15 +72,28 @@ export async function createEpubBook(bytes: Uint8Array): Promise<EpubBook> {
 
     indexOfHref: (href) => {
       const bare = href.split("#")[0]!;
-      const s = (() => {
+      // 先按 epubjs 的 href 空间精确查（spine.get(string) 内部已去 fragment、查 href 表）。
+      const direct = (() => {
         try {
-          // spine.get(string) 内部已去 fragment 并查 href 表，命中失败返回 null。
           return spine.get(bare) ?? spine.get(href) ?? null;
         } catch {
           return null;
         }
       })();
-      return s ? s.index : -1;
+      if (direct) return direct.index;
+      // 兜底：epub-parser 的 href 带 OPF 目录前缀（如 OEBPS/ch1.xhtml），而 epubjs 的
+      // section.href 是 OPF 内裸形式（ch1.xhtml）——前缀不对称会让上面的精确查对「OPF 在子目录」
+      // 的书失配（跳章失效）。退到 basename 匹配（与 chapterIdByHref 对称）；多命中视为歧义返 -1。
+      const base = basenameOf(bare);
+      let found = -1;
+      for (let i = 0; i < count; i++) {
+        const s = sectionAt(i);
+        if (s && basenameOf(s.href) === base) {
+          if (found !== -1) return -1;
+          found = i;
+        }
+      }
+      return found;
     },
 
     cfiAtIndex: (index) => {
