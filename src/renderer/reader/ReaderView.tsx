@@ -11,6 +11,7 @@ import { EpubReader } from "@renderer/reader/EpubReader";
 import { ReaderPrefs } from "@renderer/reader/ReaderPrefs";
 import { SelectionToolbar } from "@renderer/reader/SelectionToolbar";
 import { HighlightStyleBar } from "@renderer/reader/HighlightStyleBar";
+import { NoteModal } from "@renderer/reader/NoteModal";
 import { AIPanel } from "@renderer/ai/AIPanel";
 
 export function ReaderView() {
@@ -93,6 +94,7 @@ export function ReaderView() {
       </div>
       <SelectionToolbar />
       <HighlightStyleBar />
+      <NoteModal />
     </div>
   );
 }
