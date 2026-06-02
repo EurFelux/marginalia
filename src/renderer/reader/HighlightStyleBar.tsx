@@ -7,12 +7,11 @@ import { qk } from "@renderer/query/keys";
 import { useReaderStore } from "@renderer/store/reader-store";
 import { FILL_COLORS, FILL_SWATCH } from "./highlight";
 
-/** 二级样式工具栏：5 色 + 下划线；create 来自选区，edit 来自点已有高亮（多 笔记/删除）。 */
+/** 二级样式工具栏：5 色 + 下划线；点已有高亮打开（改样式 / 笔记 / 删除）。高亮已由「高亮标记」即时创建，故只在 edit 模式打开。 */
 export function HighlightStyleBar() {
   const styleBar = useReaderStore((s) => s.styleBar);
   const closeStyleBar = useReaderStore((s) => s.closeStyleBar);
   const openNoteModal = useReaderStore((s) => s.openNoteModal);
-  const selection = useReaderStore((s) => s.selection);
   const setSelection = useReaderStore((s) => s.setSelection);
   const setLastHighlightStyle = useReaderStore((s) => s.setLastHighlightStyle);
   const bookId = useReaderStore((s) => s.currentBookId);
@@ -26,10 +25,6 @@ export function HighlightStyleBar() {
   });
 
   const invalidate = () => qc.invalidateQueries({ queryKey: qk.annotations(bookId ?? "") });
-  const createM = useMutation({
-    mutationFn: window.api.annotations.create,
-    onSuccess: invalidate,
-  });
   const updateM = useMutation({
     mutationFn: window.api.annotations.update,
     onSuccess: invalidate,
@@ -58,22 +53,10 @@ export function HighlightStyleBar() {
   const current = editing ? annos.data?.find((a) => a.id === editing) : undefined;
 
   const pickStyle = (style: AnnotationStyle) => {
+    // 样式栏只在 edit 模式打开（高亮由「高亮标记」即时创建后才弹此栏）。
+    if (styleBar.target.type !== "edit") return;
     setLastHighlightStyle(style); // 记住本次选择，供下次「高亮标记」直接套用
-    if (styleBar.target.type === "create") {
-      // 同时守 selectedText：CreateAnnotationInput 的 Zod 要求 selectedText/cfiRange 均 min(1)，
-      // 否则会穿到 IPC 被拒、而 UI 已清选区，造成静默丢弃。
-      if (!selection?.cfiRange || !selection.selectionText) return;
-      createM.mutate({
-        bookId,
-        style,
-        note: "",
-        selectedText: selection.selectionText,
-        cfiRange: selection.cfiRange,
-      });
-      setSelection(null);
-    } else {
-      updateM.mutate({ id: styleBar.target.annotationId, patch: { style } });
-    }
+    updateM.mutate({ id: styleBar.target.annotationId, patch: { style } });
     closeStyleBar();
   };
 
