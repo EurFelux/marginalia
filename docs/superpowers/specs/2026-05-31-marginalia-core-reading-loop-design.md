@@ -27,11 +27,12 @@ Marginalia 是一个 Electron + React 的桌面 ePub 阅读器，核心差异化
 
 ### 延后（后续 Phase，结构上预留扩展位）
 
-| 延后项                                     | 预留方式                                                  |
-| ------------------------------------------ | --------------------------------------------------------- |
-| 文件系统工具（read/write/delete 授权目录） | 工具注册表 + agent 循环已在本 Phase 建好，后续只加函数    |
-| 多 Assistant CRUD                          | `assistants` 表与 `conversations.assistant_id` 绑定已就位 |
-| 全书检索 `searchBook`                      | 工具集预留扩展位                                          |
+| 延后项                                     | 预留方式                                                          |
+| ------------------------------------------ | ----------------------------------------------------------------- |
+| 文件系统工具（read/write/delete 授权目录） | 工具注册表 + agent 循环已在本 Phase 建好，后续只加函数            |
+| 多 Assistant CRUD                          | `assistants` 表与 `conversations.assistant_id` 绑定已就位         |
+| 全书检索 `searchBook`                      | 工具集预留扩展位                                                  |
+| 后台模型调用最大并发数设置                 | 章摘已有 per-chapter in-flight 去重；全局上限设置后续加（见 §11） |
 
 ---
 
@@ -317,6 +318,10 @@ main 后台队列，**不阻塞**阅读与对话：
 5. 之后该章**所有**会话复用这份缓存摘要。
 
 > 摘要生成默认用 Assistant 配置的 provider/model；独立「摘要模型」设置留作后续。
+
+> **触发方式修订（2026-06-02，竖切）**：上文步骤 1「首次 AI 发送触发」**已废**——否则第一条消息必无摘要。改为：**开章自动生成**（`开章自动生成摘要` 设置，**默认关**，控成本）或 **AI 面板摘要 pill 手动「生成摘要」**。`runSend` 仅「就绪则注入 prompt」、**不再触发生成**（生成入口收敛到 `content:generate-chapter-summary` IPC）。`ensureChapterSummary` 仍「仅从 pending 起 + per-chapter in-flight 去重」，保多入口安全并存。
+
+> **最大并发数设置（非 MVP）**：开章自动生成开启后，浏览 / 快速翻阅多章会**并发拉起多个章摘 `generateText`**；加上未来全书 / 批量摘要、并发对话，需要一个**全局并发上限**的可配置设置。当前仅 per-chapter in-flight 去重 + `ReaderView` 自动触发的 ~800ms debounce，**无跨章节 / 跨任务的全局上限**——大量并发可能压垮 provider 限流或本机。落地时应统一约束章摘与其它后台 AI 任务，给合理默认（如 2–3）。
 
 > **全书 / global 摘要（2026-06-01 纳入 Phase 1）**：与章节摘要同机制——`books.summaryStatus` 懒生成（导入后台队列），覆盖全书主题 / 人物 / 结构。
 
