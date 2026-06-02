@@ -1,4 +1,4 @@
-/** 选区信息（S3 由 ReaderPane 写入；字段对齐 @shared/chat 的 buildChipsInput）。 */
+/** 选区信息（由 EpubReader 经 epub-selection 写入；字段对齐 @shared/chat 的 buildChipsInput）。 */
 export interface SelectionInfo {
   selectionText: string;
   paragraphBefore: string | null;
