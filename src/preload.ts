@@ -54,6 +54,8 @@ const api = {
       ipcRenderer.invoke(IPC.contentChapterText, input),
     chapterSummary: (input: ChapterRefInput): Promise<ChapterSummaryDto> =>
       ipcRenderer.invoke(IPC.contentChapterSummary, input),
+    generateChapterSummary: (input: ChapterRefInput): Promise<ChapterSummaryDto> =>
+      ipcRenderer.invoke(IPC.contentGenerateChapterSummary, input),
   },
 
   settings: {

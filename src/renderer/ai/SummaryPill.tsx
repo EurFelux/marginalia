@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { SummaryStatus } from "@shared/library";
 import { qk } from "@renderer/query/keys";
 import { cn } from "@renderer/lib/utils";
@@ -13,10 +13,11 @@ const BADGE: Record<SummaryStatus, { label: string; cls: string }> = {
 };
 
 const PLACEHOLDER: Record<SummaryStatus, string> = {
-  pending: "发送一条消息后会自动生成本章摘要；就绪后会随提问一并提供给 AI。",
+  pending:
+    "本章摘要尚未生成。点下方「生成摘要」，或在设置里开启「开章自动生成」。就绪后会随提问一并提供给 AI。",
   generating: "本章摘要正在生成…",
   ready: "",
-  unavailable: "本章摘要暂不可用。",
+  unavailable: "本章摘要生成失败或暂不可用，可重试生成。",
 };
 
 /**
@@ -28,6 +29,7 @@ export function SummaryPill() {
   const chapterId = useReaderStore((s) => s.currentChapterId);
   const panelOpen = useReaderStore((s) => s.panelOpen);
   const { open, setOpen, ref } = usePopover();
+  const qc = useQueryClient();
 
   const summary = useQuery({
     queryKey: qk.chapterSummary(bookId ?? "", chapterId ?? ""),
@@ -39,9 +41,16 @@ export function SummaryPill() {
     },
   });
 
+  const generate = useMutation({
+    mutationFn: () =>
+      window.api.content.generateChapterSummary({ bookId: bookId!, chapterId: chapterId! }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.chapterSummary(bookId!, chapterId!) }),
+  });
+
   if (!bookId || !chapterId) return null;
   const status = summary.data?.status ?? "pending";
   const badge = BADGE[status];
+  const canGenerate = status === "pending" || status === "unavailable";
 
   return (
     <div ref={ref} className="relative">
@@ -64,6 +73,16 @@ export function SummaryPill() {
           <p className="whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">
             {status === "ready" ? summary.data?.summary : PLACEHOLDER[status]}
           </p>
+          {canGenerate && (
+            <button
+              type="button"
+              onClick={() => generate.mutate()}
+              disabled={generate.isPending}
+              className="mt-2 rounded-md bg-primary px-2.5 py-1 text-[11px] font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+            >
+              {generate.isPending ? "生成中…" : "生成摘要"}
+            </button>
+          )}
         </div>
       )}
     </div>

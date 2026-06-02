@@ -1,10 +1,11 @@
 import { useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, MessageSquare, Settings } from "lucide-react";
 import { qk } from "@renderer/query/keys";
 import { cn } from "@renderer/lib/utils";
 import { useReaderStore } from "@renderer/store/reader-store";
 import { useSettingsStore } from "@renderer/store/settings-store";
+import { usePrefsStore } from "@renderer/store/prefs-store";
 import { ChapterList } from "@renderer/reader/ChapterList";
 import { ReaderPane } from "@renderer/reader/ReaderPane";
 import { ReaderPrefs } from "@renderer/reader/ReaderPrefs";
@@ -19,6 +20,8 @@ export function ReaderView() {
   const panelOpen = useReaderStore((s) => s.panelOpen);
   const setPanelOpen = useReaderStore((s) => s.setPanelOpen);
   const openSettings = useSettingsStore((s) => s.setOpen);
+  const autoSummarize = usePrefsStore((s) => s.autoSummarize);
+  const qc = useQueryClient();
 
   const chapters = useQuery({
     queryKey: qk.chapters(bookId ?? ""),
@@ -32,6 +35,19 @@ export function ReaderView() {
       setCurrentChapter(chapters.data[0].id);
     }
   }, [chapterId, chapters.data, setCurrentChapter]);
+
+  // 开章自动生成摘要（设置开启时）：停在某章 ~800ms 才触发，避免快速翻阅时为每章都生成。
+  // 主进程 ensureChapterSummary 仅从 pending 起，故对已就绪章重复触发是廉价 no-op。
+  useEffect(() => {
+    if (!autoSummarize || bookId == null || chapterId == null) return;
+    const t = setTimeout(() => {
+      void window.api.content
+        .generateChapterSummary({ bookId, chapterId })
+        .then(() => qc.invalidateQueries({ queryKey: qk.chapterSummary(bookId, chapterId) }))
+        .catch(() => {});
+    }, 800);
+    return () => clearTimeout(t);
+  }, [autoSummarize, bookId, chapterId, qc]);
 
   if (!bookId) return null;
 

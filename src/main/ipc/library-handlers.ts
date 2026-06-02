@@ -23,6 +23,8 @@ import {
   readChapterText,
   type ChapterSummary,
 } from "@main/library/content";
+import { ensureChapterSummary } from "@main/ai/summary";
+import { makeSummaryDeps } from "@main/ai/send-deps";
 import { handle } from "@main/ipc/registry";
 
 const toDto = (b: {
@@ -95,6 +97,20 @@ export function registerLibraryHandlers(): void {
     IPC.contentChapterSummary,
     chapterRefInput,
     (input) => getChapterSummary(getDb(), input.bookId, input.chapterId),
+  );
+
+  // 触发本章摘要懒生成（开章自动 / pill 手动按钮）。fire-and-forget：ensureChapterSummary
+  // 仅从 pending 起、内部自含 reject 兜底；同步前缀会把 pending 置 generating，故返回当前状态即时反馈。
+  handle<{ bookId: string; chapterId: string }, ChapterSummary>(
+    IPC.contentGenerateChapterSummary,
+    chapterRefInput,
+    (input) => {
+      const db = getDb();
+      void ensureChapterSummary(makeSummaryDeps(), input.bookId, input.chapterId).catch((err) =>
+        console.warn("[content] generate chapter summary failed:", err),
+      );
+      return getChapterSummary(db, input.bookId, input.chapterId);
+    },
   );
 
   handle<
