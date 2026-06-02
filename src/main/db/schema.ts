@@ -158,3 +158,12 @@ export const messages = sqliteTable(
     index("messages_conversation_id_idx").on(t.conversationId),
   ],
 );
+
+// 用户偏好持久化：key → 任意 JSON value（按 @shared/preferences 的 Zod schema 在服务层校验）。
+export const preferences = sqliteTable("preferences", {
+  key: text("key").primaryKey(),
+  value: text("value", { mode: "json" }).$type<unknown>().notNull(),
+  updatedAt: integer("updated_at")
+    .notNull()
+    .$defaultFn(() => Date.now()),
+});
