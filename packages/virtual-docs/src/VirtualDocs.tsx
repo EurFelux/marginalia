@@ -8,6 +8,10 @@ export interface VirtualDocsHandle {
 
 export interface VirtualDocsProps {
   count: number;
+  /**
+   * 按索引异步取该节的（资源已解析的）HTML。**必须引用稳定**（用 useCallback 记忆）：
+   * 其身份变化会触发所有已挂载 section 重新加载。
+   */
   loadSection: (index: number) => Promise<string>;
   styleCss?: string;
   initialIndex?: number;
@@ -72,7 +76,10 @@ function LazySection({
     let alive = true;
     loadSection(index)
       .then((h) => alive && setHtml(h))
-      .catch(() => alive && setHtml("<p>（本节加载失败）</p>"));
+      .catch((err) => {
+        console.error("[virtual-docs] section load failed", index, err);
+        if (alive) setHtml("<p>（本节加载失败）</p>");
+      });
     return () => {
       alive = false;
     };
