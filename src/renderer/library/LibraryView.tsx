@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BookOpen, FolderOpen, Settings } from "lucide-react";
+import { Button } from "@renderer/components/ui/button";
 import { qk } from "@renderer/query/keys";
 import { useReaderStore } from "@renderer/store/reader-store";
 import { useSettingsStore } from "@renderer/store/settings-store";
@@ -26,21 +27,19 @@ export function LibraryView() {
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-6">
         <h1 className="font-serif text-xl font-semibold">Marginalia</h1>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => importBook.mutate()}
-            disabled={importBook.isPending}
-            className="flex items-center gap-2 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
-          >
-            <FolderOpen className="size-4" />
+          <Button onClick={() => importBook.mutate()} disabled={importBook.isPending}>
+            <FolderOpen />
             {importBook.isPending ? "导入中…" : "导入 ePub"}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => openSettings(true)}
-            className="rounded-md p-2 text-muted-foreground hover:bg-muted"
             aria-label="设置"
+            className="text-muted-foreground"
           >
-            <Settings className="size-4" />
-          </button>
+            <Settings />
+          </Button>
         </div>
       </header>
 

@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, MessageSquare, Settings } from "lucide-react";
 import { qk } from "@renderer/query/keys";
 import { cn } from "@renderer/lib/utils";
+import { Button } from "@renderer/components/ui/button";
 import { useReaderStore } from "@renderer/store/reader-store";
 import { useSettingsStore } from "@renderer/store/settings-store";
 import { usePrefsStore } from "@renderer/store/prefs-store";
@@ -50,32 +51,30 @@ export function ReaderView() {
   return (
     <div className="flex h-screen flex-col bg-background font-sans text-foreground">
       <header className="flex h-12 shrink-0 items-center justify-between border-b border-border px-3">
-        <button
-          onClick={backToLibrary}
-          className="flex items-center gap-1.5 rounded-md px-2 py-1 text-sm text-muted-foreground hover:bg-muted"
-        >
-          <ArrowLeft className="size-4" />
+        <Button variant="ghost" size="sm" onClick={backToLibrary} className="text-muted-foreground">
+          <ArrowLeft />
           书库
-        </button>
+        </Button>
         <div className="flex items-center gap-1">
           <ReaderPrefs />
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => setPanelOpen(!panelOpen)}
             aria-label="AI 面板"
-            className={cn(
-              "rounded-md p-2 hover:bg-muted",
-              panelOpen ? "text-primary" : "text-muted-foreground",
-            )}
+            className={cn(panelOpen ? "text-primary" : "text-muted-foreground")}
           >
-            <MessageSquare className="size-4" />
-          </button>
-          <button
+            <MessageSquare />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => openSettings(true)}
-            className="rounded-md p-2 text-muted-foreground hover:bg-muted"
             aria-label="设置"
+            className="text-muted-foreground"
           >
-            <Settings className="size-4" />
-          </button>
+            <Settings />
+          </Button>
         </div>
       </header>
       <div className="flex min-h-0 flex-1">
