@@ -68,6 +68,7 @@ export function useSelection(
         paragraphCurrent: current,
         paragraphAfter: after || null,
         rect: { x: r.left, y: r.top, width: r.width, height: r.height },
+        cfiRange: null, // 静态 DOM 路径无 CFI；T8 迁移后此文件将被删除
       });
     };
 

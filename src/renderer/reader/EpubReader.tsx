@@ -1,12 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { VirtualDocs, type VirtualDocsHandle } from "@marginalia/virtual-docs";
+import {
+  VirtualDocs,
+  type VirtualDocsHandle,
+  type SectionSelectEvent,
+} from "@marginalia/virtual-docs";
 import type { ChapterRefDto } from "@shared/library";
 import { useReaderStore } from "../store/reader-store";
 import { qk } from "../query/keys";
 import { chapterIdByHref } from "./chapter-id-by-href";
 import { createEpubBook, type EpubBook } from "./epub-book";
 import { prefsToCss } from "./prefs-to-css";
+import { sectionSelectToSelectionInfo } from "./epub-selection";
 
 interface Props {
   bookId: string;
@@ -23,6 +28,7 @@ export function EpubReader({ bookId, chapters }: Props) {
   const currentChapterId = useReaderStore((s) => s.currentChapterId);
   const setCurrentChapter = useReaderStore((s) => s.setCurrentChapter);
   const prefs = useReaderStore((s) => s.prefs);
+  const setSelection = useReaderStore((s) => s.setSelection);
   const qc = useQueryClient();
 
   // 防循环：记录最近一次「由滚动得出的顶部章 id」；跳章 effect 只在目标≠它时滚动。
@@ -88,6 +94,12 @@ export function EpubReader({ bookId, chapters }: Props) {
         })()
       : 0;
 
+  const onSelect = (e: SectionSelectEvent) => {
+    const cfiRange = book ? book.cfiFromRange(e.index, e.range) : null;
+    setSelection(sectionSelectToSelectionInfo(e, cfiRange));
+  };
+  const onSelectionCleared = () => setSelection(null);
+
   const onTopIndexChange = (index: number) => {
     if (!book) return;
     // 当前章高亮
@@ -135,6 +147,8 @@ export function EpubReader({ bookId, chapters }: Props) {
         styleCss={prefsToCss(prefs)}
         initialIndex={initialIndex}
         onTopIndexChange={onTopIndexChange}
+        onSelect={onSelect}
+        onSelectionCleared={onSelectionCleared}
       />
     </div>
   );
