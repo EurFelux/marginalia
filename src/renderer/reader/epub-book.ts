@@ -1,6 +1,9 @@
 import ePub, { EpubCFI, type Book } from "epubjs";
 import type Section from "epubjs/types/section";
 
+/** 高亮 mark 的 class；CFI 计算 / toRange 时作为 ignoreClass 传入，防止 mark 污染 CFI 路径。 */
+export const ANNO_IGNORE_CLASS = "anno";
+
 export interface EpubBook {
   /** spine 项数（= VirtualDocs 的 count）。 */
   count: number;
@@ -16,6 +19,8 @@ export interface EpubBook {
   indexOfCfi: (cfi: string) => number;
   /** iframe range → CFI（选区落点）；失败返回 null。 */
   cfiFromRange: (index: number, range: Range) => string | null;
+  /** CFI 区间串 → 给定 section 文档内的 DOM Range（高亮渲染）；失败返回 null。 */
+  rangeFromCfi: (cfi: string, doc: Document) => Range | null;
   /** 释放 epubjs 资源（卸载书、blob URL）。 */
   destroy: () => void;
 }
@@ -101,7 +106,9 @@ export async function createEpubBook(bytes: Uint8Array): Promise<EpubBook> {
       // s.document 在 render 前为 undefined；.d.ts 标为非空 Document，保留真值检查防御。
       if (!s || !s.document) return null;
       try {
-        return s.cfiFromElement(firstBlock(s.document));
+        // section.cfiFromElement 签名不收 ignoreClass，改用 EpubCFI 构造器传入 ANNO_IGNORE_CLASS，
+        // 确保已插入的 <mark class="anno"> 节点对 CFI 路径透明。
+        return new EpubCFI(firstBlock(s.document), s.cfiBase, ANNO_IGNORE_CLASS).toString();
       } catch {
         return null;
       }
@@ -121,7 +128,17 @@ export async function createEpubBook(bytes: Uint8Array): Promise<EpubBook> {
       const s = sectionAt(index);
       if (!s) return null;
       try {
-        return s.cfiFromRange(range);
+        // section.cfiFromRange 签名不收 ignoreClass，改用 EpubCFI 构造器传入 ANNO_IGNORE_CLASS，
+        // 确保已插入的 <mark class="anno"> 节点对 CFI 路径透明。
+        return new EpubCFI(range, s.cfiBase, ANNO_IGNORE_CLASS).toString();
+      } catch {
+        return null;
+      }
+    },
+
+    rangeFromCfi: (cfi, doc) => {
+      try {
+        return new EpubCFI(cfi).toRange(doc, ANNO_IGNORE_CLASS);
       } catch {
         return null;
       }
