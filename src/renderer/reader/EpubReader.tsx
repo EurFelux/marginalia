@@ -12,6 +12,8 @@ import { chapterIdByHref } from "./chapter-id-by-href";
 import { createEpubBook, type EpubBook } from "./epub-book";
 import { prefsToCss } from "./prefs-to-css";
 import { sectionSelectToSelectionInfo } from "./epub-selection";
+import { applyAnnotations } from "./apply-annotations";
+import { ANNO_IFRAME_CSS } from "./highlight";
 
 interface Props {
   bookId: string;
@@ -29,6 +31,8 @@ export function EpubReader({ bookId, chapters }: Props) {
   const setCurrentChapter = useReaderStore((s) => s.setCurrentChapter);
   const prefs = useReaderStore((s) => s.prefs);
   const setSelection = useReaderStore((s) => s.setSelection);
+  const openStyleBar = useReaderStore((s) => s.openStyleBar);
+  const scrollToCfi = useReaderStore((s) => s.scrollToCfi);
   const qc = useQueryClient();
 
   // 防循环：记录最近一次「由滚动得出的顶部章 id」；跳章 effect 只在目标≠它时滚动。
@@ -45,6 +49,12 @@ export function EpubReader({ bookId, chapters }: Props) {
   const progress = useQuery({
     queryKey: qk.progress(bookId),
     queryFn: () => window.api.progress.get({ bookId }),
+    staleTime: Infinity,
+  });
+
+  const annotations = useQuery({
+    queryKey: qk.annotations(bookId),
+    queryFn: () => window.api.annotations.listByBook({ bookId }),
     staleTime: Infinity,
   });
 
@@ -129,6 +139,28 @@ export function EpubReader({ bookId, chapters }: Props) {
     [],
   );
 
+  const decorate = (index: number, doc: Document) => {
+    if (book) applyAnnotations(book, annotations.data ?? [], index, doc);
+  };
+  const onHighlightClick = (
+    annoId: string,
+    rect: { x: number; y: number; width: number; height: number },
+  ) => {
+    openStyleBar({ rect, target: { type: "edit", annotationId: annoId } });
+  };
+
+  // 标注数据变化（建/改/删后 invalidate）→ 对在挂 section 重贴高亮。
+  useEffect(() => {
+    vRef.current?.redecorate();
+  }, [annotations.data]);
+
+  // 侧栏列表点击 → 滚到该标注所在 section（best-effort：稍后把 mark 滚入视口）。
+  useEffect(() => {
+    if (!book || !scrollToCfi) return;
+    const idx = book.indexOfCfi(scrollToCfi.cfi);
+    if (idx >= 0) vRef.current?.scrollToIndex(idx);
+  }, [book, scrollToCfi]);
+
   if (bytes.isError) return <ReaderError message="无法读取此书的文件。" />;
   if (parseError) return <ReaderError message={`无法渲染此书：${parseError}`} />;
   // 等字节+进度都就绪再挂 VirtualDocs，使 initialIndex 一次到位（避免先 0 再跳）。
@@ -144,11 +176,13 @@ export function EpubReader({ bookId, chapters }: Props) {
         ref={vRef}
         count={book.count}
         loadSection={book.loadSection}
-        styleCss={prefsToCss(prefs)}
+        styleCss={prefsToCss(prefs) + "\n" + ANNO_IFRAME_CSS}
         initialIndex={initialIndex}
         onTopIndexChange={onTopIndexChange}
         onSelect={onSelect}
         onSelectionCleared={onSelectionCleared}
+        decorate={decorate}
+        onHighlightClick={onHighlightClick}
       />
     </div>
   );
