@@ -61,14 +61,15 @@
 
 ### 类型设计债（趁渲染层刚接 preload、迁移成本低，优先清）
 
-| 项                                                                   | 来源               |
-| -------------------------------------------------------------------- | ------------------ |
-| `ProviderDto` 三布尔扁平态 → `key` 判别联合（非法态不可表示）        | ma3-deferred       |
-| `ConversationDto` 章节/独立判别联合 + DB `CHECK`                     | ma4-deferred       |
-| `conversations.assistantId` 收紧 `NOT NULL`（连迁移 + 测试 fixture） | ma4-deferred       |
-| `Chip.required`/`enabled` 闭合联合（UI toggle 落地时）               | ma4 / ma5-deferred |
-| `ChatModel` → 直接 `import type { LanguageModelV3 }`                 | ma3-deferred       |
-| 具名 `ReadingTools` 类型 + `InferUITools` 收紧 chunk                 | ma5-deferred       |
+> 1/2/3/5 已清（分支 `chore/type-design-debt`，2026-06-03；spec/plan 见 `2026-06-03-type-design-debt-cleanup*`）。4/6 当前**零消费方**，延后到各自消费方（UI chip toggle / 需要精确 tool-result chunk）落地时按实际需求收敛——避免对不存在的消费方猜类型形状。
+
+| 项                                                                      | 状态 | 来源               |
+| ----------------------------------------------------------------------- | ---- | ------------------ |
+| `ProviderDto` 三布尔扁平态 → `key` 判别联合（非法态不可表示）           | ✅   | ma3-deferred       |
+| `ConversationDto` 章节/独立判别联合 + `book_id`/`assistant_id` NOT NULL | ✅   | ma4-deferred       |
+| `ChatModel` → 直接 `import type { LanguageModelV3 }`                    | ✅   | ma3-deferred       |
+| `Chip.required`/`enabled` 闭合联合（UI toggle 落地时收敛）              | 🔴   | ma4 / ma5-deferred |
+| 具名 `ReadingTools` 类型 + `InferUITools` 收紧 chunk（需精确 chunk 时） | 🔴   | ma5-deferred       |
 
 ### 设置 / 产品
 
