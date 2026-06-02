@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import { defineConfig } from "vite";
 import { devtools } from "@tanstack/devtools-vite";
 
@@ -8,7 +10,12 @@ import babel from "@rolldown/plugin-babel";
 import tailwindcss from "@tailwindcss/vite";
 
 const config = defineConfig({
-  resolve: { tsconfigPaths: true },
+  resolve: {
+    tsconfigPaths: true,
+    alias: {
+      "@marginalia/virtual-docs": path.resolve(__dirname, "../virtual-docs/src/index.ts"),
+    },
+  },
   plugins: [
     devtools(),
     tailwindcss(),
