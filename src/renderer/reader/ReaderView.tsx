@@ -15,7 +15,6 @@ import { AIPanel } from "@renderer/ai/AIPanel";
 export function ReaderView() {
   const bookId = useReaderStore((s) => s.currentBookId);
   const chapterId = useReaderStore((s) => s.currentChapterId);
-  const setCurrentChapter = useReaderStore((s) => s.setCurrentChapter);
   const backToLibrary = useReaderStore((s) => s.backToLibrary);
   const panelOpen = useReaderStore((s) => s.panelOpen);
   const setPanelOpen = useReaderStore((s) => s.setPanelOpen);
@@ -29,14 +28,9 @@ export function ReaderView() {
     enabled: bookId != null,
   });
 
-  // 首章解析：开书时 currentChapterId 为 null，章节列表到位后回填首章。
-  useEffect(() => {
-    if (chapterId == null && chapters.data && chapters.data.length > 0) {
-      setCurrentChapter(chapters.data[0].id);
-    }
-  }, [chapterId, chapters.data, setCurrentChapter]);
-
   // 开章自动生成摘要（设置开启时）：停在某章 ~800ms 才触发，避免快速翻阅时为每章都生成。
+  // 注：当前章 id 现由 EpubReader 据滚动位置回写（onTopIndexChange），不再在此回填首章——
+  // 否则开书时强设首章会覆盖 EpubReader 的 CFI 进度恢复（initialIndex）。
   // 主进程 ensureChapterSummary 仅从 pending 起，故对已就绪章重复触发是廉价 no-op。
   useEffect(() => {
     if (!autoSummarize || bookId == null || chapterId == null) return;
@@ -87,13 +81,9 @@ export function ReaderView() {
           <ChapterList bookId={bookId} />
         </aside>
         <main className="min-w-0 flex-1">
-          {chapterId ? (
-            <EpubReader bookId={bookId} />
-          ) : (
-            <p className="p-10 text-sm text-muted-foreground">
-              {chapters.isPending ? "加载章节…" : "本书无可读章节。"}
-            </p>
-          )}
+          {/* 无条件渲染：EpubReader 自管载入/错误态，并据 CFI 进度恢复初始位置（不门控在 chapterId 上，
+              否则需先有当前章才渲染，与「开书即按进度连续渲染」相悖）。 */}
+          <EpubReader bookId={bookId} chapters={chapters.data ?? []} />
         </main>
         {/* 始终挂载，用 hidden 切换可见——保住 useChat 对话状态在开合间存活。 */}
         <aside className={cn("w-96 shrink-0 border-l border-border", !panelOpen && "hidden")}>
