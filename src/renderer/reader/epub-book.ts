@@ -138,7 +138,9 @@ export async function createEpubBook(bytes: Uint8Array): Promise<EpubBook> {
 
     rangeFromCfi: (cfi, doc) => {
       try {
-        return new EpubCFI(cfi).toRange(doc, ANNO_IGNORE_CLASS);
+        // toRange 的 .d.ts 标为非空 Range，但实际在 startContainer 缺失时会返回 null
+        // （epubjs epubcfi.js）；用 ?? null 把这一路径显式化（接口已声明 Range | null）。
+        return new EpubCFI(cfi).toRange(doc, ANNO_IGNORE_CLASS) ?? null;
       } catch {
         return null;
       }
