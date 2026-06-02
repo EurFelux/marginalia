@@ -8,6 +8,7 @@ import { registerLibraryHandlers } from "@main/ipc/library-handlers";
 import { registerSettingsHandlers } from "@main/ipc/settings-handlers";
 import { registerChatHandlers } from "@main/ipc/chat-handlers";
 import { registerAiHandlers } from "@main/ipc/ai-handlers";
+import { registerAnnotationHandlers } from "@main/ipc/annotations-handlers";
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -61,6 +62,7 @@ app.on("ready", () => {
   registerLibraryHandlers();
   registerSettingsHandlers();
   registerChatHandlers();
+  registerAnnotationHandlers();
   registerAiHandlers();
   createWindow();
 });

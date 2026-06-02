@@ -31,6 +31,11 @@ import type {
   SendAck,
   SendRequest,
 } from "@shared/chat";
+import type {
+  AnnotationDto,
+  CreateAnnotationInput,
+  UpdateAnnotationInput,
+} from "@shared/annotations";
 
 const api = {
   app: {
@@ -65,6 +70,17 @@ const api = {
       ipcRenderer.invoke(IPC.contentChapterSummary, input),
     generateChapterSummary: (input: ChapterRefInput): Promise<ChapterSummaryDto> =>
       ipcRenderer.invoke(IPC.contentGenerateChapterSummary, input),
+  },
+
+  annotations: {
+    listByBook: (input: BookIdInput): Promise<AnnotationDto[]> =>
+      ipcRenderer.invoke(IPC.annotationsListByBook, input),
+    create: (input: CreateAnnotationInput): Promise<AnnotationDto> =>
+      ipcRenderer.invoke(IPC.annotationsCreate, input),
+    update: (input: UpdateAnnotationInput): Promise<AnnotationDto> =>
+      ipcRenderer.invoke(IPC.annotationsUpdate, input),
+    delete: (input: { id: string }): Promise<void> =>
+      ipcRenderer.invoke(IPC.annotationsDelete, input),
   },
 
   settings: {
