@@ -15,6 +15,10 @@ export interface VirtualDocsProps {
   loadSection: (index: number) => Promise<string>;
   styleCss?: string;
   initialIndex?: number;
+  /**
+   * 顶部可见 section 索引变化时回调。注意这是 virtuoso 渲染区的起始索引（含 overscan），
+   * **近似**而非像素级视口顶——滚动中可能比真正视口顶部的 section 略小一两个。用于当前章/进度足够。
+   */
   onTopIndexChange?: (index: number) => void;
   onSelect?: (e: SectionSelectEvent) => void;
   onSelectionCleared?: () => void;
