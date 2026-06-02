@@ -149,6 +149,12 @@ export function EpubReader({ bookId, chapters }: Props) {
   ) => {
     openStyleBar({ rect, target: { type: "edit", annotationId: annoId } });
   };
+  // 正文内任意 mousedown：关样式栏并清选区。二者一并 set（同一帧）→ 关栏后主工具栏不会因
+  // selection 仍在而闪回。点高亮时此 mousedown 先关栏，随后的 click 再开该高亮的 edit 栏。
+  const onContentMouseDown = () => {
+    closeStyleBar();
+    setSelection(null);
+  };
 
   // 标注数据变化（建/改/删后 invalidate）→ 对在挂 section 重贴高亮。
   useEffect(() => {
@@ -184,7 +190,7 @@ export function EpubReader({ bookId, chapters }: Props) {
         onSelectionCleared={onSelectionCleared}
         decorate={decorate}
         onHighlightClick={onHighlightClick}
-        onContentMouseDown={closeStyleBar}
+        onContentMouseDown={onContentMouseDown}
       />
     </div>
   );

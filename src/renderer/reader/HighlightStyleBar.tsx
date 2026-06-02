@@ -41,11 +41,16 @@ export function HighlightStyleBar() {
   useEffect(() => {
     if (!styleBar) return;
     const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) closeStyleBar();
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        // 点栏外即放弃：关栏并清选区，否则主文档点击不会 collapse iframe 选区，
+        // 关栏后 store.selection 仍在 → 主工具栏重现。
+        closeStyleBar();
+        setSelection(null);
+      }
     };
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
-  }, [styleBar, closeStyleBar]);
+  }, [styleBar, closeStyleBar, setSelection]);
 
   if (!styleBar || bookId == null) return null;
   const editing = styleBar.target.type === "edit" ? styleBar.target.annotationId : null;
