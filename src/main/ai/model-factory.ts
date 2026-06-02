@@ -2,14 +2,14 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import type { LanguageModelV3 } from "@ai-sdk/provider";
 import type { ProviderType } from "@shared/providers";
 
 /**
- * AI SDK 语言模型实例类型（由 provider 工厂返回；四家结构一致，可喂 generateText/streamText）。
- * 经 OpenAIProvider 的调用签名解析为 `@ai-sdk/provider` 的 `LanguageModelV3`。若某次 `@ai-sdk/openai`
- * 大版本升级导致该类型漂移，改为直接 `import type { LanguageModelV3 } from "@ai-sdk/provider"` 更稳。
+ * AI SDK 语言模型实例类型：四家 provider 工厂均返回 `@ai-sdk/provider` 的 `LanguageModelV3`
+ * （可喂 generateText/streamText）。直接依赖该接口，不再经 `@ai-sdk/openai` 的返回类型推导，免大版本漂移。
  */
-export type ChatModel = ReturnType<ReturnType<typeof createOpenAI>>;
+export type ChatModel = LanguageModelV3;
 
 export interface ResolveModelParams {
   type: ProviderType;
