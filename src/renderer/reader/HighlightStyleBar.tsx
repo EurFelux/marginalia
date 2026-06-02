@@ -53,7 +53,9 @@ export function HighlightStyleBar() {
 
   const pickStyle = (style: AnnotationStyle) => {
     if (styleBar.target.type === "create") {
-      if (!selection?.cfiRange) return;
+      // 同时守 selectedText：CreateAnnotationInput 的 Zod 要求 selectedText/cfiRange 均 min(1)，
+      // 否则会穿到 IPC 被拒、而 UI 已清选区，造成静默丢弃。
+      if (!selection?.cfiRange || !selection.selectionText) return;
       createM.mutate({
         bookId,
         style,
