@@ -55,7 +55,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
       ref={vRef}
       style={{ height: "100%" }}
       totalCount={count}
-      initialTopMostItemIndex={initialIndex}
+      initialTopMostItemIndex={initialIndex ?? 0}
       itemContent={itemContent}
       rangeChanged={({ startIndex }) => onTopIndexChange?.(startIndex)}
     />
