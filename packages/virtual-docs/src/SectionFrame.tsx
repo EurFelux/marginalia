@@ -89,27 +89,34 @@ export function SectionFrame({
       const fr = iframe.getBoundingClientRect();
       cbRef.current.onHighlightClick?.(id, toViewportRect(r, fr));
     };
-    const onContentDown = (e: MouseEvent) => {
-      if (!doc) return;
-      // 点在已有非塌缩选区内部：阻止默认塌缩、保留选区，让随后的 mouseup 照常触发 onSelect
-      // （滚动隐藏工具栏后，点回选区即在新位置重弹工具栏）。点在选区外则照常上报（关闭浮层）。
+    // (clientX, clientY 为 iframe 视口坐标) 是否落在当前非塌缩选区内。
+    const pointInSelection = (x: number, y: number): boolean => {
+      if (!doc) return false;
       const sel = doc.getSelection();
-      if (sel && !sel.isCollapsed && sel.rangeCount > 0) {
-        try {
-          const caret = (
-            doc as Document & {
-              caretRangeFromPoint?(x: number, y: number): Range | null;
-            }
-          ).caretRangeFromPoint?.(e.clientX, e.clientY);
-          if (caret && sel.getRangeAt(0).isPointInRange(caret.startContainer, caret.startOffset)) {
-            e.preventDefault();
-            return;
-          }
-        } catch {
-          /* caretRangeFromPoint/isPointInRange 不可用则按选区外处理 */
-        }
+      if (!sel || sel.isCollapsed || sel.rangeCount === 0) return false;
+      try {
+        const caret = (
+          doc as Document & { caretRangeFromPoint?(x: number, y: number): Range | null }
+        ).caretRangeFromPoint?.(x, y);
+        return !!caret && sel.getRangeAt(0).isPointInRange(caret.startContainer, caret.startOffset);
+      } catch {
+        return false;
+      }
+    };
+    const onContentDown = (e: MouseEvent) => {
+      // 点在已有选区内部：阻止默认塌缩、保留选区，让随后的 mouseup 照常触发 onSelect
+      // （滚动隐藏工具栏后，点回选区即在新位置重弹工具栏）。点在选区外则照常上报（关闭浮层）。
+      if (pointInSelection(e.clientX, e.clientY)) {
+        e.preventDefault();
+        return;
       }
       cbRef.current.onContentMouseDown?.();
+    };
+    // 悬停在选区上 → 光标变手型，提示「可点击重弹工具栏」。
+    const onContentMove = (e: MouseEvent) => {
+      if (!doc?.body) return;
+      const cursor = pointInSelection(e.clientX, e.clientY) ? "pointer" : "";
+      if (doc.body.style.cursor !== cursor) doc.body.style.cursor = cursor;
     };
     const detach = () => {
       ro?.disconnect();
@@ -118,6 +125,8 @@ export function SectionFrame({
       doc?.removeEventListener("selectionchange", onSelChange);
       doc?.removeEventListener("click", onAnnoClick);
       doc?.removeEventListener("mousedown", onContentDown);
+      doc?.removeEventListener("mousemove", onContentMove);
+      if (doc?.body) doc.body.style.cursor = "";
       doc = null;
       docRef.current = null;
     };
@@ -137,6 +146,7 @@ export function SectionFrame({
       cbRef.current.decorate?.(index, doc);
       doc.addEventListener("click", onAnnoClick);
       doc.addEventListener("mousedown", onContentDown);
+      doc.addEventListener("mousemove", onContentMove);
     };
 
     iframe.addEventListener("load", onLoad);
