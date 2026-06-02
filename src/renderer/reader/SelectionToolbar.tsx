@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { BookOpen, FileText, Highlighter, Languages, Sparkles, StickyNote } from "lucide-react";
 import { cn } from "@renderer/lib/utils";
+import { qk } from "@renderer/query/keys";
 import { useReaderStore } from "@renderer/store/reader-store";
 import { useAiActions, type PresetId } from "@renderer/ai/use-ai-actions";
 
@@ -14,9 +16,17 @@ export function SelectionToolbar() {
   const selection = useReaderStore((s) => s.selection);
   const openStyleBar = useReaderStore((s) => s.openStyleBar);
   const openNoteModal = useReaderStore((s) => s.openNoteModal);
+  const setSelection = useReaderStore((s) => s.setSelection);
   const styleBar = useReaderStore((s) => s.styleBar);
   const noteModal = useReaderStore((s) => s.noteModal);
+  const bookId = useReaderStore((s) => s.currentBookId);
+  const lastStyle = useReaderStore((s) => s.lastHighlightStyle);
   const { startAiAction } = useAiActions();
+  const qc = useQueryClient();
+  const createM = useMutation({
+    mutationFn: window.api.annotations.create,
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.annotations(bookId ?? "") }),
+  });
   // 二级工具栏（样式栏）/ 笔记 modal 打开时，主工具栏让位消失（Apple Books 式取代，
   // 而非叠层）。选区仍保留在 store 里，供样式栏/modal 读取 cfiRange/selectedText。
   if (styleBar || noteModal) return null;
@@ -27,6 +37,26 @@ export function SelectionToolbar() {
   const left = Math.min(Math.max(rect.x + rect.width / 2, PAD), window.innerWidth - PAD);
   const top = rect.y - 10;
 
+  // 选「高亮标记」：立即用上次的样式建高亮（Apple Books 式，无需先选色），再打开该条的样式栏供改色；
+  // 滚动 / 点别处则关栏、高亮保留。
+  const applyHighlight = () => {
+    if (!bookId || !selection.cfiRange || !selection.selectionText) return;
+    createM.mutate(
+      {
+        bookId,
+        style: lastStyle,
+        note: "",
+        selectedText: selection.selectionText,
+        cfiRange: selection.cfiRange,
+      },
+      {
+        onSuccess: (anno) =>
+          openStyleBar({ rect, target: { type: "edit", annotationId: anno.id } }),
+      },
+    );
+    setSelection(null);
+  };
+
   return (
     <div
       onMouseDown={(e) => e.preventDefault()}
@@ -34,7 +64,7 @@ export function SelectionToolbar() {
       className="flex w-max items-center gap-0.5 whitespace-nowrap rounded-xl border border-border bg-popover/95 p-1 shadow-lg backdrop-blur"
     >
       <ToolBtn
-        onClick={() => openStyleBar({ rect, target: { type: "create" } })}
+        onClick={applyHighlight}
         icon={<Highlighter className="size-3.5" />}
         label="高亮标记"
       />

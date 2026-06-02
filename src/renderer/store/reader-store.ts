@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { AnnotationStyle } from "@shared/annotations";
 import type { Chip } from "@shared/chat";
 import type { ReaderPrefs, SelectionInfo } from "@renderer/types";
 
@@ -25,6 +26,8 @@ interface ReaderState {
   styleBar: StyleBarState | null;
   noteModal: NoteModalState | null;
   scrollToCfi: { cfi: string; nonce: number } | null;
+  /** 上次选用的高亮样式；选「高亮标记」时直接套用（Apple Books 式记忆，会话内）。 */
+  lastHighlightStyle: AnnotationStyle;
 }
 
 interface ReaderActions {
@@ -43,6 +46,7 @@ interface ReaderActions {
   openNoteModal: (s: NoteModalState) => void;
   closeNoteModal: () => void;
   requestScrollToCfi: (cfi: string) => void;
+  setLastHighlightStyle: (style: AnnotationStyle) => void;
 }
 
 export const READER_INITIAL: ReaderState = {
@@ -59,6 +63,7 @@ export const READER_INITIAL: ReaderState = {
   styleBar: null,
   noteModal: null,
   scrollToCfi: null,
+  lastHighlightStyle: "yellow",
 };
 
 export const useReaderStore = create<ReaderState & ReaderActions>((set) => ({
@@ -85,4 +90,5 @@ export const useReaderStore = create<ReaderState & ReaderActions>((set) => ({
   closeNoteModal: () => set({ noteModal: null }),
   requestScrollToCfi: (cfi) =>
     set((s) => ({ scrollToCfi: { cfi, nonce: (s.scrollToCfi?.nonce ?? 0) + 1 } })),
+  setLastHighlightStyle: (lastHighlightStyle) => set({ lastHighlightStyle }),
 }));

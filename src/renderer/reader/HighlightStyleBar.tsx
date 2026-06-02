@@ -14,6 +14,7 @@ export function HighlightStyleBar() {
   const openNoteModal = useReaderStore((s) => s.openNoteModal);
   const selection = useReaderStore((s) => s.selection);
   const setSelection = useReaderStore((s) => s.setSelection);
+  const setLastHighlightStyle = useReaderStore((s) => s.setLastHighlightStyle);
   const bookId = useReaderStore((s) => s.currentBookId);
   const qc = useQueryClient();
   const ref = useRef<HTMLDivElement | null>(null);
@@ -57,6 +58,7 @@ export function HighlightStyleBar() {
   const current = editing ? annos.data?.find((a) => a.id === editing) : undefined;
 
   const pickStyle = (style: AnnotationStyle) => {
+    setLastHighlightStyle(style); // 记住本次选择，供下次「高亮标记」直接套用
     if (styleBar.target.type === "create") {
       // 同时守 selectedText：CreateAnnotationInput 的 Zod 要求 selectedText/cfiRange 均 min(1)，
       // 否则会穿到 IPC 被拒、而 UI 已清选区，造成静默丢弃。
