@@ -91,6 +91,31 @@ export const progress = sqliteTable("progress", {
     .$defaultFn(() => Date.now()),
 });
 
+export const annotations = sqliteTable(
+  "annotations",
+  {
+    id: pkUuid(),
+    bookId: text("book_id")
+      .notNull()
+      .references(() => books.id),
+    style: text("style").notNull(), // yellow|green|blue|pink|purple|underline
+    note: text("note").notNull().default(""),
+    selectedText: text("selected_text").notNull(),
+    cfiRange: text("cfi_range").notNull(),
+    createdAt: nowMs(),
+    updatedAt: integer("updated_at")
+      .notNull()
+      .$defaultFn(() => Date.now()),
+  },
+  (t) => [
+    check(
+      "annotations_style_check",
+      sql`${t.style} in ('yellow','green','blue','pink','purple','underline')`,
+    ),
+    index("annotations_book_id_idx").on(t.bookId),
+  ],
+);
+
 export const conversations = sqliteTable(
   "conversations",
   {
