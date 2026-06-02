@@ -85,10 +85,10 @@ export function SettingsPanel() {
         <div className="space-y-3">
           <div className="block">
             <span className="mb-1 block text-xs text-muted-foreground">API Key</span>
-            {anthropic?.hasKey && !editingKey ? (
+            {anthropic && anthropic.key.status !== "none" && !editingKey ? (
               <div className="flex items-center gap-2">
                 <div className="min-w-0 flex-1 truncate rounded-md border border-border bg-muted/40 px-3 py-2 font-mono text-sm text-muted-foreground">
-                  {anthropic.keyMask ?? "已配置（本机无法解密）"}
+                  {anthropic.key.status === "set" ? anthropic.key.mask : "已配置（本机无法解密）"}
                 </div>
                 <button
                   type="button"
@@ -107,7 +107,7 @@ export function SettingsPanel() {
                   placeholder="sk-ant-…"
                   className="min-w-0 flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
                 />
-                {anthropic?.hasKey && (
+                {anthropic && anthropic.key.status !== "none" && (
                   <button
                     type="button"
                     onClick={() => {

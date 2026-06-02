@@ -32,18 +32,24 @@ export const upsertProviderInput = z
   });
 export type UpsertProviderInput = z.infer<typeof upsertProviderInput>;
 
+/**
+ * 密钥存在性的判别联合（仅这三态合法，非法组合不可表示）：
+ *  - `none`：密文不存在。
+ *  - `set`：密文存在且本机可解密，附掩码预览（如 "sk-…1234"）。
+ *  - `undecryptable`：密文存在但本机无法解密（跨机器迁移 / safeStorage 不可用）。
+ */
+export type ProviderKeyState =
+  | { status: "none" }
+  | { status: "set"; mask: string }
+  | { status: "undecryptable" };
+
 /** 发往 renderer 的 provider 视图：绝不含明文 / 密文，只含掩码预览。 */
 export interface ProviderDto {
   id: string;
   type: ProviderType;
   label: string | null;
   baseUrl: string | null;
-  /** 掩码预览（如 "sk-…1234"）；无密钥或无法解密时为 null。 */
-  keyMask: string | null;
-  /** 是否存有密钥（密文存在）。 */
-  hasKey: boolean;
-  /** 存有密钥但本机无法解密时为 false（如跨机器迁移 / safeStorage 不可用）。无密钥时亦为 false——应配合 hasKey 一同判断。 */
-  keyDecryptable: boolean;
+  key: ProviderKeyState;
   createdAt: number;
 }
 

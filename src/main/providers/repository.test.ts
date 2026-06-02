@@ -53,9 +53,7 @@ describe("provider repository", () => {
     const db = freshDb();
     const dto = upsertProvider(db, fakeEncryptor, { type: "openai", apiKey: "sk-abcdefghij" });
     expect(dto.type).toBe("openai");
-    expect(dto.hasKey).toBe(true);
-    expect(dto.keyDecryptable).toBe(true);
-    expect(dto.keyMask).toBe("sk-…ghij");
+    expect(dto.key).toEqual({ status: "set", mask: "sk-…ghij" });
     const row = getProviderRow(db, dto.id);
     expect(row?.apiKeyEncrypted).toBeInstanceOf(Buffer);
     expect(row?.apiKeyEncrypted?.toString("utf8")).toBe("sk-abcdefghij");
@@ -68,9 +66,7 @@ describe("provider repository", () => {
   it("creates a provider without a key", () => {
     const db = freshDb();
     const dto = upsertProvider(db, fakeEncryptor, { type: "anthropic" });
-    expect(dto.hasKey).toBe(false);
-    expect(dto.keyMask).toBeNull();
-    expect(dto.keyDecryptable).toBe(false);
+    expect(dto.key).toEqual({ status: "none" });
   });
 
   it("update without apiKey keeps the existing key", () => {
@@ -131,13 +127,11 @@ describe("provider repository", () => {
     ).toThrow(/secure storage is unavailable/i);
   });
 
-  it("marks keyDecryptable false (and keyMask null) when decryption fails", () => {
+  it("reports key status 'undecryptable' when decryption fails", () => {
     const db = freshDb();
     const created = upsertProvider(db, fakeEncryptor, { type: "openai", apiKey: "sk-abcdefghij" });
     const listed = listProviders(db, brokenDecryptEncryptor).find((p) => p.id === created.id);
-    expect(listed?.hasKey).toBe(true);
-    expect(listed?.keyDecryptable).toBe(false);
-    expect(listed?.keyMask).toBeNull();
+    expect(listed?.key).toEqual({ status: "undecryptable" });
   });
 
   it("removeProvider deletes it and clears assistant references", () => {

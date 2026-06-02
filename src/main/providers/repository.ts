@@ -4,33 +4,35 @@ import { assistants, providers } from "@main/db/schema";
 import type { Encryptor } from "@main/secrets/encryptor";
 import type { ProviderTester } from "@main/secrets/tester";
 import { maskKey } from "@main/providers/mask";
-import type { ProviderDto, TestResult, UpsertProviderInput } from "@shared/providers";
+import type {
+  ProviderDto,
+  ProviderKeyState,
+  TestResult,
+  UpsertProviderInput,
+} from "@shared/providers";
 
 export type ProviderRow = typeof providers.$inferSelect;
 
-/** 行 → DTO：在 main 内解密以产生掩码，明文绝不离开 main。解密失败则优雅降级。 */
-function toDto(row: ProviderRow, encryptor: Encryptor): ProviderDto {
-  const cipher = row.apiKeyEncrypted;
-  let keyMask: string | null = null;
-  let keyDecryptable = false;
-  if (cipher != null) {
-    try {
-      keyMask = maskKey(encryptor.decrypt(cipher));
-      keyDecryptable = true;
-    } catch (err) {
-      // 跨机迁移属预期；但真实 encryptor 故障也走这里——记日志以便区分（err 来自 OS 钥匙串，不含明文）。
-      console.warn(`[providers] toDto: decrypt failed for provider ${row.id}:`, err);
-      keyDecryptable = false;
-    }
+/** 在 main 内解密以产生掩码，明文绝不离开 main。解密失败则优雅降级为 undecryptable。 */
+function keyState(cipher: Buffer | null, row: ProviderRow, encryptor: Encryptor): ProviderKeyState {
+  if (cipher == null) return { status: "none" };
+  try {
+    return { status: "set", mask: maskKey(encryptor.decrypt(cipher)) };
+  } catch (err) {
+    // 跨机迁移属预期；但真实 encryptor 故障也走这里——记日志以便区分（err 来自 OS 钥匙串，不含明文）。
+    console.warn(`[providers] toDto: decrypt failed for provider ${row.id}:`, err);
+    return { status: "undecryptable" };
   }
+}
+
+/** 行 → DTO（密钥存在性收敛为判别联合 key）。 */
+function toDto(row: ProviderRow, encryptor: Encryptor): ProviderDto {
   return {
     id: row.id,
     type: row.type,
     label: row.label ?? null,
     baseUrl: row.baseUrl ?? null,
-    keyMask,
-    hasKey: cipher != null,
-    keyDecryptable,
+    key: keyState(row.apiKeyEncrypted, row, encryptor),
     createdAt: row.createdAt,
   };
 }
