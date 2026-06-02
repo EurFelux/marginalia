@@ -1,4 +1,5 @@
 import path from "node:path";
+import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { createDb, runMigrations } from "@main/db/client";
 import { annotations, books } from "@main/db/schema";
@@ -44,6 +45,23 @@ describe("annotations repository", () => {
     expect(u.style).toBe("green");
     expect(u.note).toBe("my note");
     expect(u.updatedAt).toBeGreaterThanOrEqual(a.createdAt);
+  });
+
+  it("throws for unknown annotation on update", () => {
+    const db = freshDb();
+    expect(() =>
+      updateAnnotation(db, { id: "00000000-0000-0000-0000-000000000000", patch: { note: "x" } }),
+    ).toThrow(/annotation .* not found/);
+  });
+
+  it("lists most-recently-created first", () => {
+    const db = freshDb();
+    const a = createAnnotation(db, base);
+    const b = createAnnotation(db, { ...base, selectedText: "second" });
+    // 强制不同的 createdAt，避免同毫秒插入导致顺序不确定。
+    db.update(annotations).set({ createdAt: 1 }).where(eq(annotations.id, a.id)).run();
+    db.update(annotations).set({ createdAt: 2 }).where(eq(annotations.id, b.id)).run();
+    expect(listAnnotationsByBook(db, "book-1").map((x) => x.id)).toEqual([b.id, a.id]);
   });
 
   it("deletes", () => {
