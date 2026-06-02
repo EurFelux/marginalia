@@ -26,10 +26,14 @@ export type CreateAnnotationInput = z.infer<typeof createAnnotationInput>;
 
 export const updateAnnotationInput = z.object({
   id: z.string().min(1),
-  patch: z.object({
-    style: annotationStyle.optional(),
-    note: z.string().optional(),
-  }),
+  patch: z
+    .object({
+      style: annotationStyle.optional(),
+      note: z.string().optional(),
+    })
+    .refine((p) => p.style !== undefined || p.note !== undefined, {
+      message: "patch must include at least one of: style, note",
+    }),
 });
 export type UpdateAnnotationInput = z.infer<typeof updateAnnotationInput>;
 
