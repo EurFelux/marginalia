@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Trash2, Underline } from "lucide-react";
 import type { AnnotationStyle } from "@shared/annotations";
 import { cn } from "@renderer/lib/utils";
+import { Button } from "@renderer/components/ui/button";
 import { qk } from "@renderer/query/keys";
 import { useReaderStore } from "@renderer/store/reader-store";
 import { FILL_COLORS, FILL_SWATCH } from "./highlight";
@@ -84,42 +85,42 @@ export function HighlightStyleBar() {
           )}
         />
       ))}
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="icon-xs"
         aria-label="下划线"
         onClick={() => pickStyle("underline")}
-        className={cn(
-          "grid size-6 place-items-center rounded-md hover:bg-muted",
-          current?.style === "underline" && "bg-muted ring-1 ring-foreground/40",
-        )}
+        className={cn(current?.style === "underline" && "bg-muted ring-1 ring-foreground/40")}
       >
         <Underline className="size-4" />
-      </button>
+      </Button>
       {editing && (
         <>
           <span className="mx-0.5 h-5 w-px bg-border" />
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon-xs"
             aria-label="笔记"
             onClick={() => {
               openNoteModal({ target: { type: "edit", annotationId: editing } });
               closeStyleBar();
             }}
-            className="grid size-6 place-items-center rounded-md text-muted-foreground hover:bg-muted"
+            className="text-muted-foreground"
           >
             <StickyNoteIcon />
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-xs"
             aria-label="删除"
             onClick={() => {
               deleteM.mutate({ id: editing });
               closeStyleBar();
             }}
-            className="grid size-6 place-items-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+            className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
           >
             <Trash2 className="size-4" />
-          </button>
+          </Button>
         </>
       )}
     </div>

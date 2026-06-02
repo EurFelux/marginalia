@@ -2,6 +2,7 @@ import { useEffect, useRef, type KeyboardEvent } from "react";
 import type { ChatStatus } from "ai";
 import { ArrowUp, Square } from "lucide-react";
 import type { Chip } from "@shared/chat";
+import { Button } from "@renderer/components/ui/button";
 import { useReaderStore } from "@renderer/store/reader-store";
 import { ChipBar } from "@renderer/ai/ChipBar";
 
@@ -57,22 +58,18 @@ export function Composer({ status, onSend, onStop }: Props) {
           className="max-h-32 min-h-9 flex-1 resize-none overflow-y-auto bg-transparent px-1 py-1 text-sm outline-none placeholder:text-muted-foreground"
         />
         {isStreaming ? (
-          <button
-            onClick={onStop}
-            aria-label="停止"
-            className="grid size-9 shrink-0 place-items-center rounded-lg bg-secondary text-secondary-foreground hover:opacity-90"
-          >
-            <Square className="size-4" />
-          </button>
+          <Button variant="secondary" size="icon-lg" onClick={onStop} aria-label="停止">
+            <Square />
+          </Button>
         ) : (
-          <button
+          <Button
+            size="icon-lg"
             onClick={send}
             disabled={draftText.trim() === ""}
             aria-label="发送"
-            className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50"
           >
-            <ArrowUp className="size-4" />
-          </button>
+            <ArrowUp />
+          </Button>
         )}
       </div>
     </div>

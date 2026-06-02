@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { BookOpen, FileText, Highlighter, Languages, Sparkles, StickyNote } from "lucide-react";
 import { cn } from "@renderer/lib/utils";
+import { Button } from "@renderer/components/ui/button";
 import { qk } from "@renderer/query/keys";
 import { useReaderStore } from "@renderer/store/reader-store";
 import { useAiActions, type PresetId } from "@renderer/ai/use-ai-actions";
@@ -112,16 +113,9 @@ function ToolBtn({
   primary?: boolean;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium hover:bg-muted",
-        primary && "text-primary",
-      )}
-    >
+    <Button variant="ghost" size="sm" onClick={onClick} className={cn(primary && "text-primary")}>
       {icon}
       <span>{label}</span>
-    </button>
+    </Button>
   );
 }
