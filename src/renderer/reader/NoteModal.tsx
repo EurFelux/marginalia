@@ -24,6 +24,8 @@ export function NoteModal() {
   const current = editing ? annos.data?.find((a) => a.id === editing) : undefined;
 
   // 打开时初始化文本（edit 取现笔记，create 空）+ 聚焦。
+  // 仅依赖 [noteModal, editing]：openNoteModal 每次都 set 全新对象，故每次打开 noteModal 引用必变、
+  // effect 必重跑、文本必重置——不必把 current/text 列入依赖（列了反会因 current 变化覆盖用户输入）。
   useEffect(() => {
     if (!noteModal) return;
     setText(editing ? (current?.note ?? "") : "");
