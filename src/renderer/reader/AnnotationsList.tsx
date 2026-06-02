@@ -34,6 +34,7 @@ export function AnnotationsList({ bookId }: { bookId: string }) {
   });
 
   if (annos.isPending) return <p className="p-3 text-sm text-muted-foreground">加载标注…</p>;
+  if (annos.isError) return <p className="p-3 text-sm text-destructive">标注加载失败</p>;
   const list = annos.data ?? [];
   if (list.length === 0)
     return <p className="p-4 text-center text-xs text-muted-foreground">还没有标注。划词试试～</p>;
@@ -53,7 +54,7 @@ export function AnnotationsList({ bookId }: { bookId: string }) {
   };
 
   return (
-    <div className="space-y-1.5 overflow-y-auto p-2">
+    <div className="h-full space-y-1.5 overflow-y-auto p-2">
       {sorted.map((a) => (
         <AnnoItem
           key={a.id}
