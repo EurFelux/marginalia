@@ -4,6 +4,8 @@ export const qk = {
   toc: (bookId: string) => ["toc", bookId] as const,
   chapter: (bookId: string, chapterId: string) => ["chapter", bookId, chapterId] as const,
   chapters: (bookId: string) => ["chapters", bookId] as const,
+  chapterSummary: (bookId: string, chapterId: string) =>
+    ["chapter-summary", bookId, chapterId] as const,
   providers: ["providers"] as const,
   assistantDefault: ["assistant", "default"] as const,
   conversations: (bookId: string) => ["conversations", bookId] as const,

@@ -46,3 +46,12 @@ export interface ChapterRefDto {
   orderIndex: number;
   level: number;
 }
+
+/** 章节摘要状态机（与 chapters.summary_status 的 CHECK 约束一致）。 */
+export type SummaryStatus = "pending" | "generating" | "ready" | "unavailable";
+
+/** content:chapter-summary 返回：摘要状态 + 正文（ready 时非空）。 */
+export interface ChapterSummaryDto {
+  status: SummaryStatus;
+  summary: string | null;
+}

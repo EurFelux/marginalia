@@ -6,6 +6,7 @@ import { createIpcChatTransport } from "@renderer/ai/ipc-chat-transport";
 import type { ChatUIMessage } from "@renderer/ai/types";
 import { MessageList } from "@renderer/ai/MessageList";
 import { Composer } from "@renderer/ai/Composer";
+import { SummaryPill } from "@renderer/ai/SummaryPill";
 
 export function AIPanel() {
   const transport = useMemo(() => createIpcChatTransport(), []);
@@ -30,7 +31,8 @@ export function AIPanel() {
     <div className="flex h-full flex-col bg-muted/30 font-sans">
       <header className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
         <span className="text-xs font-semibold">AI 助手</span>
-        <div className="ml-auto flex items-center gap-1">
+        <div className="ml-auto flex items-center gap-1.5">
+          <SummaryPill />
           <button
             onClick={newConversation}
             aria-label="新对话"
