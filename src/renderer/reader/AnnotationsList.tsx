@@ -4,6 +4,7 @@ import { Trash2 } from "lucide-react";
 import type { AnnotationDto } from "@shared/annotations";
 import type { ChapterRefDto } from "@shared/library";
 import { cn } from "@renderer/lib/utils";
+import { Button } from "@renderer/components/ui/button";
 import { qk } from "@renderer/query/keys";
 import { useReaderStore } from "@renderer/store/reader-store";
 import { STYLE_STRIPE } from "./highlight";
@@ -89,14 +90,15 @@ function AnnoItem({
         )}
         {chapter && <div className="mt-1 text-[10px] text-muted-foreground/70">{chapter}</div>}
       </button>
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="icon-xs"
         aria-label="删除"
         onClick={onDelete}
-        className="grid size-6 shrink-0 self-start place-items-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+        className="shrink-0 self-start text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
       >
         <Trash2 className="size-3.5" />
-      </button>
+      </Button>
     </div>
   );
 }

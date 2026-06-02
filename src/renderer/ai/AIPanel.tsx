@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useChat } from "@ai-sdk/react";
 import { Plus, X } from "lucide-react";
+import { Button } from "@renderer/components/ui/button";
 import { useReaderStore } from "@renderer/store/reader-store";
 import { createIpcChatTransport } from "@renderer/ai/ipc-chat-transport";
 import type { ChatUIMessage } from "@renderer/ai/types";
@@ -33,20 +34,24 @@ export function AIPanel() {
         <span className="text-xs font-semibold">AI 助手</span>
         <div className="ml-auto flex items-center gap-1.5">
           <SummaryPill />
-          <button
+          <Button
+            variant="ghost"
+            size="icon-sm"
             onClick={newConversation}
             aria-label="新对话"
-            className="rounded-md p-1.5 text-muted-foreground hover:bg-muted"
+            className="text-muted-foreground"
           >
-            <Plus className="size-4" />
-          </button>
-          <button
+            <Plus />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
             onClick={() => setPanelOpen(false)}
             aria-label="关闭面板"
-            className="rounded-md p-1.5 text-muted-foreground hover:bg-muted"
+            className="text-muted-foreground"
           >
-            <X className="size-4" />
-          </button>
+            <X />
+          </Button>
         </div>
       </header>
 
