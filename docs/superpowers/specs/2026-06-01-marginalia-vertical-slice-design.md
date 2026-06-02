@@ -470,7 +470,9 @@ graph LR
 
 ## 10. 刻意推迟（不在竖切内）
 
-epub.js 真实分页 · CFI 锚定 · 标注与笔记(RA3) · 跨章会话(M-c/RA4) · 全书摘要(M-d) · i18n / 主题切换 · 打包与迁移路径(D1) · 多 provider 类型(google/openai/openai-compatible) · `reconnectToStream` 断线重连 · 可配置代理设置（自定义代理地址 / PAC / 按 provider 覆盖；MVP 仅「默认系统代理」，见 §8.1）。
+epub.js 真实分页 · CFI 锚定 · 标注与笔记(RA3) · 跨章会话(M-c/RA4) · 全书摘要(M-d) · i18n / 主题切换 · 打包与迁移路径(D1) · 多 provider 类型(google/openai/openai-compatible) · `reconnectToStream` 断线重连 · 可配置代理设置（自定义代理地址 / PAC / 按 provider 覆盖；MVP 仅「默认系统代理」，见 §8.1）· **最大并发数设置**（限制同时进行的后台模型调用并发数；见下）。
+
+> **最大并发数设置（非 MVP）**：为后台模型调用（首要驱动是**开章自动生成摘要**——开启后浏览/快速翻阅多章会并发拉起多个章摘 `generateText`；未来还有全书/批量摘要、并发对话等）提供一个**全局并发上限**的可配置设置。当前 MVP 仅有 `ensureChapterSummary` 的 **per-chapter in-flight 去重**（同章不重复生成）+ `ReaderView` 自动触发的 ~800ms debounce，**无跨章节/跨任务的全局上限**——大量并发时可能压垮 provider 限流或本机。设置项落地时应同时约束章摘生成与其它后台 AI 任务，并给出合理默认（如 2–3）。
 
 > `S2` 仅完成 `RA1-min`（经 `content:toc`/`content:chapter-text` 静态渲染真实章节文本），**不代表 `RA1-full`**；真实 epub.js/CFI 渲染留给后续 `RA1-full`（亦为 RA3 标注锚定的前置）。
 
