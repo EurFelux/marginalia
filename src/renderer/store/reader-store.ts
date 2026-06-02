@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { AnnotationStyle } from "@shared/annotations";
 import type { Chip } from "@shared/chat";
 import type { ReaderPrefs, SelectionInfo } from "@renderer/types";
+import { persistPreference } from "@renderer/store/persist-preference";
 
 export type AnnoTarget = { type: "create" } | { type: "edit"; annotationId: string };
 export interface StyleBarState {
@@ -85,7 +86,12 @@ export const useReaderStore = create<ReaderState & ReaderActions>((set) => ({
   setCurrentChapter: (currentChapterId) => set({ currentChapterId }),
   setSelection: (selection) => set({ selection }),
   setActiveConversation: (activeConversationId) => set({ activeConversationId }),
-  updatePrefs: (patch) => set((s) => ({ prefs: { ...s.prefs, ...patch } })),
+  updatePrefs: (patch) =>
+    set((s) => {
+      const prefs = { ...s.prefs, ...patch };
+      persistPreference({ key: "readerPrefs", value: prefs });
+      return { prefs };
+    }),
   setPanelOpen: (panelOpen) => set({ panelOpen }),
   setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
   setDraftText: (draftText) => set({ draftText }),
@@ -96,5 +102,8 @@ export const useReaderStore = create<ReaderState & ReaderActions>((set) => ({
   closeNoteModal: () => set({ noteModal: null }),
   requestScrollToCfi: (cfi) =>
     set((s) => ({ scrollToCfi: { cfi, nonce: (s.scrollToCfi?.nonce ?? 0) + 1 } })),
-  setLastHighlightStyle: (lastHighlightStyle) => set({ lastHighlightStyle }),
+  setLastHighlightStyle: (lastHighlightStyle) => {
+    persistPreference({ key: "lastHighlightStyle", value: lastHighlightStyle });
+    set({ lastHighlightStyle });
+  },
 }));

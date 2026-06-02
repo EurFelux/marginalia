@@ -10,8 +10,5 @@ export interface SelectionInfo {
   cfiRange: string | null;
 }
 
-export interface ReaderPrefs {
-  fontScale: number;
-  lineHeight: number;
-  maxWidth: number;
-}
+// ReaderPrefs 收口到 @shared/preferences 的 Zod schema（单一源，供 preferences 表持久化）。
+export type { ReaderPrefs } from "@shared/preferences";
