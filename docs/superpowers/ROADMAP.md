@@ -108,6 +108,8 @@
 | 当前章高亮滞后（用 react-virtuoso `rangeChanged.startIndex` 含 overscan、非视口顶 section；短章≈滞后一整章）→ VirtualDocs 加 IntersectionObserver 精确上报视口顶 section              | 🔴             | Plan B T5 真书手测确认；并入「精度 pass」                             |
 | 长书 `section.document` 常驻内存（epub-book 解析后不 `unload` 以供 CFI，长书全程滚动后所有访问过的 section 文档常驻 JS 堆）→ 远离视口的节 `unload`、需要时重渲                        | 🔴             | spec「长书内存有界」成功判据；Plan B 刻意推迟，并入「精度/内存 pass」 |
 | 全 schema 级 FK `ON DELETE CASCADE` 策略（`chapters`/`progress`/`conversations`/`messages`/`annotations` 等所有 `references(books.id)` 均无 cascade；删书功能落地前统一定，免孤儿行） | 🔴             | RA3 T1 代码审查；删书 IPC 尚未实现，暂无孤儿                          |
+| **移除阅读区原生滚动条**：阅读区（Virtuoso 滚动容器）现显示 OS 滚动条；隐藏之（配合下条自绘条）。                                                                                     | 🔴             | 用户 2026-06-03 指定                                                  |
+| **类 macOS 自绘滚动条**：迁移 ui-prototype 的 `ScrollArea.tsx`（自绘 thumb：height/top/opacity + 悬停淡入），统一用于阅读区/侧栏等滚动容器。                                          | 🔴             | 用户 2026-06-03 指定                                                  |
 
 ### 已由竖切解决（存档，勿重复开）
 
