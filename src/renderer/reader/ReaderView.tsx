@@ -6,7 +6,7 @@ import { cn } from "@renderer/lib/utils";
 import { useReaderStore } from "@renderer/store/reader-store";
 import { useSettingsStore } from "@renderer/store/settings-store";
 import { usePrefsStore } from "@renderer/store/prefs-store";
-import { ChapterList } from "@renderer/reader/ChapterList";
+import { Sidebar } from "@renderer/reader/Sidebar";
 import { EpubReader } from "@renderer/reader/EpubReader";
 import { ReaderPrefs } from "@renderer/reader/ReaderPrefs";
 import { SelectionToolbar } from "@renderer/reader/SelectionToolbar";
@@ -80,7 +80,7 @@ export function ReaderView() {
       </header>
       <div className="flex min-h-0 flex-1">
         <aside className="w-64 shrink-0 border-r border-border bg-muted/30">
-          <ChapterList bookId={bookId} />
+          <Sidebar bookId={bookId} />
         </aside>
         <main className="min-w-0 flex-1">
           {/* 无条件渲染：EpubReader 自管载入/错误态，并据 CFI 进度恢复初始位置（不门控在 chapterId 上，
