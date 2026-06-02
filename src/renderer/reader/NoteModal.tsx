@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { CornerDownLeft } from "lucide-react";
 import { Kbd, KbdGroup } from "@renderer/components/ui/kbd";
 import { qk } from "@renderer/query/keys";
 import { useReaderStore } from "@renderer/store/reader-store";
@@ -101,30 +102,29 @@ export function NoteModal() {
           rows={8}
           className="no-scrollbar w-full resize-none rounded-md border border-border bg-background px-3 py-2.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring"
         />
-        <div className="mt-3 flex items-center justify-between">
-          <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            <KbdGroup>
-              <Kbd>{SAVE_MOD}</Kbd>
-              <Kbd>Enter</Kbd>
-            </KbdGroup>
+        <div className="mt-3 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={dismiss}
+            className="rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted"
+          >
+            取消
+          </button>
+          <button
+            type="button"
+            onClick={save}
+            className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
             保存
-          </span>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={dismiss}
-              className="rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted"
-            >
-              取消
-            </button>
-            <button
-              type="button"
-              onClick={save}
-              className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-            >
-              保存
-            </button>
-          </div>
+            <KbdGroup>
+              <Kbd className="border-transparent bg-primary-foreground/20 text-primary-foreground">
+                {SAVE_MOD}
+              </Kbd>
+              <Kbd className="border-transparent bg-primary-foreground/20 text-primary-foreground">
+                <CornerDownLeft className="size-3" />
+              </Kbd>
+            </KbdGroup>
+          </button>
         </div>
       </div>
     </div>
