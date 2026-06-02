@@ -6,6 +6,7 @@ import { useReaderStore } from "../store/reader-store";
 import { qk } from "../query/keys";
 import { chapterIdByHref } from "./chapter-id-by-href";
 import { createEpubBook, type EpubBook } from "./epub-book";
+import { prefsToCss } from "./prefs-to-css";
 
 interface Props {
   bookId: string;
@@ -21,6 +22,7 @@ export function EpubReader({ bookId, chapters }: Props) {
 
   const currentChapterId = useReaderStore((s) => s.currentChapterId);
   const setCurrentChapter = useReaderStore((s) => s.setCurrentChapter);
+  const prefs = useReaderStore((s) => s.prefs);
 
   // 防循环：记录最近一次「由滚动得出的顶部章 id」；跳章 effect 只在目标≠它时滚动。
   const topChapterIdRef = useRef<string | null>(null);
@@ -126,6 +128,7 @@ export function EpubReader({ bookId, chapters }: Props) {
         ref={vRef}
         count={book.count}
         loadSection={book.loadSection}
+        styleCss={prefsToCss(prefs)}
         initialIndex={initialIndex}
         onTopIndexChange={onTopIndexChange}
       />
