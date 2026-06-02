@@ -4,7 +4,7 @@
 >
 > **维护约定**：每次合并分支（走 `finishing-a-development-branch`）时**顺手更新本文件**——挪动里程碑状态、勾掉已完成、新增发现的待办。别让进度状态散回各文档的散文里。
 >
-> 更新日期：2026-06-02
+> 更新日期：2026-06-03
 
 ---
 
@@ -17,7 +17,9 @@
 - **Plan A（✅）**：`@marginalia/virtual-docs` 包——react-virtuoso 薄封装 + 自适应高度 iframe + 选区事件，epub-agnostic。
 - **Plan B（✅）**：app 集成——`readEpubBytes` IPC + epubjs 胶水（`ePub`/`section.render`/`EpubCFI`）+ `EpubReader` 替换 ReaderPane + CFI 进度/恢复/跳章/当前章 + 偏好注入（`!important` 覆盖 ePub 自带样式）+ 选区桥（块级取段 + `cfiRange`，AI 契约零改动）。真书手测通过；执行中修的集成 bug（恢复缓存、字体覆盖、子目录 OPF 跳章）已落地。
 
-**下一目标候选**：RA3 + M-b（标注，依赖 CFI——现已解锁，`cfiRange` 已捕获）、RA4 收尾（M-d/M-c）、类型设计债清理、RA1-full「精度/内存 pass」（图片延时 / 当前章高亮滞后 / 长书 section 内存，见 backlog）。
+**RA3 + M-b 已交付并合并**（标注与笔记，2026-06-03）：annotations 表/repository（headless 测）+ IPC/preload + CFI 高亮渲染（`ignoreClass` 防污染 + `rangeFromCfi`）+ 点击编辑（5 色 + 下划线，「高亮标记」即时套用上次样式）+ 段内笔记 modal（原文引用、⌘/Ctrl+Enter）+ 侧栏标注列表（阅读序 + 跳转）。真书手测通过；最终综合审查修掉跨任务接缝（笔记长文滚动丢失、样式栏死代码）。
+
+**下一目标候选**：**类型设计债清理**（已定为下一步）、RA4 收尾（M-d 全书摘要 / M-c 跨章）、`preferences` 持久化表 + 颜色模式、RA1-full「精度/内存 pass」（图片延时 / 当前章高亮滞后 / 长书 section 内存，见 backlog）。
 
 ---
 
@@ -27,14 +29,14 @@
 
 ### 主进程
 
-| 单元    | 名称                                                          | 状态 | 备注                                         |
-| ------- | ------------------------------------------------------------- | ---- | -------------------------------------------- |
-| MA1–MA5 | DB/IPC 脊柱 · ePub · Provider/密钥 · 会话/Prompt · 流式 Agent | ✅   | headless 测试覆盖                            |
-| M-a     | 流式 IPC transport                                            | ✅   | 竖切落地（`ai:send`/`abort`/`chunk` + pump） |
-| M-p     | preload / `window.api` 契约                                   | ✅   | 竖切落地（library/content/settings/chat/ai） |
-| M-b     | annotations 持久化 + IPC + CFI                                | 🔴   | RA3 前置                                     |
-| M-c     | 跨章 `routeConversation(chapterIds[])`                        | 🔴   | 单章已支持；`chapterIds[]` 待扩展            |
-| M-d     | `books.summary` 全书摘要                                      | 🔴   | 章节摘要已成；全书 schema/IPC 待补           |
+| 单元    | 名称                                                          | 状态 | 备注                                                  |
+| ------- | ------------------------------------------------------------- | ---- | ----------------------------------------------------- |
+| MA1–MA5 | DB/IPC 脊柱 · ePub · Provider/密钥 · 会话/Prompt · 流式 Agent | ✅   | headless 测试覆盖                                     |
+| M-a     | 流式 IPC transport                                            | ✅   | 竖切落地（`ai:send`/`abort`/`chunk` + pump）          |
+| M-p     | preload / `window.api` 契约                                   | ✅   | 竖切落地（library/content/settings/chat/ai）          |
+| M-b     | annotations 持久化 + IPC + CFI                                | ✅   | annotations 表/repository（headless 测）+ IPC/preload |
+| M-c     | 跨章 `routeConversation(chapterIds[])`                        | 🔴   | 单章已支持；`chapterIds[]` 待扩展                     |
+| M-d     | `books.summary` 全书摘要                                      | 🔴   | 章节摘要已成；全书 schema/IPC 待补                    |
 
 ### 渲染层（RA 轨）
 
@@ -44,7 +46,7 @@
 | RA1-min  | 书库导入 + 静态正文 + TOC 章节                  | ✅   |                                                                                                                            |
 | RA1-full | epub.js 真实渲染 / 分页 / CFI                   | ✅   | Plan A + Plan B 落地：真实渲染 + CFI 进度/恢复/跳章/当前章 + 选区桥，连续滚动；分页以连续滚动替代；精度/内存优化见 backlog |
 | RA2      | 选区 → 工具栏 → chip → 流式聊天                 | ✅   | CFI 选区落地（epub-selection 块级取段 + `cfiRange`；AI 契约零改动）                                                        |
-| RA3      | 标注与笔记 UI                                   | 🔴   | 依赖 M-b（待）；RA1-full ✅ 已就绪，`cfiRange` 已捕获                                                                      |
+| RA3      | 标注与笔记 UI                                   | ✅   | CFI 高亮(5 色+下划线)/点击编辑/笔记 modal/侧栏列表；即时套用上次样式                                                       |
 | RA4      | 摘要查看 + 跨章会话                             | 🟡   | 章节摘要 pill ✅；全书摘要 / 跨章 🔴                                                                                       |
 | RA5      | Provider / 设置 UI                              | 🟡   | Anthropic ✅；多 provider 类型 🔴                                                                                          |
 | D1       | 打包 / 迁移路径                                 | 🔴   | `electron-forge extraResources` 复制迁移 SQL                                                                               |
