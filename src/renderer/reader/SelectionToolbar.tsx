@@ -14,7 +14,12 @@ export function SelectionToolbar() {
   const selection = useReaderStore((s) => s.selection);
   const openStyleBar = useReaderStore((s) => s.openStyleBar);
   const openNoteModal = useReaderStore((s) => s.openNoteModal);
+  const styleBar = useReaderStore((s) => s.styleBar);
+  const noteModal = useReaderStore((s) => s.noteModal);
   const { startAiAction } = useAiActions();
+  // 二级工具栏（样式栏）/ 笔记 modal 打开时，主工具栏让位消失（Apple Books 式取代，
+  // 而非叠层）。选区仍保留在 store 里，供样式栏/modal 读取 cfiRange/selectedText。
+  if (styleBar || noteModal) return null;
   if (!selection || !selection.rect) return null;
 
   const { rect } = selection;
