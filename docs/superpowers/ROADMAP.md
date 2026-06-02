@@ -76,7 +76,8 @@
 | 可配置代理设置（自定义地址 / PAC / 按 provider 覆盖）    | 🔴   | vslice spec §8.1 / §10             |
 | `stepLimit` 设置项（现硬编默认 5）                       | 🔴   | ma5-deferred #8                    |
 | 独立「摘要模型」设置                                     | 🔴   | core §11                           |
-| i18n / 主题切换                                          | 🔴   | 竖切未上；UP1 用过 i18next         |
+| i18n（多语言）                                           | 🔴   | 竖切未上；UP1 用过 i18next         |
+| **颜色模式**（dark / light / system 三档，跟随系统）     | 🔴   | 用户 2026-06-02 指定               |
 | `metadata.usage` 落库（token 用量）                      | 🔴   | ma5-deferred #4                    |
 | 结构化 `reason` 分类（现自由字符串，UI 要 i18n 时再做）  | 🔴   | ma5-deferred #6                    |
 | onboarding/landing 引导用户先配 provider + 开自动摘要    | 🔴   | 记忆 onboarding-guide-auto-summary |
