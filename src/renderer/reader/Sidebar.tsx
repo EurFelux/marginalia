@@ -4,10 +4,12 @@ import { ChapterList } from "./ChapterList";
 import { AnnotationsList } from "./AnnotationsList";
 
 export function Sidebar({ bookId }: { bookId: string }) {
+  // shadcn 的 tabs 组件用 data-horizontal/data-vertical 控方向/高度，但 Base UI Tabs.Root 发的是
+  // data-orientation（属性名不匹配，那些类是惰性的）——故此处显式 flex-col + TabsList h-8 兜底。
   return (
-    <Tabs defaultValue="toc" className="h-full gap-0">
+    <Tabs defaultValue="toc" className="h-full flex-col gap-0">
       <div className="shrink-0 border-b border-border p-1.5">
-        <TabsList className="w-full">
+        <TabsList className="h-8 w-full">
           <TabsTrigger value="toc">
             <List />
             目录
