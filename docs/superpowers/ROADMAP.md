@@ -12,12 +12,12 @@
 
 **最小可用竖切已交付并合并**（PR #6，2026-06-02）：导入 → 读 → 选 → 问 → **真模型流式回复**，端到端可用。
 
-**已定下一目标：RA1-full**（epub.js 真实渲染 + CFI 锚定，RA3 标注前置）。拆成两个计划：
+**RA1-full 已交付并合并**（epub.js 真实渲染 + CFI 锚定）：
 
-- **Plan A（✅ 已完成并合并）**：`@marginalia/virtual-docs` 包——react-virtuoso 薄封装 + 自适应高度 iframe + 选区事件，epub-agnostic。ui-prototype 合成数据验证通过（连续滚动 / 自适应高度 / 选区 rect / 跳转）。执行中清掉两个集成坑：ui-prototype 消费源码包的两份 React（vite `dedupe`）、react-virtuoso optional prop 不接受 `undefined`（边界 `?? 0`）。
-- **Plan B（🔴 下一步）**：RA1-full app 集成——`readEpubBytes` IPC + epub.js 胶水（`ePub`/`section.load`/`EpubCFI`）+ `EpubReader` 替换 ReaderPane + CFI 进度/跳章/当前章 + 偏好注入 + 选区桥（消费包 `onSelect`）。据 Plan A 验证过的真实 API 编写。
+- **Plan A（✅）**：`@marginalia/virtual-docs` 包——react-virtuoso 薄封装 + 自适应高度 iframe + 选区事件，epub-agnostic。
+- **Plan B（✅）**：app 集成——`readEpubBytes` IPC + epubjs 胶水（`ePub`/`section.render`/`EpubCFI`）+ `EpubReader` 替换 ReaderPane + CFI 进度/恢复/跳章/当前章 + 偏好注入（`!important` 覆盖 ePub 自带样式）+ 选区桥（块级取段 + `cfiRange`，AI 契约零改动）。真书手测通过；执行中修的集成 bug（恢复缓存、字体覆盖、子目录 OPF 跳章）已落地。
 
-其后候选：RA3 + M-b（标注，依赖 CFI）、RA4 收尾（M-d/M-c）、类型设计债清理。
+**下一目标候选**：RA3 + M-b（标注，依赖 CFI——现已解锁，`cfiRange` 已捕获）、RA4 收尾（M-d/M-c）、类型设计债清理、RA1-full「精度/内存 pass」（图片延时 / 当前章高亮滞后 / 长书 section 内存，见 backlog）。
 
 ---
 
@@ -38,16 +38,16 @@
 
 ### 渲染层（RA 轨）
 
-| 单元     | 名称                                            | 状态 | 备注                                            |
-| -------- | ----------------------------------------------- | ---- | ----------------------------------------------- |
-| RA0      | 渲染层地基（三栏 / Tailwind / Query / zustand） | ✅   | 竖切重建，替换 Forge 模板桩                     |
-| RA1-min  | 书库导入 + 静态正文 + TOC 章节                  | ✅   |                                                 |
-| RA1-full | epub.js 真实渲染 / 分页 / CFI                   | 🟡   | Plan A `virtual-docs` 包 ✅；Plan B app 集成 🔴 |
-| RA2      | 选区 → 工具栏 → chip → 流式聊天                 | 🟡   | 字符偏移版 ✅；CFI 选区待 RA1-full              |
-| RA3      | 标注与笔记 UI                                   | 🔴   | 依赖 M-b + RA1-full                             |
-| RA4      | 摘要查看 + 跨章会话                             | 🟡   | 章节摘要 pill ✅；全书摘要 / 跨章 🔴            |
-| RA5      | Provider / 设置 UI                              | 🟡   | Anthropic ✅；多 provider 类型 🔴               |
-| D1       | 打包 / 迁移路径                                 | 🔴   | `electron-forge extraResources` 复制迁移 SQL    |
+| 单元     | 名称                                            | 状态 | 备注                                                                                                                       |
+| -------- | ----------------------------------------------- | ---- | -------------------------------------------------------------------------------------------------------------------------- |
+| RA0      | 渲染层地基（三栏 / Tailwind / Query / zustand） | ✅   | 竖切重建，替换 Forge 模板桩                                                                                                |
+| RA1-min  | 书库导入 + 静态正文 + TOC 章节                  | ✅   |                                                                                                                            |
+| RA1-full | epub.js 真实渲染 / 分页 / CFI                   | ✅   | Plan A + Plan B 落地：真实渲染 + CFI 进度/恢复/跳章/当前章 + 选区桥，连续滚动；分页以连续滚动替代；精度/内存优化见 backlog |
+| RA2      | 选区 → 工具栏 → chip → 流式聊天                 | ✅   | CFI 选区落地（epub-selection 块级取段 + `cfiRange`；AI 契约零改动）                                                        |
+| RA3      | 标注与笔记 UI                                   | 🔴   | 依赖 M-b（待）；RA1-full ✅ 已就绪，`cfiRange` 已捕获                                                                      |
+| RA4      | 摘要查看 + 跨章会话                             | 🟡   | 章节摘要 pill ✅；全书摘要 / 跨章 🔴                                                                                       |
+| RA5      | Provider / 设置 UI                              | 🟡   | Anthropic ✅；多 provider 类型 🔴                                                                                          |
+| D1       | 打包 / 迁移路径                                 | 🔴   | `electron-forge extraResources` 复制迁移 SQL                                                                               |
 
 > 全量分解与依赖 DAG 见 [`renderer-track-decomposition`](plans/2026-06-01-marginalia-renderer-track-decomposition.md)。
 
