@@ -2,12 +2,7 @@ import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Lock } from "lucide-react";
 import type { Chip } from "@shared/chat";
-
-const CHIP_LABEL: Record<string, string> = {
-  "chip.selection": "选区",
-  "chip.paragraph": "段落上下文",
-};
-const labelOf = (chip: Chip): string => CHIP_LABEL[chip.labelKey] ?? chip.labelKey;
+import { chipLabel } from "@renderer/ai/chip-label";
 
 interface HoverState {
   chip: Chip;
@@ -44,7 +39,7 @@ export function ChipBar({ chips }: { chips: Chip[] }) {
           className="min-w-0 flex-1 cursor-default rounded-lg border border-border bg-muted/40 px-2.5 py-1.5 transition-colors hover:bg-muted"
         >
           <div className="flex items-center gap-1.5">
-            <span className="text-xs font-medium">{labelOf(chip)}</span>
+            <span className="text-xs font-medium">{chipLabel(chip)}</span>
             <span className="text-[10px] tabular-nums text-muted-foreground">
               ≈{chip.tokenCount} tok
             </span>
@@ -57,7 +52,7 @@ export function ChipBar({ chips }: { chips: Chip[] }) {
         <ChipPopover
           chip={hover.chip}
           rect={hover.rect}
-          label={labelOf(hover.chip)}
+          label={chipLabel(hover.chip)}
           onEnter={cancelClose}
           onLeave={scheduleClose}
         />
