@@ -72,17 +72,19 @@
 
 ### 设置 / 产品
 
-| 项                                                       | 状态 | 来源                               |
-| -------------------------------------------------------- | ---- | ---------------------------------- |
-| **最大并发数设置**（后台模型调用全局上限，默认建议 2–3） | 🔴   | vslice spec §10 / core §11         |
-| 可配置代理设置（自定义地址 / PAC / 按 provider 覆盖）    | 🔴   | vslice spec §8.1 / §10             |
-| `stepLimit` 设置项（现硬编默认 5）                       | 🔴   | ma5-deferred #8                    |
-| 独立「摘要模型」设置                                     | 🔴   | core §11                           |
-| i18n（多语言）                                           | 🔴   | 竖切未上；UP1 用过 i18next         |
-| **颜色模式**（dark / light / system 三档，跟随系统）     | 🔴   | 用户 2026-06-02 指定               |
-| `metadata.usage` 落库（token 用量）                      | 🔴   | ma5-deferred #4                    |
-| 结构化 `reason` 分类（现自由字符串，UI 要 i18n 时再做）  | 🔴   | ma5-deferred #6                    |
-| onboarding/landing 引导用户先配 provider + 开自动摘要    | 🔴   | 记忆 onboarding-guide-auto-summary |
+| 项                                                                                                                     | 状态 | 来源                               |
+| ---------------------------------------------------------------------------------------------------------------------- | ---- | ---------------------------------- |
+| **最大并发数设置**（后台模型调用全局上限，默认建议 2–3）                                                               | 🔴   | vslice spec §10 / core §11         |
+| 可配置代理设置（自定义地址 / PAC / 按 provider 覆盖）                                                                  | 🔴   | vslice spec §8.1 / §10             |
+| `stepLimit` 设置项（现硬编默认 5）                                                                                     | 🔴   | ma5-deferred #8                    |
+| 独立「摘要模型」设置                                                                                                   | 🔴   | core §11                           |
+| i18n（多语言）                                                                                                         | 🔴   | 竖切未上；UP1 用过 i18next         |
+| **颜色模式**（dark / light / system 三档，跟随系统）                                                                   | 🔴   | 用户 2026-06-02 指定               |
+| `metadata.usage` 落库（token 用量）                                                                                    | 🔴   | ma5-deferred #4                    |
+| 结构化 `reason` 分类（现自由字符串，UI 要 i18n 时再做）                                                                | 🔴   | ma5-deferred #6                    |
+| onboarding/landing 引导用户先配 provider + 开自动摘要                                                                  | 🔴   | 记忆 onboarding-guide-auto-summary |
+| **书库样式改善 + 书封面**：书库视图美化；每本书显示封面（从 ePub 提取封面图，epub-parser 可能需补 cover 提取）。       | 🔴   | 用户 2026-06-03 指定               |
+| **provider `baseUrl` 设置**：每个 provider 可配自定义 API 端点（OpenAI 兼容代理 / 自建网关等）；关联 RA5 provider UI。 | 🔴   | 用户 2026-06-03 指定               |
 
 ### 基建 / 重构
 
