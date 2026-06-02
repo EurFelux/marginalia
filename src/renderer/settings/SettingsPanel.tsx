@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, X } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@renderer/components/ui/dialog";
+import { Input } from "@renderer/components/ui/input";
+import { Checkbox } from "@renderer/components/ui/checkbox";
+import { Button } from "@renderer/components/ui/button";
 import { qk } from "@renderer/query/keys";
 import { useSettingsStore } from "@renderer/store/settings-store";
 import { usePrefsStore } from "@renderer/store/prefs-store";
@@ -69,55 +73,43 @@ export function SettingsPanel() {
   const canSave = apiKey.trim().length > 0 || anthropic != null;
 
   return (
-    <div className="fixed inset-0 z-[100] grid place-items-center bg-black/30 p-4">
-      <div className="w-[28rem] max-w-full rounded-2xl border border-border bg-card p-5 font-sans text-foreground shadow-2xl">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-serif text-lg font-semibold">设置</h2>
-          <button
-            onClick={() => setOpen(false)}
-            className="rounded-md p-1.5 text-muted-foreground hover:bg-muted"
-            aria-label="关闭"
-          >
-            <X className="size-4" />
-          </button>
-        </div>
+    <Dialog open={open} onOpenChange={(o) => setOpen(o)}>
+      <DialogContent className="font-sans sm:max-w-[28rem]">
+        <DialogHeader>
+          <DialogTitle className="font-serif text-lg">设置</DialogTitle>
+        </DialogHeader>
 
         <div className="space-y-3">
-          <div className="block">
+          <div>
             <span className="mb-1 block text-xs text-muted-foreground">API Key</span>
             {anthropic && anthropic.key.status !== "none" && !editingKey ? (
               <div className="flex items-center gap-2">
                 <div className="min-w-0 flex-1 truncate rounded-md border border-border bg-muted/40 px-3 py-2 font-mono text-sm text-muted-foreground">
                   {anthropic.key.status === "set" ? anthropic.key.mask : "已配置（本机无法解密）"}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setEditingKey(true)}
-                  className="shrink-0 rounded-md border border-border px-3 py-2 text-sm hover:bg-muted"
-                >
+                <Button variant="outline" size="sm" onClick={() => setEditingKey(true)}>
                   编辑
-                </button>
+                </Button>
               </div>
             ) : (
               <div className="flex items-center gap-2">
-                <input
+                <Input
                   type="password"
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
                   placeholder="sk-ant-…"
-                  className="min-w-0 flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
                 />
                 {anthropic && anthropic.key.status !== "none" && (
-                  <button
-                    type="button"
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => {
                       setEditingKey(false);
                       setApiKey("");
                     }}
-                    className="shrink-0 rounded-md border border-border px-3 py-2 text-sm hover:bg-muted"
                   >
                     取消
-                  </button>
+                  </Button>
                 )}
               </div>
             )}
@@ -125,12 +117,11 @@ export function SettingsPanel() {
 
           <label className="block">
             <span className="mb-1 block text-xs text-muted-foreground">模型</span>
-            <input
+            <Input
               type="text"
               value={model}
               onChange={(e) => setModel(e.target.value)}
               placeholder="claude-3-5-haiku-latest"
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
             />
           </label>
 
@@ -158,39 +149,35 @@ export function SettingsPanel() {
           )}
 
           <div className="flex items-center justify-end gap-2 pt-1">
-            <button
+            <Button
+              variant="outline"
               onClick={() => test.mutate()}
               disabled={test.isPending || !anthropic}
-              className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted disabled:opacity-50"
             >
               {test.isPending ? "测试中…" : "测试连接"}
-            </button>
-            <button
-              onClick={() => save.mutate()}
-              disabled={save.isPending || !canSave}
-              className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
-            >
+            </Button>
+            <Button onClick={() => save.mutate()} disabled={save.isPending || !canSave}>
               {save.isPending ? "保存中…" : "保存"}
-            </button>
+            </Button>
           </div>
 
-          <label className="mt-1 flex cursor-pointer items-start justify-between gap-3 border-t border-border pt-3">
-            <span className="min-w-0">
+          <div className="mt-1 flex items-start justify-between gap-3 border-t border-border pt-3">
+            <label htmlFor="auto-summarize" className="min-w-0 cursor-pointer">
               <span className="block text-sm font-medium">开章自动生成本章摘要</span>
               <span className="mt-0.5 block text-[11px] leading-relaxed text-muted-foreground">
                 打开 / 切换章节时后台生成本章摘要，就绪后随提问一并提供给
                 AI（会产生模型调用）。关闭时可在 AI 面板的摘要 pill 里手动生成。
               </span>
-            </span>
-            <input
-              type="checkbox"
+            </label>
+            <Checkbox
+              id="auto-summarize"
               checked={autoSummarize}
-              onChange={(e) => setAutoSummarize(e.target.checked)}
-              className="mt-0.5 size-4 shrink-0 accent-primary"
+              onCheckedChange={setAutoSummarize}
+              className="mt-0.5"
             />
-          </label>
+          </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

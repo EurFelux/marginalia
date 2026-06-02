@@ -2,6 +2,15 @@ import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CornerDownLeft } from "lucide-react";
 import { Kbd, KbdGroup, ModKey } from "@renderer/components/ui/kbd";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@renderer/components/ui/dialog";
+import { Textarea } from "@renderer/components/ui/textarea";
+import { Button } from "@renderer/components/ui/button";
 import { qk } from "@renderer/query/keys";
 import { useReaderStore } from "@renderer/store/reader-store";
 
@@ -69,22 +78,23 @@ export function NoteModal() {
   };
 
   return (
-    <div
-      onMouseDown={dismiss}
-      style={{ position: "fixed", inset: 0, zIndex: 70 }}
-      className="grid place-items-center bg-black/30"
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        // ESC / 点遮罩 / X 关闭 → 同 dismiss（关 modal + 清选区）
+        if (!open) dismiss();
+      }}
     >
-      <div
-        onMouseDown={(e) => e.stopPropagation()}
-        className="w-[36rem] max-w-[90vw] rounded-xl border border-border bg-popover p-5 font-sans shadow-2xl"
-      >
-        <h2 className="mb-2.5 text-sm font-medium">{editing ? "编辑笔记" : "添加笔记"}</h2>
+      <DialogContent className="font-sans sm:max-w-[36rem]">
+        <DialogHeader>
+          <DialogTitle>{editing ? "编辑笔记" : "添加笔记"}</DialogTitle>
+        </DialogHeader>
         {quote && (
-          <blockquote className="mb-3 line-clamp-2 border-l-2 border-border pl-3 font-serif text-sm italic leading-snug text-muted-foreground">
+          <blockquote className="line-clamp-2 border-l-2 border-border pl-3 font-serif text-sm italic leading-snug text-muted-foreground">
             {quote}
           </blockquote>
         )}
-        <textarea
+        <Textarea
           ref={taRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -96,22 +106,13 @@ export function NoteModal() {
             }
           }}
           placeholder="写点想法…"
-          rows={8}
-          className="no-scrollbar w-full resize-none rounded-md border border-border bg-background px-3 py-2.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring"
+          className="no-scrollbar min-h-40 resize-none leading-relaxed"
         />
-        <div className="mt-3 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={dismiss}
-            className="rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted"
-          >
+        <DialogFooter>
+          <Button variant="ghost" onClick={dismiss}>
             取消
-          </button>
-          <button
-            type="button"
-            onClick={save}
-            className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
+          </Button>
+          <Button onClick={save}>
             保存
             <KbdGroup>
               <ModKey className="border-transparent bg-primary-foreground/20 text-primary-foreground" />
@@ -119,9 +120,9 @@ export function NoteModal() {
                 <CornerDownLeft className="size-3" />
               </Kbd>
             </KbdGroup>
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
