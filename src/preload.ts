@@ -33,6 +33,7 @@ import type {
 } from "@shared/chat";
 import type {
   AnnotationDto,
+  AnnotationIdInput,
   CreateAnnotationInput,
   UpdateAnnotationInput,
 } from "@shared/annotations";
@@ -79,7 +80,7 @@ const api = {
       ipcRenderer.invoke(IPC.annotationsCreate, input),
     update: (input: UpdateAnnotationInput): Promise<AnnotationDto> =>
       ipcRenderer.invoke(IPC.annotationsUpdate, input),
-    delete: (input: { id: string }): Promise<void> =>
+    delete: (input: AnnotationIdInput): Promise<void> =>
       ipcRenderer.invoke(IPC.annotationsDelete, input),
   },
 

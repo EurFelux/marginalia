@@ -22,16 +22,19 @@ export function registerAnnotationHandlers(): void {
   handle<{ bookId: string }, AnnotationDto[]>(IPC.annotationsListByBook, bookIdInput, (input) =>
     listAnnotationsByBook(getDb(), input.bookId),
   );
+
   handle<CreateAnnotationInput, AnnotationDto>(
     IPC.annotationsCreate,
     createAnnotationInput,
     (input) => createAnnotation(getDb(), input),
   );
+
   handle<UpdateAnnotationInput, AnnotationDto>(
     IPC.annotationsUpdate,
     updateAnnotationInput,
     (input) => updateAnnotation(getDb(), input),
   );
+
   handle<{ id: string }, void>(IPC.annotationsDelete, annotationIdInput, (input) =>
     deleteAnnotation(getDb(), input.id),
   );
