@@ -35,6 +35,7 @@
     "@fontsource-variable/fraunces": "^5.2.9",
     "@fontsource-variable/manrope": "^5.2.8",
     "@marginalia/epub-parser": "workspace:*",
+    "@marginalia/virtual-docs": "workspace:*",
     "@tanstack/react-query": "^5.100.14",
     "ai": "^6.0.193",
     "better-sqlite3": "^12.10.0",

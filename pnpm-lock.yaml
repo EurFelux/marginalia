@@ -32,6 +32,9 @@ importers:
       '@marginalia/epub-parser':
         specifier: workspace:*
         version: link:packages/epub-parser
+      '@marginalia/virtual-docs':
+        specifier: workspace:*
+        version: link:packages/virtual-docs
       '@tanstack/react-query':
         specifier: ^5.100.14
         version: 5.100.14(react@19.2.6)

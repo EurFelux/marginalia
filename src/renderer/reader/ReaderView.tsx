@@ -7,7 +7,7 @@ import { useReaderStore } from "@renderer/store/reader-store";
 import { useSettingsStore } from "@renderer/store/settings-store";
 import { usePrefsStore } from "@renderer/store/prefs-store";
 import { ChapterList } from "@renderer/reader/ChapterList";
-import { ReaderPane } from "@renderer/reader/ReaderPane";
+import { EpubReader } from "@renderer/reader/EpubReader";
 import { ReaderPrefs } from "@renderer/reader/ReaderPrefs";
 import { SelectionToolbar } from "@renderer/reader/SelectionToolbar";
 import { AIPanel } from "@renderer/ai/AIPanel";
@@ -51,8 +51,6 @@ export function ReaderView() {
 
   if (!bookId) return null;
 
-  const currentTitle = chapters.data?.find((c) => c.id === chapterId)?.title ?? null;
-
   return (
     <div className="flex h-screen flex-col bg-background font-sans text-foreground">
       <header className="flex h-12 shrink-0 items-center justify-between border-b border-border px-3">
@@ -90,7 +88,7 @@ export function ReaderView() {
         </aside>
         <main className="min-w-0 flex-1">
           {chapterId ? (
-            <ReaderPane bookId={bookId} chapterId={chapterId} title={currentTitle} />
+            <EpubReader bookId={bookId} />
           ) : (
             <p className="p-10 text-sm text-muted-foreground">
               {chapters.isPending ? "加载章节…" : "本书无可读章节。"}
