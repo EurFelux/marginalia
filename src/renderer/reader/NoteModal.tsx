@@ -22,6 +22,8 @@ export function NoteModal() {
 
   const editing = noteModal?.target.type === "edit" ? noteModal.target.annotationId : null;
   const current = editing ? annos.data?.find((a) => a.id === editing) : undefined;
+  // modal 内显示被标注/选中的原文引用（create 取当前选区，edit 取标注快照）。
+  const quote = editing ? current?.selectedText : selection?.selectionText;
 
   // 打开时初始化文本（edit 取现笔记，create 空）+ 聚焦。
   // 仅依赖 [noteModal, editing]：openNoteModal 每次都 set 全新对象，故每次打开 noteModal 引用必变、
@@ -74,6 +76,11 @@ export function NoteModal() {
         className="w-[36rem] max-w-[90vw] rounded-xl border border-border bg-popover p-5 font-sans shadow-2xl"
       >
         <h2 className="mb-2.5 text-sm font-medium">{editing ? "编辑笔记" : "添加笔记"}</h2>
+        {quote && (
+          <blockquote className="mb-3 line-clamp-2 border-l-2 border-border pl-3 font-serif text-sm italic leading-snug text-muted-foreground">
+            {quote}
+          </blockquote>
+        )}
         <textarea
           ref={taRef}
           value={text}
