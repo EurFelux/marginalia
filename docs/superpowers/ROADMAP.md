@@ -1,0 +1,105 @@
+# Marginalia · 开发进度总览（ROADMAP）
+
+> **这是开发进度的单一真相源。** 里程碑状态、当前焦点、待办 backlog 都看这里；实现细节去对应的 `specs/` 设计文档与 `plans/` 实现计划。
+>
+> **维护约定**：每次合并分支（走 `finishing-a-development-branch`）时**顺手更新本文件**——挪动里程碑状态、勾掉已完成、新增发现的待办。别让进度状态散回各文档的散文里。
+>
+> 更新日期：2026-06-02
+
+---
+
+## 当前焦点
+
+**最小可用竖切已交付并合并**（PR #6，2026-06-02）：导入 → 读 → 选 → 问 → **真模型流式回复**，端到端可用。
+
+**下一目标（待拍板）**，候选与理由：
+
+- **RA1-full**：epub.js 真实渲染 / 分页 / CFI 锚定——是 RA3 标注锚定的前置，解锁面最大。
+- **RA3 + M-b**：标注与笔记（已核心化、UP1 有 UI；主进程 `annotations` 表 / IPC / CFI 待补）——依赖 RA1-full 的 CFI。
+- **RA4 收尾**：全书摘要（M-d）+ 跨章会话（M-c）。
+- **类型设计债清理**：趁渲染层刚接 preload、迁移成本最低（见 Backlog）。
+
+---
+
+## 里程碑 / 工作单元状态
+
+图例：✅ 完成 · 🟡 部分 · 🔴 未开始
+
+### 主进程
+
+| 单元    | 名称                                                          | 状态 | 备注                                         |
+| ------- | ------------------------------------------------------------- | ---- | -------------------------------------------- |
+| MA1–MA5 | DB/IPC 脊柱 · ePub · Provider/密钥 · 会话/Prompt · 流式 Agent | ✅   | headless 测试覆盖                            |
+| M-a     | 流式 IPC transport                                            | ✅   | 竖切落地（`ai:send`/`abort`/`chunk` + pump） |
+| M-p     | preload / `window.api` 契约                                   | ✅   | 竖切落地（library/content/settings/chat/ai） |
+| M-b     | annotations 持久化 + IPC + CFI                                | 🔴   | RA3 前置                                     |
+| M-c     | 跨章 `routeConversation(chapterIds[])`                        | 🔴   | 单章已支持；`chapterIds[]` 待扩展            |
+| M-d     | `books.summary` 全书摘要                                      | 🔴   | 章节摘要已成；全书 schema/IPC 待补           |
+
+### 渲染层（RA 轨）
+
+| 单元     | 名称                                            | 状态 | 备注                                         |
+| -------- | ----------------------------------------------- | ---- | -------------------------------------------- |
+| RA0      | 渲染层地基（三栏 / Tailwind / Query / zustand） | ✅   | 竖切重建，替换 Forge 模板桩                  |
+| RA1-min  | 书库导入 + 静态正文 + TOC 章节                  | ✅   |                                              |
+| RA1-full | epub.js 真实渲染 / 分页 / CFI                   | 🔴   | RA3 前置                                     |
+| RA2      | 选区 → 工具栏 → chip → 流式聊天                 | 🟡   | 字符偏移版 ✅；CFI 选区待 RA1-full           |
+| RA3      | 标注与笔记 UI                                   | 🔴   | 依赖 M-b + RA1-full                          |
+| RA4      | 摘要查看 + 跨章会话                             | 🟡   | 章节摘要 pill ✅；全书摘要 / 跨章 🔴         |
+| RA5      | Provider / 设置 UI                              | 🟡   | Anthropic ✅；多 provider 类型 🔴            |
+| D1       | 打包 / 迁移路径                                 | 🔴   | `electron-forge extraResources` 复制迁移 SQL |
+
+> 全量分解与依赖 DAG 见 [`renderer-track-decomposition`](plans/2026-06-01-marginalia-renderer-track-decomposition.md)。
+
+---
+
+## Backlog（待办，按主题）
+
+> 收口自各 spec/plan 的「刻意推迟」段与 `*-deferred-followups` 记忆。细节看「来源」列。
+
+### 类型设计债（趁渲染层刚接 preload、迁移成本低，优先清）
+
+| 项                                                                   | 来源               |
+| -------------------------------------------------------------------- | ------------------ |
+| `ProviderDto` 三布尔扁平态 → `key` 判别联合（非法态不可表示）        | ma3-deferred       |
+| `ConversationDto` 章节/独立判别联合 + DB `CHECK`                     | ma4-deferred       |
+| `conversations.assistantId` 收紧 `NOT NULL`（连迁移 + 测试 fixture） | ma4-deferred       |
+| `Chip.required`/`enabled` 闭合联合（UI toggle 落地时）               | ma4 / ma5-deferred |
+| `ChatModel` → 直接 `import type { LanguageModelV3 }`                 | ma3-deferred       |
+| 具名 `ReadingTools` 类型 + `InferUITools` 收紧 chunk                 | ma5-deferred       |
+
+### 设置 / 产品
+
+| 项                                                       | 状态 | 来源                               |
+| -------------------------------------------------------- | ---- | ---------------------------------- |
+| **最大并发数设置**（后台模型调用全局上限，默认建议 2–3） | 🔴   | vslice spec §10 / core §11         |
+| 可配置代理设置（自定义地址 / PAC / 按 provider 覆盖）    | 🔴   | vslice spec §8.1 / §10             |
+| `stepLimit` 设置项（现硬编默认 5）                       | 🔴   | ma5-deferred #8                    |
+| 独立「摘要模型」设置                                     | 🔴   | core §11                           |
+| i18n / 主题切换                                          | 🔴   | 竖切未上；UP1 用过 i18next         |
+| `metadata.usage` 落库（token 用量）                      | 🔴   | ma5-deferred #4                    |
+| 结构化 `reason` 分类（现自由字符串，UI 要 i18n 时再做）  | 🔴   | ma5-deferred #6                    |
+| onboarding/landing 引导用户先配 provider + 开自动摘要    | 🔴   | 记忆 onboarding-guide-auto-summary |
+
+### 接缝 / 小修
+
+| 项                                                               | 状态           | 来源            |
+| ---------------------------------------------------------------- | -------------- | --------------- |
+| 跨章选区 → 独立会话 + best-effort 组合摘要（M-c 的 UI 侧）       | 🔴             | ma4-deferred #8 |
+| `textOfParts` 历史回放丢弃 assistant 的 tool/reasoning part      | 🟡 Phase1 有意 | ma4 #5 / ma5 #9 |
+| `conversations:create` FK 友好预检（现抛原始 SQLITE_CONSTRAINT） | 🔴 cosmetic    | ma4-deferred #7 |
+| 嵌套 TOC 层级目录渲染（现 `content.chapters` 扁平）              | 🔴             | vslice p3       |
+| 章内完整分页（`hasMore` 续读 `nextOffset`）                      | 🔴             | vslice p3 / p4  |
+| 会话历史初值（重开会话载入 `messages.list-by-conversation`）     | 🔴             | vslice p4       |
+
+### 已由竖切解决（存档，勿重复开）
+
+M-a 流式 IPC · M-p 契约闭合 · `SendInput` Zod schema · `SendDeps`/`SummaryDeps` 生产工厂 · transport consume/cancel `callerStream` · `getChapterSummary` 补 `title` · chip 快照投影 · `presetId` 模板预填（解释/翻译/概括）· 工具章节 `id`/`href` 容错 · 摘要生成与发消息解耦（自动/手动触发）。
+
+---
+
+## 文档地图
+
+- **`specs/`**：产品与技术设计——核心阅读闭环（Phase 1）、UP1 UI 原型、最小可用竖切。
+- **`plans/`**：里程碑 bite-sized 实现计划——MA1–MA5、竖切 P1–P4、RA 轨任务分解。
+- **记忆**（`~/.claude/.../memory/`）：`*-deferred-followups`（MA3/4/5 细节）、各类 feedback/project 记忆（见 `MEMORY.md` 索引）。
