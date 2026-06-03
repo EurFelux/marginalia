@@ -6,6 +6,7 @@ import { LibraryView } from "@renderer/library/LibraryView";
 import { ReaderView } from "@renderer/reader/ReaderView";
 import { SettingsShell } from "@renderer/settings/SettingsShell";
 import { ThemeController } from "@renderer/theme/ThemeController";
+import { Toaster } from "@renderer/components/ui/sonner";
 
 export function App() {
   const view = useReaderStore((s) => s.view);
@@ -18,6 +19,7 @@ export function App() {
       <ThemeController />
       {view === "reader" ? <ReaderView /> : <LibraryView />}
       <SettingsShell />
+      <Toaster />
     </TooltipProvider>
   );
 }
