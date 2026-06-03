@@ -1,7 +1,11 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { SectionFrame, type SectionSelectEvent } from "./SectionFrame";
 import type { ViewportRect } from "./geometry";
+import { estimateHeight } from "./precision";
+
+/** 未缓存 section 的默认占位高度（px）；缓存命中后用真实测高。 */
+const DEFAULT_ESTIMATE = 600;
 
 export interface VirtualDocsHandle {
   scrollToIndex: (index: number) => void;
@@ -56,30 +60,32 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
     [],
   );
 
-  const itemContent = useCallback(
-    (index: number) => (
-      <LazySection
-        index={index}
-        loadSection={loadSection}
-        styleCss={styleCss}
-        onSelect={onSelect}
-        onSelectionCleared={onSelectionCleared}
-        decorate={decorate}
-        onHighlightClick={onHighlightClick}
-        decorateNonce={decorateNonce}
-        onContentMouseDown={onContentMouseDown}
-      />
-    ),
-    [
-      loadSection,
-      styleCss,
-      onSelect,
-      onSelectionCleared,
-      decorate,
-      onHighlightClick,
-      decorateNonce,
-      onContentMouseDown,
-    ],
+  const heightCache = useRef<Map<number, number>>(new Map());
+  // styleCss（排版偏好/主题）变更会改变所有 section 高度 → 整体失效缓存。
+  useEffect(() => {
+    heightCache.current.clear();
+  }, [styleCss]);
+
+  // onMeasured / itemContent 故意不手写 useCallback——virtual-docs 经 React Compiler 编译
+  //（renderer 的 vite babel 覆盖工作区源码包：symlink 解析为 packages/ 真实路径、不含 node_modules，
+  // 故被 RC 处理），由其自动记忆保持身份稳定。否则身份每次渲染变化会让 Virtuoso 重渲全部在挂行。
+  const onMeasured = (i: number, h: number) => {
+    heightCache.current.set(i, h);
+  };
+  const itemContent = (index: number) => (
+    <LazySection
+      index={index}
+      loadSection={loadSection}
+      styleCss={styleCss}
+      onSelect={onSelect}
+      onSelectionCleared={onSelectionCleared}
+      decorate={decorate}
+      onHighlightClick={onHighlightClick}
+      decorateNonce={decorateNonce}
+      onContentMouseDown={onContentMouseDown}
+      estimatedHeight={estimateHeight(heightCache.current, index, DEFAULT_ESTIMATE)}
+      onMeasured={onMeasured}
+    />
   );
 
   return (
@@ -104,6 +110,8 @@ function LazySection({
   onHighlightClick,
   decorateNonce,
   onContentMouseDown,
+  estimatedHeight,
+  onMeasured,
 }: {
   index: number;
   loadSection: (index: number) => Promise<string>;
@@ -114,6 +122,8 @@ function LazySection({
   onHighlightClick?: (annoId: string, rect: ViewportRect) => void;
   decorateNonce?: number;
   onContentMouseDown?: () => void;
+  estimatedHeight?: number;
+  onMeasured?: (index: number, height: number) => void;
 }) {
   const [html, setHtml] = useState<string | null>(null);
   useEffect(() => {
@@ -129,7 +139,7 @@ function LazySection({
     };
   }, [index, loadSection]);
 
-  if (html == null) return <div style={{ minHeight: 200 }} />;
+  if (html == null) return <div style={{ height: estimatedHeight ?? 200 }} />;
   return (
     <SectionFrame
       index={index}
@@ -141,6 +151,8 @@ function LazySection({
       onHighlightClick={onHighlightClick}
       decorateNonce={decorateNonce}
       onContentMouseDown={onContentMouseDown}
+      estimatedHeight={estimatedHeight}
+      onMeasured={onMeasured}
     />
   );
 }
