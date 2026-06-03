@@ -4,6 +4,7 @@ import type { Encryptor } from "@main/secrets/encryptor";
 import { getDefaultAssistant } from "@main/providers/assistant";
 import { loadProvider } from "@main/providers/repository";
 import { resolveLanguageModel, type ChatModel } from "@main/ai/model-factory";
+import { t } from "@main/i18n";
 
 export type ResolvedModel =
   | { ok: true; model: ChatModel; modelId: string }
@@ -12,14 +13,21 @@ export type ResolvedModel =
 /** 把默认 Assistant 解析为可调用模型；任一前置缺失返回结构化错误（供发送前友好拦截）。 */
 export function resolveAssistantModel(db: DB, encryptor: Encryptor): ResolvedModel {
   const assistant = getDefaultAssistant(db);
-  if (!assistant.providerId) return { ok: false, reason: "assistant has no provider configured" };
-  if (!assistant.model) return { ok: false, reason: "assistant has no model configured" };
+  if (!assistant.providerId)
+    return { ok: false, reason: t("errors.assistantNoProvider", "助手未配置 provider") };
+  if (!assistant.model)
+    return { ok: false, reason: t("errors.assistantNoModel", "助手未配置模型") };
 
   const provider = loadProvider(db, assistant.providerId);
-  if (!provider) return { ok: false, reason: "configured provider not found" };
-  if (!provider.apiKeyEncrypted) return { ok: false, reason: "provider has no API key set" };
+  if (!provider)
+    return { ok: false, reason: t("errors.assistantProviderNotFound", "未找到所配置的 provider") };
+  if (!provider.apiKeyEncrypted)
+    return { ok: false, reason: t("errors.assistantNoApiKey", "provider 未设置密钥") };
   if (!encryptor.isAvailable())
-    return { ok: false, reason: "secure storage is unavailable on this machine" };
+    return {
+      ok: false,
+      reason: t("errors.secureStorageUnavailableMachine", "本机安全存储不可用"),
+    };
 
   let apiKey: string;
   try {
@@ -27,7 +35,10 @@ export function resolveAssistantModel(db: DB, encryptor: Encryptor): ResolvedMod
   } catch (err) {
     // 跨机迁移属预期；但真实 encryptor 故障也走这里——记日志以便区分（与 providers/repository 一致）
     console.warn("[assistant-model] decrypt failed:", err);
-    return { ok: false, reason: "stored API key cannot be decrypted on this machine" };
+    return {
+      ok: false,
+      reason: t("errors.keyUndecryptableMachine", "已存密钥无法在本机解密"),
+    };
   }
 
   try {
@@ -39,6 +50,9 @@ export function resolveAssistantModel(db: DB, encryptor: Encryptor): ResolvedMod
     });
     return { ok: true, model, modelId: assistant.model };
   } catch (err) {
-    return { ok: false, reason: err instanceof Error ? err.message : "failed to build model" };
+    return {
+      ok: false,
+      reason: err instanceof Error ? err.message : t("errors.failedToBuildModel", "构建模型失败"),
+    };
   }
 }

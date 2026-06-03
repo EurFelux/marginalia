@@ -1,5 +1,5 @@
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { createDb, runMigrations } from "@main/db/client";
 import { providers } from "@main/db/schema";
 import type { Encryptor } from "@main/secrets/encryptor";
@@ -17,6 +17,9 @@ import {
   getDefaultAssistant,
   updateDefaultAssistant,
 } from "@main/providers/assistant";
+import { initMainI18n } from "@main/i18n";
+
+beforeAll(() => initMainI18n("en"));
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
 const freshDb = () => {

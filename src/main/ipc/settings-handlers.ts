@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { net } from "electron";
 import { IPC } from "@shared/ipc";
+import { t } from "@main/i18n";
 import {
   listModelsInput,
   providerIdInput,
@@ -61,7 +62,7 @@ export function registerSettingsHandlers(): void {
       try {
         apiKey = input.apiKey ?? revealProviderKey(getDb(), safeStorageEncryptor, input.id ?? "");
       } catch {
-        return { ok: false, message: "No API key available for this provider" };
+        return { ok: false, message: t("errors.noApiKeyAvailable", "该 provider 无可用密钥") };
       }
       try {
         const netFetch: typeof fetch = (url, init) => net.fetch(url as string, init);

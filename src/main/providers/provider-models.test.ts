@@ -1,10 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import {
   buildModelsRequest,
   adaptModelsResponse,
   fetchProviderModels,
   mapModelsError,
 } from "@main/providers/provider-models";
+import { initMainI18n } from "@main/i18n";
+
+beforeAll(() => initMainI18n("en"));
 
 describe("buildModelsRequest", () => {
   it("openai: /models with Bearer; default base", () => {

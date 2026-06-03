@@ -2,6 +2,7 @@ import { APICallError, LoadAPIKeyError, generateText } from "ai";
 import { resolveLanguageModel, type ChatModel } from "@main/ai/model-factory";
 import type { ProviderTestParams, ProviderTester } from "@main/secrets/tester";
 import type { TestResult } from "@shared/providers";
+import { t } from "@main/i18n";
 
 /** 对给定模型发一次最小生成；成功即返回，失败即抛出。可注入用于测试。 */
 export type GenerateProbe = (model: ChatModel) => Promise<void>;
@@ -61,7 +62,7 @@ function describeFallback(status: number | undefined, err: unknown): string {
  */
 export function mapTestError(err: unknown): TestResult {
   if (LoadAPIKeyError.isInstance(err)) {
-    return { ok: false, message: "No API key configured" };
+    return { ok: false, message: t("errors.noApiKeyConfigured", "未配置密钥") };
   }
   const status = APICallError.isInstance(err) ? err.statusCode : undefined;
   return { ok: false, status, message: getErrorMessage(err) ?? describeFallback(status, err) };

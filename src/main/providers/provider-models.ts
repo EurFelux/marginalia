@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { DEFAULT_BASE_URL, type AiProviderApiType } from "@shared/providers";
+import { t } from "@main/i18n";
 
 export interface ModelsRequest {
   url: string;
@@ -13,7 +14,7 @@ export function buildModelsRequest(
   apiKey: string,
 ): ModelsRequest {
   const raw = baseUrl ?? DEFAULT_BASE_URL[type];
-  if (!raw) throw new Error("baseUrl is required for this provider");
+  if (!raw) throw new Error(t("errors.baseUrlRequiredForProvider", "该 provider 需要 baseUrl"));
   // baseUrl 约定：含版本路径（openai `/v1`、anthropic `/v1`、google `/v1beta`），拉模型只拼 `/models`，
   // 与 model-factory 生成路径的 baseURL 约定一致（自建代理填同一个 base 两处都对）。去尾斜杠避免 `//models`。
   const base = raw.replace(/\/+$/, "");
@@ -82,7 +83,7 @@ export function mapModelsError(
   if (status && status >= 500)
     return { status, message: `HTTP ${status}: the provider had a server-side error` };
   if (status) return { status, message: `HTTP ${status}` };
-  return { message: "Request failed" };
+  return { message: t("errors.requestFailed", "请求失败") };
 }
 
 /** 从错误响应体尽力提真实 message（{error:{message}} / {error:"str"} / {message}）；提不到返 null。 */

@@ -11,6 +11,7 @@ import { createReadingTools, type LoadBytes } from "@main/ai/tools";
 import type { ResolvedModel } from "@main/ai/assistant-model";
 import { routeConversation } from "@main/chat/conversations";
 import { appendMessage, getLastParagraphContent, listMessages } from "@main/chat/messages";
+import { t } from "@main/i18n";
 import { type SendInput } from "@shared/chat";
 export type { SendInput };
 
@@ -61,7 +62,7 @@ export function runSend(
   // 1b. 校验章节属于本书——在任何写入前拦截（§16 无孤儿）。否则步骤6 getChapterSummary 会在
   //     已建会话 + 已落 user 消息之后裸抛（章节存在于别的书时 FK 不报错，但 book 作用域查询无行）。
   const chapterRow = getChapter(db, input.bookId, input.currentChapterId);
-  if (!chapterRow) return { ok: false, reason: "chapter not found in this book" };
+  if (!chapterRow) return { ok: false, reason: t("errors.chapterNotInBook", "本书中未找到该章节") };
 
   // 2. 路由会话
   const route = routeConversation(db, {

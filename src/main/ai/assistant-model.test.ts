@@ -1,11 +1,14 @@
 // src/main/ai/assistant-model.test.ts
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { createDb, runMigrations } from "@main/db/client";
 import type { Encryptor } from "@main/secrets/encryptor";
 import { upsertProvider } from "@main/providers/repository";
 import { getDefaultAssistant, updateDefaultAssistant } from "@main/providers/assistant";
 import { resolveAssistantModel } from "@main/ai/assistant-model";
+import { initMainI18n } from "@main/i18n";
+
+beforeAll(() => initMainI18n("en"));
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
 const freshDb = () => {

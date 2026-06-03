@@ -1,11 +1,14 @@
 import { APICallError, LoadAPIKeyError } from "ai";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import {
   createAiSdkTester,
   getErrorMessage,
   mapTestError,
   type GenerateProbe,
 } from "@main/secrets/ai-sdk-tester";
+import { initMainI18n } from "@main/i18n";
+
+beforeAll(() => initMainI18n("en"));
 
 // 构造真实的 APICallError 实例，避免 duck-typing 绕过类型守卫。responseBody 可选。
 const apiErr = (statusCode?: number, responseBody?: string) =>
