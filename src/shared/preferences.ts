@@ -14,6 +14,14 @@ export type ReaderPrefs = z.infer<typeof readerPrefsSchema>;
 export const colorMode = z.enum(["light", "dark", "system"]);
 export type ColorMode = z.infer<typeof colorMode>;
 
+/** 阅读器三向布局开关（左栏 / AI 面板 / 顶栏），整对象落盘、重启恢复。 */
+export const readerLayoutSchema = z.object({
+  sidebarOpen: z.boolean(),
+  panelOpen: z.boolean(),
+  headerOpen: z.boolean(),
+});
+export type ReaderLayout = z.infer<typeof readerLayoutSchema>;
+
 /**
  * 可持久化用户偏好的单一源：key → 值 Zod schema。
  * 新增偏好＝在此注册一个 key + schema；DB / 服务 / IPC / 类型全部据此推导。
@@ -24,6 +32,7 @@ export const PREFERENCE_SCHEMAS = {
   autoSummarize: z.boolean(),
   colorMode,
   language: uiLanguage,
+  readerLayout: readerLayoutSchema,
 } as const;
 
 export type PreferenceKey = keyof typeof PREFERENCE_SCHEMAS;
@@ -47,5 +56,6 @@ export const setPreferenceInput = z.discriminatedUnion("key", [
   z.object({ key: z.literal("autoSummarize"), value: z.boolean() }),
   z.object({ key: z.literal("colorMode"), value: colorMode }),
   z.object({ key: z.literal("language"), value: uiLanguage }),
+  z.object({ key: z.literal("readerLayout"), value: readerLayoutSchema }),
 ]);
 export type SetPreferenceInput = z.infer<typeof setPreferenceInput>;

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   PREFERENCE_SCHEMAS,
   preferenceKey,
+  readerLayoutSchema,
   readerPrefsSchema,
   setPreferenceInput,
 } from "@shared/preferences";
@@ -23,6 +24,7 @@ describe("preferences schemas", () => {
       "colorMode",
       "language",
       "lastHighlightStyle",
+      "readerLayout",
       "readerPrefs",
     ]);
   });
@@ -31,6 +33,19 @@ describe("preferences schemas", () => {
     expect(preferenceKey.safeParse("readerPrefs").success).toBe(true);
     expect(preferenceKey.safeParse("colorMode").success).toBe(true);
     expect(preferenceKey.safeParse("nope").success).toBe(false);
+  });
+
+  it("readerLayoutSchema requires all three boolean flags", () => {
+    expect(
+      readerLayoutSchema.safeParse({ sidebarOpen: true, panelOpen: false, headerOpen: true })
+        .success,
+    ).toBe(true);
+    expect(readerLayoutSchema.safeParse({ sidebarOpen: true, panelOpen: false }).success).toBe(
+      false,
+    );
+    expect(
+      readerLayoutSchema.safeParse({ sidebarOpen: 1, panelOpen: false, headerOpen: true }).success,
+    ).toBe(false);
   });
 
   it("lastHighlightStyle validates against the annotation style enum", () => {
@@ -54,6 +69,15 @@ describe("preferences schemas", () => {
       setPreferenceInput.safeParse({ key: "readerPrefs", value: { fontScale: 1 } }).success,
     ).toBe(false);
     expect(setPreferenceInput.safeParse({ key: "unknownKey", value: 1 }).success).toBe(false);
+    expect(
+      setPreferenceInput.safeParse({
+        key: "readerLayout",
+        value: { sidebarOpen: true, panelOpen: false, headerOpen: true },
+      }).success,
+    ).toBe(true);
+    expect(
+      setPreferenceInput.safeParse({ key: "readerLayout", value: { sidebarOpen: true } }).success,
+    ).toBe(false);
   });
 });
 
