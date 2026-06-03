@@ -18,19 +18,19 @@ export const DEFAULT_PROVIDERS: DefaultProvider[] = [
     type: "openai-responses",
     compatibleApis: ["openai-responses"],
     label: "OpenAI",
-    models: ["gpt-4o", "gpt-4o-mini"],
+    models: ["gpt-5.5", "gpt-5.4-mini", "gpt-5.4-nano"],
   },
   {
     type: "anthropic",
     compatibleApis: ["anthropic"],
     label: "Anthropic",
-    models: ["claude-3-5-sonnet-latest", "claude-3-5-haiku-latest"],
+    models: ["claude-sonnet-4-6", "claude-haiku-4-5"],
   },
   {
     type: "google-generate-content",
     compatibleApis: ["google-generate-content"],
     label: "Gemini",
-    models: ["gemini-1.5-flash", "gemini-1.5-pro"],
+    models: ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-3.1-pro-preview"],
   },
 ];
 
