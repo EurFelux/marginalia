@@ -38,18 +38,12 @@ import type {
   CreateAnnotationInput,
   UpdateAnnotationInput,
 } from "@shared/annotations";
-import type { ColorMode, PreferencesSnapshot, SetPreferenceInput } from "@shared/preferences";
-import { resolveTheme } from "@shared/theme";
+import type { PreferencesSnapshot, SetPreferenceInput } from "@shared/preferences";
 
-/** 首帧前按持久化的颜色模式挂 .dark（system 经 matchMedia 解析）。 */
-function applyBootstrapTheme(mode: ColorMode): void {
-  const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches === true;
-  document.documentElement.classList.toggle("dark", resolveTheme(mode, prefersDark) === "dark");
-}
-
-// 首帧前同步读整份偏好快照（read 仅启动一次）：驱动主题 + 供渲染层同步 hydrate。
+// 首帧前同步读整份偏好快照（read 仅启动一次）：供渲染层同步初始化 theme-store（挂 .dark）+ hydrate。
+// 注意：挂 .dark 的 DOM 操作放在 renderer 入口（src/renderer.tsx），不在此处——sandbox preload 模块求值时
+// document.documentElement 尚为 null，在此 toggle 会抛错并令整个 preload（含 contextBridge 暴露）失败。
 const prefsSnapshot = ipcRenderer.sendSync(IPC.preferencesGetAllSync) as PreferencesSnapshot;
-applyBootstrapTheme(prefsSnapshot.colorMode ?? "system");
 
 const api = {
   app: {
