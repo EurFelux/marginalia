@@ -1,8 +1,11 @@
 import { app, BrowserWindow, net } from "electron";
 import path from "node:path";
 import started from "electron-squirrel-startup";
-import { initDb } from "@main/db/instance";
+import { initDb, getDb } from "@main/db/instance";
 import { setModelFetch } from "@main/ai/model-factory";
+import { getPreference } from "@main/preferences/repository";
+import { initMainI18n } from "@main/i18n";
+import { resolveInitialLanguage } from "@shared/i18n/language";
 import { registerAppHandlers } from "@main/ipc/app-handlers";
 import { registerLibraryHandlers } from "@main/ipc/library-handlers";
 import { registerSettingsHandlers } from "@main/ipc/settings-handlers";
@@ -56,6 +59,10 @@ app.on("ready", () => {
     app.quit();
     return;
   }
+  // 主进程 i18n：读已存语言偏好（null → undefined 退系统 locale 匹配）
+  initMainI18n(
+    resolveInitialLanguage(getPreference(getDb(), "language") ?? undefined, app.getLocale()),
+  );
   // AI 出站请求默认走系统代理：Electron net.fetch 经 Chromium 网络栈，默认采用系统代理设置。
   // （部分地区直连 api.anthropic.com 会被 403「Request not allowed」按区域拦截，须经系统代理出网。）
   setModelFetch((input, init) => net.fetch(input instanceof URL ? input.toString() : input, init));

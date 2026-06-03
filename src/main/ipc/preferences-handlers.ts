@@ -4,6 +4,7 @@ import { setPreferenceInput, type SetPreferenceInput } from "@shared/preferences
 import { getDb } from "@main/db/instance";
 import { getAllPreferences, setPreference } from "@main/preferences/repository";
 import { handle } from "@main/ipc/registry";
+import { setMainLanguage } from "@main/i18n";
 
 export function registerPreferenceHandlers(): void {
   // 读：同步 sendSync 通道——preload 在首帧前取整份快照（挂 .dark + hydrate）。
@@ -29,6 +30,7 @@ export function registerPreferenceHandlers(): void {
       case "colorMode":
         return setPreference(getDb(), input.key, input.value);
       case "language":
+        setMainLanguage(input.value);
         return setPreference(getDb(), input.key, input.value);
     }
   });
