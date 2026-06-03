@@ -54,9 +54,34 @@ describe("adaptModelsResponse", () => {
     expect(adaptModelsResponse("google-generate-content", json)).toEqual(["gemini-1.5-flash"]);
   });
   it("google: includes a model lacking supportedGenerationMethods (don't silently drop)", () => {
-    expect(adaptModelsResponse("google-generate-content", { models: [{ name: "models/gemini-x" }] })).toEqual([
-      "gemini-x",
-    ]);
+    expect(
+      adaptModelsResponse("google-generate-content", { models: [{ name: "models/gemini-x" }] }),
+    ).toEqual(["gemini-x"]);
+  });
+  it("openai/anthropic: filters out non-text models (image/tts/whisper/embedding/moderation)", () => {
+    expect(
+      adaptModelsResponse("openai-responses", {
+        data: [
+          { id: "gpt-4o" },
+          { id: "o3-mini" },
+          { id: "dall-e-3" },
+          { id: "gpt-image-1" },
+          { id: "tts-1" },
+          { id: "gpt-4o-mini-tts" },
+          { id: "whisper-1" },
+          { id: "gpt-4o-transcribe" },
+          { id: "text-embedding-3-small" },
+          { id: "omni-moderation-latest" },
+        ],
+      }),
+    ).toEqual(["gpt-4o", "o3-mini"]);
+  });
+  it("openai-compatible: also filters non-text models, keeps unknown chat ids", () => {
+    expect(
+      adaptModelsResponse("openai-chat-completions", {
+        data: [{ id: "llama-3.1-70b" }, { id: "nomic-embed-text" }, { id: "bge-reranker-v2" }],
+      }),
+    ).toEqual(["llama-3.1-70b"]);
   });
   it("strict types throw on malformed response", () => {
     expect(() => adaptModelsResponse("openai-responses", { foo: 1 })).toThrow();
@@ -64,7 +89,9 @@ describe("adaptModelsResponse", () => {
   });
   it("openai-compatible best-effort: salvages valid ids, tolerates junk, [] when no data", () => {
     expect(
-      adaptModelsResponse("openai-chat-completions", { data: [{ id: "a", extra: 1 }, { noId: true }] }),
+      adaptModelsResponse("openai-chat-completions", {
+        data: [{ id: "a", extra: 1 }, { noId: true }],
+      }),
     ).toEqual(["a"]);
     expect(adaptModelsResponse("openai-chat-completions", { whatever: 1 })).toEqual([]);
   });

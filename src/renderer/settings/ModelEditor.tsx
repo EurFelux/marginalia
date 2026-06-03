@@ -47,7 +47,8 @@ export function ModelEditor({
     setLoading(false);
     if (res.ok) {
       setFetched(res.models);
-      setChecked(new Set(res.models));
+      // 默认不勾选——用户通常只挑少数几个目标模型，全选会逼他去逐个取消。
+      setChecked(new Set());
     } else {
       setErr(res.message);
     }
@@ -105,12 +106,13 @@ export function ModelEditor({
             type="button"
             size="sm"
             className="mt-1"
+            disabled={checked.size === 0}
             onClick={() => {
               onChange(mergeModels(models, [...checked]));
               setFetched(null);
             }}
           >
-            添加所选
+            添加所选{checked.size > 0 ? `（${checked.size}）` : ""}
           </Button>
         </div>
       )}

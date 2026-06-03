@@ -39,6 +39,20 @@ const googleSchema = z.object({
 });
 const looseItem = z.object({ id: z.string() }).passthrough();
 
+/**
+ * 非文本生成模型的 id 片段（图像 dall-e/gpt-image、语音合成 tts、语音转写 whisper/transcribe、
+ * 向量 embed、重排 rerank、审核 moderation、视频 sora）——这些不能用于对话/文本生成，从拉取结果剔除。
+ * 用 `(^|[-/])…` 词界匹配，避免误伤恰好含相同子串的对话模型；只剔确信项、未知一律保留
+ * （honest：宁可多列让用户自行取舍，绝不静默漏掉可用模型）。google 走 generateContent 能力过滤，不经此名单。
+ */
+const NON_TEXT_MODEL =
+  /(^|[-/])(dall-e|gpt-image|tts|whisper|transcribe|embed|rerank|moderation|sora)/i;
+
+/** 从 model id 列表剔除明确的非文本生成模型（见 NON_TEXT_MODEL）。 */
+function filterTextModels(ids: string[]): string[] {
+  return ids.filter((id) => !NON_TEXT_MODEL.test(id));
+}
+
 export interface FetchModelsParams {
   type: AiProviderApiType;
   baseUrl: string | null;
@@ -119,11 +133,12 @@ export function adaptModelsResponse(type: AiProviderApiType, json: unknown): str
   if (type === "openai-chat-completions") {
     const data = (json as { data?: unknown })?.data;
     if (!Array.isArray(data)) return [];
-    return data.flatMap((it) => {
+    const ids = data.flatMap((it) => {
       const p = looseItem.safeParse(it);
       return p.success ? [p.data.id] : [];
     });
+    return filterTextModels(ids);
   }
   // openai-responses / anthropic：严格 data[].id
-  return openaiLike.parse(json).data.map((m) => m.id);
+  return filterTextModels(openaiLike.parse(json).data.map((m) => m.id));
 }
