@@ -142,7 +142,7 @@ export default {
   "settings.provider.keyLabel": "🔑 {{key}}",
   "settings.provider.keyNotSet": "未配置",
   "settings.provider.keyUndecryptable": "本机无法解密",
-  "settings.provider.modelCount": "{{n}} 个模型",
+  "settings.provider.modelCount": "{{count}} 个模型",
   "settings.provider.name": "名称",
   "settings.provider.namePlaceholder": "（必填）",
   "settings.provider.saveFailed": "保存失败：{{message}}",

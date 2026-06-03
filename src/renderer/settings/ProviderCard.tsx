@@ -92,7 +92,8 @@ export function ProviderCard({
       <div className="mt-1 text-xs text-muted-foreground">
         <span>{t("settings.provider.keyLabel", "🔑 {{key}}", { key: keyText(provider) })}</span>
         <span className="ms-2">
-          · {t("settings.provider.modelCount", "{{n}} 个模型", { n: provider.models.length })}
+          ·{" "}
+          {t("settings.provider.modelCount", "{{count}} 个模型", { count: provider.models.length })}
         </span>
       </div>
       {(test.isPending || result) && (
