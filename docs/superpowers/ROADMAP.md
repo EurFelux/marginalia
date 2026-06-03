@@ -23,6 +23,8 @@
 
 **i18n 已交付**（双语 zh-CN/en，2026-06-03）：`@shared/i18n` 纯逻辑 + **扁平点分键** locale（i18next-cli extract/lint/status 工具链，`defaultNS:false`/`keySeparator:false` 便于全文搜索）；主进程 vanilla i18next 本地化「自产」错误消息（honest-error 透传不动）+ 渲染层 react-i18next（**跟随系统语言** + 偏好持久化 + 设置「外观」语言切换 + `<html lang/dir>`）；**全量 UI 文案抽取**（160 键、zh-CN/en 各 100%）；`provider` 提为 **`terms.provider`** 术语（zh「模型服务商」）经 `$t()` 嵌套复用；物理 Tailwind 类 → **逻辑类**（RTL-ready，LTR 渲染零变化）。详见 `specs/2026-06-03-i18n-design.md` / `plans/2026-06-03-i18n.md`。
 
+**书库拖拽导入已交付**（2026-06-03）：拖 ePub 到书库即导入——`useEpubDrop` 拖拽状态机 + `DropOverlay` 居中投放卡 + `epub-drop` 纯 helper（过滤/basename）+ `library.pathForFile`（preload 经 `webUtils.getPathForFile`）+ sonner toast 即时反馈；文案已 i18n 化。详见 `specs/2026-06-03-library-drag-drop-import-design.md`。**待办**：导入卡顿（主进程同步解析 ePub）待挪 worker。
+
 **下一目标候选**：**类型设计债清理**（已定为下一步）、RA4 收尾（M-d 全书摘要 / M-c 跨章）、`preferences` 持久化表、RA1-full「精度/内存 pass」（图片延时 / 当前章高亮滞后 / 长书 section 内存，见 backlog）。颜色模式（dark / light / system）✅ 已完成。RA5 ✅ 已完成。
 
 ---
