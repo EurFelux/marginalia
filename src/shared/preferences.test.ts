@@ -20,6 +20,7 @@ describe("preferences schemas", () => {
   it("registers exactly the keys with current consumers", () => {
     expect(Object.keys(PREFERENCE_SCHEMAS).sort()).toEqual([
       "autoSummarize",
+      "colorMode",
       "lastHighlightStyle",
       "readerPrefs",
     ]);
@@ -27,8 +28,8 @@ describe("preferences schemas", () => {
 
   it("preferenceKey accepts known keys and rejects unknown", () => {
     expect(preferenceKey.safeParse("readerPrefs").success).toBe(true);
-    expect(preferenceKey.safeParse("autoSummarize").success).toBe(true);
-    expect(preferenceKey.safeParse("colorMode").success).toBe(false);
+    expect(preferenceKey.safeParse("colorMode").success).toBe(true);
+    expect(preferenceKey.safeParse("nope").success).toBe(false);
   });
 
   it("lastHighlightStyle validates against the annotation style enum", () => {
@@ -46,6 +47,8 @@ describe("preferences schemas", () => {
     expect(setPreferenceInput.safeParse({ key: "autoSummarize", value: "yes" }).success).toBe(
       false,
     );
+    expect(setPreferenceInput.safeParse({ key: "colorMode", value: "dark" }).success).toBe(true);
+    expect(setPreferenceInput.safeParse({ key: "colorMode", value: "sepia" }).success).toBe(false);
     expect(
       setPreferenceInput.safeParse({ key: "readerPrefs", value: { fontScale: 1 } }).success,
     ).toBe(false);

@@ -9,15 +9,19 @@ export const readerPrefsSchema = z.object({
 });
 export type ReaderPrefs = z.infer<typeof readerPrefsSchema>;
 
+/** 颜色模式三档。renderer 的 ColorMode 由此推导，单一源。 */
+export const colorMode = z.enum(["light", "dark", "system"]);
+export type ColorMode = z.infer<typeof colorMode>;
+
 /**
  * 可持久化用户偏好的单一源：key → 值 Zod schema。
  * 新增偏好＝在此注册一个 key + schema；DB / 服务 / IPC / 类型全部据此推导。
- * （颜色模式等零消费方项暂不注册，待其功能落地——见 spec 非目标。）
  */
 export const PREFERENCE_SCHEMAS = {
   readerPrefs: readerPrefsSchema,
   lastHighlightStyle: annotationStyle,
   autoSummarize: z.boolean(),
+  colorMode,
 } as const;
 
 export type PreferenceKey = keyof typeof PREFERENCE_SCHEMAS;
@@ -39,5 +43,6 @@ export const setPreferenceInput = z.discriminatedUnion("key", [
   z.object({ key: z.literal("readerPrefs"), value: readerPrefsSchema }),
   z.object({ key: z.literal("lastHighlightStyle"), value: annotationStyle }),
   z.object({ key: z.literal("autoSummarize"), value: z.boolean() }),
+  z.object({ key: z.literal("colorMode"), value: colorMode }),
 ]);
 export type SetPreferenceInput = z.infer<typeof setPreferenceInput>;

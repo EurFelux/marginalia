@@ -27,6 +27,13 @@ describe("preferences repository", () => {
     expect(getPreference(db, "autoSummarize")).toBe(true);
   });
 
+  it("round-trips colorMode", () => {
+    const db = freshDb();
+    setPreference(db, "colorMode", "dark");
+    expect(getPreference(db, "colorMode")).toBe("dark");
+    expect(getAllPreferences(db)).toEqual({ colorMode: "dark" });
+  });
+
   it("returns null for an unset key", () => {
     const db = freshDb();
     expect(getPreference(db, "autoSummarize")).toBeNull();
