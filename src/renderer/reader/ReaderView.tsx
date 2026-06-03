@@ -7,7 +7,6 @@ import { cn } from "@renderer/lib/utils";
 import { Button } from "@renderer/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@renderer/components/ui/tooltip";
 import { useNavigationStore } from "@renderer/store/navigation-store";
-import { useChatStore } from "@renderer/store/chat-store";
 import { useSettingsStore } from "@renderer/store/settings-store";
 import { usePrefsStore } from "@renderer/store/prefs-store";
 import { Sidebar } from "@renderer/reader/Sidebar";
@@ -23,8 +22,8 @@ export function ReaderView() {
   const bookId = useNavigationStore((s) => s.currentBookId);
   const chapterId = useNavigationStore((s) => s.currentChapterId);
   const backToLibrary = useNavigationStore((s) => s.backToLibrary);
-  const panelOpen = useChatStore((s) => s.panelOpen);
-  const setPanelOpen = useChatStore((s) => s.setPanelOpen);
+  const panelOpen = usePrefsStore((s) => s.layout.panelOpen);
+  const updateLayout = usePrefsStore((s) => s.updateLayout);
   const openSettings = useSettingsStore((s) => s.setOpen);
   const autoSummarize = usePrefsStore((s) => s.autoSummarize);
   const qc = useQueryClient();
@@ -67,7 +66,7 @@ export function ReaderView() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => setPanelOpen(!panelOpen)}
+                  onClick={() => updateLayout({ panelOpen: !panelOpen })}
                   aria-label={t("reader.aiPanel", "AI 面板")}
                   className={cn(panelOpen ? "text-primary" : "text-muted-foreground")}
                 />

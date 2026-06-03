@@ -1,8 +1,12 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { useChatStore, CHAT_INITIAL } from "@renderer/store/chat-store";
+import { usePrefsStore, PREFS_INITIAL } from "@renderer/store/prefs-store";
 import type { Chip } from "@shared/chat";
 
-beforeEach(() => useChatStore.setState(CHAT_INITIAL));
+beforeEach(() => {
+  useChatStore.setState(CHAT_INITIAL);
+  usePrefsStore.setState(PREFS_INITIAL);
+});
 
 describe("chat-store", () => {
   it("setActiveConversation stores id", () => {
@@ -34,30 +38,24 @@ describe("chat-store", () => {
     expect(useChatStore.getState().draftText).toBe("hi");
     expect(useChatStore.getState().draftChips).toHaveLength(1);
   });
-  it("setPanelOpen toggles", () => {
-    useChatStore.getState().setPanelOpen(true);
-    expect(useChatStore.getState().panelOpen).toBe(true);
-  });
 });
 
 describe("openConversation", () => {
   it("sets active + chapter + opens panel + bumps openCommand nonce", () => {
-    useChatStore.setState(CHAT_INITIAL);
     useChatStore.getState().openConversation("conv-1", "ch-1");
     const s1 = useChatStore.getState();
     expect(s1.activeConversationId).toBe("conv-1");
     expect(s1.activeConversationChapterId).toBe("ch-1");
-    expect(s1.panelOpen).toBe(true);
+    expect(usePrefsStore.getState().layout.panelOpen).toBe(true);
     expect(s1.openCommand).toEqual({ conversationId: "conv-1", nonce: 1 });
     useChatStore.getState().openConversation("conv-1", "ch-1");
     expect(useChatStore.getState().openCommand?.nonce).toBe(2); // 同会话重开也递增 → 触发重载
   });
   it("openConversation with null chapterId (independent) sets chapter to null", () => {
-    useChatStore.setState(CHAT_INITIAL);
     useChatStore.getState().openConversation("conv-indep", null);
     const s = useChatStore.getState();
     expect(s.activeConversationId).toBe("conv-indep");
     expect(s.activeConversationChapterId).toBeNull();
-    expect(s.panelOpen).toBe(true);
+    expect(usePrefsStore.getState().layout.panelOpen).toBe(true);
   });
 });

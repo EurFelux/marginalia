@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@renderer/components/ui/button";
 import { ScrollArea } from "@renderer/components/ui/scroll-area";
 import { useChatStore } from "@renderer/store/chat-store";
+import { usePrefsStore } from "@renderer/store/prefs-store";
 import { useNavigationStore } from "@renderer/store/navigation-store";
 import { createIpcChatTransport } from "@renderer/ai/ipc-chat-transport";
 import type { ChatUIMessage } from "@renderer/ai/types";
@@ -22,7 +23,7 @@ export function AIPanel() {
     transport,
   });
   const setActiveConversation = useChatStore((s) => s.setActiveConversation);
-  const setPanelOpen = useChatStore((s) => s.setPanelOpen);
+  const updateLayout = usePrefsStore((s) => s.updateLayout);
   const openCommand = useChatStore((s) => s.openCommand);
   const activeConversationId = useChatStore((s) => s.activeConversationId);
   const qc = useQueryClient();
@@ -108,7 +109,7 @@ export function AIPanel() {
           <Button
             variant="ghost"
             size="icon-sm"
-            onClick={() => setPanelOpen(false)}
+            onClick={() => updateLayout({ panelOpen: false })}
             aria-label={t("ai.closePanel", "关闭面板")}
             className="text-muted-foreground"
           >

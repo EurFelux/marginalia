@@ -6,7 +6,7 @@ import { cn } from "@renderer/lib/utils";
 import { Button } from "@renderer/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@renderer/components/ui/popover";
 import { useNavigationStore } from "@renderer/store/navigation-store";
-import { useChatStore } from "@renderer/store/chat-store";
+import { usePrefsStore } from "@renderer/store/prefs-store";
 
 /**
  * AI 面板头部的本章摘要 pill（移植 UP1 SummaryPill）：显示摘要状态，点开弹卡看正文。
@@ -16,7 +16,7 @@ export function SummaryPill() {
   const { t } = useTranslation();
   const bookId = useNavigationStore((s) => s.currentBookId);
   const chapterId = useNavigationStore((s) => s.currentChapterId);
-  const panelOpen = useChatStore((s) => s.panelOpen);
+  const panelOpen = usePrefsStore((s) => s.layout.panelOpen);
   const qc = useQueryClient();
 
   const BADGE: Record<SummaryStatus, { label: string; cls: string }> = {

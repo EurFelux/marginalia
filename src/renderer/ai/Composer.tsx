@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import type { Chip } from "@shared/chat";
 import { Button } from "@renderer/components/ui/button";
 import { useChatStore } from "@renderer/store/chat-store";
+import { usePrefsStore } from "@renderer/store/prefs-store";
 import { ChipBar } from "@renderer/ai/ChipBar";
 
 interface Props {
@@ -19,7 +20,7 @@ export function Composer({ status, onSend, onStop }: Props) {
   const draftChips = useChatStore((s) => s.draftChips);
   const setDraftText = useChatStore((s) => s.setDraftText);
   const setDraftChips = useChatStore((s) => s.setDraftChips);
-  const panelOpen = useChatStore((s) => s.panelOpen);
+  const panelOpen = usePrefsStore((s) => s.layout.panelOpen);
   const ref = useRef<HTMLTextAreaElement | null>(null);
   const isStreaming = status === "streaming" || status === "submitted";
 
