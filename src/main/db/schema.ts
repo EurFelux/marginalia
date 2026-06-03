@@ -23,6 +23,7 @@ export const providers = sqliteTable(
     label: text("label"),
     baseUrl: text("base_url"),
     apiKeyEncrypted: blob("api_key_encrypted", { mode: "buffer" }),
+    models: text("models", { mode: "json" }).$type<string[]>(),
     createdAt: nowMs(),
   },
   (t) => [
