@@ -39,6 +39,70 @@ const googleSchema = z.object({
 });
 const looseItem = z.object({ id: z.string() }).passthrough();
 
+export interface FetchModelsParams {
+  type: ProviderType;
+  baseUrl: string | null;
+  apiKey: string;
+}
+
+/** HTTP 状态码标准语义兜底（标「可能方向」，绝不编造）；与 ai-sdk-tester 同款。 */
+const HTTP_HINT: Record<number, string> = {
+  400: "Bad Request — the request may be rejected",
+  401: "Unauthorized — the API key may be invalid or missing",
+  403: "Forbidden — access denied",
+  404: "Not Found — the endpoint or base URL may be wrong",
+  429: "Too Many Requests — rate limited or quota exhausted",
+};
+
+/** 把抛出/非 2xx 响应映射为可读 message（优先透传 provider 原文，提不到退 HTTP 语义）。 */
+export function mapModelsError(
+  err: unknown,
+  status: number | undefined,
+): { status?: number; message: string } {
+  const fromErr = err instanceof Error ? err.message : err ? String(err) : "";
+  if (fromErr) return { status, message: fromErr };
+  if (status && HTTP_HINT[status])
+    return { status, message: `HTTP ${status}: ${HTTP_HINT[status]}` };
+  if (status && status >= 500)
+    return { status, message: `HTTP ${status}: the provider had a server-side error` };
+  if (status) return { status, message: `HTTP ${status}` };
+  return { message: "Request failed" };
+}
+
+/** 从错误响应体尽力提真实 message（{error:{message}} / {error:"str"} / {message}）；提不到返 null。 */
+function extractBodyMessage(body: unknown): string | null {
+  if (body === null || typeof body !== "object") return null;
+  const o = body as Record<string, unknown>;
+  const e = o.error;
+  if (typeof e === "string" && e.trim()) return e;
+  if (e && typeof e === "object") {
+    const m = (e as Record<string, unknown>).message;
+    if (typeof m === "string" && m.trim()) return m;
+  }
+  if (typeof o.message === "string" && o.message.trim()) return o.message;
+  return null;
+}
+
+/** 调 provider /models 端点 → model id 列表。失败抛 Error（message 已透传 provider 原文或 HTTP 语义）。 */
+export async function fetchProviderModels(
+  p: FetchModelsParams,
+  fetchImpl: typeof fetch,
+): Promise<string[]> {
+  const req = buildModelsRequest(p.type, p.baseUrl, p.apiKey);
+  const res = await fetchImpl(req.url, { method: "GET", headers: req.headers });
+  let body: unknown;
+  try {
+    body = await res.json();
+  } catch {
+    body = undefined;
+  }
+  if (!res.ok) {
+    const message = extractBodyMessage(body) ?? mapModelsError(undefined, res.status).message;
+    throw new Error(message);
+  }
+  return adaptModelsResponse(p.type, body);
+}
+
 /** 先 Zod 校验外部响应（API 边界），再按 type 归一为 model id 列表。openai-compatible 放宽 best-effort。 */
 export function adaptModelsResponse(type: ProviderType, json: unknown): string[] {
   if (type === "google") {

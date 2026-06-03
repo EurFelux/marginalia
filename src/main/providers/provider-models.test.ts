@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildModelsRequest, adaptModelsResponse } from "@main/providers/provider-models";
+import {
+  buildModelsRequest,
+  adaptModelsResponse,
+  fetchProviderModels,
+  mapModelsError,
+} from "@main/providers/provider-models";
 
 describe("buildModelsRequest", () => {
   it("openai: /models with Bearer; default base", () => {
@@ -62,5 +67,52 @@ describe("adaptModelsResponse", () => {
       adaptModelsResponse("openai-compatible", { data: [{ id: "a", extra: 1 }, { noId: true }] }),
     ).toEqual(["a"]);
     expect(adaptModelsResponse("openai-compatible", { whatever: 1 })).toEqual([]);
+  });
+});
+
+function jsonResponse(body: unknown, init?: { status?: number; ok?: boolean }): Response {
+  const status = init?.status ?? 200;
+  return {
+    ok: init?.ok ?? status < 300,
+    status,
+    json: async () => body,
+    text: async () => JSON.stringify(body),
+  } as unknown as Response;
+}
+
+describe("fetchProviderModels", () => {
+  it("returns adapted ids on 200", async () => {
+    const fetchImpl = async () => jsonResponse({ data: [{ id: "gpt-4o" }] });
+    await expect(
+      fetchProviderModels(
+        { type: "openai", baseUrl: null, apiKey: "sk" },
+        fetchImpl as typeof fetch,
+      ),
+    ).resolves.toEqual(["gpt-4o"]);
+  });
+  it("throws with provider message on non-2xx", async () => {
+    const fetchImpl = async () =>
+      jsonResponse({ error: { message: "bad key" } }, { status: 401, ok: false });
+    await expect(
+      fetchProviderModels(
+        { type: "openai", baseUrl: null, apiKey: "x" },
+        fetchImpl as typeof fetch,
+      ),
+    ).rejects.toThrow("bad key");
+  });
+});
+
+describe("mapModelsError", () => {
+  it("transparent provider message wins", () => {
+    expect(mapModelsError(new Error("boom"), undefined).message).toContain("boom");
+  });
+  it("stringifies non-Error throws", () => {
+    expect(mapModelsError("oops", undefined).message).toContain("oops");
+  });
+  it("falls back to HTTP semantics by status when no error", () => {
+    expect(mapModelsError(undefined, 401).message).toContain("API key");
+    expect(mapModelsError(undefined, 503).message).toContain("server-side");
+    expect(mapModelsError(undefined, 418).message).toBe("HTTP 418");
+    expect(mapModelsError(undefined, undefined).message).toBe("Request failed");
   });
 });
