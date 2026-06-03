@@ -9,6 +9,7 @@ import {
   getConversation,
   listConversationsByBook,
   routeConversation,
+  setConversationTitle,
 } from "@main/chat/conversations";
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
@@ -158,5 +159,15 @@ describe("routeConversation", () => {
     });
     expect(r.conversationId).not.toBe(otherBookConvo.id);
     expect(r.switchedFromActive).toBe(true);
+  });
+});
+
+describe("setConversationTitle", () => {
+  it("updates the title and is read back by getConversation", () => {
+    const db = freshDb();
+    seedBookWithChapters(db);
+    const conv = createConversation(db, { bookId: "book-1", chapterId: null });
+    setConversationTitle(db, conv.id, "关于灯塔的光");
+    expect(getConversation(db, conv.id)?.title).toBe("关于灯塔的光");
   });
 });

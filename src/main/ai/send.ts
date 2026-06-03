@@ -15,7 +15,8 @@ import { assemblePrompt } from "@main/ai/prompt";
 import { dedupeParagraph, toContextChips } from "@main/ai/chips";
 import { createReadingTools, type LoadBytes } from "@main/ai/tools";
 import type { ResolvedModel } from "@main/ai/assistant-model";
-import { routeConversation } from "@main/chat/conversations";
+import { routeConversation, setConversationTitle } from "@main/chat/conversations";
+import { deriveConversationTitle } from "@main/chat/conversation-title";
 import { appendMessage, getLastParagraphContent, listMessages } from "@main/chat/messages";
 import { t } from "@main/i18n";
 import { type SendInput } from "@shared/chat";
@@ -77,6 +78,11 @@ export function runSend(
     activeConversationId: input.activeConversationId,
   });
   const conversationId = route.conversationId;
+
+  // 首次创建会话时落「随便起」的标题（首条用户消息派生）；后续自动命名功能覆盖同字段。
+  if (route.created) {
+    setConversationTitle(db, conversationId, deriveConversationTitle(input.userText));
+  }
 
   // 3. 段落去重（对照本会话上一次插入的段落）
   const deduped = dedupeParagraph(input.chips, getLastParagraphContent(db, conversationId));
