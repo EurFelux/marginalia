@@ -11,9 +11,11 @@ import { qk } from "../query/keys";
 import { chapterIdByHref } from "./chapter-id-by-href";
 import { createEpubBook, type EpubBook } from "./epub-book";
 import { prefsToCss } from "./prefs-to-css";
+import { readerThemeCss } from "./reader-theme-css";
 import { sectionSelectToSelectionInfo } from "./epub-selection";
 import { applyAnnotations } from "./apply-annotations";
 import { ANNO_IFRAME_CSS } from "./highlight";
+import { useThemeStore } from "../store/theme-store";
 
 interface Props {
   bookId: string;
@@ -27,6 +29,7 @@ export function EpubReader({ bookId, chapters }: Props) {
   const [book, setBook] = useState<EpubBook | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
 
+  const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
   const currentChapterId = useReaderStore((s) => s.currentChapterId);
   const setCurrentChapter = useReaderStore((s) => s.setCurrentChapter);
   const prefs = useReaderStore((s) => s.prefs);
@@ -194,7 +197,13 @@ export function EpubReader({ bookId, chapters }: Props) {
         ref={vRef}
         count={book.count}
         loadSection={book.loadSection}
-        styleCss={prefsToCss(prefs) + "\n" + ANNO_IFRAME_CSS}
+        styleCss={
+          prefsToCss(prefs) +
+          "\n" +
+          ANNO_IFRAME_CSS +
+          "\n" +
+          readerThemeCss(resolvedTheme === "dark")
+        }
         initialIndex={initialIndex}
         onTopIndexChange={onTopIndexChange}
         onSelect={onSelect}
