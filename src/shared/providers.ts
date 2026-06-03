@@ -3,6 +3,22 @@ import { z } from "zod";
 export const providerType = z.enum(["openai", "anthropic", "google", "openai-compatible"]);
 export type ProviderType = z.infer<typeof providerType>;
 
+/** 各 type 官方默认端点：UI baseUrl 占位符 + 拉模型兜底共用（不注入生成路径——那交 SDK 自带默认）。 */
+export const DEFAULT_BASE_URL: Record<ProviderType, string | null> = {
+  openai: "https://api.openai.com/v1",
+  anthropic: "https://api.anthropic.com",
+  google: "https://generativelanguage.googleapis.com/v1beta",
+  "openai-compatible": null,
+};
+
+/** provider type 的 UI 显示名（枚举值不变；按其讲的 API 命名）。 */
+export const PROVIDER_TYPE_LABEL: Record<ProviderType, string> = {
+  openai: "OpenAI Responses",
+  "openai-compatible": "OpenAI Chat Completions",
+  anthropic: "Anthropic",
+  google: "Google Gemini",
+};
+
 /** 只含一个 provider id 的入参（reveal / remove 共用）。 */
 export const providerIdInput = z.object({ id: z.string().min(1) });
 export type ProviderIdInput = z.infer<typeof providerIdInput>;
@@ -56,6 +72,22 @@ export interface ProviderDto {
 /** reveal 返回的临时明文（仅用于 UI「👁 显示」）。 */
 export const revealResult = z.object({ apiKey: z.string() });
 export type RevealResult = z.infer<typeof revealResult>;
+
+/** 列 provider 可用模型入参：key 解析 = 表单现填 apiKey ?? 由 id 解密的存储 key。 */
+export const listModelsInput = z.object({
+  type: providerType,
+  baseUrl: z.string().min(1).nullish(),
+  apiKey: z.string().min(1).optional(),
+  id: z.string().min(1).optional(),
+});
+export type ListModelsInput = z.infer<typeof listModelsInput>;
+
+/** 拉模型返回（判别联合）：成功带 models；失败带真实 message，`status` 仅 HTTP 错误时有（网络层无）。 */
+export const listModelsResult = z.discriminatedUnion("ok", [
+  z.object({ ok: z.literal(true), models: z.array(z.string()) }),
+  z.object({ ok: z.literal(false), status: z.number().int().optional(), message: z.string() }),
+]);
+export type ListModelsResult = z.infer<typeof listModelsResult>;
 
 /** 测试连接结果（判别联合）。 */
 export const testResult = z.discriminatedUnion("ok", [

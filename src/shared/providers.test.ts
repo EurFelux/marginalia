@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { testProviderInput, upsertProviderInput } from "@shared/providers";
+import {
+  DEFAULT_BASE_URL,
+  PROVIDER_TYPE_LABEL,
+  listModelsInput,
+  listModelsResult,
+  providerType,
+  testProviderInput,
+  upsertProviderInput,
+} from "@shared/providers";
 
 describe("upsertProviderInput", () => {
   it("accepts a minimal create (type only)", () => {
@@ -32,5 +40,31 @@ describe("testProviderInput", () => {
     expect(testProviderInput.safeParse({ id: "p1", model: "gpt-4o-mini" }).success).toBe(true);
     expect(testProviderInput.safeParse({ id: "p1" }).success).toBe(false);
     expect(testProviderInput.safeParse({ id: "p1", model: "" }).success).toBe(false);
+  });
+});
+
+describe("provider-type metadata", () => {
+  it("DEFAULT_BASE_URL covers every provider type", () => {
+    expect(Object.keys(DEFAULT_BASE_URL).sort()).toEqual([...providerType.options].sort());
+    expect(DEFAULT_BASE_URL["openai-compatible"]).toBeNull();
+    expect(DEFAULT_BASE_URL.openai).toContain("https://");
+  });
+  it("PROVIDER_TYPE_LABEL covers every type with the agreed names", () => {
+    expect(Object.keys(PROVIDER_TYPE_LABEL).sort()).toEqual([...providerType.options].sort());
+    expect(PROVIDER_TYPE_LABEL.openai).toBe("OpenAI Responses");
+    expect(PROVIDER_TYPE_LABEL["openai-compatible"]).toBe("OpenAI Chat Completions");
+  });
+});
+
+describe("listModels contracts", () => {
+  it("listModelsInput accepts ephemeral key and id forms", () => {
+    expect(listModelsInput.safeParse({ type: "openai", apiKey: "sk-x" }).success).toBe(true);
+    expect(listModelsInput.safeParse({ type: "anthropic", id: "p1" }).success).toBe(true);
+    expect(listModelsInput.safeParse({ type: "nope" }).success).toBe(false);
+  });
+  it("listModelsResult is a discriminated union on ok", () => {
+    expect(listModelsResult.safeParse({ ok: true, models: ["a"] }).success).toBe(true);
+    expect(listModelsResult.safeParse({ ok: false, message: "x", status: 401 }).success).toBe(true);
+    expect(listModelsResult.safeParse({ ok: false }).success).toBe(false);
   });
 });
