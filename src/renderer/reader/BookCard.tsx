@@ -5,6 +5,7 @@ import type { SummaryStatus } from "@shared/library";
 import { qk } from "@renderer/query/keys";
 import { cn } from "@renderer/lib/utils";
 import { Button } from "@renderer/components/ui/button";
+import { ScrollArea } from "@renderer/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@renderer/components/ui/popover";
 
 const BADGE_CLS: Record<SummaryStatus, string> = {
@@ -113,16 +114,18 @@ export function BookCard({ bookId }: { bookId: string }) {
               </Button>
             )}
           </div>
-          <div className="max-h-96 overflow-y-auto text-sm leading-relaxed text-foreground">
-            {text ? (
-              // Streamdown 渲染 markdown（同 AI 消息）；生成中即流式渲染累积的 partial
-              <Streamdown>{text}</Streamdown>
-            ) : (
-              <p className="whitespace-pre-wrap text-xs text-muted-foreground">
-                {PLACEHOLDER[status]}
-              </p>
-            )}
-          </div>
+          <ScrollArea viewportClassName="max-h-96">
+            <div className="text-sm leading-relaxed text-foreground">
+              {text ? (
+                // Streamdown 渲染 markdown（同 AI 消息）；生成中即流式渲染累积的 partial
+                <Streamdown>{text}</Streamdown>
+              ) : (
+                <p className="whitespace-pre-wrap text-xs text-muted-foreground">
+                  {PLACEHOLDER[status]}
+                </p>
+              )}
+            </div>
+          </ScrollArea>
         </PopoverContent>
       </Popover>
     </div>
