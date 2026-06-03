@@ -53,7 +53,7 @@ pnpm db:rebuild:electron  # 将 better-sqlite3 编译为 Electron ABI（已由 p
 
 **迁移目录格式**：drizzle-orm 1.0-rc 使用新格式——每个迁移是独立的子目录（`src/main/db/migrations/<timestamp>_<name>/`，含 `migration.sql` 和 `snapshot.json`），没有 `meta/_journal.json`。不要手工编辑迁移文件，修改 schema 后用 `pnpm db:generate` 重新生成。
 
-**打包期迁移路径**（待解决）：`src/main/db/instance.ts` 中有 TODO 注释，生产打包时迁移 SQL 尚未被复制到产物中，需要在打包里程碑通过 `electron-forge extraResources` 处理。
+**打包期 native 模块 + 迁移路径**（已解决，#9 P4）：两个独立的打包缺口，生产打包此前从未真正跑通（无头 vitest 走源码树、`pnpm start` 走 dev server 均绕开，长期掩盖）。① **迁移 SQL**：`forge.config.ts` 的 `packagerConfig.extraResource: ["./src/main/db/migrations"]` 把迁移目录复制进产物 `resources/migrations`，`instance.ts` 生产分支读 `process.resourcesPath/migrations`（asar 内取不到迁移 SQL）。② **native 模块（更隐蔽）**：Forge Vite plugin 默认令 `packagerConfig.ignore` 排除「除 `.vite/` 外一切」（含整个 `node_modules`），使被 vite external 的 better-sqlite3 不进 asar、产物启动即 `cannot find module better-sqlite3`、DB 无法初始化。修复＝自定义 `ignore` 保留 `.vite/` 与 better-sqlite3 运行时子树（require 链 → `bindings` → `file-uri-to-path`），其余 node_modules 文件一律忽略（代码已 bundle 进 `.vite`；**放行全量会让 asar 从 15M 暴涨到 334M**，故白名单裁剪是有意为之）＋ 启用 `@electron-forge/plugin-auto-unpack-natives` 把 `better_sqlite3.node` 解包出 asar 才能 dlopen。**验证**：`pnpm package` 后用 `--user-data-dir=/tmp/<x>` 启动产物（避免污染真实 userData）冒烟，`sqlite3 .../marginalia.db ".tables"` 应列出全表。
 
 ## 高层架构
 
