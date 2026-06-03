@@ -70,7 +70,7 @@ export const chapters = sqliteTable(
     id: pkUuid(), // uuidv7 代理键（spine id 跨书不唯一）
     bookId: text("book_id")
       .notNull()
-      .references(() => books.id),
+      .references(() => books.id, { onDelete: "cascade" }),
     title: text("title"),
     orderIndex: integer("order_index"),
     href: text("href").notNull(), // spine 项 href（书内唯一定位）
@@ -82,7 +82,7 @@ export const chapters = sqliteTable(
 export const progress = sqliteTable("progress", {
   bookId: text("book_id")
     .primaryKey()
-    .references(() => books.id),
+    .references(() => books.id, { onDelete: "cascade" }),
   cfi: text("cfi").notNull(),
   updatedAt: integer("updated_at")
     .notNull()
@@ -95,7 +95,7 @@ export const annotations = sqliteTable(
     id: pkUuid(),
     bookId: text("book_id")
       .notNull()
-      .references(() => books.id),
+      .references(() => books.id, { onDelete: "cascade" }),
     style: text("style").notNull(), // yellow|green|blue|pink|purple|underline
     note: text("note").notNull().default(""),
     selectedText: text("selected_text").notNull(),
@@ -120,8 +120,8 @@ export const conversations = sqliteTable(
     id: pkUuid(),
     bookId: text("book_id")
       .notNull()
-      .references(() => books.id),
-    chapterId: text("chapter_id").references(() => chapters.id), // NULL = 独立会话
+      .references(() => books.id, { onDelete: "cascade" }),
+    chapterId: text("chapter_id").references(() => chapters.id, { onDelete: "cascade" }), // NULL = 独立会话
     assistantId: text("assistant_id")
       .notNull()
       .references(() => assistants.id),
@@ -140,7 +140,7 @@ export const messages = sqliteTable(
     id: pkUuid(),
     conversationId: text("conversation_id")
       .notNull()
-      .references(() => conversations.id),
+      .references(() => conversations.id, { onDelete: "cascade" }),
     role: text("role", { enum: ["system", "user", "assistant"] }).notNull(),
     parts: text("parts", { mode: "json" }).$type<UIMessage["parts"]>().notNull(),
     metadata: text("metadata", { mode: "json" }).$type<MessageMetadata>(),

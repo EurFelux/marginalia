@@ -1,7 +1,16 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
 import { createDb, runMigrations } from "@main/db/client";
-import { chapters } from "@main/db/schema";
+import {
+  annotations,
+  assistants,
+  books,
+  chapters,
+  conversations,
+  messages,
+  progress,
+} from "@main/db/schema";
 import { getBook, importBook, listBooks, resolveChapterByHref } from "@main/library/repository";
 import { makeFixtureEpub } from "@marginalia/epub-parser";
 
@@ -63,5 +72,33 @@ describe("library repository", () => {
     const db = freshDb();
     const book = importBook(db, { bytes: makeFixtureEpub(), filePath: "/books/fixture.epub" });
     expect(resolveChapterByHref(db, book.id, "OEBPS/nonexistent.xhtml")).toBeUndefined();
+  });
+
+  it("ON DELETE CASCADE removes all book-owned dependents", () => {
+    const db = freshDb();
+    const book = importBook(db, { bytes: makeFixtureEpub(), filePath: "/b.epub" });
+    const ch1 = resolveChapterByHref(db, book.id, "OEBPS/ch1.xhtml")!;
+    const assistantId = db.insert(assistants).values({ name: "A" }).returning().get().id;
+    db.insert(progress).values({ bookId: book.id, cfi: "epubcfi(/6/2)" }).run();
+    db.insert(annotations)
+      .values({ bookId: book.id, style: "yellow", selectedText: "x", cfiRange: "r" })
+      .run();
+    const conv = db
+      .insert(conversations)
+      .values({ bookId: book.id, chapterId: ch1.id, assistantId })
+      .returning()
+      .get();
+    db.insert(messages).values({ conversationId: conv.id, role: "user", parts: [], seq: 0 }).run();
+
+    db.delete(books).where(eq(books.id, book.id)).run();
+
+    expect(listBooks(db)).toHaveLength(0);
+    expect(db.select().from(chapters).all()).toHaveLength(0);
+    expect(db.select().from(progress).all()).toHaveLength(0);
+    expect(db.select().from(annotations).all()).toHaveLength(0);
+    expect(db.select().from(conversations).all()).toHaveLength(0);
+    expect(db.select().from(messages).all()).toHaveLength(0);
+    // assistant 是共享资源，不随书删
+    expect(db.select().from(assistants).all()).toHaveLength(1);
   });
 });
