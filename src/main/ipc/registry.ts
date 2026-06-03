@@ -33,7 +33,7 @@ export interface Binding {
 /** 把契约与业务 fn 绑成一条 Binding；input 类型由契约 input schema 推导，返回值被 output 类型约束。 */
 export function bind<S extends z.ZodType, O>(
   contract: Contract<S, O>,
-  fn: (input: z.infer<S>, event: IpcMainInvokeEvent) => O | Promise<O>,
+  fn: (input: z.infer<S>, event: IpcMainInvokeEvent) => NoInfer<O> | Promise<NoInfer<O>>,
 ): Binding {
   return { contract, fn: fn as Binding["fn"] };
 }
