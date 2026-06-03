@@ -51,8 +51,11 @@ export function AssistantModelPicker() {
           value={providerId || null}
           onValueChange={(id) => {
             // 切 provider 同时清 model（旧 model 多半不属于新 provider）：显 placeholder 强制重选，
-            // 避免残留出非法 (provider, model) 对让测试/对话失败。
-            if (id) save.mutate({ providerId: id, model: null });
+            // 避免残留出非法 (provider, model) 对让测试/对话失败。换选后旧测试结果作废。
+            if (id) {
+              save.mutate({ providerId: id, model: null });
+              setTestResult(null);
+            }
           }}
         >
           <SelectTrigger>
@@ -70,7 +73,10 @@ export function AssistantModelPicker() {
         <Select
           value={model || null}
           onValueChange={(m) => {
-            if (m) save.mutate({ model: m });
+            if (m) {
+              save.mutate({ model: m });
+              setTestResult(null);
+            }
           }}
         >
           <SelectTrigger>

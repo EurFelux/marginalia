@@ -60,11 +60,21 @@ export function ModelEditor({
     }
   }
 
+  // openai-compatible 无默认端点：没填 baseUrl 拉不了（buildModelsRequest 会抛），直接禁用更干净。
+  const cannotPull = type === "openai-compatible" && !baseUrl.trim();
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted-foreground">模型</span>
-        <Button type="button" variant="outline" size="sm" onClick={pull} disabled={loading}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={pull}
+          disabled={loading || cannotPull}
+          title={cannotPull ? "请先填写 baseURL" : "从 provider 拉取模型列表"}
+        >
           <Download className="size-4" /> {loading ? "拉取中…" : "拉取模型"}
         </Button>
       </div>
