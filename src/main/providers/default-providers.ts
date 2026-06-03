@@ -5,13 +5,14 @@ import type { AiProviderApiType } from "@shared/providers";
 
 interface DefaultProvider {
   type: AiProviderApiType;
-  /** 兼容的 API 格式；length>1 才允许切 type。当前三个内置均单一原生。 */
+  /** 兼容的 API 格式；length>1 才允许切 type（如 DeepSeek 兼容 chat-completions + anthropic）。 */
   compatibleApis: AiProviderApiType[];
   label: string;
   models: string[];
 }
 
-/** 内置默认 provider 的单一源。models 为预填常用起始型号；baseUrl=null（用各 type 默认端点）、无 apiKey。
+/** 内置默认 provider 的单一源。models 为预填常用起始型号；baseUrl=null（OpenAI/Anthropic/Gemini 用各 type
+ *  默认端点；DeepSeek 两 API 端点不同，由 provider-factory 按 type 派生）、无 apiKey。
  *  **以 label 作内置身份**（label 内置不可改）。往此数组加一条 → 下次启动 `ensureBuiltinProviders` 自动补齐。 */
 export const DEFAULT_PROVIDERS: DefaultProvider[] = [
   {
@@ -31,6 +32,14 @@ export const DEFAULT_PROVIDERS: DefaultProvider[] = [
     compatibleApis: ["google-generate-content"],
     label: "Gemini",
     models: ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-3.1-pro-preview"],
+  },
+  {
+    // DeepSeek 同时兼容 OpenAI Chat Completions 与 Anthropic（两端点不同）：默认 chat-completions；
+    // baseUrl 不入 db（保持 null），由 provider-factory / resolveProviderBaseUrl 按 type 派生。
+    type: "openai-chat-completions",
+    compatibleApis: ["openai-chat-completions", "anthropic"],
+    label: "DeepSeek",
+    models: ["deepseek-v4-flash", "deepseek-v4-pro"],
   },
 ];
 

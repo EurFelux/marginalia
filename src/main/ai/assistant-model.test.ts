@@ -35,6 +35,7 @@ const unavailableEncryptor: Encryptor = {
 function configure(db: ReturnType<typeof freshDb>) {
   const provider = upsertProvider(db, fakeEncryptor, {
     type: "openai-responses",
+    baseUrl: "https://api.openai.com/v1",
     apiKey: "sk-test",
   });
   updateDefaultAssistant(db, { providerId: provider.id, model: "gpt-4o-mini" });
@@ -62,7 +63,11 @@ describe("resolveAssistantModel", () => {
 
   it("fails when the assistant has a provider but no model", () => {
     const db = freshDb();
-    const provider = upsertProvider(db, fakeEncryptor, { type: "openai-responses", apiKey: "sk" });
+    const provider = upsertProvider(db, fakeEncryptor, {
+      type: "openai-responses",
+      baseUrl: "https://api.openai.com/v1",
+      apiKey: "sk",
+    });
     updateDefaultAssistant(db, { providerId: provider.id });
     const r = resolveAssistantModel(db, fakeEncryptor);
     expect(r).toMatchObject({ ok: false, reason: expect.stringContaining("model") });
@@ -70,7 +75,10 @@ describe("resolveAssistantModel", () => {
 
   it("fails when the provider has no API key", () => {
     const db = freshDb();
-    const provider = upsertProvider(db, fakeEncryptor, { type: "openai-responses" });
+    const provider = upsertProvider(db, fakeEncryptor, {
+      type: "openai-responses",
+      baseUrl: "https://api.openai.com/v1",
+    });
     updateDefaultAssistant(db, { providerId: provider.id, model: "gpt-4o-mini" });
     const r = resolveAssistantModel(db, fakeEncryptor);
     expect(r).toMatchObject({ ok: false, reason: expect.stringContaining("API key") });

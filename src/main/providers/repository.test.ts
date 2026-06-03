@@ -54,6 +54,7 @@ describe("provider repository", () => {
     const db = freshDb();
     const dto = upsertProvider(db, fakeEncryptor, {
       type: "openai-responses",
+      baseUrl: "https://api.openai.com/v1",
       apiKey: "sk-abcdefghij",
     });
     expect(dto.type).toBe("openai-responses");
@@ -69,7 +70,10 @@ describe("provider repository", () => {
 
   it("creates a provider without a key", () => {
     const db = freshDb();
-    const dto = upsertProvider(db, fakeEncryptor, { type: "anthropic" });
+    const dto = upsertProvider(db, fakeEncryptor, {
+      type: "anthropic",
+      baseUrl: "https://api.anthropic.com/v1",
+    });
     expect(dto.key).toEqual({ status: "none" });
   });
 
@@ -77,6 +81,7 @@ describe("provider repository", () => {
     const db = freshDb();
     const created = upsertProvider(db, fakeEncryptor, {
       type: "openai-responses",
+      baseUrl: "https://api.openai.com/v1",
       apiKey: "sk-original99",
     });
     const updated = upsertProvider(db, fakeEncryptor, {
@@ -109,6 +114,7 @@ describe("provider repository", () => {
     const db = freshDb();
     const created = upsertProvider(db, fakeEncryptor, {
       type: "openai-responses",
+      baseUrl: "https://api.openai.com/v1",
       apiKey: "sk-original99",
     });
     upsertProvider(db, fakeEncryptor, {
@@ -121,8 +127,16 @@ describe("provider repository", () => {
 
   it("lists all providers", () => {
     const db = freshDb();
-    upsertProvider(db, fakeEncryptor, { type: "openai-responses", apiKey: "sk-aaaaaaaa11" });
-    upsertProvider(db, fakeEncryptor, { type: "anthropic", apiKey: "sk-bbbbbbbb22" });
+    upsertProvider(db, fakeEncryptor, {
+      type: "openai-responses",
+      baseUrl: "https://api.openai.com/v1",
+      apiKey: "sk-aaaaaaaa11",
+    });
+    upsertProvider(db, fakeEncryptor, {
+      type: "anthropic",
+      baseUrl: "https://api.anthropic.com/v1",
+      apiKey: "sk-bbbbbbbb22",
+    });
     expect(listProviders(db, fakeEncryptor)).toHaveLength(2);
   });
 
@@ -130,10 +144,14 @@ describe("provider repository", () => {
     const db = freshDb();
     const withKey = upsertProvider(db, fakeEncryptor, {
       type: "openai-responses",
+      baseUrl: "https://api.openai.com/v1",
       apiKey: "sk-secretkey1",
     });
     expect(revealProviderKey(db, fakeEncryptor, withKey.id)).toBe("sk-secretkey1");
-    const noKey = upsertProvider(db, fakeEncryptor, { type: "openai-responses" });
+    const noKey = upsertProvider(db, fakeEncryptor, {
+      type: "openai-responses",
+      baseUrl: "https://api.openai.com/v1",
+    });
     expect(() => revealProviderKey(db, fakeEncryptor, noKey.id)).toThrow(/no API key/i);
   });
 
@@ -151,6 +169,7 @@ describe("provider repository", () => {
     const db = freshDb();
     const created = upsertProvider(db, fakeEncryptor, {
       type: "openai-responses",
+      baseUrl: "https://api.openai.com/v1",
       apiKey: "sk-abcdefghij",
     });
     const listed = listProviders(db, brokenDecryptEncryptor).find((p) => p.id === created.id);
@@ -161,6 +180,7 @@ describe("provider repository", () => {
     const db = freshDb();
     const prov = upsertProvider(db, fakeEncryptor, {
       type: "openai-responses",
+      baseUrl: "https://api.openai.com/v1",
       apiKey: "sk-abcdefghij",
     });
     getDefaultAssistant(db);
@@ -180,9 +200,14 @@ describe("provider repository", () => {
     const db = freshDb();
     const provA = upsertProvider(db, fakeEncryptor, {
       type: "openai-responses",
+      baseUrl: "https://api.openai.com/v1",
       apiKey: "sk-aaaaaaaa11",
     });
-    const provB = upsertProvider(db, fakeEncryptor, { type: "anthropic", apiKey: "sk-bbbbbbbb22" });
+    const provB = upsertProvider(db, fakeEncryptor, {
+      type: "anthropic",
+      baseUrl: "https://api.anthropic.com/v1",
+      apiKey: "sk-bbbbbbbb22",
+    });
     getDefaultAssistant(db);
     updateDefaultAssistant(db, { providerId: provA.id });
     removeProvider(db, provB.id);
@@ -193,14 +218,29 @@ describe("provider repository", () => {
   it("upsert sets models; omit preserves; [] clears; toDto returns [] for null", () => {
     const db = freshDb();
     const enc = fakeEncryptor;
-    const a = upsertProvider(db, enc, { type: "openai-responses", models: ["gpt-4o"] });
+    const a = upsertProvider(db, enc, {
+      type: "openai-responses",
+      baseUrl: "https://api.openai.com/v1",
+      models: ["gpt-4o"],
+    });
     expect(a.models).toEqual(["gpt-4o"]);
     const b = upsertProvider(db, enc, { id: a.id, type: "openai-responses" }); // 省略 models
     expect(b.models).toEqual(["gpt-4o"]); // 保留
     const c = upsertProvider(db, enc, { id: a.id, type: "openai-responses", models: [] }); // 清空
     expect(c.models).toEqual([]);
-    const d = upsertProvider(db, enc, { type: "anthropic" });
+    const d = upsertProvider(db, enc, {
+      type: "anthropic",
+      baseUrl: "https://api.anthropic.com/v1",
+    });
     expect(d.models).toEqual([]); // 新建省略 → []
+  });
+
+  it("rejects creating a custom (non-builtin) provider without a baseUrl, even for a type with an official default endpoint", () => {
+    const db = freshDb();
+    // anthropic 有官方默认端点，但非内置仍必须显式给 baseUrl（规则按 isBuiltin，而非 type）。
+    expect(() => upsertProvider(db, fakeEncryptor, { type: "anthropic" })).toThrow(
+      /baseUrl is required/i,
+    );
   });
 
   describe("testProvider", () => {
@@ -213,7 +253,10 @@ describe("provider repository", () => {
 
     it("returns ok:false when the provider has no key", async () => {
       const db = freshDb();
-      const noKey = upsertProvider(db, fakeEncryptor, { type: "openai-responses" });
+      const noKey = upsertProvider(db, fakeEncryptor, {
+        type: "openai-responses",
+        baseUrl: "https://api.openai.com/v1",
+      });
       const r = await testProvider(db, fakeEncryptor, okTester, noKey.id, "gpt-4o-mini");
       expect(r).toEqual({ ok: false, message: "No API key set for this provider" });
     });
@@ -222,6 +265,7 @@ describe("provider repository", () => {
       const db = freshDb();
       const p = upsertProvider(db, fakeEncryptor, {
         type: "openai-responses",
+        baseUrl: "https://api.openai.com/v1",
         apiKey: "sk-abcdefghij",
       });
       const r = await testProvider(db, brokenDecryptEncryptor, okTester, p.id, "gpt-4o-mini");
@@ -260,6 +304,31 @@ describe("provider repository", () => {
       });
       expect(JSON.stringify(r)).not.toContain("sk-abcdefghij"); // 结果不得携带明文
     });
+
+    it("derives a builtin DeepSeek's baseUrl from its type (db baseUrl is null)", async () => {
+      const db = freshDb();
+      const id = db
+        .insert(providers)
+        .values({
+          type: "anthropic",
+          label: "DeepSeek",
+          baseUrl: null,
+          isBuiltin: true,
+          compatibleApis: ["openai-chat-completions", "anthropic"],
+          apiKeyEncrypted: fakeEncryptor.encrypt("sk-deepseek0001"),
+        })
+        .returning()
+        .get().id;
+      let seenBase: string | null | undefined;
+      const spy: ProviderTester = {
+        test: async (p) => {
+          seenBase = p.baseUrl;
+          return { ok: true };
+        },
+      };
+      await testProvider(db, fakeEncryptor, spy, id, "deepseek-v4-pro");
+      expect(seenBase).toBe("https://api.deepseek.com/anthropic"); // 工厂按 type 派生
+    });
   });
 });
 
@@ -282,7 +351,11 @@ describe("builtin provider immutability", () => {
 
   it("toDto exposes isBuiltin (false for user-created)", () => {
     const db = freshDb();
-    const dto = upsertProvider(db, fakeEncryptor, { type: "anthropic", label: "Mine" });
+    const dto = upsertProvider(db, fakeEncryptor, {
+      type: "anthropic",
+      baseUrl: "https://api.anthropic.com/v1",
+      label: "Mine",
+    });
     expect(dto.isBuiltin).toBe(false);
   });
 
@@ -290,6 +363,44 @@ describe("builtin provider immutability", () => {
     const db = freshDb();
     insertBuiltin(db);
     expect(listProviders(db, fakeEncryptor)[0]?.isBuiltin).toBe(true);
+  });
+
+  it("toDto derives a builtin DeepSeek's baseUrl from its type (db null → derived)", () => {
+    const db = freshDb();
+    db.insert(providers)
+      .values({
+        type: "openai-chat-completions",
+        label: "DeepSeek",
+        baseUrl: null,
+        isBuiltin: true,
+        compatibleApis: ["openai-chat-completions", "anthropic"],
+      })
+      .run();
+    const dto = listProviders(db, fakeEncryptor).find((p) => p.label === "DeepSeek");
+    expect(dto?.baseUrl).toBe("https://api.deepseek.com"); // 经工厂派生，非 db 的 null
+  });
+
+  it("lets a builtin DeepSeek save with null baseUrl (factory derives it, no baseUrl-required error)", () => {
+    const db = freshDb();
+    const id = db
+      .insert(providers)
+      .values({
+        type: "openai-chat-completions",
+        label: "DeepSeek",
+        baseUrl: null,
+        isBuiltin: true,
+        compatibleApis: ["openai-chat-completions", "anthropic"],
+      })
+      .returning()
+      .get().id;
+    const dto = upsertProvider(db, fakeEncryptor, {
+      id,
+      type: "openai-chat-completions",
+      label: "DeepSeek",
+      models: ["deepseek-v4-flash"],
+    });
+    expect(dto.baseUrl).toBe("https://api.deepseek.com");
+    expect(dto.models).toEqual(["deepseek-v4-flash"]);
   });
 
   it("allows editing key + models on a builtin", () => {

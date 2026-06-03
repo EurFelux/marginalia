@@ -2,7 +2,7 @@
 import type { DB } from "@main/db/client";
 import type { Encryptor } from "@main/secrets/encryptor";
 import { getDefaultAssistant } from "@main/providers/assistant";
-import { getProviderRow } from "@main/providers/repository";
+import { loadProvider } from "@main/providers/repository";
 import { resolveLanguageModel, type ChatModel } from "@main/ai/model-factory";
 
 export type ResolvedModel =
@@ -15,7 +15,7 @@ export function resolveAssistantModel(db: DB, encryptor: Encryptor): ResolvedMod
   if (!assistant.providerId) return { ok: false, reason: "assistant has no provider configured" };
   if (!assistant.model) return { ok: false, reason: "assistant has no model configured" };
 
-  const provider = getProviderRow(db, assistant.providerId);
+  const provider = loadProvider(db, assistant.providerId);
   if (!provider) return { ok: false, reason: "configured provider not found" };
   if (!provider.apiKeyEncrypted) return { ok: false, reason: "provider has no API key set" };
   if (!encryptor.isAvailable())

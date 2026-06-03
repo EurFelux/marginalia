@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_BASE_URL,
   PROVIDER_TYPE_LABEL,
+  isDeepseekProvider,
   listModelsInput,
   listModelsResult,
   aiProviderApiType,
+  resolveProviderBaseUrl,
   testProviderInput,
   upsertProviderInput,
 } from "@shared/providers";
@@ -18,10 +20,8 @@ describe("upsertProviderInput", () => {
     expect(upsertProviderInput.safeParse({ type: "cohere" }).success).toBe(false);
   });
 
-  it("requires baseUrl for openai-compatible", () => {
-    const r = upsertProviderInput.safeParse({ type: "openai-chat-completions" });
-    expect(r.success).toBe(false);
-    if (!r.success) expect(r.error.issues.some((i) => i.path.includes("baseUrl"))).toBe(true);
+  it("structurally accepts openai-chat-completions without baseUrl (the baseUrl-required rule lives in repository, not the schema — internal DeepSeek derives it)", () => {
+    expect(upsertProviderInput.safeParse({ type: "openai-chat-completions" }).success).toBe(true);
   });
 
   it("accepts openai-compatible when baseUrl is provided", () => {
@@ -65,6 +65,25 @@ describe("upsertProviderInput models field", () => {
     expect(upsertProviderInput.safeParse({ type: "openai-responses", models: [""] }).success).toBe(
       false,
     ); // 空串非法
+  });
+});
+
+describe("DeepSeek provider helpers", () => {
+  it("isDeepseekProvider matches only the builtin DeepSeek", () => {
+    expect(isDeepseekProvider({ label: "DeepSeek", isBuiltin: true })).toBe(true);
+    expect(isDeepseekProvider({ label: "DeepSeek", isBuiltin: false })).toBe(false);
+    expect(isDeepseekProvider({ label: "OpenAI", isBuiltin: true })).toBe(false);
+    expect(isDeepseekProvider({ label: null, isBuiltin: true })).toBe(false);
+  });
+  it("resolveProviderBaseUrl derives DeepSeek per type, passes through otherwise", () => {
+    const ds = { label: "DeepSeek", isBuiltin: true, baseUrl: null };
+    expect(resolveProviderBaseUrl(ds, "openai-chat-completions")).toBe("https://api.deepseek.com");
+    expect(resolveProviderBaseUrl(ds, "anthropic")).toBe("https://api.deepseek.com/anthropic");
+    // DeepSeek 不支持的 type → null（兜底）。
+    expect(resolveProviderBaseUrl(ds, "openai-responses")).toBeNull();
+    // 非 DeepSeek：原样返回存储值。
+    const gw = { label: "Gw", isBuiltin: false, baseUrl: "https://gw/v1" };
+    expect(resolveProviderBaseUrl(gw, "openai-chat-completions")).toBe("https://gw/v1");
   });
 });
 

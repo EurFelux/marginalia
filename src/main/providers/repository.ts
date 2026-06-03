@@ -4,6 +4,7 @@ import { assistants, providers } from "@main/db/schema";
 import type { Encryptor } from "@main/secrets/encryptor";
 import type { ProviderTester } from "@main/secrets/tester";
 import { maskKey } from "@main/providers/mask";
+import { createProvider, type Provider } from "@main/providers/provider-factory";
 import type {
   ProviderDto,
   ProviderKeyState,
@@ -25,23 +26,29 @@ function keyState(cipher: Buffer | null, row: ProviderRow, encryptor: Encryptor)
   }
 }
 
-/** 行 → DTO（密钥存在性收敛为判别联合 key）。 */
-function toDto(row: ProviderRow, encryptor: Encryptor): ProviderDto {
+/** Provider → DTO（密钥存在性收敛为判别联合 key）。入参经工厂解析，故 baseUrl 已按 type 派生。 */
+function toDto(provider: Provider, encryptor: Encryptor): ProviderDto {
   return {
-    id: row.id,
-    type: row.type,
-    compatibleApis: row.compatibleApis ?? [row.type],
-    label: row.label ?? null,
-    baseUrl: row.baseUrl ?? null,
-    key: keyState(row.apiKeyEncrypted, row, encryptor),
-    models: row.models ?? [],
-    isBuiltin: row.isBuiltin,
-    createdAt: row.createdAt,
+    id: provider.id,
+    type: provider.type,
+    compatibleApis: provider.compatibleApis ?? [provider.type],
+    label: provider.label ?? null,
+    baseUrl: provider.baseUrl, // 工厂已派生（DeepSeek 等内置不再是 db 里的 null）
+    key: keyState(provider.apiKeyEncrypted, provider, encryptor),
+    models: provider.models ?? [],
+    isBuiltin: provider.isBuiltin,
+    createdAt: provider.createdAt,
   };
 }
 
 export function getProviderRow(db: DB, id: string): ProviderRow | undefined {
   return db.select().from(providers).where(eq(providers.id, id)).get();
+}
+
+/** 取 provider 并经工厂解析为下游可消费的 {@link Provider}（baseUrl 已按 type 派生）。 */
+export function loadProvider(db: DB, id: string): Provider | undefined {
+  const row = getProviderRow(db, id);
+  return row ? createProvider(row) : undefined;
 }
 
 export function listProviders(db: DB, encryptor: Encryptor): ProviderDto[] {
@@ -50,7 +57,18 @@ export function listProviders(db: DB, encryptor: Encryptor): ProviderDto[] {
     .from(providers)
     .orderBy(asc(providers.createdAt))
     .all()
-    .map((r) => toDto(r, encryptor));
+    .map((r) => toDto(createProvider(r), encryptor));
+}
+
+/**
+ * 用户自建（非内置）provider 必须显式提供 baseUrl——内置才走默认端点 / 工厂派生免填
+ * （OpenAI/Anthropic/Gemini 用各 type 官方端点，DeepSeek 按 type 派生）。
+ * 该规则依赖 isBuiltin，故在仓储而非 Zod input schema 中强制。
+ */
+function assertUsableBaseUrl(p: { isBuiltin: boolean; baseUrl: string | null }): void {
+  if (!p.isBuiltin && p.baseUrl == null) {
+    throw new Error("baseUrl is required for custom (non-builtin) providers");
+  }
 }
 
 export function upsertProvider(
@@ -85,6 +103,13 @@ export function upsertProvider(
       }
     }
     const lockedMeta = existing.isBuiltin; // label / baseUrl 锁定
+    // 按更新后的最终态校验（内置豁免；非内置 baseUrl：省略=沿用 existing，显式=用新值——清空会被此拦下）。
+    const finalBaseUrl = lockedMeta
+      ? existing.baseUrl
+      : input.baseUrl !== undefined
+        ? input.baseUrl
+        : existing.baseUrl;
+    assertUsableBaseUrl({ isBuiltin: existing.isBuiltin, baseUrl: finalBaseUrl });
     const row = db
       .update(providers)
       .set({
@@ -100,9 +125,11 @@ export function upsertProvider(
       .returning()
       .get();
     if (!row) throw new Error(`provider ${input.id} not found`);
-    return toDto(row, encryptor);
+    return toDto(createProvider(row), encryptor);
   }
 
+  // 用户自建（非内置）：必须显式给 baseUrl（无默认端点 / 工厂派生豁免）。
+  assertUsableBaseUrl({ isBuiltin: false, baseUrl: input.baseUrl ?? null });
   const inserted = db
     .insert(providers)
     .values({
@@ -115,7 +142,7 @@ export function upsertProvider(
     })
     .returning()
     .get();
-  return toDto(inserted, encryptor);
+  return toDto(createProvider(inserted), encryptor);
 }
 
 export function removeProvider(db: DB, id: string): void {
@@ -143,17 +170,18 @@ export async function testProvider(
   id: string,
   model: string,
 ): Promise<TestResult> {
-  const row = getProviderRow(db, id);
-  if (!row) throw new Error(`provider ${id} not found`);
-  if (row.apiKeyEncrypted == null) {
+  const provider = loadProvider(db, id);
+  if (!provider) throw new Error(`provider ${id} not found`);
+  if (provider.apiKeyEncrypted == null) {
     return { ok: false, message: "No API key set for this provider" };
   }
   let apiKey: string;
   try {
-    apiKey = encryptor.decrypt(row.apiKeyEncrypted);
+    apiKey = encryptor.decrypt(provider.apiKeyEncrypted);
   } catch (err) {
     console.warn(`[providers] testProvider: decrypt failed for provider ${id}:`, err);
     return { ok: false, message: "Stored API key cannot be decrypted on this machine" };
   }
-  return tester.test({ type: row.type, baseUrl: row.baseUrl ?? null, apiKey, model });
+  // provider.baseUrl 已由工厂按 type 派生（DeepSeek 特判集中在此一处）。
+  return tester.test({ type: provider.type, baseUrl: provider.baseUrl, apiKey, model });
 }

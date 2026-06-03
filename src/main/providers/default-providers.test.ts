@@ -28,6 +28,11 @@ describe("ensureBuiltinProviders", () => {
     expect(byLabel.OpenAI.isBuiltin).toBe(true);
     expect(byLabel.Anthropic.type).toBe("anthropic");
     expect(byLabel.Gemini.label).toBe("Gemini");
+    // DeepSeek：双兼容 API，baseUrl 不入库（按 type 派生）。
+    expect(byLabel.DeepSeek.type).toBe("openai-chat-completions");
+    expect(byLabel.DeepSeek.compatibleApis).toEqual(["openai-chat-completions", "anthropic"]);
+    expect(byLabel.DeepSeek.baseUrl).toBeNull();
+    expect(byLabel.DeepSeek.isBuiltin).toBe(true);
   });
 
   it("is idempotent — second run inserts nothing", () => {

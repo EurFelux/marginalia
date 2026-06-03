@@ -28,6 +28,33 @@ export const PROVIDER_TYPE_LABEL: Record<AiProviderApiType, string> = {
   "google-generate-content": "Gemini",
 };
 
+/**
+ * 内置 DeepSeek 的 per-type baseUrl —— DeepSeek 同时兼容 OpenAI Chat Completions 与 Anthropic，
+ * 但两套 API 端点不同；其 `db.baseUrl` 存 null，按当前 type 派生（见 {@link resolveProviderBaseUrl}）。
+ */
+const DEEPSEEK_BASE_URL: Partial<Record<AiProviderApiType, string>> = {
+  "openai-chat-completions": "https://api.deepseek.com",
+  anthropic: "https://api.deepseek.com/anthropic",
+};
+
+/** 是否为内置 DeepSeek provider（其 baseUrl 在 db 为 null、需按 type 派生，故下游须特判）。 */
+export function isDeepseekProvider(p: { label: string | null; isBuiltin: boolean }): boolean {
+  return p.isBuiltin && p.label === "DeepSeek";
+}
+
+/**
+ * provider 在某 type 下实际生效的 baseUrl（纯逻辑单一源，main 工厂与 renderer 表单共用）：
+ *  - 内置 DeepSeek：`db.baseUrl=null`，按 type 派生（chat-completions / anthropic 端点不同）；
+ *  - 其它：直接用存储的 baseUrl（null = 用 type 默认端点 / SDK 默认）。
+ */
+export function resolveProviderBaseUrl(
+  p: { label: string | null; isBuiltin: boolean; baseUrl: string | null },
+  type: AiProviderApiType,
+): string | null {
+  if (isDeepseekProvider(p)) return DEEPSEEK_BASE_URL[type] ?? null;
+  return p.baseUrl;
+}
+
 /** 只含一个 provider id 的入参（reveal / remove 共用）。 */
 export const providerIdInput = z.object({ id: z.string().min(1) });
 export type ProviderIdInput = z.infer<typeof providerIdInput>;
@@ -43,20 +70,18 @@ export type TestProviderInput = z.infer<typeof testProviderInput>;
  *  - 提供非空字符串 → 加密后替换。
  * 不支持把 key 清空为 null（schema 拒 null/空串；如需移除整条记录用 remove）。
  */
-export const upsertProviderInput = z
-  .object({
-    id: z.string().min(1).optional(),
-    type: aiProviderApiType,
-    label: z.string().nullish(),
-    baseUrl: z.string().min(1).nullish(),
-    apiKey: z.string().min(1).optional(),
-    models: z.array(z.string().min(1)).optional(),
-  })
-  .refine((v) => v.type !== "openai-chat-completions" || v.baseUrl != null, {
-    message: "baseUrl is required for openai-chat-completions providers",
-    path: ["baseUrl"],
-  });
+export const upsertProviderInput = z.object({
+  id: z.string().min(1).optional(),
+  type: aiProviderApiType,
+  label: z.string().nullish(),
+  baseUrl: z.string().min(1).nullish(),
+  apiKey: z.string().min(1).optional(),
+  models: z.array(z.string().min(1)).optional(),
+});
 export type UpsertProviderInput = z.infer<typeof upsertProviderInput>;
+// 注：「openai-chat-completions 必须有可用 baseUrl」的规则**依赖 isBuiltin**（内置 DeepSeek 由工厂按
+// type 派生、db 存 null 即合法），故不在此 input schema 里 refine，而在 repository.upsertProvider 按
+// effective baseUrl（resolveProviderBaseUrl）判定。
 
 /**
  * 密钥存在性的判别联合（仅这三态合法，非法组合不可表示）：

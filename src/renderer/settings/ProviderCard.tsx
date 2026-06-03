@@ -11,6 +11,7 @@ const BRAND_KEY: Record<string, string> = {
   OpenAI: "openai",
   Anthropic: "anthropic",
   Gemini: "google", // ProviderIcon 的 provider key 是 "google"（"gemini" 是 model 级、ProviderIcon 不认）
+  DeepSeek: "deepseek", // provider 级映射存在（providerConfig keywords:[ModelProvider.DeepSeek]）
 };
 
 function keyText(p: ProviderDto): string {
@@ -75,7 +76,6 @@ export function ProviderCard({
         </div>
       </div>
       <div className="mt-1 text-xs text-muted-foreground">
-        {provider.baseUrl && <div className="truncate">⛓ {provider.baseUrl}</div>}
         <span>🔑 {keyText(provider)}</span>
         <span className="ml-2">· {provider.models.length} 个模型</span>
       </div>
