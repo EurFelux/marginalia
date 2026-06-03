@@ -1,14 +1,5 @@
 // src/main/ipc/annotations-handlers.ts
-import { IPC } from "@shared/ipc";
-import { bookIdInput } from "@shared/library";
-import {
-  annotationIdInput,
-  createAnnotationInput,
-  updateAnnotationInput,
-  type AnnotationDto,
-  type CreateAnnotationInput,
-  type UpdateAnnotationInput,
-} from "@shared/annotations";
+import { C } from "@shared/ipc";
 import { getDb } from "@main/db/instance";
 import {
   createAnnotation,
@@ -16,26 +7,15 @@ import {
   listAnnotationsByBook,
   updateAnnotation,
 } from "@main/library/annotations";
-import { handle } from "@main/ipc/registry";
+import { bind, register, type Binding } from "@main/ipc/registry";
+
+export const annotationsBindings: Binding[] = [
+  bind(C.annotationsListByBook, (input) => listAnnotationsByBook(getDb(), input.bookId)),
+  bind(C.annotationsCreate, (input) => createAnnotation(getDb(), input)),
+  bind(C.annotationsUpdate, (input) => updateAnnotation(getDb(), input)),
+  bind(C.annotationsDelete, (input) => deleteAnnotation(getDb(), input.id)),
+];
 
 export function registerAnnotationHandlers(): void {
-  handle<{ bookId: string }, AnnotationDto[]>(IPC.annotationsListByBook, bookIdInput, (input) =>
-    listAnnotationsByBook(getDb(), input.bookId),
-  );
-
-  handle<CreateAnnotationInput, AnnotationDto>(
-    IPC.annotationsCreate,
-    createAnnotationInput,
-    (input) => createAnnotation(getDb(), input),
-  );
-
-  handle<UpdateAnnotationInput, AnnotationDto>(
-    IPC.annotationsUpdate,
-    updateAnnotationInput,
-    (input) => updateAnnotation(getDb(), input),
-  );
-
-  handle<{ id: string }, void>(IPC.annotationsDelete, annotationIdInput, (input) =>
-    deleteAnnotation(getDb(), input.id),
-  );
+  register(annotationsBindings);
 }
