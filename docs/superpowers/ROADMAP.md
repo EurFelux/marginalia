@@ -36,7 +36,7 @@
 | M-p     | preload / `window.api` 契约                                   | ✅   | 竖切落地（library/content/settings/chat/ai）          |
 | M-b     | annotations 持久化 + IPC + CFI                                | ✅   | annotations 表/repository（headless 测）+ IPC/preload |
 | M-c     | 跨章 `routeConversation(chapterIds[])`                        | 🔴   | 单章已支持；`chapterIds[]` 待扩展                     |
-| M-d     | `books.summary` 全书摘要                                      | 🔴   | 章节摘要已成；全书 schema/IPC 待补                    |
+| M-d     | `books.summary` 全书摘要                                      | ✅   | 派生态（不持久化 status）+ 整本喂 + 侧栏书卡 UI       |
 
 ### 渲染层（RA 轨）
 
@@ -47,7 +47,7 @@
 | RA1-full | epub.js 真实渲染 / 分页 / CFI                   | ✅   | Plan A + Plan B 落地：真实渲染 + CFI 进度/恢复/跳章/当前章 + 选区桥，连续滚动；分页以连续滚动替代；精度/内存优化见 backlog |
 | RA2      | 选区 → 工具栏 → chip → 流式聊天                 | ✅   | CFI 选区落地（epub-selection 块级取段 + `cfiRange`；AI 契约零改动）                                                        |
 | RA3      | 标注与笔记 UI                                   | ✅   | CFI 高亮(5 色+下划线)/点击编辑/笔记 modal/侧栏列表；即时套用上次样式                                                       |
-| RA4      | 摘要查看 + 跨章会话                             | 🟡   | 章节摘要 pill ✅；全书摘要 / 跨章 🔴                                                                                       |
+| RA4      | 摘要查看 + 跨章会话                             | 🟡   | 章节摘要 pill ✅；全书摘要书卡 ✅；跨章 🔴                                                                                 |
 | RA5      | Provider / 设置 UI                              | 🟡   | Anthropic ✅；多 provider 类型 🔴                                                                                          |
 | D1       | 打包 / 迁移路径                                 | 🔴   | `electron-forge extraResources` 复制迁移 SQL                                                                               |
 
