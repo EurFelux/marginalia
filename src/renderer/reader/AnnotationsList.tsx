@@ -100,7 +100,7 @@ function AnnoItem({
   return (
     <div className="group flex gap-2 rounded-lg border border-border bg-background/60 p-2">
       <span className={cn("w-1 shrink-0 self-stretch rounded-full", STYLE_STRIPE[a.style])} />
-      <button type="button" onClick={onGoto} className="min-w-0 flex-1 text-left">
+      <button type="button" onClick={onGoto} className="min-w-0 flex-1 text-start">
         <div className="line-clamp-2 text-xs leading-relaxed text-foreground">{a.selectedText}</div>
         {a.note && (
           <div className="mt-1 line-clamp-2 text-[11px] text-muted-foreground">✎ {a.note}</div>

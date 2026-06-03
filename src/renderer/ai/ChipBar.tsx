@@ -45,7 +45,7 @@ export function ChipBar({ chips }: { chips: Chip[] }) {
             <span className="text-[10px] tabular-nums text-muted-foreground">
               ≈{chip.tokenCount} {t("ai.tokUnit", "tok")}
             </span>
-            {chip.required && <Lock className="ml-auto size-3 shrink-0 text-muted-foreground/70" />}
+            {chip.required && <Lock className="ms-auto size-3 shrink-0 text-muted-foreground/70" />}
           </div>
           <div className="truncate text-[11px] text-muted-foreground">{chip.content}</div>
         </div>

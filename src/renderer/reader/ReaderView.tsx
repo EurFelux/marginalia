@@ -95,7 +95,7 @@ export function ReaderView() {
         </div>
       </header>
       <div className="flex min-h-0 flex-1">
-        <aside className="w-64 shrink-0 border-r border-border bg-muted/30">
+        <aside className="w-64 shrink-0 border-e border-border bg-muted/30">
           <Sidebar bookId={bookId} />
         </aside>
         <main className="min-w-0 flex-1">
@@ -104,7 +104,7 @@ export function ReaderView() {
           <EpubReader bookId={bookId} chapters={chapters.data ?? []} />
         </main>
         {/* 始终挂载，用 hidden 切换可见——保住 useChat 对话状态在开合间存活。 */}
-        <aside className={cn("w-96 shrink-0 border-l border-border", !panelOpen && "hidden")}>
+        <aside className={cn("w-96 shrink-0 border-s border-border", !panelOpen && "hidden")}>
           <AIPanel />
         </aside>
       </div>

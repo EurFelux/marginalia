@@ -33,7 +33,7 @@ export function ChapterList({ bookId }: { bookId: string }) {
           // level 缩进为运行时计算值（章/节层级），按 CLAUDE.md 允许内联 style 承载。
           style={{ paddingLeft: `${0.5 + ch.level * 0.875}rem` }}
           className={cn(
-            "shrink-0 truncate rounded-md py-1.5 pr-2 text-left transition-colors",
+            "shrink-0 truncate rounded-md py-1.5 pe-2 text-start transition-colors",
             ch.level === 0 ? "text-sm" : "text-xs",
             ch.id === currentChapterId
               ? "bg-primary/10 font-medium text-primary"

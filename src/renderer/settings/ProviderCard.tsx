@@ -91,7 +91,7 @@ export function ProviderCard({
       </div>
       <div className="mt-1 text-xs text-muted-foreground">
         <span>{t("settings.provider.keyLabel", "🔑 {{key}}", { key: keyText(provider) })}</span>
-        <span className="ml-2">
+        <span className="ms-2">
           · {t("settings.provider.modelCount", "{{n}} 个模型", { n: provider.models.length })}
         </span>
       </div>

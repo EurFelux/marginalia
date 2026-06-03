@@ -72,7 +72,7 @@ export function LibraryView() {
             <li key={b.id}>
               <button
                 onClick={() => openBook(b.id)}
-                className="flex w-full items-center gap-3 rounded-xl border border-border bg-card/60 p-3 text-left hover:bg-muted"
+                className="flex w-full items-center gap-3 rounded-xl border border-border bg-card/60 p-3 text-start hover:bg-muted"
               >
                 <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
                   <BookOpen className="size-5" />

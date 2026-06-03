@@ -81,7 +81,7 @@ export function SummaryPill() {
       >
         {badge.label}
       </PopoverTrigger>
-      <PopoverContent align="end" sideOffset={6} className="w-72 text-left">
+      <PopoverContent align="end" sideOffset={6} className="w-72 text-start">
         <div className="mb-1.5 flex items-center justify-between gap-2">
           <span className="truncate text-xs font-semibold">
             {t("ai.summary.heading", "本章摘要")}

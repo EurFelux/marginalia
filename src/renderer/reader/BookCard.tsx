@@ -91,7 +91,7 @@ export function BookCard({ bookId }: { bookId: string }) {
         >
           {BADGE_LABEL[status]}
         </PopoverTrigger>
-        <PopoverContent align="start" sideOffset={6} className="w-96 text-left">
+        <PopoverContent align="start" sideOffset={6} className="w-96 text-start">
           <div className="mb-1.5 flex items-center justify-between gap-2">
             <span className="truncate text-xs font-semibold">
               {t("reader.bookSummary.panelTitle", "全书摘要")}

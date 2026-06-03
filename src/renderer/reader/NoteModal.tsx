@@ -96,7 +96,7 @@ export function NoteModal() {
           </DialogTitle>
         </DialogHeader>
         {quote && (
-          <blockquote className="line-clamp-2 border-l-2 border-border pl-3 font-serif text-sm italic leading-snug text-muted-foreground">
+          <blockquote className="line-clamp-2 border-s-2 border-border ps-3 font-serif text-sm italic leading-snug text-muted-foreground">
             {quote}
           </blockquote>
         )}

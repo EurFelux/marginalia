@@ -103,7 +103,7 @@ function ToolStepCard({ part }: { part: ChatUIMessage["parts"][number] }) {
       {/* i18next-instrument-ignore */}
       <span>📖</span>
       <span className="font-medium text-foreground">{name}</span>
-      <span className={failed ? "ml-auto text-destructive" : "ml-auto text-muted-foreground"}>
+      <span className={failed ? "ms-auto text-destructive" : "ms-auto text-muted-foreground"}>
         {failed
           ? t("ai.toolStep.failed", "读取失败")
           : done

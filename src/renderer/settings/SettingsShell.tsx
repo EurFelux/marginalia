@@ -36,7 +36,7 @@ export function SettingsShell() {
       aria-label={t("settings.title", "设置")}
       className="fixed inset-0 z-50 flex bg-background font-sans"
     >
-      <nav className="flex w-48 shrink-0 flex-col gap-1 overflow-y-auto border-r border-border p-3">
+      <nav className="flex w-48 shrink-0 flex-col gap-1 overflow-y-auto border-e border-border p-3">
         <div className="mb-2 px-2 font-serif text-base font-semibold">
           {t("settings.title", "设置")}
         </div>
@@ -46,7 +46,7 @@ export function SettingsShell() {
             type="button"
             onClick={() => setActive(c.key)}
             className={cn(
-              "rounded-md px-3 py-1.5 text-left text-sm",
+              "rounded-md px-3 py-1.5 text-start text-sm",
               active === c.key ? "bg-accent text-accent-foreground" : "hover:bg-accent/50",
             )}
           >
@@ -59,7 +59,7 @@ export function SettingsShell() {
           variant="ghost"
           size="icon"
           onClick={() => setOpen(false)}
-          className="absolute right-4 top-4"
+          className="absolute end-4 top-4"
           aria-label={t("settings.close", "关闭设置")}
         >
           <X />

@@ -34,7 +34,7 @@ export function AIPanel() {
     <div className="flex h-full flex-col bg-muted/30 font-sans">
       <header className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
         <span className="text-xs font-semibold">{t("ai.panelTitle", "AI 助手")}</span>
-        <div className="ml-auto flex items-center gap-1.5">
+        <div className="ms-auto flex items-center gap-1.5">
           <SummaryPill />
           <Button
             variant="ghost"
