@@ -1,3 +1,6 @@
+// 渲染层 i18next 单例：模块体在求值时同步读 window.api（preferences 快照 + 系统 locale）来定首启语言。
+// 故本模块只可从渲染进程上下文导入——切勿在无头 vitest 里 import（含间接 import 本模块的渲染层 .ts），
+// 那里 window.api 为 undefined 会崩；需要时改用惰性 `await import("@renderer/i18n")` 或 mock window.api。
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import { sharedInitOptions } from "@shared/i18n/resources";
