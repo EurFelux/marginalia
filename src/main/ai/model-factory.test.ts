@@ -40,7 +40,12 @@ describe("resolveLanguageModel", () => {
   });
   it("throws for openai-compatible without a baseUrl", () => {
     expect(() =>
-      resolveLanguageModel({ type: "openai-chat-completions", baseUrl: null, apiKey: "sk", model: "x" }),
+      resolveLanguageModel({
+        type: "openai-chat-completions",
+        baseUrl: null,
+        apiKey: "sk",
+        model: "x",
+      }),
     ).toThrow(/baseUrl/i);
   });
 });
