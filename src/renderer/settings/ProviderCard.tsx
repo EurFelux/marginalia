@@ -36,10 +36,10 @@ export function ProviderCard({
     <div className="rounded-lg border border-border p-3">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium">
+          <span className="text-sm font-medium">{provider.label ?? "（未命名）"}</span>
+          <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
             {PROVIDER_TYPE_LABEL[provider.type]}
           </span>
-          <span className="ml-2 text-sm font-medium">{provider.label ?? "（未命名）"}</span>
         </div>
         <div className="flex shrink-0 gap-1">
           <Button variant="ghost" size="sm" onClick={onEdit} aria-label="编辑">

@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, X } from "lucide-react";
-import { PROVIDER_TYPE_LABEL } from "@shared/providers";
 import { qk } from "@renderer/query/keys";
 import { Button } from "@renderer/components/ui/button";
 import {
@@ -58,13 +57,20 @@ export function AssistantModelPicker() {
             }
           }}
         >
-          <SelectTrigger>
-            <SelectValue placeholder="选择 provider" />
+          <SelectTrigger className="h-9 w-full">
+            {/* value 是 provider id（uuid）；Base UI Select.Value 默认渲染裸 value，故用函数 child 映射成名字。 */}
+            <SelectValue placeholder="选择 provider">
+              {(value) =>
+                typeof value === "string"
+                  ? (providers.data?.find((p) => p.id === value)?.label ?? "（未命名）")
+                  : "选择 provider"
+              }
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {providers.data?.map((p) => (
               <SelectItem key={p.id} value={p.id}>
-                {PROVIDER_TYPE_LABEL[p.type]} · {p.label ?? "（未命名）"}
+                {p.label ?? "（未命名）"}
               </SelectItem>
             ))}
           </SelectContent>
@@ -79,7 +85,7 @@ export function AssistantModelPicker() {
             }
           }}
         >
-          <SelectTrigger>
+          <SelectTrigger className="h-9 w-full">
             <SelectValue placeholder="选择模型" />
           </SelectTrigger>
           <SelectContent>

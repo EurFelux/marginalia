@@ -46,7 +46,8 @@ export function ProviderForm({
     },
   });
 
-  const canSave = !(baseRequired && !f.baseUrl.trim());
+  // 名称必填；openai-compatible 还要求 baseUrl。
+  const canSave = f.label.trim().length > 0 && !(baseRequired && !f.baseUrl.trim());
 
   return (
     <div className="space-y-3 rounded-lg border border-border p-3">
@@ -58,8 +59,11 @@ export function ProviderForm({
             if (v) setF({ ...f, type: v as ProviderType });
           }}
         >
-          <SelectTrigger>
-            <SelectValue />
+          <SelectTrigger className="h-9 w-full">
+            {/* value 是 type 裸值（如 "openai"）；用函数 child 映射成显示名（OpenAI Responses 等）。 */}
+            <SelectValue>
+              {(v) => (typeof v === "string" ? PROVIDER_TYPE_LABEL[v as ProviderType] : null)}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {providerType.options.map((t) => (
@@ -73,7 +77,7 @@ export function ProviderForm({
         <Input
           value={f.label}
           onChange={(e) => setF({ ...f, label: e.target.value })}
-          placeholder="（可选）"
+          placeholder="（必填）"
         />
         <span className="text-xs text-muted-foreground">baseURL</span>
         <Input
