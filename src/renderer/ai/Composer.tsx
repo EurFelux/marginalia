@@ -1,6 +1,7 @@
 import { useEffect, useRef, type KeyboardEvent } from "react";
 import type { ChatStatus } from "ai";
 import { ArrowUp, Square } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { Chip } from "@shared/chat";
 import { Button } from "@renderer/components/ui/button";
 import { useReaderStore } from "@renderer/store/reader-store";
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export function Composer({ status, onSend, onStop }: Props) {
+  const { t } = useTranslation();
   const draftText = useReaderStore((s) => s.draftText);
   const draftChips = useReaderStore((s) => s.draftChips);
   const setDraftText = useReaderStore((s) => s.setDraftText);
@@ -54,11 +56,16 @@ export function Composer({ status, onSend, onStop }: Props) {
           onChange={(e) => setDraftText(e.target.value)}
           onKeyDown={onKeyDown}
           rows={2}
-          placeholder="问点什么…（Enter 发送，Shift+Enter 换行）"
+          placeholder={t("ai.composer.placeholder", "问点什么…（Enter 发送，Shift+Enter 换行）")}
           className="max-h-32 min-h-9 flex-1 resize-none overflow-y-auto bg-transparent px-1 py-1 text-sm outline-none placeholder:text-muted-foreground"
         />
         {isStreaming ? (
-          <Button variant="secondary" size="icon-lg" onClick={onStop} aria-label="停止">
+          <Button
+            variant="secondary"
+            size="icon-lg"
+            onClick={onStop}
+            aria-label={t("ai.stop", "停止")}
+          >
             <Square />
           </Button>
         ) : (
@@ -66,7 +73,7 @@ export function Composer({ status, onSend, onStop }: Props) {
             size="icon-lg"
             onClick={send}
             disabled={draftText.trim() === ""}
-            aria-label="发送"
+            aria-label={t("ai.send", "发送")}
           >
             <ArrowUp />
           </Button>

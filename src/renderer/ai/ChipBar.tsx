@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Lock } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { Chip } from "@shared/chat";
 import { chipLabel } from "@renderer/ai/chip-label";
 
@@ -10,6 +11,7 @@ interface HoverState {
 }
 
 export function ChipBar({ chips }: { chips: Chip[] }) {
+  const { t } = useTranslation();
   const [hover, setHover] = useState<HoverState | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -41,7 +43,7 @@ export function ChipBar({ chips }: { chips: Chip[] }) {
           <div className="flex items-center gap-1.5">
             <span className="text-xs font-medium">{chipLabel(chip)}</span>
             <span className="text-[10px] tabular-nums text-muted-foreground">
-              ≈{chip.tokenCount} tok
+              ≈{chip.tokenCount} {t("ai.tokUnit", "tok")}
             </span>
             {chip.required && <Lock className="ml-auto size-3 shrink-0 text-muted-foreground/70" />}
           </div>
@@ -74,6 +76,7 @@ function ChipPopover({
   onEnter: () => void;
   onLeave: () => void;
 }) {
+  const { t } = useTranslation();
   if (typeof document === "undefined") return null;
   const left = Math.min(Math.max(rect.left, 12), window.innerWidth - 320 - 12);
   const bottom = window.innerHeight - rect.top + 8; // 底边贴卡片顶上方 8px，向上生长
@@ -85,11 +88,13 @@ function ChipPopover({
       style={{ position: "fixed", left, bottom, zIndex: 60 }}
       className="max-h-40 w-80 overflow-y-auto rounded-lg border border-border bg-popover p-3 text-xs leading-relaxed shadow-xl"
     >
-      <div className="mb-1 font-medium text-foreground">将发送 · {label}</div>
+      <div className="mb-1 font-medium text-foreground">
+        {t("ai.chip.willSend", "将发送")} · {label}
+      </div>
       <p className="whitespace-pre-wrap text-muted-foreground">{chip.content}</p>
       {chip.required && (
         <div className="mt-2 text-[11px] text-muted-foreground/70">
-          必备上下文，随消息一并发送。
+          {t("ai.chip.requiredContext", "必备上下文，随消息一并发送。")}
         </div>
       )}
     </div>,

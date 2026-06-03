@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useChat } from "@ai-sdk/react";
 import { Plus, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@renderer/components/ui/button";
 import { useReaderStore } from "@renderer/store/reader-store";
 import { createIpcChatTransport } from "@renderer/ai/ipc-chat-transport";
@@ -10,6 +11,7 @@ import { Composer } from "@renderer/ai/Composer";
 import { SummaryPill } from "@renderer/ai/SummaryPill";
 
 export function AIPanel() {
+  const { t } = useTranslation();
   const transport = useMemo(() => createIpcChatTransport(), []);
   const { messages, sendMessage, status, stop, setMessages, error } = useChat<ChatUIMessage>({
     transport,
@@ -31,14 +33,14 @@ export function AIPanel() {
   return (
     <div className="flex h-full flex-col bg-muted/30 font-sans">
       <header className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
-        <span className="text-xs font-semibold">AI 助手</span>
+        <span className="text-xs font-semibold">{t("ai.panelTitle", "AI 助手")}</span>
         <div className="ml-auto flex items-center gap-1.5">
           <SummaryPill />
           <Button
             variant="ghost"
             size="icon-sm"
             onClick={newConversation}
-            aria-label="新对话"
+            aria-label={t("ai.newConversation", "新对话")}
             className="text-muted-foreground"
           >
             <Plus />
@@ -47,7 +49,7 @@ export function AIPanel() {
             variant="ghost"
             size="icon-sm"
             onClick={() => setPanelOpen(false)}
-            aria-label="关闭面板"
+            aria-label={t("ai.closePanel", "关闭面板")}
             className="text-muted-foreground"
           >
             <X />
@@ -61,9 +63,9 @@ export function AIPanel() {
 
       {error && (
         <div className="shrink-0 border-t border-border bg-destructive/10 px-3 py-2 text-xs text-destructive">
-          发送失败：{error.message}
+          {t("ai.sendFailed", "发送失败：{{message}}", { message: error.message })}
           <span className="text-muted-foreground">
-            （请确认已在「设置」配置 Anthropic API Key 与模型）
+            {t("ai.sendFailedHint", "（请确认已在「设置」配置 Anthropic API Key 与模型）")}
           </span>
         </div>
       )}
