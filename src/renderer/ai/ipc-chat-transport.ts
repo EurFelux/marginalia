@@ -82,7 +82,8 @@ export function createIpcChatTransport(): ChatTransport<ChatUIMessage> {
         void stream.cancel(); // 触发 cancel() → 退订，避免监听器泄漏
         throw new Error(ack.reason); // useChat 进 error 态
       }
-      useChatStore.getState().setActiveConversation(ack.conversationId); // ack 回写（组件外）
+      // ack 回写（组件外）：记录会话 id 及其所属章（路由后的会话总是属于 currentChapterId 或同章/独立追加）
+      useChatStore.getState().setActiveConversation(ack.conversationId, currentChapterId);
       return stream;
     },
     // 单窗口竖切不做断线重连。

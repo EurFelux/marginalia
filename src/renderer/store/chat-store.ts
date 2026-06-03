@@ -3,6 +3,8 @@ import type { Chip } from "@shared/chat";
 
 interface ChatState {
   activeConversationId: string | null;
+  /** 显示中会话所属章；独立会话/无 active 为 null。 */
+  activeConversationChapterId: string | null;
   draftText: string;
   draftChips: Chip[];
   panelOpen: boolean;
@@ -14,16 +16,17 @@ interface ChatState {
   openCommand: { conversationId: string; nonce: number } | null;
 }
 interface ChatActions {
-  setActiveConversation: (id: string | null) => void;
+  setActiveConversation: (id: string | null, chapterId?: string | null) => void;
   setDraftText: (text: string) => void;
   setDraftChips: (chips: Chip[]) => void;
   setPanelOpen: (open: boolean) => void;
   /** 重开会话：发命令信号（触发载历史）+ 设 active（高亮）+ 开面板。 */
-  openConversation: (id: string) => void;
+  openConversation: (id: string, chapterId: string | null) => void;
 }
 
 export const CHAT_INITIAL: ChatState = {
   activeConversationId: null,
+  activeConversationChapterId: null,
   draftText: "",
   draftChips: [],
   panelOpen: false,
@@ -32,13 +35,18 @@ export const CHAT_INITIAL: ChatState = {
 
 export const useChatStore = create<ChatState & ChatActions>((set) => ({
   ...CHAT_INITIAL,
-  setActiveConversation: (activeConversationId) => set({ activeConversationId }),
+  setActiveConversation: (id, chapterId) =>
+    set({
+      activeConversationId: id,
+      activeConversationChapterId: id === null ? null : (chapterId ?? null),
+    }),
   setDraftText: (draftText) => set({ draftText }),
   setDraftChips: (draftChips) => set({ draftChips }),
   setPanelOpen: (panelOpen) => set({ panelOpen }),
-  openConversation: (id) =>
+  openConversation: (id, chapterId) =>
     set((s) => ({
       activeConversationId: id,
+      activeConversationChapterId: chapterId,
       panelOpen: true,
       openCommand: { conversationId: id, nonce: (s.openCommand?.nonce ?? 0) + 1 },
     })),

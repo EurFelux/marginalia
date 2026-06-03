@@ -63,7 +63,7 @@ export function ConversationsTab({ bookId }: { bookId: string }) {
           <button
             key={c.id}
             type="button"
-            onClick={() => openConversation(c.id)}
+            onClick={() => openConversation(c.id, c.kind === "chapter" ? c.chapterId : null)}
             className={cn(
               "flex w-full items-center gap-2 rounded-lg border border-transparent p-2 text-start",
               c.id === activeId ? "bg-accent" : "hover:bg-muted",
