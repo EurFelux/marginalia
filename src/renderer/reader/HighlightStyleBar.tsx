@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Trash2, Underline } from "lucide-react";
 import type { AnnotationStyle } from "@shared/annotations";
@@ -10,6 +11,7 @@ import { FILL_COLORS, FILL_SWATCH } from "./highlight";
 
 /** 二级样式工具栏：5 色 + 下划线；点已有高亮打开（改样式 / 笔记 / 删除）。高亮已由「高亮标记」即时创建，故只在 edit 模式打开。 */
 export function HighlightStyleBar() {
+  const { t } = useTranslation();
   const styleBar = useReaderStore((s) => s.styleBar);
   const closeStyleBar = useReaderStore((s) => s.closeStyleBar);
   const openNoteModal = useReaderStore((s) => s.openNoteModal);
@@ -76,7 +78,7 @@ export function HighlightStyleBar() {
         <button
           key={c}
           type="button"
-          aria-label={`高亮 ${c}`}
+          aria-label={t("reader.highlight.colorLabel", "高亮 {{color}}", { color: c })}
           onClick={() => pickStyle(c)}
           className={cn(
             "size-5 rounded-full ring-offset-1 ring-offset-popover transition",
@@ -88,7 +90,7 @@ export function HighlightStyleBar() {
       <Button
         variant="ghost"
         size="icon-xs"
-        aria-label="下划线"
+        aria-label={t("reader.highlight.underline", "下划线")}
         onClick={() => pickStyle("underline")}
         className={cn(current?.style === "underline" && "bg-muted ring-1 ring-foreground/40")}
       >
@@ -100,7 +102,7 @@ export function HighlightStyleBar() {
           <Button
             variant="ghost"
             size="icon-xs"
-            aria-label="笔记"
+            aria-label={t("reader.note.label", "笔记")}
             onClick={() => {
               openNoteModal({ target: { type: "edit", annotationId: editing } });
               closeStyleBar();
@@ -112,7 +114,7 @@ export function HighlightStyleBar() {
           <Button
             variant="ghost"
             size="icon-xs"
-            aria-label="删除"
+            aria-label={t("reader.annotation.delete", "删除")}
             onClick={() => {
               deleteM.mutate({ id: editing });
               closeStyleBar();

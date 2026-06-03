@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   VirtualDocs,
@@ -25,6 +26,7 @@ interface Props {
 const SAVE_DEBOUNCE_MS = 1000;
 
 export function EpubReader({ bookId, chapters }: Props) {
+  const { t } = useTranslation();
   const vRef = useRef<VirtualDocsHandle | null>(null);
   const [book, setBook] = useState<EpubBook | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
@@ -182,12 +184,20 @@ export function EpubReader({ bookId, chapters }: Props) {
     return () => document.removeEventListener("scroll", onScroll, true);
   }, [closeStyleBar, setSelection]);
 
-  if (bytes.isError) return <ReaderError message="无法读取此书的文件。" />;
-  if (parseError) return <ReaderError message={`无法渲染此书：${parseError}`} />;
+  if (bytes.isError)
+    return <ReaderError message={t("reader.epub.loadError", "无法读取此书的文件。")} />;
+  if (parseError)
+    return (
+      <ReaderError
+        message={t("reader.epub.parseError", "无法渲染此书：{{error}}", { error: parseError })}
+      />
+    );
   // 等字节+进度都就绪再挂 VirtualDocs，使 initialIndex 一次到位（避免先 0 再跳）。
   if (!book || progress.isLoading) {
     return (
-      <div className="flex h-full items-center justify-center text-muted-foreground">载入中…</div>
+      <div className="flex h-full items-center justify-center text-muted-foreground">
+        {t("reader.epub.loading", "载入中…")}
+      </div>
     );
   }
 

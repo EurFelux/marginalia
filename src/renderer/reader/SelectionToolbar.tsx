@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { BookOpen, FileText, Highlighter, Languages, Sparkles, StickyNote } from "lucide-react";
 import { cn } from "@renderer/lib/utils";
@@ -7,13 +8,14 @@ import { qk } from "@renderer/query/keys";
 import { useReaderStore } from "@renderer/store/reader-store";
 import { useAiActions, type PresetId } from "@renderer/ai/use-ai-actions";
 
-const PRESETS: { id: PresetId; label: string; icon: typeof BookOpen }[] = [
-  { id: "explain", label: "解释", icon: BookOpen },
-  { id: "translate", label: "翻译", icon: Languages },
-  { id: "summarize", label: "概括", icon: FileText },
+const PRESETS: { id: PresetId; icon: typeof BookOpen }[] = [
+  { id: "explain", icon: BookOpen },
+  { id: "translate", icon: Languages },
+  { id: "summarize", icon: FileText },
 ];
 
 export function SelectionToolbar() {
+  const { t } = useTranslation();
   const selection = useReaderStore((s) => s.selection);
   const openStyleBar = useReaderStore((s) => s.openStyleBar);
   const openNoteModal = useReaderStore((s) => s.openNoteModal);
@@ -76,24 +78,34 @@ export function SelectionToolbar() {
       <ToolBtn
         onClick={applyHighlight}
         icon={<Highlighter className="size-3.5" />}
-        label="高亮标记"
+        label={t("reader.selection.highlight", "高亮标记")}
       />
-      <ToolBtn onClick={addNote} icon={<StickyNote className="size-3.5" />} label="添加笔记" />
+      <ToolBtn
+        onClick={addNote}
+        icon={<StickyNote className="size-3.5" />}
+        label={t("reader.selection.addNote", "添加笔记")}
+      />
       <span className="mx-0.5 h-5 w-px bg-border" />
       <ToolBtn
         primary
         onClick={() => void startAiAction(null)}
         icon={<Sparkles className="size-3.5 text-primary" />}
-        label="AI 问"
+        label={t("reader.selection.askAi", "AI 问")}
       />
       {PRESETS.map((p) => {
         const Icon = p.icon;
+        const label =
+          p.id === "explain"
+            ? t("reader.selection.explain", "解释")
+            : p.id === "translate"
+              ? t("reader.selection.translate", "翻译")
+              : t("reader.selection.summarize", "概括");
         return (
           <ToolBtn
             key={p.id}
             onClick={() => void startAiAction(p.id)}
             icon={<Icon className="size-3.5" />}
-            label={p.label}
+            label={label}
           />
         );
       })}

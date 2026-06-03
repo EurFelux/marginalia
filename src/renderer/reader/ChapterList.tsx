@@ -1,9 +1,11 @@
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@renderer/lib/utils";
 import { qk } from "@renderer/query/keys";
 import { useReaderStore } from "@renderer/store/reader-store";
 
 export function ChapterList({ bookId }: { bookId: string }) {
+  const { t } = useTranslation();
   const currentChapterId = useReaderStore((s) => s.currentChapterId);
   const setCurrentChapter = useReaderStore((s) => s.setCurrentChapter);
   const chapters = useQuery({
@@ -13,10 +15,16 @@ export function ChapterList({ bookId }: { bookId: string }) {
 
   return (
     <nav className="flex h-full flex-col gap-0.5 overflow-y-auto p-2 font-sans">
-      {chapters.isPending && <p className="p-2 text-sm text-muted-foreground">加载目录…</p>}
-      {chapters.isError && <p className="p-2 text-sm text-destructive">目录读取失败</p>}
+      {chapters.isPending && (
+        <p className="p-2 text-sm text-muted-foreground">{t("reader.toc.loading", "加载目录…")}</p>
+      )}
+      {chapters.isError && (
+        <p className="p-2 text-sm text-destructive">{t("reader.toc.loadError", "目录读取失败")}</p>
+      )}
       {chapters.data?.length === 0 && (
-        <p className="p-2 text-sm text-muted-foreground">（本书无目录章节）</p>
+        <p className="p-2 text-sm text-muted-foreground">
+          {t("reader.toc.empty", "（本书无目录章节）")}
+        </p>
       )}
       {chapters.data?.map((ch) => (
         <button
@@ -34,7 +42,7 @@ export function ChapterList({ bookId }: { bookId: string }) {
                 : "text-muted-foreground hover:bg-muted",
           )}
         >
-          {ch.title ?? `第 ${ch.orderIndex + 1} 章`}
+          {ch.title ?? t("reader.toc.chapterFallback", "第 {{n}} 章", { n: ch.orderIndex + 1 })}
         </button>
       ))}
     </nav>

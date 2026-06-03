@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, MessageSquare, Settings } from "lucide-react";
 import { qk } from "@renderer/query/keys";
@@ -17,6 +18,7 @@ import { NoteModal } from "@renderer/reader/NoteModal";
 import { AIPanel } from "@renderer/ai/AIPanel";
 
 export function ReaderView() {
+  const { t } = useTranslation();
   const bookId = useReaderStore((s) => s.currentBookId);
   const chapterId = useReaderStore((s) => s.currentChapterId);
   const backToLibrary = useReaderStore((s) => s.backToLibrary);
@@ -54,7 +56,7 @@ export function ReaderView() {
       <header className="flex h-12 shrink-0 items-center justify-between border-b border-border px-3">
         <Button variant="ghost" size="sm" onClick={backToLibrary} className="text-muted-foreground">
           <ArrowLeft />
-          书库
+          {t("reader.backToLibrary", "书库")}
         </Button>
         <div className="flex items-center gap-1">
           <ReaderPrefs />
@@ -65,14 +67,14 @@ export function ReaderView() {
                   variant="ghost"
                   size="icon"
                   onClick={() => setPanelOpen(!panelOpen)}
-                  aria-label="AI 面板"
+                  aria-label={t("reader.aiPanel", "AI 面板")}
                   className={cn(panelOpen ? "text-primary" : "text-muted-foreground")}
                 />
               }
             >
               <MessageSquare />
             </TooltipTrigger>
-            <TooltipContent>AI 面板</TooltipContent>
+            <TooltipContent>{t("reader.aiPanel", "AI 面板")}</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger
@@ -81,14 +83,14 @@ export function ReaderView() {
                   variant="ghost"
                   size="icon"
                   onClick={() => openSettings(true)}
-                  aria-label="设置"
+                  aria-label={t("settings.title", "设置")}
                   className="text-muted-foreground"
                 />
               }
             >
               <Settings />
             </TooltipTrigger>
-            <TooltipContent>设置</TooltipContent>
+            <TooltipContent>{t("settings.title", "设置")}</TooltipContent>
           </Tooltip>
         </div>
       </header>

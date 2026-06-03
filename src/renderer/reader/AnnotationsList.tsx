@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { EpubCFI } from "epubjs";
 import { Trash2 } from "lucide-react";
@@ -19,6 +20,7 @@ function spineOf(cfi: string): number {
 }
 
 export function AnnotationsList({ bookId }: { bookId: string }) {
+  const { t } = useTranslation();
   const requestScrollToCfi = useReaderStore((s) => s.requestScrollToCfi);
   const qc = useQueryClient();
   const annos = useQuery({
@@ -34,11 +36,25 @@ export function AnnotationsList({ bookId }: { bookId: string }) {
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.annotations(bookId) }),
   });
 
-  if (annos.isPending) return <p className="p-3 text-sm text-muted-foreground">加载标注…</p>;
-  if (annos.isError) return <p className="p-3 text-sm text-destructive">标注加载失败</p>;
+  if (annos.isPending)
+    return (
+      <p className="p-3 text-sm text-muted-foreground">
+        {t("reader.annotation.loading", "加载标注…")}
+      </p>
+    );
+  if (annos.isError)
+    return (
+      <p className="p-3 text-sm text-destructive">
+        {t("reader.annotation.loadError", "标注加载失败")}
+      </p>
+    );
   const list = annos.data ?? [];
   if (list.length === 0)
-    return <p className="p-4 text-center text-xs text-muted-foreground">还没有标注。划词试试～</p>;
+    return (
+      <p className="p-4 text-center text-xs text-muted-foreground">
+        {t("reader.annotation.empty", "还没有标注。划词试试～")}
+      </p>
+    );
 
   // 阅读序排序（compare 不可用时回退 spinePos）。
   const sorted = [...list].sort((a, b) => {
@@ -80,6 +96,7 @@ function AnnoItem({
   onGoto: () => void;
   onDelete: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="group flex gap-2 rounded-lg border border-border bg-background/60 p-2">
       <span className={cn("w-1 shrink-0 self-stretch rounded-full", STYLE_STRIPE[a.style])} />
@@ -93,7 +110,7 @@ function AnnoItem({
       <Button
         variant="ghost"
         size="icon-xs"
-        aria-label="删除"
+        aria-label={t("reader.annotation.delete", "删除")}
         onClick={onDelete}
         className="shrink-0 self-start text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
       >

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CornerDownLeft } from "lucide-react";
 import { Kbd, KbdGroup, ModKey } from "@renderer/components/ui/kbd";
@@ -16,6 +17,7 @@ import { useReaderStore } from "@renderer/store/reader-store";
 
 /** 居中笔记 modal：create 来自选区（默认 yellow），edit 来自已有标注。 */
 export function NoteModal() {
+  const { t } = useTranslation();
   const noteModal = useReaderStore((s) => s.noteModal);
   const closeNoteModal = useReaderStore((s) => s.closeNoteModal);
   const setSelection = useReaderStore((s) => s.setSelection);
@@ -87,7 +89,11 @@ export function NoteModal() {
     >
       <DialogContent className="font-sans sm:max-w-[36rem]">
         <DialogHeader>
-          <DialogTitle>{editing ? "编辑笔记" : "添加笔记"}</DialogTitle>
+          <DialogTitle>
+            {editing
+              ? t("reader.note.editTitle", "编辑笔记")
+              : t("reader.note.addTitle", "添加笔记")}
+          </DialogTitle>
         </DialogHeader>
         {quote && (
           <blockquote className="line-clamp-2 border-l-2 border-border pl-3 font-serif text-sm italic leading-snug text-muted-foreground">
@@ -105,15 +111,15 @@ export function NoteModal() {
               save();
             }
           }}
-          placeholder="写点想法…"
+          placeholder={t("reader.note.placeholder", "写点想法…")}
           className="no-scrollbar min-h-40 resize-none leading-relaxed"
         />
         <DialogFooter>
           <Button variant="ghost" onClick={dismiss}>
-            取消
+            {t("common.cancel", "取消")}
           </Button>
           <Button onClick={save}>
-            保存
+            {t("common.save", "保存")}
             <KbdGroup>
               <ModKey className="border-transparent bg-primary-foreground/20 text-primary-foreground" />
               <Kbd className="border-transparent bg-primary-foreground/20 text-primary-foreground">
