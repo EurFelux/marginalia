@@ -4,6 +4,7 @@ import { BookOpen, FolderOpen, Settings } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { BookSummaryDto } from "@shared/library";
 import { Button } from "@renderer/components/ui/button";
+import { ScrollArea } from "@renderer/components/ui/scroll-area";
 import { qk } from "@renderer/query/keys";
 import { useNavigationStore } from "@renderer/store/navigation-store";
 import { useSettingsStore } from "@renderer/store/settings-store";
@@ -139,33 +140,35 @@ export function LibraryView() {
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-6">
-        {books.isPending && (
-          <p className="text-sm text-muted-foreground">{t("library.loading", "加载书库…")}</p>
-        )}
-        {books.isError && (
-          <p className="text-sm text-destructive">{t("library.loadError", "读取书库失败")}</p>
-        )}
-        {books.data?.length === 0 && (
-          <div className="mt-20 text-center text-muted-foreground">
-            <BookOpen className="mx-auto mb-3 size-10 opacity-40" />
-            <p className="text-sm">
-              {t("library.empty", "书库为空，点右上角「导入 ePub」或把 .epub 拖进窗口开始。")}
-            </p>
-          </div>
-        )}
-        <ul className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-5">
-          {books.data?.map((b) => (
-            <li key={b.id}>
-              <BookCover
-                book={b}
-                onOpen={() => openBook(b.id)}
-                onDelete={() => deleteBook.mutate(b)}
-              />
-            </li>
-          ))}
-        </ul>
-      </main>
+      <ScrollArea className="flex-1">
+        <main className="p-6">
+          {books.isPending && (
+            <p className="text-sm text-muted-foreground">{t("library.loading", "加载书库…")}</p>
+          )}
+          {books.isError && (
+            <p className="text-sm text-destructive">{t("library.loadError", "读取书库失败")}</p>
+          )}
+          {books.data?.length === 0 && (
+            <div className="mt-20 text-center text-muted-foreground">
+              <BookOpen className="mx-auto mb-3 size-10 opacity-40" />
+              <p className="text-sm">
+                {t("library.empty", "书库为空，点右上角「导入 ePub」或把 .epub 拖进窗口开始。")}
+              </p>
+            </div>
+          )}
+          <ul className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-5">
+            {books.data?.map((b) => (
+              <li key={b.id}>
+                <BookCover
+                  book={b}
+                  onOpen={() => openBook(b.id)}
+                  onDelete={() => deleteBook.mutate(b)}
+                />
+              </li>
+            ))}
+          </ul>
+        </main>
+      </ScrollArea>
 
       {isDragging && <DropOverlay active={isOverZone} zoneHandlers={zoneHandlers} />}
     </div>
