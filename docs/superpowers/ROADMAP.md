@@ -4,7 +4,7 @@
 >
 > **维护约定**：每次合并分支（走 `finishing-a-development-branch`）时**顺手更新本文件**——挪动里程碑状态、勾掉已完成、新增发现的待办。别让进度状态散回各文档的散文里。
 >
-> 更新日期：2026-06-03
+> 更新日期：2026-06-04
 
 ---
 
@@ -35,7 +35,9 @@
 
 **阅读精度 / 长书内存 pass 已交付**（2026-06-03）：RA1-full 刻意推迟的三项渲染债收口——① `SectionFrame` 等图片（`img.decode()`）/字体（`fonts.ready`）就绪后一次性上报稳定高度（超时兜底）+ `VirtualDocs` 测高缓存占位，根除图片加载致的向上滚跳；② `VirtualDocs` 按 `active range ± keepDistance` 主动回调 `onUnloadSection` + `epub-book.unloadSection`（`section.unload()`），长书内存有界（CFI 操作只在可见 section，故 unload 远离视口安全）；③ `VirtualDocs` IntersectionObserver + 纯函数 `topVisibleIndex` 精确上报视口顶 `onTopSectionChange`，当前章高亮跟手。纯逻辑（`topVisibleIndex`/`sectionsToUnload`/`estimateHeight`）headless 单测，渲染真书手测验收。**关键坑**：`virtual-docs` 工作区源码包**不过 React Compiler**（经 node_modules 软链被 babel `/node_modules/` exclude），传给 react-virtuoso 的回调（尤其 `scrollerRef`）必须手动 `useCallback` 稳定身份，否则白屏（无限渲染）。详见 `specs/2026-06-03-reader-precision-memory-pass-design.md` / `plans/2026-06-03-reader-precision-memory-pass.md`。
 
-**下一目标候选**：**类型设计债清理**（已定为下一步）、RA4 收尾（M-d 全书摘要 / M-c 跨章）。颜色模式（dark / light / system）✅、`preferences` 持久化表 ✅、RA5 ✅、RA1-full「精度/内存 pass」✅ 均已完成。
+**类 macOS 自绘滚动条已交付**（2026-06-04）：新增 `components/ui/scroll-area.tsx`（包 Base UI `@base-ui/react/scroll-area`：Root>Viewport>Content + Scrollbar>Thumb，thumb 原生可拖、a11y/键盘内置）。**阅读区（Virtuoso）彻底隐条**——经既有全局类 `no-scrollbar` 透传到 `<Virtuoso className>` 隐原生条、无 thumb（绕开虚拟化估高跳变，VirtualDocs 加 epub-agnostic `className` 透传）。**7 处外壳容器**（侧栏目录/标注、书库网格、AI 消息流、设置 nav+面板、书卡、ChipBar 浮卡）换 ScrollArea；`Composer` textarea / `Select` 弹层排除。**显示时机 = 滚动时 ∪ 指针在滚动条轨道上时**：`data-[scrolling]` 瞬现 + 滚动条**元素自身** CSS `hover:opacity-100`（非 Base UI 整区 `data-hovering`——整区 hover 太急、不符 macOS），停手/移开经 `duration-300` 渐隐；设置面板关闭按钮顺带提为固定悬浮。无新单测（行为由 Base UI 拥有），整体代码审查（读 Base UI 源码核实 ref 转发/`data-` 属性名/7 处高度上下文）+ 真机手测验收（滚动条手感经用户两轮微调定稿）。详见 `specs/2026-06-03-custom-scrollbar-design.md` / `plans/2026-06-03-custom-scrollbar.md`。
+
+**下一目标候选**：RA4 收尾（**M-c 跨章会话**——最后一个未绿 RA 单元）、设置/产品 backlog（最大并发数 / 代理 / stepLimit / 独立摘要模型 / onboarding 引导）、其余延后项（选区工具栏/ChipBar → Base UI 原语、自绘窗口 chrome、嵌套 TOC / 章内分页 / 会话历史初值）。类型设计债清理 ✅、颜色模式 ✅、`preferences` ✅、RA5 ✅、RA1-full「精度/内存 pass」✅、IPC 契约注册表 #8 ✅、**类 macOS 自绘滚动条 ✅** 均已完成。
 
 ---
 
@@ -131,8 +133,8 @@
 | 当前章高亮滞后（overscan）→ VirtualDocs IntersectionObserver + topVisibleIndex 精确视口顶                                                                                                                                                                                         | ✅             | 阅读精度 pass（2026-06-03）               |
 | 长书 `section.document` 常驻内存 → 距视口阈值外 unloadSection、重进重渲                                                                                                                                                                                                           | ✅             | 阅读精度 pass（2026-06-03）               |
 | 全 schema 级 FK `ON DELETE CASCADE` 策略（6 个 book-owned FK 全加 `onDelete:cascade`；`assistants`/`providers` 共享资源不级联；表重建迁移）                                                                                                                                       | ✅             | #9 P3a                                    |
-| **移除阅读区原生滚动条**：阅读区（Virtuoso 滚动容器）现显示 OS 滚动条；隐藏之（配合下条自绘条）。                                                                                                                                                                                 | 🔴             | 用户 2026-06-03 指定                      |
-| **类 macOS 自绘滚动条**：迁移 ui-prototype 的 `ScrollArea.tsx`（自绘 thumb：height/top/opacity + 悬停淡入），统一用于阅读区/侧栏等滚动容器。                                                                                                                                      | 🔴             | 用户 2026-06-03 指定                      |
+| **移除阅读区原生滚动条**：阅读区（Virtuoso）经既有全局类 `no-scrollbar` 透传到 `<Virtuoso className>` 隐原生条、无 thumb。                                                                                                                                                        | ✅             | 自绘滚动条（2026-06-04）                  |
+| **类 macOS 自绘滚动条**：`components/ui/scroll-area.tsx` 包 Base UI ScrollArea（thumb 可拖、滚动 ∪ hover 轨道显示），7 处外壳容器换用；阅读区无条。                                                                                                                               | ✅             | 自绘滚动条（2026-06-04）                  |
 | **选区浮动工具栏迁 Base UI Popover**：`SelectionToolbar`/`HighlightStyleBar` 现保留 RA3 自定义 iframe 感知定位/消失逻辑（shadcn 重构期仅把内部按钮换成 Button 原语）；后续尝试迁到 Base UI Popover + virtual anchor 统一交互。                                                    | 🔴             | 用户 2026-06-03 指定（shadcn 重构期延后） |
 | **ChipBar 迁 Base UI PreviewCard**：现为自定义 hover 卡片（hover + 计时桥 + 自绘向上定位）；Base UI Popover 点击式不匹配 hover，留待 PreviewCard 原语化。                                                                                                                         | 🔴             | shadcn 重构延后                           |
 | **更广 Tooltip 应用 + Card 化 composite**：Tooltip 现仅阅读页顶栏 2 按钮，可推广到其余图标按钮；书卡/章节项/标注项/消息气泡等 composite 仍手搓 Tailwind，可按需抽成 shadcn `Card`。                                                                                               | 🔴             | shadcn 重构延后（按需）                   |
