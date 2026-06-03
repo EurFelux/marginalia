@@ -47,8 +47,7 @@ export function BookCard({ bookId }: { bookId: string }) {
   const status = summary.data?.status ?? "pending";
   const badge = BADGE[status];
   const text = summary.data?.summary ?? null; // ready=全文；generating=累积 partial（流式）
-  const genLabel =
-    status === "ready" ? "重新生成" : status === "unavailable" ? "重试生成" : "生成摘要";
+  const genLabel = status === "ready" ? "重新生成" : status === "unavailable" ? "重试" : "生成";
 
   return (
     <div className="shrink-0 border-b border-border p-3">
@@ -75,9 +74,20 @@ export function BookCard({ bookId }: { bookId: string }) {
         <PopoverContent align="start" sideOffset={6} className="w-96 text-left">
           <div className="mb-1.5 flex items-center justify-between gap-2">
             <span className="truncate text-xs font-semibold">全书摘要</span>
-            <span className={cn("shrink-0 rounded-full px-1.5 py-0.5 text-[10px]", badge.cls)}>
-              {badge.label}
-            </span>
+            {/* 右上角放生成/重新生成按钮（状态已由触发器 pill 表达）；生成中显示一行提示 */}
+            {status === "generating" ? (
+              <span className="shrink-0 text-[10px] text-muted-foreground">生成中…</span>
+            ) : (
+              <Button
+                size="xs"
+                variant={status === "ready" ? "outline" : "default"}
+                onClick={() => generate.mutate()}
+                disabled={generate.isPending}
+                className="shrink-0"
+              >
+                {generate.isPending ? "…" : genLabel}
+              </Button>
+            )}
           </div>
           <div className="max-h-96 overflow-y-auto text-sm leading-relaxed text-foreground">
             {text ? (
@@ -89,17 +99,6 @@ export function BookCard({ bookId }: { bookId: string }) {
               </p>
             )}
           </div>
-          {status !== "generating" && (
-            <Button
-              size="sm"
-              variant={status === "ready" ? "outline" : "default"}
-              onClick={() => generate.mutate()}
-              disabled={generate.isPending}
-              className="mt-2"
-            >
-              {generate.isPending ? "生成中…" : genLabel}
-            </Button>
-          )}
         </PopoverContent>
       </Popover>
     </div>
