@@ -3,6 +3,7 @@ import { useChat } from "@ai-sdk/react";
 import { Plus, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@renderer/components/ui/button";
+import { ScrollArea } from "@renderer/components/ui/scroll-area";
 import { useChatStore } from "@renderer/store/chat-store";
 import { createIpcChatTransport } from "@renderer/ai/ipc-chat-transport";
 import type { ChatUIMessage } from "@renderer/ai/types";
@@ -57,9 +58,11 @@ export function AIPanel() {
         </div>
       </header>
 
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto p-4">
-        <MessageList messages={messages} status={status} />
-      </div>
+      <ScrollArea className="min-h-0 flex-1" viewportRef={scrollRef}>
+        <div className="p-4">
+          <MessageList messages={messages} status={status} />
+        </div>
+      </ScrollArea>
 
       {error && (
         <div className="shrink-0 border-t border-border bg-destructive/10 px-3 py-2 text-xs text-destructive">
