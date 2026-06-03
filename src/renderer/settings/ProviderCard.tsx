@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { ProviderIcon } from "@lobehub/icons";
 import { Check, Pencil, PlugZap, Trash2, X } from "lucide-react";
 import type { ProviderDto } from "@shared/providers";
 import { PROVIDER_TYPE_LABEL } from "@shared/providers";
@@ -35,9 +36,11 @@ export function ProviderCard({
   return (
     <div className="rounded-lg border border-border p-3">
       <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          <span className="text-sm font-medium">{provider.label ?? "（未命名）"}</span>
-          <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+        <div className="flex min-w-0 items-center gap-1.5">
+          {/* 内置 provider 显示品牌图标（@lobehub/icons；provider key = 我们的 type）。 */}
+          {provider.isBuiltin && <ProviderIcon provider={provider.type} type="color" size={18} />}
+          <span className="truncate text-sm font-medium">{provider.label ?? "（未命名）"}</span>
+          <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
             {PROVIDER_TYPE_LABEL[provider.type]}
           </span>
         </div>
