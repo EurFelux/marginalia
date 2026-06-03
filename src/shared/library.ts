@@ -47,7 +47,7 @@ export interface ChapterRefDto {
   level: number;
 }
 
-/** 章节摘要状态机（与 chapters.summary_status 的 CHECK 约束一致）。 */
+/** 章节/全书摘要的派生状态机（主进程读取时派生，不入 DB；见 DB lifecycle spec §2 / DD-§2）。 */
 export type SummaryStatus = "pending" | "generating" | "ready" | "unavailable";
 
 /** content:chapter-summary 返回：摘要状态 + 正文（ready 时非空）。 */

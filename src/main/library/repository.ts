@@ -48,7 +48,6 @@ export function importBook(db: DB, input: ImportInput): BookRow {
           href: item.href,
           orderIndex: index,
           title: labels.get(item.href) ?? null,
-          summaryStatus: "pending",
         })
         .run();
     });

@@ -186,7 +186,7 @@ describe("runSend", () => {
       modelId: "mock",
     });
     db.update(chapters)
-      .set({ summaryStatus: "ready", summary: "CHAPTER-SUMMARY-XYZ" })
+      .set({ summary: "CHAPTER-SUMMARY-XYZ" })
       .where(eq(chapters.id, ch1.id))
       .run();
     const r = runSend(deps, input(book.id, ch1.id));

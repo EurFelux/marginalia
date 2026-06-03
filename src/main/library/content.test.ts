@@ -62,7 +62,6 @@ describe("content service", () => {
         bookId: book.id,
         href: "OEBPS/cover.xhtml",
         orderIndex: 99,
-        summaryStatus: "pending",
       })
       .run();
     const chs = listChapters(db, book.id);

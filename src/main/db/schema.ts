@@ -75,20 +75,8 @@ export const chapters = sqliteTable(
     orderIndex: integer("order_index"),
     href: text("href").notNull(), // spine 项 href（书内唯一定位）
     summary: text("summary"),
-    summaryStatus: text("summary_status", {
-      enum: ["pending", "generating", "ready", "unavailable"],
-    })
-      .notNull()
-      .default("pending"),
   },
-  (t) => [
-    unique().on(t.bookId, t.href),
-    check(
-      "chapters_summary_status_check",
-      sql`${t.summaryStatus} in ('pending','generating','ready','unavailable')`,
-    ),
-    index("chapters_book_id_idx").on(t.bookId),
-  ],
+  (t) => [unique().on(t.bookId, t.href), index("chapters_book_id_idx").on(t.bookId)],
 );
 
 export const progress = sqliteTable("progress", {

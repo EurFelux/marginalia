@@ -26,7 +26,6 @@ describe("library repository", () => {
     expect(ch1?.orderIndex).toBe(0);
     expect(ch2?.orderIndex).toBe(1);
     expect(ch1?.title).toBe("Chapter One");
-    expect(ch1?.summaryStatus).toBe("pending");
     expect(ch1?.id).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
     );
