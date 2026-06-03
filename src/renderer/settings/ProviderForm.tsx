@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import type { AiProviderApiType, ProviderDto } from "@shared/providers";
 import {
   aiProviderApiType,
@@ -39,6 +40,7 @@ export function ProviderForm({
   provider: ProviderDto | null;
   onDone: () => void;
 }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [f, setF] = useState<ProviderFormState>(() => initial(provider));
   const [editingKey, setEditingKey] = useState(provider == null || provider.key.status === "none");
@@ -68,7 +70,7 @@ export function ProviderForm({
   return (
     <div className="space-y-3 rounded-lg border border-border p-3">
       <div className="grid grid-cols-[5rem_1fr] items-center gap-2">
-        <span className="text-xs text-muted-foreground">类型</span>
+        <span className="text-xs text-muted-foreground">{t("settings.provider.type", "类型")}</span>
         <Select
           value={f.type}
           disabled={typeLocked}
@@ -90,28 +92,37 @@ export function ProviderForm({
             ))}
           </SelectContent>
         </Select>
-        <span className="text-xs text-muted-foreground">名称</span>
+        <span className="text-xs text-muted-foreground">{t("settings.provider.name", "名称")}</span>
         <Input
           value={f.label}
           onChange={(e) => setF({ ...f, label: e.target.value })}
           disabled={locked}
-          placeholder="（必填）"
+          placeholder={t("settings.provider.namePlaceholder", "（必填）")}
         />
-        <span className="text-xs text-muted-foreground">baseURL</span>
+        <span className="text-xs text-muted-foreground">
+          {t("settings.provider.baseUrl", "baseURL")}
+        </span>
         <Input
           value={displayBaseUrl}
           onChange={(e) => setF({ ...f, baseUrl: e.target.value })}
           disabled={locked}
-          placeholder={DEFAULT_BASE_URL[f.type] ?? "https://你的网关/v1（必填）"}
+          placeholder={
+            DEFAULT_BASE_URL[f.type] ??
+            t("settings.provider.baseUrlPlaceholder", "https://你的网关/v1（必填）")
+          }
         />
-        <span className="text-xs text-muted-foreground">API Key</span>
+        <span className="text-xs text-muted-foreground">
+          {t("settings.provider.apiKey", "API Key")}
+        </span>
         {!editingKey && provider && provider.key.status !== "none" ? (
           <div className="flex items-center gap-2">
             <span className="flex-1 truncate font-mono text-sm text-muted-foreground">
-              {provider.key.status === "set" ? provider.key.mask : "本机无法解密"}
+              {provider.key.status === "set"
+                ? provider.key.mask
+                : t("settings.provider.keyUndecryptable", "本机无法解密")}
             </span>
             <Button type="button" variant="outline" size="sm" onClick={() => setEditingKey(true)}>
-              编辑
+              {t("common.edit", "编辑")}
             </Button>
           </div>
         ) : (
@@ -132,11 +143,15 @@ export function ProviderForm({
         id={f.id}
       />
       {save.isError && (
-        <p className="text-xs text-destructive">保存失败：{(save.error as Error).message}</p>
+        <p className="text-xs text-destructive">
+          {t("settings.provider.saveFailed", "保存失败：{{message}}", {
+            message: (save.error as Error).message,
+          })}
+        </p>
       )}
       <div className="flex justify-end gap-2">
         <Button type="button" variant="ghost" size="sm" onClick={onDone}>
-          取消
+          {t("common.cancel", "取消")}
         </Button>
         <Button
           type="button"
@@ -144,7 +159,7 @@ export function ProviderForm({
           disabled={!canSave || save.isPending}
           onClick={() => save.mutate()}
         >
-          {save.isPending ? "保存中…" : "保存"}
+          {save.isPending ? t("common.saving", "保存中…") : t("common.save", "保存")}
         </Button>
       </div>
     </div>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { ProviderDto } from "@shared/providers";
 import { qk } from "@renderer/query/keys";
 import { Button } from "@renderer/components/ui/button";
@@ -9,6 +10,7 @@ import { ProviderCard } from "./ProviderCard";
 import { ProviderForm } from "./ProviderForm";
 
 export function ModelsSettings() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const providers = useQuery({
     queryKey: qk.providers,
@@ -23,13 +25,15 @@ export function ModelsSettings() {
 
   return (
     <section className="space-y-6">
-      <h2 className="font-serif text-lg">模型</h2>
+      <h2 className="font-serif text-lg">{t("settings.models", "模型")}</h2>
       <AssistantModelPicker />
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold">Providers</h3>
+          <h3 className="text-sm font-semibold">
+            {t("settings.provider.title", "$t(terms.provider)")}
+          </h3>
           <Button variant="outline" size="sm" onClick={() => setEditing("new")}>
-            <Plus className="size-4" /> 添加
+            <Plus className="size-4" /> {t("settings.provider.add", "添加$t(terms.provider)")}
           </Button>
         </div>
         {editing === "new" && <ProviderForm provider={null} onDone={() => setEditing(null)} />}

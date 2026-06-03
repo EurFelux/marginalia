@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { qk } from "@renderer/query/keys";
 import { Button } from "@renderer/components/ui/button";
 import {
@@ -13,6 +14,7 @@ import { useSettingsStore } from "@renderer/store/settings-store";
 import { assistantModelOptions } from "./settings-logic";
 
 export function AssistantModelPicker() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const providers = useQuery({
     queryKey: qk.providers,
@@ -41,11 +43,13 @@ export function AssistantModelPicker() {
     onError: (e) => setTestResult({ ok: false, message: (e as Error).message }),
   });
 
+  const unnamed = t("settings.provider.unnamed", "（未命名）");
+
   return (
     <section className="space-y-3">
-      <h3 className="text-sm font-semibold">对话模型</h3>
+      <h3 className="text-sm font-semibold">{t("settings.assistantModel", "对话模型")}</h3>
       <div className="grid grid-cols-[5rem_1fr] items-center gap-2">
-        <span className="text-xs text-muted-foreground">Provider</span>
+        <span className="text-xs text-muted-foreground">{t("terms.provider")}</span>
         <Select
           value={providerId || null}
           onValueChange={(id) => {
@@ -59,23 +63,23 @@ export function AssistantModelPicker() {
         >
           <SelectTrigger className="h-9 w-full">
             {/* value 是 provider id（uuid）；Base UI Select.Value 默认渲染裸 value，故用函数 child 映射成名字。 */}
-            <SelectValue placeholder="选择 provider">
+            <SelectValue placeholder={t("settings.provider.select", "选择$t(terms.provider)")}>
               {(value) =>
                 typeof value === "string"
-                  ? (providers.data?.find((p) => p.id === value)?.label ?? "（未命名）")
-                  : "选择 provider"
+                  ? (providers.data?.find((p) => p.id === value)?.label ?? unnamed)
+                  : t("settings.provider.select", "选择$t(terms.provider)")
               }
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {providers.data?.map((p) => (
               <SelectItem key={p.id} value={p.id}>
-                {p.label ?? "（未命名）"}
+                {p.label ?? unnamed}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <span className="text-xs text-muted-foreground">模型</span>
+        <span className="text-xs text-muted-foreground">{t("settings.model", "模型")}</span>
         <Select
           value={model || null}
           disabled={!providerId}
@@ -87,7 +91,7 @@ export function AssistantModelPicker() {
           }}
         >
           <SelectTrigger className="h-9 w-full">
-            <SelectValue placeholder="选择模型" />
+            <SelectValue placeholder={t("settings.model.select", "选择模型")} />
           </SelectTrigger>
           <SelectContent>
             {modelOptions.map((m) => (
@@ -105,7 +109,9 @@ export function AssistantModelPicker() {
           disabled={!providerId || !model || test.isPending}
           onClick={() => test.mutate()}
         >
-          {test.isPending ? "测试中…" : "测试连接"}
+          {test.isPending
+            ? t("settings.provider.testing", "测试中…")
+            : t("settings.provider.test", "测试连接")}
         </Button>
         {testResult && (
           <span
@@ -116,7 +122,11 @@ export function AssistantModelPicker() {
             }
           >
             {testResult.ok ? <Check className="size-4" /> : <X className="size-4" />}
-            {testResult.ok ? "连接成功" : `失败：${testResult.message ?? ""}`}
+            {testResult.ok
+              ? t("settings.provider.testOk", "连接成功")
+              : t("settings.provider.testFail", "失败：{{message}}", {
+                  message: testResult.message ?? "",
+                })}
           </span>
         )}
       </div>

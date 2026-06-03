@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Download, Plus, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { AiProviderApiType } from "@shared/providers";
 import { Button } from "@renderer/components/ui/button";
 import { Input } from "@renderer/components/ui/input";
@@ -21,6 +22,7 @@ export function ModelEditor({
   apiKey: string;
   id: string | undefined;
 }) {
+  const { t } = useTranslation();
   const [manual, setManual] = useState("");
   const [fetched, setFetched] = useState<string[] | null>(null);
   const [checked, setChecked] = useState<Set<string>>(new Set());
@@ -67,22 +69,33 @@ export function ModelEditor({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">模型</span>
+        <span className="text-xs text-muted-foreground">{t("settings.model", "模型")}</span>
         <Button
           type="button"
           variant="outline"
           size="sm"
           onClick={pull}
           disabled={loading || cannotPull}
-          title={cannotPull ? "请先填写 baseURL" : "从 provider 拉取模型列表"}
+          title={
+            cannotPull
+              ? t("settings.modelEditor.pullDisabled", "请先填写 baseURL")
+              : t("settings.modelEditor.pullTitle", "从$t(terms.provider)拉取模型列表")
+          }
         >
-          <Download className="size-4" /> {loading ? "拉取中…" : "拉取模型"}
+          <Download className="size-4" />{" "}
+          {loading
+            ? t("settings.modelEditor.pulling", "拉取中…")
+            : t("settings.modelEditor.pull", "拉取模型")}
         </Button>
       </div>
       {err && <p className="text-xs text-destructive">{err}</p>}
       {fetched && (
         <div className="rounded-md border border-border p-2">
-          {fetched.length === 0 && <p className="text-xs text-muted-foreground">（无模型）</p>}
+          {fetched.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              {t("settings.modelEditor.noModels", "（无模型）")}
+            </p>
+          )}
           {fetched.map((m) => (
             <label key={m} className="flex cursor-pointer items-center gap-2 py-0.5 text-sm">
               <Checkbox
@@ -112,7 +125,9 @@ export function ModelEditor({
               setFetched(null);
             }}
           >
-            添加所选{checked.size > 0 ? `（${checked.size}）` : ""}
+            {checked.size > 0
+              ? t("settings.modelEditor.addSelected", "添加所选（{{n}}）", { n: checked.size })
+              : t("settings.modelEditor.addSelectedEmpty", "添加所选")}
           </Button>
         </div>
       )}
@@ -125,7 +140,7 @@ export function ModelEditor({
             {m}
             <button
               type="button"
-              aria-label="移除"
+              aria-label={t("common.remove", "移除")}
               onClick={() => onChange(models.filter((x) => x !== m))}
             >
               <X className="size-3.5" />
@@ -143,7 +158,7 @@ export function ModelEditor({
               addManual();
             }
           }}
-          placeholder="手动添加模型名…"
+          placeholder={t("settings.modelEditor.manualPlaceholder", "手动添加模型名…")}
         />
         <Button type="button" variant="outline" size="sm" onClick={addManual}>
           <Plus className="size-4" />
