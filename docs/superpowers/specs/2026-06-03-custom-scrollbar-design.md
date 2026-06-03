@@ -18,7 +18,7 @@
 - **DD-1 阅读区：彻底无条**。阅读区（Virtuoso）只隐藏原生 OS 条、**不要任何 thumb**（不论自绘还是原生）。干净沉浸的书页，同时绕开虚拟化 thumb 难题（该难题留给将来的「精度/内存 pass」）。仅竖向（阅读不横滚）。
 - **DD-2 其余容器：Base UI ScrollArea 原语**，而非迁移自搓原型。理由：项目刚标准化到 Base UI，可拖拽行为/键盘/a11y 白送，长期维护面更小，与「迁原语」backlog 方向一致。（放弃迁移 ui-prototype `ScrollArea.tsx`——其 thumb 不可拖，且自搓拖拽/a11y 需自维护。）
 - **DD-3 交互：可拖拽 thumb，轨道不可点**。thumb 可鼠标抓拽滚动（Base UI 原生，拖拽期自动防选中）；点击空轨道翻页**不做**（overlay 窄条命中面积小、与内容点击区分需额外处理，超范围）。
-- **DD-4 审美：macOS 细 overlay**。沿用原型语汇——thumb `w-1.5 rounded-full bg-foreground/35`，浮在右缘**不占布局**（不给 Content 留 gutter），`opacity-0` → 滚动/悬停 `opacity-100` 过渡淡入、停手淡出。
+- **DD-4 审美：macOS 细 overlay**。沿用原型语汇——thumb `w-1.5 rounded-full bg-foreground/35`，浮在右缘**不占布局**（不给 Content 留 gutter）。**仅滚动时显示**：`data-scrolling` 时 `opacity-100` 瞬现，停手后经 `duration-300` 渐隐；**不认 `data-hovering`**（悬停整区不显——经实机评审，整区 hover 持续显示太急、不符 macOS「show on scroll」预期）。
 - **DD-5 实现结构**：新增 `components/ui/scroll-area.tsx` shadcn 风包装（手写包装 `@base-ui/react/scroll-area`，仿 `popover.tsx`——`cn` + 现有 token + `data-slot`）。**不跑 shadcn CLI**（primitive 已随 `@base-ui/react` 安装，无新依赖）。
 - **DD-6 消费方范围**：7 处应用外壳容器换 ScrollArea；`Composer.tsx`（原生 `<textarea>` 内部滚动）与 `select.tsx`（Base UI Select 自管弹层）**排除**，保持现状。
 
@@ -42,7 +42,7 @@
   - props：`className`（→ Root，承尺寸/`relative`）、`viewportClassName`（→ Viewport，默认 `size-full`）、`viewportRef?: Ref<HTMLDivElement>`（透传到 Viewport，供程序化滚动如 AIPanel 滚底）、`children`（进 `Content`）、其余 `...props` → Root。
   - **`Content` 不可省**：Base UI 靠 Viewport vs Content 尺寸差测溢出（`data-has-overflow-y`），省了则不溢出时 scrollbar 不显/显错。
 - **`ScrollBar`**：`Scrollbar(orientation="vertical") > Thumb`。
-  - Scrollbar：`flex w-2.5 touch-none select-none justify-center opacity-0 transition-opacity duration-300 data-[hovering]:opacity-100 data-[scrolling]:opacity-100 data-[scrolling]:duration-0`（停手 → 失去 hovering/scrolling → 淡出）。
+  - Scrollbar：`flex w-2.5 touch-none select-none justify-center opacity-0 transition-opacity duration-300 data-[scrolling]:opacity-100 data-[scrolling]:duration-0`（仅 `data-scrolling` 瞬现；停手 → 失去 scrolling → `duration-300` 渐隐。**不用 `data-[hovering]`**）。
   - Thumb：`w-1.5 rounded-full bg-foreground/35`（暗色经 `--foreground` 自动反相，对比足够）。
   - 浮在右缘、不占布局（不在 Content 上留 padding/gutter）。
 - **变体名待实测**：Base UI 的 `data-hovering`/`data-scrolling` 为布尔存在属性，Tailwind v4 用 `data-[hovering]:`/`data-[scrolling]:` 匹配；若实测变体未生效（参照此前 tabs `data-orientation` 错配坑），在 `src/index.css` 补 `@custom-variant` 映射。
@@ -94,7 +94,7 @@
 - **`pnpm typecheck` + `pnpm lint`** 必过。
 - **手测清单**（`pnpm start`，逐容器）：
   - 阅读区：滚动全程**无任何条**（原生消失、无 thumb）✓
-  - 7 处外壳容器，逐处：原生条消失 ✓ / 内容溢出时 thumb 现、不溢出时无 thumb ✓ / 滚动或悬停淡入、停手淡出 ✓ / thumb 可拖拽滚动且拖时不选中文本 ✓ / 暗色下 thumb 对比可见 ✓ / 无布局回归（高度/flex/padding 正确）✓
+  - 7 处外壳容器，逐处：原生条消失 ✓ / 内容溢出时 thumb 现、不溢出时无 thumb ✓ / **滚动时淡入、停手淡出**（悬停整区不应显示）✓ / thumb 可拖拽滚动且拖时不选中文本 ✓ / 暗色下 thumb 对比可见 ✓ / 无布局回归（高度/flex/padding 正确）✓
   - AIPanel：发新消息仍平滑自动滚底 ✓
 - 加 Base UI 组件后按记忆惯例确认 `@base-ui/react` 已装（`^1.5.0`，无新依赖）；若 `pnpm install` 被触发，`postinstall` 自动 `db:rebuild:electron` 翻回 Electron ABI。
 
@@ -102,7 +102,7 @@
 
 - **逐容器布局回归**：滚动归属从单 div 改为 Root/Viewport/Content 三层，高度上下文（`h-full`/`flex-1`/`min-h-0`）、flex、padding 错位风险——逐处手测兜底。SettingsShell 两处 + 边框/`min-w-0` 归属最易错。
 - **Base UI 变体名**：`data-[hovering]`/`data-[scrolling]` 若未生效，补 `@custom-variant`（参照 tabs `data-orientation` 坑）。
-- **overlay thumb 遮内容**：浮条压在内容极右缘——thumb 细且仅滚动/悬停可见，可接受；个别容器按需补 `pe-*`。
+- **overlay thumb 遮内容**：浮条压在内容极右缘——thumb 细且仅滚动时可见，可接受；个别容器按需补 `pe-*`。
 
 ## §8 · 范围外（YAGNI）
 
@@ -117,6 +117,6 @@
 - **DD-1**：阅读区彻底无条（隐原生 + 无 thumb，仅竖向；虚拟化 thumb 延后精度 pass）。
 - **DD-2**：其余容器用 Base UI ScrollArea 原语（非迁自搓原型）。
 - **DD-3**：可拖拽 thumb，轨道不可点。
-- **DD-4**：macOS 细 overlay 审美（`w-1.5 rounded-full bg-foreground/35`，浮右缘不占布局，淡入淡出）。
+- **DD-4**：macOS 细 overlay 审美（`w-1.5 rounded-full bg-foreground/35`，浮右缘不占布局，**仅滚动时显示、停手渐隐**，不认 hover）。
 - **DD-5**：新增 `components/ui/scroll-area.tsx` shadcn 风包装（仿 popover，不跑 CLI）。
 - **DD-6**：7 处外壳容器换条；Composer/Select 排除。
