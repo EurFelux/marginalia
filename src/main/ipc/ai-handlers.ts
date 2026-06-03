@@ -1,14 +1,7 @@
 import type { IpcMainInvokeEvent, WebContents } from "electron";
-import { IPC } from "@shared/ipc";
-import {
-  abortInput,
-  sendRequest,
-  type AbortInput,
-  type AiStreamEvent,
-  type SendAck,
-  type SendRequest,
-} from "@shared/chat";
-import { handle } from "@main/ipc/registry";
+import { C } from "@shared/ipc";
+import type { AiStreamEvent, SendAck } from "@shared/chat";
+import { bind, register, type Binding } from "@main/ipc/registry";
 import { runSend, type SendResult } from "@main/ai/send";
 import { makeSendDeps } from "@main/ai/send-deps";
 
@@ -22,7 +15,7 @@ export async function pumpStream(
   signal: AbortSignal,
 ): Promise<void> {
   const emit = (ev: AiStreamEvent) => {
-    if (!sender.isDestroyed()) sender.send(IPC.aiChunk, ev);
+    if (!sender.isDestroyed()) sender.send(C.aiChunk.channel, ev);
   };
   try {
     for await (const chunk of result.stream) {
@@ -40,8 +33,8 @@ export async function pumpStream(
 
 const controllers = new Map<string, AbortController>();
 
-export function registerAiHandlers(): void {
-  handle<SendRequest, SendAck>(IPC.aiSend, sendRequest, (req, event: IpcMainInvokeEvent) => {
+export const aiBindings: Binding[] = [
+  bind(C.aiSend, (req, event: IpcMainInvokeEvent): SendAck => {
     const { streamId, ...input } = req;
     const controller = new AbortController();
     controllers.set(streamId, controller);
@@ -60,9 +53,13 @@ export function registerAiHandlers(): void {
       created: result.created,
       switchedFromActive: result.switchedFromActive,
     };
-  });
+  }),
 
-  handle<AbortInput, void>(IPC.aiAbort, abortInput, ({ streamId }) => {
+  bind(C.aiAbort, ({ streamId }) => {
     controllers.get(streamId)?.abort();
-  });
+  }),
+];
+
+export function registerAiHandlers(): void {
+  register(aiBindings);
 }
