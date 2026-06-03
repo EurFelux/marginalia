@@ -59,7 +59,9 @@ export function mapModelsError(
   err: unknown,
   status: number | undefined,
 ): { status?: number; message: string } {
-  const fromErr = err instanceof Error ? err.message : err ? String(err) : "";
+  // 仅取 Error.message / string 原文（避免对任意 unknown 调 String 得到 "[object Object]"）；
+  // 其它形态（对象/数字等）退到 HTTP 语义——honest，不编造。
+  const fromErr = err instanceof Error ? err.message : typeof err === "string" ? err : "";
   if (fromErr) return { status, message: fromErr };
   if (status && HTTP_HINT[status])
     return { status, message: `HTTP ${status}: ${HTTP_HINT[status]}` };
