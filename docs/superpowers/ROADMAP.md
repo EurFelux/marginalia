@@ -21,6 +21,8 @@
 
 **RA5 已交付并合并**（多 provider + baseUrl + 双栏设置 + 拉模型）：providers.models 字段 + seed 默认值 + `fetchProviderModels` + `list-models` IPC + 双栏 Settings UI 替换旧 modal；provider `baseUrl` 可配自定义 API 端点。
 
+**i18n 已交付**（双语 zh-CN/en，2026-06-03）：`@shared/i18n` 纯逻辑 + **扁平点分键** locale（i18next-cli extract/lint/status 工具链，`defaultNS:false`/`keySeparator:false` 便于全文搜索）；主进程 vanilla i18next 本地化「自产」错误消息（honest-error 透传不动）+ 渲染层 react-i18next（**跟随系统语言** + 偏好持久化 + 设置「外观」语言切换 + `<html lang/dir>`）；**全量 UI 文案抽取**（160 键、zh-CN/en 各 100%）；`provider` 提为 **`terms.provider`** 术语（zh「模型服务商」）经 `$t()` 嵌套复用；物理 Tailwind 类 → **逻辑类**（RTL-ready，LTR 渲染零变化）。详见 `specs/2026-06-03-i18n-design.md` / `plans/2026-06-03-i18n.md`。
+
 **下一目标候选**：**类型设计债清理**（已定为下一步）、RA4 收尾（M-d 全书摘要 / M-c 跨章）、`preferences` 持久化表、RA1-full「精度/内存 pass」（图片延时 / 当前章高亮滞后 / 长书 section 内存，见 backlog）。颜色模式（dark / light / system）✅ 已完成。RA5 ✅ 已完成。
 
 ---
@@ -75,21 +77,21 @@
 
 ### 设置 / 产品
 
-| 项                                                                                                                     | 状态 | 来源                               |
-| ---------------------------------------------------------------------------------------------------------------------- | ---- | ---------------------------------- |
-| **最大并发数设置**（后台模型调用全局上限，默认建议 2–3）                                                               | 🔴   | vslice spec §10 / core §11         |
-| 可配置代理设置（自定义地址 / PAC / 按 provider 覆盖）                                                                  | 🔴   | vslice spec §8.1 / §10             |
-| `stepLimit` 设置项（现硬编默认 5）                                                                                     | 🔴   | ma5-deferred #8                    |
-| 独立「摘要模型」设置                                                                                                   | 🔴   | core §11                           |
-| i18n（多语言）                                                                                                         | 🔴   | 竖切未上；UP1 用过 i18next         |
-| **颜色模式**（dark / light / system 三档，跟随系统）                                                                   | ✅   | 用户 2026-06-02 指定               |
-| 书页暗色无法覆盖带 `!important` 硬编码颜色的 ePub（颜色模式 v1 已知局限）                                              | 🔴   | 颜色模式 v1 已知局限               |
-| 独立阅读主题（sepia / 与外壳解耦的夜间档）                                                                             | 🔴   | 颜色模式后续扩展                   |
-| `metadata.usage` 落库（token 用量）                                                                                    | 🔴   | ma5-deferred #4                    |
-| 结构化 `reason` 分类（现自由字符串，UI 要 i18n 时再做）                                                                | 🔴   | ma5-deferred #6                    |
-| onboarding/landing 引导用户先配 provider + 开自动摘要                                                                  | 🔴   | 记忆 onboarding-guide-auto-summary |
-| **书库样式改善 + 书封面**：书库视图美化；每本书显示封面（从 ePub 提取封面图，epub-parser 可能需补 cover 提取）。       | 🔴   | 用户 2026-06-03 指定               |
-| **provider `baseUrl` 设置**：每个 provider 可配自定义 API 端点（OpenAI 兼容代理 / 自建网关等）；关联 RA5 provider UI。 | ✅   | 用户 2026-06-03 指定               |
+| 项                                                                                                                     | 状态 | 来源                                                                                                                 |
+| ---------------------------------------------------------------------------------------------------------------------- | ---- | -------------------------------------------------------------------------------------------------------------------- |
+| **最大并发数设置**（后台模型调用全局上限，默认建议 2–3）                                                               | 🔴   | vslice spec §10 / core §11                                                                                           |
+| 可配置代理设置（自定义地址 / PAC / 按 provider 覆盖）                                                                  | 🔴   | vslice spec §8.1 / §10                                                                                               |
+| `stepLimit` 设置项（现硬编默认 5）                                                                                     | 🔴   | ma5-deferred #8                                                                                                      |
+| 独立「摘要模型」设置                                                                                                   | 🔴   | core §11                                                                                                             |
+| i18n（多语言）                                                                                                         | ✅   | zh-CN/en；跟随系统 + 偏好持久化；主进程错误 + 渲染层全量抽取（160 键 100%）；RTL-ready；2026-06-03                   |
+| **颜色模式**（dark / light / system 三档，跟随系统）                                                                   | ✅   | 用户 2026-06-02 指定                                                                                                 |
+| 书页暗色无法覆盖带 `!important` 硬编码颜色的 ePub（颜色模式 v1 已知局限）                                              | 🔴   | 颜色模式 v1 已知局限                                                                                                 |
+| 独立阅读主题（sepia / 与外壳解耦的夜间档）                                                                             | 🔴   | 颜色模式后续扩展                                                                                                     |
+| `metadata.usage` 落库（token 用量）                                                                                    | 🔴   | ma5-deferred #4                                                                                                      |
+| 结构化 `reason` 分类（`reason` 现为自由字符串）                                                                        | 🔴   | ma5-deferred #6；i18n 已落地但选择在主进程产出时本地化 `reason` 串，结构化分类本身未做（仅渲染层需按码重译时才需要） |
+| onboarding/landing 引导用户先配 provider + 开自动摘要                                                                  | 🔴   | 记忆 onboarding-guide-auto-summary                                                                                   |
+| **书库样式改善 + 书封面**：书库视图美化；每本书显示封面（从 ePub 提取封面图，epub-parser 可能需补 cover 提取）。       | 🔴   | 用户 2026-06-03 指定                                                                                                 |
+| **provider `baseUrl` 设置**：每个 provider 可配自定义 API 端点（OpenAI 兼容代理 / 自建网关等）；关联 RA5 provider UI。 | ✅   | 用户 2026-06-03 指定                                                                                                 |
 
 ### 基建 / 重构
 
