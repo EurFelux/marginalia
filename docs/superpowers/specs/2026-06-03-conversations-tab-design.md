@@ -137,3 +137,11 @@ ack → setActiveConversation + invalidate qk.conversations(bookId) → 列表�
 - 相关纯函数（`messageDtoToUIMessage` / `deriveConversationTitle`）+ 测试。
 
 **不改：** `ConversationDto`/`MessageDto`/IPC 契约 `C`/`routeConversation`/`listByBook`/`listByConversation`。
+
+## 9. 追加：跨章路由 + 「无 active」语义（2026-06-04，用户决定，取代 §4.3 第 6 点与 §8「不改 routeConversation」）
+
+会话 tab 手测后用户裁定：**active 会话章节 ≠ 划词章节时应建新会话**（无「一章一会话」约束，复用旧会话不符直觉）；且**会话只在 send 时创建**、「不同章划词」只是渲染层**进入无 active 状态**（不写库）。落地：
+
+- **`routeConversation` 新语义**：active 存在且同书且（独立 `chapterId===null` 或同章）→ 追加；**其余一律建新**（含无 active / 陈旧 id——**弃 find-or-create「复活」**，显式重开由会话 tab 取代；「新对话」后提问从此真·新会话）。`switchedFromActive` 仅在离开「同书、不同章的活会话」时为 true。
+- **渲染层「不同章划词 → 进入无 active」**：chat-store 增 `activeConversationChapterId`（显示中会话所属章：`openConversation(id, chapterId)` 从 tab 传入 / send ack 回写当前章 / 置 null 时同清）；`startAiAction`（划词→AI 问）在章节不匹配时 `setActiveConversation(null)`；AIPanel 增「`activeConversationId === null` → 清面板」effect（统一覆盖划词清 / 新对话 / 开书）。
+- **关键时序约束**：`handleSend` 对「跨章自由输入」的防御兜底**只清面板、不得 null 化 active**——否则「active===null → 清面板」effect 会在 React 提交后把 `sendMessage` 刚加入的用户消息一并擦掉（ack 异步设新 id 晚于 effect）；该路径路由交给主进程防御分支（active 不同章 → 建新），ack 回写即纠正 active 与所属章（active 全程不经 null）。
