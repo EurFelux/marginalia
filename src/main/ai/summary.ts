@@ -97,14 +97,14 @@ export function getBookSummaryView(
   const row = db.select({ summary: books.summary }).from(books).where(eq(books.id, bookId)).get();
   if (!row) throw new Error(`summary: book ${bookId} not found`);
   const summary = row.summary ?? null;
-  const status: SummaryStatus =
-    summary != null
+  // inFlight 优先于 summary 存在性：重新生成（旧 summary 还在 + 正在重生）应显示 generating。
+  const status: SummaryStatus = inFlightBooks.has(bookId)
+    ? "generating"
+    : summary != null
       ? "ready"
-      : inFlightBooks.has(bookId)
-        ? "generating"
-        : failedBooks.has(bookId)
-          ? "unavailable"
-          : "pending";
+      : failedBooks.has(bookId)
+        ? "unavailable"
+        : "pending";
   return { status, summary };
 }
 
@@ -133,7 +133,7 @@ export async function ensureBookSummary(deps: SummaryDeps, bookId: string): Prom
       model: resolved.model,
       system: BOOK_SUMMARY_SYSTEM,
       prompt: text,
-      maxOutputTokens: 1024,
+      maxOutputTokens: 4096, // 全书摘要（主题/人物/结构、多段）比单章长，给足额度避免输出截断
       maxRetries: 1,
     });
     db.update(books).set({ summary }).where(eq(books.id, bookId)).run();

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Streamdown } from "streamdown";
 import type { SummaryStatus } from "@shared/library";
 import { qk } from "@renderer/query/keys";
 import { cn } from "@renderer/lib/utils";
@@ -68,16 +69,23 @@ export function BookCard({ bookId }: { bookId: string }) {
         >
           {badge.label}
         </PopoverTrigger>
-        <PopoverContent align="start" sideOffset={6} className="w-72 text-left">
+        <PopoverContent align="start" sideOffset={6} className="w-96 text-left">
           <div className="mb-1.5 flex items-center justify-between gap-2">
             <span className="truncate text-xs font-semibold">全书摘要</span>
             <span className={cn("shrink-0 rounded-full px-1.5 py-0.5 text-[10px]", badge.cls)}>
               {badge.label}
             </span>
           </div>
-          <p className="max-h-72 overflow-y-auto whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">
-            {status === "ready" ? summary.data?.summary : PLACEHOLDER[status]}
-          </p>
+          <div className="max-h-96 overflow-y-auto text-sm leading-relaxed text-foreground">
+            {status === "ready" ? (
+              // Streamdown 自带 markdown 排版（同 AI 消息）；全书摘要常含 ## 主题/人物/结构 等结构
+              <Streamdown>{summary.data?.summary ?? ""}</Streamdown>
+            ) : (
+              <p className="whitespace-pre-wrap text-xs text-muted-foreground">
+                {PLACEHOLDER[status]}
+              </p>
+            )}
+          </div>
           {canGenerate && (
             <Button
               size="sm"
