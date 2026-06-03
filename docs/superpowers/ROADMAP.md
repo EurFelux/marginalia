@@ -19,7 +19,7 @@
 
 **RA3 + M-b 已交付并合并**（标注与笔记，2026-06-03）：annotations 表/repository（headless 测）+ IPC/preload + CFI 高亮渲染（`ignoreClass` 防污染 + `rangeFromCfi`）+ 点击编辑（5 色 + 下划线，「高亮标记」即时套用上次样式）+ 段内笔记 modal（原文引用、⌘/Ctrl+Enter）+ 侧栏标注列表（阅读序 + 跳转）。真书手测通过；最终综合审查修掉跨任务接缝（笔记长文滚动丢失、样式栏死代码）。
 
-**下一目标候选**：**类型设计债清理**（已定为下一步）、RA4 收尾（M-d 全书摘要 / M-c 跨章）、`preferences` 持久化表 + 颜色模式、RA1-full「精度/内存 pass」（图片延时 / 当前章高亮滞后 / 长书 section 内存，见 backlog）。
+**下一目标候选**：**类型设计债清理**（已定为下一步）、RA4 收尾（M-d 全书摘要 / M-c 跨章）、`preferences` 持久化表、RA1-full「精度/内存 pass」（图片延时 / 当前章高亮滞后 / 长书 section 内存，见 backlog）。颜色模式（dark / light / system）✅ 已完成。
 
 ---
 
@@ -80,7 +80,9 @@
 | `stepLimit` 设置项（现硬编默认 5）                                                                                     | 🔴   | ma5-deferred #8                    |
 | 独立「摘要模型」设置                                                                                                   | 🔴   | core §11                           |
 | i18n（多语言）                                                                                                         | 🔴   | 竖切未上；UP1 用过 i18next         |
-| **颜色模式**（dark / light / system 三档，跟随系统）                                                                   | 🔴   | 用户 2026-06-02 指定               |
+| **颜色模式**（dark / light / system 三档，跟随系统）                                                                   | ✅   | 用户 2026-06-02 指定               |
+| 书页暗色无法覆盖带 `!important` 硬编码颜色的 ePub（颜色模式 v1 已知局限）                                              | 🔴   | 颜色模式 v1 已知局限               |
+| 独立阅读主题（sepia / 与外壳解耦的夜间档）                                                                             | 🔴   | 颜色模式后续扩展                   |
 | `metadata.usage` 落库（token 用量）                                                                                    | 🔴   | ma5-deferred #4                    |
 | 结构化 `reason` 分类（现自由字符串，UI 要 i18n 时再做）                                                                | 🔴   | ma5-deferred #6                    |
 | onboarding/landing 引导用户先配 provider + 开自动摘要                                                                  | 🔴   | 记忆 onboarding-guide-auto-summary |
