@@ -1,8 +1,8 @@
 import { create } from "zustand";
 import type { AnnotationStyle } from "@shared/annotations";
-import type { Chip } from "@shared/chat";
 import type { ReaderPrefs, SelectionInfo } from "@renderer/types";
 import { persistPreference } from "@renderer/store/persist-preference";
+import { useChatStore } from "@renderer/store/chat-store";
 
 export type AnnoTarget = { type: "create" } | { type: "edit"; annotationId: string };
 export interface StyleBarState {
@@ -25,11 +25,7 @@ interface ReaderState {
   currentChapterId: string | null;
   selection: SelectionInfo | null;
   prefs: ReaderPrefs;
-  activeConversationId: string | null;
-  panelOpen: boolean;
   sidebarOpen: boolean;
-  draftChips: Chip[];
-  draftText: string;
   styleBar: StyleBarState | null;
   noteModal: NoteModalState | null;
   scrollToCfi: { cfi: string; nonce: number } | null;
@@ -42,12 +38,8 @@ interface ReaderActions {
   backToLibrary: () => void;
   setCurrentChapter: (chapterId: string) => void;
   setSelection: (selection: SelectionInfo | null) => void;
-  setActiveConversation: (id: string | null) => void;
   updatePrefs: (patch: Partial<ReaderPrefs>) => void;
-  setPanelOpen: (open: boolean) => void;
   setSidebarOpen: (open: boolean) => void;
-  setDraftText: (text: string) => void;
-  setDraftChips: (chips: Chip[]) => void;
   openStyleBar: (s: StyleBarState) => void;
   closeStyleBar: () => void;
   openNoteModal: (s: NoteModalState) => void;
@@ -62,11 +54,7 @@ export const READER_INITIAL: ReaderState = {
   currentChapterId: null,
   selection: null,
   prefs: { fontScale: 1, lineHeight: 1.9, maxWidth: 640 },
-  activeConversationId: null,
-  panelOpen: false,
   sidebarOpen: true,
-  draftChips: [],
-  draftText: "",
   styleBar: null,
   noteModal: null,
   scrollToCfi: null,
@@ -75,27 +63,20 @@ export const READER_INITIAL: ReaderState = {
 
 export const useReaderStore = create<ReaderState & ReaderActions>((set) => ({
   ...READER_INITIAL,
-  openBook: (bookId, chapterId = null) =>
-    set({
-      view: "reader",
-      currentBookId: bookId,
-      currentChapterId: chapterId,
-      activeConversationId: null,
-    }),
+  openBook: (bookId, chapterId = null) => {
+    set({ view: "reader", currentBookId: bookId, currentChapterId: chapterId });
+    useChatStore.getState().setActiveConversation(null);
+  },
   backToLibrary: () => set({ view: "library" }),
   setCurrentChapter: (currentChapterId) => set({ currentChapterId }),
   setSelection: (selection) => set({ selection }),
-  setActiveConversation: (activeConversationId) => set({ activeConversationId }),
   updatePrefs: (patch) =>
     set((s) => {
       const prefs = { ...s.prefs, ...patch };
       persistPreference({ key: "readerPrefs", value: prefs });
       return { prefs };
     }),
-  setPanelOpen: (panelOpen) => set({ panelOpen }),
   setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
-  setDraftText: (draftText) => set({ draftText }),
-  setDraftChips: (draftChips) => set({ draftChips }),
   openStyleBar: (styleBar) => set({ styleBar }),
   closeStyleBar: () => set({ styleBar: null }),
   openNoteModal: (noteModal) => set({ noteModal }),

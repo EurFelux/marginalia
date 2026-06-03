@@ -2,6 +2,7 @@ import type { ChatTransport, UIMessageChunk } from "ai";
 import { v7 as uuidv7 } from "uuid";
 import type { AiStreamEvent } from "@shared/chat";
 import { useReaderStore } from "@renderer/store/reader-store";
+import { useChatStore } from "@renderer/store/chat-store";
 import type { ChatUIMessage } from "@renderer/ai/types";
 
 /** onChunk 订阅器签名（与 window.api.ai.onChunk 一致；测试可注入假实现）。 */
@@ -55,7 +56,8 @@ function lastUserText(messages: ChatUIMessage[]): string {
 export function createIpcChatTransport(): ChatTransport<ChatUIMessage> {
   return {
     async sendMessages({ messages, abortSignal }) {
-      const { currentBookId, currentChapterId, activeConversationId } = useReaderStore.getState();
+      const { currentBookId, currentChapterId } = useReaderStore.getState();
+      const { activeConversationId } = useChatStore.getState();
       if (!currentBookId || !currentChapterId) {
         const { default: i18n } = await import("@renderer/i18n");
         throw new Error(i18n.t("ai.noChapterToSend", "没有正在阅读的章节，无法发送。"));
@@ -80,7 +82,7 @@ export function createIpcChatTransport(): ChatTransport<ChatUIMessage> {
         void stream.cancel(); // 触发 cancel() → 退订，避免监听器泄漏
         throw new Error(ack.reason); // useChat 进 error 态
       }
-      useReaderStore.getState().setActiveConversation(ack.conversationId); // ack 回写（组件外）
+      useChatStore.getState().setActiveConversation(ack.conversationId); // ack 回写（组件外）
       return stream;
     },
     // 单窗口竖切不做断线重连。

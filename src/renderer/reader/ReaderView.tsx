@@ -7,6 +7,7 @@ import { cn } from "@renderer/lib/utils";
 import { Button } from "@renderer/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@renderer/components/ui/tooltip";
 import { useReaderStore } from "@renderer/store/reader-store";
+import { useChatStore } from "@renderer/store/chat-store";
 import { useSettingsStore } from "@renderer/store/settings-store";
 import { usePrefsStore } from "@renderer/store/prefs-store";
 import { Sidebar } from "@renderer/reader/Sidebar";
@@ -22,8 +23,8 @@ export function ReaderView() {
   const bookId = useReaderStore((s) => s.currentBookId);
   const chapterId = useReaderStore((s) => s.currentChapterId);
   const backToLibrary = useReaderStore((s) => s.backToLibrary);
-  const panelOpen = useReaderStore((s) => s.panelOpen);
-  const setPanelOpen = useReaderStore((s) => s.setPanelOpen);
+  const panelOpen = useChatStore((s) => s.panelOpen);
+  const setPanelOpen = useChatStore((s) => s.setPanelOpen);
   const openSettings = useSettingsStore((s) => s.setOpen);
   const autoSummarize = usePrefsStore((s) => s.autoSummarize);
   const qc = useQueryClient();

@@ -3,7 +3,7 @@ import { useChat } from "@ai-sdk/react";
 import { Plus, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@renderer/components/ui/button";
-import { useReaderStore } from "@renderer/store/reader-store";
+import { useChatStore } from "@renderer/store/chat-store";
 import { createIpcChatTransport } from "@renderer/ai/ipc-chat-transport";
 import type { ChatUIMessage } from "@renderer/ai/types";
 import { MessageList } from "@renderer/ai/MessageList";
@@ -16,8 +16,8 @@ export function AIPanel() {
   const { messages, sendMessage, status, stop, setMessages, error } = useChat<ChatUIMessage>({
     transport,
   });
-  const setActiveConversation = useReaderStore((s) => s.setActiveConversation);
-  const setPanelOpen = useReaderStore((s) => s.setPanelOpen);
+  const setActiveConversation = useChatStore((s) => s.setActiveConversation);
+  const setPanelOpen = useChatStore((s) => s.setPanelOpen);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {

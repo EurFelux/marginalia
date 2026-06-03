@@ -4,7 +4,7 @@ import { ArrowUp, Square } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { Chip } from "@shared/chat";
 import { Button } from "@renderer/components/ui/button";
-import { useReaderStore } from "@renderer/store/reader-store";
+import { useChatStore } from "@renderer/store/chat-store";
 import { ChipBar } from "@renderer/ai/ChipBar";
 
 interface Props {
@@ -15,11 +15,11 @@ interface Props {
 
 export function Composer({ status, onSend, onStop }: Props) {
   const { t } = useTranslation();
-  const draftText = useReaderStore((s) => s.draftText);
-  const draftChips = useReaderStore((s) => s.draftChips);
-  const setDraftText = useReaderStore((s) => s.setDraftText);
-  const setDraftChips = useReaderStore((s) => s.setDraftChips);
-  const panelOpen = useReaderStore((s) => s.panelOpen);
+  const draftText = useChatStore((s) => s.draftText);
+  const draftChips = useChatStore((s) => s.draftChips);
+  const setDraftText = useChatStore((s) => s.setDraftText);
+  const setDraftChips = useChatStore((s) => s.setDraftChips);
+  const panelOpen = useChatStore((s) => s.panelOpen);
   const ref = useRef<HTMLTextAreaElement | null>(null);
   const isStreaming = status === "streaming" || status === "submitted";
 
