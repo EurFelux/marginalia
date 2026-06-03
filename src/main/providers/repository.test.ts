@@ -161,6 +161,19 @@ describe("provider repository", () => {
     expect(getProviderRow(db, provB.id)).toBeUndefined();
   });
 
+  it("upsert sets models; omit preserves; [] clears; toDto returns [] for null", () => {
+    const db = freshDb();
+    const enc = fakeEncryptor;
+    const a = upsertProvider(db, enc, { type: "openai", models: ["gpt-4o"] });
+    expect(a.models).toEqual(["gpt-4o"]);
+    const b = upsertProvider(db, enc, { id: a.id, type: "openai" }); // 省略 models
+    expect(b.models).toEqual(["gpt-4o"]); // 保留
+    const c = upsertProvider(db, enc, { id: a.id, type: "openai", models: [] }); // 清空
+    expect(c.models).toEqual([]);
+    const d = upsertProvider(db, enc, { type: "anthropic" });
+    expect(d.models).toEqual([]); // 新建省略 → []
+  });
+
   describe("testProvider", () => {
     it("throws when the provider does not exist", async () => {
       const db = freshDb();

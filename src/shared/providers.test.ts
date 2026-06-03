@@ -56,6 +56,15 @@ describe("provider-type metadata", () => {
   });
 });
 
+describe("upsertProviderInput models field", () => {
+  it("upsertProviderInput accepts optional models array", () => {
+    expect(
+      upsertProviderInput.safeParse({ type: "openai", models: ["gpt-4o", "gpt-4o-mini"] }).success,
+    ).toBe(true);
+    expect(upsertProviderInput.safeParse({ type: "openai", models: [""] }).success).toBe(false); // 空串非法
+  });
+});
+
 describe("listModels contracts", () => {
   it("listModelsInput accepts ephemeral key and id forms", () => {
     expect(listModelsInput.safeParse({ type: "openai", apiKey: "sk-x" }).success).toBe(true);

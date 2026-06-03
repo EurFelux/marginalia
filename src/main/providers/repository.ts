@@ -33,6 +33,7 @@ function toDto(row: ProviderRow, encryptor: Encryptor): ProviderDto {
     label: row.label ?? null,
     baseUrl: row.baseUrl ?? null,
     key: keyState(row.apiKeyEncrypted, row, encryptor),
+    models: row.models ?? [],
     createdAt: row.createdAt,
   };
 }
@@ -73,6 +74,7 @@ export function upsertProvider(
         ...(input.label !== undefined ? { label: input.label } : {}),
         ...(input.baseUrl !== undefined ? { baseUrl: input.baseUrl } : {}),
         ...(encrypted !== undefined ? { apiKeyEncrypted: encrypted } : {}),
+        ...(input.models !== undefined ? { models: input.models } : {}),
       })
       .where(eq(providers.id, input.id))
       .returning()
@@ -88,6 +90,7 @@ export function upsertProvider(
       label: input.label ?? null,
       baseUrl: input.baseUrl ?? null,
       apiKeyEncrypted: encrypted ?? null,
+      models: input.models ?? [],
     })
     .returning()
     .get();

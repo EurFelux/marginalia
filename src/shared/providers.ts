@@ -41,6 +41,7 @@ export const upsertProviderInput = z
     label: z.string().nullish(),
     baseUrl: z.string().min(1).nullish(),
     apiKey: z.string().min(1).optional(),
+    models: z.array(z.string().min(1)).optional(),
   })
   .refine((v) => v.type !== "openai-compatible" || v.baseUrl != null, {
     message: "baseUrl is required for openai-compatible providers",
@@ -66,6 +67,7 @@ export interface ProviderDto {
   label: string | null;
   baseUrl: string | null;
   key: ProviderKeyState;
+  models: string[];
   createdAt: number;
 }
 
