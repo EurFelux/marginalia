@@ -23,5 +23,11 @@ export default {
   "errors.requestFailed": "Request failed",
   "errors.secureStorageUnavailable": "Cannot store API key: OS secure storage is unavailable",
   "errors.secureStorageUnavailableMachine": "secure storage is unavailable on this machine",
+  "settings.appearance": "Appearance",
+  "settings.colorMode": "Color mode",
+  "settings.dark": "Dark",
+  "settings.language": "Language",
+  "settings.light": "Light",
+  "settings.system": "System",
   "terms.provider": "provider",
 } as const;

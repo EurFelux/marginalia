@@ -21,5 +21,11 @@ export default {
   "errors.requestFailed": "请求失败",
   "errors.secureStorageUnavailable": "无法存储密钥：系统安全存储不可用",
   "errors.secureStorageUnavailableMachine": "本机安全存储不可用",
+  "settings.appearance": "外观",
+  "settings.colorMode": "颜色模式",
+  "settings.dark": "深色",
+  "settings.language": "语言",
+  "settings.light": "浅色",
+  "settings.system": "跟随系统",
   "terms.provider": "模型服务商",
 } as const;

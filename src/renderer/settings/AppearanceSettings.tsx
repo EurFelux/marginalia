@@ -1,16 +1,19 @@
+import { useTranslation } from "react-i18next";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { colorMode as colorModeSchema } from "@shared/preferences";
 import { ToggleGroup, ToggleGroupItem } from "@renderer/components/ui/toggle-group";
 import { useThemeStore } from "@renderer/store/theme-store";
+import { LanguageSwitcher } from "@renderer/i18n/LanguageSwitcher";
 
 export function AppearanceSettings() {
+  const { t } = useTranslation();
   const colorMode = useThemeStore((s) => s.colorMode);
   const setColorMode = useThemeStore((s) => s.setColorMode);
   return (
     <section className="space-y-4">
-      <h2 className="font-serif text-lg">外观</h2>
+      <h2 className="font-serif text-lg">{t("settings.appearance", "外观")}</h2>
       <div className="flex items-center justify-between gap-3">
-        <span className="text-sm font-medium">颜色模式</span>
+        <span className="text-sm font-medium">{t("settings.colorMode", "颜色模式")}</span>
         <ToggleGroup
           value={[colorMode]}
           onValueChange={(g) => {
@@ -22,16 +25,20 @@ export function AppearanceSettings() {
           variant="outline"
           size="sm"
         >
-          <ToggleGroupItem value="light" aria-label="浅色">
+          <ToggleGroupItem value="light" aria-label={t("settings.light", "浅色")}>
             <Sun />
           </ToggleGroupItem>
-          <ToggleGroupItem value="system" aria-label="跟随系统">
+          <ToggleGroupItem value="system" aria-label={t("settings.system", "跟随系统")}>
             <Monitor />
           </ToggleGroupItem>
-          <ToggleGroupItem value="dark" aria-label="深色">
+          <ToggleGroupItem value="dark" aria-label={t("settings.dark", "深色")}>
             <Moon />
           </ToggleGroupItem>
         </ToggleGroup>
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm font-medium">{t("settings.language", "语言")}</span>
+        <LanguageSwitcher />
       </div>
     </section>
   );
