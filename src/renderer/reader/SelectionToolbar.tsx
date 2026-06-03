@@ -6,8 +6,8 @@ import { cn } from "@renderer/lib/utils";
 import { Button } from "@renderer/components/ui/button";
 import { qk } from "@renderer/query/keys";
 import { useNavigationStore } from "@renderer/store/navigation-store";
-import { useReaderStore } from "@renderer/store/reader-store";
 import { useAnnotationStore } from "@renderer/store/annotation-store";
+import { usePrefsStore } from "@renderer/store/prefs-store";
 import { useAiActions, type PresetId } from "@renderer/ai/use-ai-actions";
 
 const PRESETS: { id: PresetId; icon: typeof BookOpen }[] = [
@@ -25,7 +25,7 @@ export function SelectionToolbar() {
   const styleBar = useAnnotationStore((s) => s.styleBar);
   const noteModal = useAnnotationStore((s) => s.noteModal);
   const bookId = useNavigationStore((s) => s.currentBookId);
-  const lastStyle = useReaderStore((s) => s.lastHighlightStyle);
+  const lastStyle = usePrefsStore((s) => s.lastHighlightStyle);
   const { startAiAction } = useAiActions();
   const qc = useQueryClient();
   const createM = useMutation({

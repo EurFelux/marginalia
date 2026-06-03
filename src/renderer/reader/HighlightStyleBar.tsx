@@ -7,8 +7,8 @@ import { cn } from "@renderer/lib/utils";
 import { Button } from "@renderer/components/ui/button";
 import { qk } from "@renderer/query/keys";
 import { useNavigationStore } from "@renderer/store/navigation-store";
-import { useReaderStore } from "@renderer/store/reader-store";
 import { useAnnotationStore } from "@renderer/store/annotation-store";
+import { usePrefsStore } from "@renderer/store/prefs-store";
 import { FILL_COLORS, FILL_SWATCH } from "./highlight";
 
 /** 二级样式工具栏：5 色 + 下划线；点已有高亮打开（改样式 / 笔记 / 删除）。高亮已由「高亮标记」即时创建，故只在 edit 模式打开。 */
@@ -18,7 +18,7 @@ export function HighlightStyleBar() {
   const closeStyleBar = useAnnotationStore((s) => s.closeStyleBar);
   const openNoteModal = useAnnotationStore((s) => s.openNoteModal);
   const setSelection = useAnnotationStore((s) => s.setSelection);
-  const setLastHighlightStyle = useReaderStore((s) => s.setLastHighlightStyle);
+  const setLastHighlightStyle = usePrefsStore((s) => s.setLastHighlightStyle);
   const bookId = useNavigationStore((s) => s.currentBookId);
   const qc = useQueryClient();
   const ref = useRef<HTMLDivElement | null>(null);

@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { Minus, Plus, Type } from "lucide-react";
 import { Button } from "@renderer/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@renderer/components/ui/popover";
-import { useReaderStore } from "@renderer/store/reader-store";
+import { usePrefsStore } from "@renderer/store/prefs-store";
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const round2 = (v: number) => Math.round(v * 100) / 100;
@@ -47,8 +47,8 @@ function Row({
 
 export function ReaderPrefs() {
   const { t } = useTranslation();
-  const prefs = useReaderStore((s) => s.prefs);
-  const updatePrefs = useReaderStore((s) => s.updatePrefs);
+  const prefs = usePrefsStore((s) => s.prefs);
+  const updatePrefs = usePrefsStore((s) => s.updatePrefs);
 
   return (
     <Popover>
