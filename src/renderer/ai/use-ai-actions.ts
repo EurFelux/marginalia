@@ -1,13 +1,20 @@
 import { useCallback } from "react";
 import { useReaderStore } from "@renderer/store/reader-store";
+import i18n from "@renderer/i18n";
 
 export type PresetId = "explain" | "translate" | "summarize";
 
-const PRESET_PROMPT: Record<PresetId, string> = {
-  explain: "请解释选中的这段内容。",
-  translate: "请把选中的这段内容翻译成简体中文。",
-  summarize: "请概括选中的这段内容。",
-};
+/** 按 preset 取本地化的预设提示语（调用时求值，跟随 UI 语言）。 */
+function resolvePresetPrompt(preset: PresetId): string {
+  switch (preset) {
+    case "explain":
+      return i18n.t("ai.action.explain", "请解释选中的这段内容。");
+    case "translate":
+      return i18n.t("ai.action.translate", "请把选中的这段内容翻译成简体中文。");
+    case "summarize":
+      return i18n.t("ai.action.summarize", "请概括选中的这段内容。");
+  }
+}
 
 export function useAiActions() {
   const startAiAction = useCallback(async (preset: PresetId | null) => {
@@ -21,7 +28,7 @@ export function useAiActions() {
       paragraphAfter: selection.paragraphAfter,
     });
     setDraftChips(chips);
-    setDraftText(preset ? PRESET_PROMPT[preset] : "");
+    setDraftText(preset ? resolvePresetPrompt(preset) : "");
     setPanelOpen(true);
     setSelection(null); // 收起工具栏
   }, []);

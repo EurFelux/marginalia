@@ -57,7 +57,8 @@ export function createIpcChatTransport(): ChatTransport<ChatUIMessage> {
     async sendMessages({ messages, abortSignal }) {
       const { currentBookId, currentChapterId, activeConversationId } = useReaderStore.getState();
       if (!currentBookId || !currentChapterId) {
-        throw new Error("没有正在阅读的章节，无法发送。");
+        const { default: i18n } = await import("@renderer/i18n");
+        throw new Error(i18n.t("ai.noChapterToSend", "没有正在阅读的章节，无法发送。"));
       }
       const last = messages.at(-1);
       const userText = lastUserText(messages);

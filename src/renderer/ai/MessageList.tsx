@@ -100,6 +100,7 @@ function ToolStepCard({ part }: { part: ChatUIMessage["parts"][number] }) {
   const done = p.state === "output-available" || failed;
   return (
     <div className="flex w-full max-w-[88%] items-center gap-2 rounded-lg border border-border bg-card/60 px-2.5 py-1.5 text-xs">
+      {/* i18next-instrument-ignore */}
       <span>📖</span>
       <span className="font-medium text-foreground">{name}</span>
       <span className={failed ? "ml-auto text-destructive" : "ml-auto text-muted-foreground"}>

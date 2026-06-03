@@ -1,5 +1,6 @@
 import ePub, { EpubCFI, type Book } from "epubjs";
 import type Section from "epubjs/types/section";
+import i18n from "@renderer/i18n";
 
 /** 高亮 mark 的 class；CFI 计算 / toRange 时作为 ignoreClass 传入，防止 mark 污染 CFI 路径。 */
 export const ANNO_IGNORE_CLASS = "anno";
@@ -64,7 +65,7 @@ export async function createEpubBook(bytes: Uint8Array): Promise<EpubBook> {
 
     loadSection: async (index) => {
       const s = sectionAt(index);
-      if (!s) return "<p>（本节不存在）</p>";
+      if (!s) return `<p>${i18n.t("reader.sectionMissing", "（本节不存在）")}</p>`;
       // render 产出资源已解析的 HTML 串；request = book.load.bind(book)。
       // 注：section.d.ts 0.3.93 把 render 误标为同步返回 string，但运行时返回 Promise<string>
       // （lib/section.js 里 render 返回 defer().promise），故按真实类型断言后 await。

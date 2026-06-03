@@ -1,9 +1,14 @@
 import type { Chip } from "@shared/chat";
+import i18n from "@renderer/i18n";
 
-const CHIP_LABEL: Record<string, string> = {
-  "chip.selection": "选区",
-  "chip.paragraph": "段落上下文",
+/** chip 的本地化显示名（调用时求值，跟随 UI 语言）。 */
+export const chipLabel = (chip: Chip): string => {
+  switch (chip.labelKey) {
+    case "chip.selection":
+      return i18n.t("ai.chip.selection", "选区");
+    case "chip.paragraph":
+      return i18n.t("ai.chip.paragraph", "段落上下文");
+    default:
+      return chip.labelKey;
+  }
 };
-
-/** chip 的中文显示名（竖切不上 i18n，labelKey → 直写中文）。 */
-export const chipLabel = (chip: Chip): string => CHIP_LABEL[chip.labelKey] ?? chip.labelKey;
