@@ -68,7 +68,7 @@ export function listProviders(db: DB, encryptor: Encryptor): ProviderDto[] {
  */
 function assertUsableBaseUrl(p: { isBuiltin: boolean; baseUrl: string | null }): void {
   if (!p.isBuiltin && p.baseUrl == null) {
-    throw new Error(t("errors.baseUrlRequiredCustom", "自建 provider 必须填写 baseUrl"));
+    throw new Error(t("errors.baseUrlRequiredCustom", "自建$t(terms.provider)必须填写 baseUrl"));
   }
 }
 
@@ -90,20 +90,24 @@ export function upsertProvider(
   if (input.id) {
     const existing = getProviderRow(db, input.id);
     if (!existing)
-      throw new Error(t("errors.providerNotFound", "未找到 provider {{id}}", { id: input.id }));
+      throw new Error(
+        t("errors.providerNotFound", "未找到$t(terms.provider) {{id}}", { id: input.id }),
+      );
     // 内置 provider：label / baseUrl 不可改；type 仅可在 compatibleApis 内切换。main 侧防御非法改动。
     if (existing.isBuiltin) {
       const compat = existing.compatibleApis ?? [existing.type];
       if (input.type !== existing.type && !compat.includes(input.type)) {
         throw new Error(
-          t("errors.builtinTypeOutsideCompat", "内置 provider 的类型只能在兼容 API 内切换"),
+          t("errors.builtinTypeOutsideCompat", "内置$t(terms.provider)的类型只能在兼容 API 内切换"),
         );
       }
       if (input.label != null && input.label !== existing.label) {
-        throw new Error(t("errors.builtinLabelLocked", "内置 provider 的名称不可修改"));
+        throw new Error(t("errors.builtinLabelLocked", "内置$t(terms.provider)的名称不可修改"));
       }
       if (input.baseUrl != null && input.baseUrl !== existing.baseUrl) {
-        throw new Error(t("errors.builtinBaseUrlLocked", "内置 provider 的 baseUrl 不可修改"));
+        throw new Error(
+          t("errors.builtinBaseUrlLocked", "内置$t(terms.provider)的 baseUrl 不可修改"),
+        );
       }
     }
     const lockedMeta = existing.isBuiltin; // label / baseUrl 锁定
@@ -129,7 +133,9 @@ export function upsertProvider(
       .returning()
       .get();
     if (!row)
-      throw new Error(t("errors.providerNotFound", "未找到 provider {{id}}", { id: input.id }));
+      throw new Error(
+        t("errors.providerNotFound", "未找到$t(terms.provider) {{id}}", { id: input.id }),
+      );
     return toDto(createProvider(row), encryptor);
   }
 
@@ -152,8 +158,10 @@ export function upsertProvider(
 
 export function removeProvider(db: DB, id: string): void {
   const row = getProviderRow(db, id);
-  if (!row) throw new Error(t("errors.providerNotFound", "未找到 provider {{id}}", { id }));
-  if (row.isBuiltin) throw new Error(t("errors.builtinUndeletable", "内置 provider 不可删除"));
+  if (!row)
+    throw new Error(t("errors.providerNotFound", "未找到$t(terms.provider) {{id}}", { id }));
+  if (row.isBuiltin)
+    throw new Error(t("errors.builtinUndeletable", "内置$t(terms.provider)不可删除"));
   db.transaction((tx) => {
     // 先解除默认 Assistant 对该 provider 的引用，避免外键约束失败。
     tx.update(assistants).set({ providerId: null }).where(eq(assistants.providerId, id)).run();
@@ -163,9 +171,12 @@ export function removeProvider(db: DB, id: string): void {
 
 export function revealProviderKey(db: DB, encryptor: Encryptor, id: string): string {
   const row = getProviderRow(db, id);
-  if (!row) throw new Error(t("errors.providerNotFound", "未找到 provider {{id}}", { id }));
+  if (!row)
+    throw new Error(t("errors.providerNotFound", "未找到$t(terms.provider) {{id}}", { id }));
   if (row.apiKeyEncrypted == null)
-    throw new Error(t("errors.providerHasNoApiKey", "provider {{id}} 未配置密钥", { id }));
+    throw new Error(
+      t("errors.providerHasNoApiKey", "$t(terms.provider) {{id}} 未配置密钥", { id }),
+    );
   return encryptor.decrypt(row.apiKeyEncrypted);
 }
 
@@ -177,9 +188,10 @@ export async function testProvider(
   model: string,
 ): Promise<TestResult> {
   const provider = loadProvider(db, id);
-  if (!provider) throw new Error(t("errors.providerNotFound", "未找到 provider {{id}}", { id }));
+  if (!provider)
+    throw new Error(t("errors.providerNotFound", "未找到$t(terms.provider) {{id}}", { id }));
   if (provider.apiKeyEncrypted == null) {
-    return { ok: false, message: t("errors.noApiKeySet", "该 provider 未配置密钥") };
+    return { ok: false, message: t("errors.noApiKeySet", "该$t(terms.provider)未配置密钥") };
   }
   let apiKey: string;
   try {

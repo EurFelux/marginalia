@@ -14,7 +14,8 @@ export function buildModelsRequest(
   apiKey: string,
 ): ModelsRequest {
   const raw = baseUrl ?? DEFAULT_BASE_URL[type];
-  if (!raw) throw new Error(t("errors.baseUrlRequiredForProvider", "该 provider 需要 baseUrl"));
+  if (!raw)
+    throw new Error(t("errors.baseUrlRequiredForProvider", "该$t(terms.provider)需要 baseUrl"));
   // baseUrl 约定：含版本路径（openai `/v1`、anthropic `/v1`、google `/v1beta`），拉模型只拼 `/models`，
   // 与 model-factory 生成路径的 baseURL 约定一致（自建代理填同一个 base 两处都对）。去尾斜杠避免 `//models`。
   const base = raw.replace(/\/+$/, "");

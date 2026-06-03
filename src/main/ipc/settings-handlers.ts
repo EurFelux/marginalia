@@ -62,7 +62,10 @@ export function registerSettingsHandlers(): void {
       try {
         apiKey = input.apiKey ?? revealProviderKey(getDb(), safeStorageEncryptor, input.id ?? "");
       } catch {
-        return { ok: false, message: t("errors.noApiKeyAvailable", "该 provider 无可用密钥") };
+        return {
+          ok: false,
+          message: t("errors.noApiKeyAvailable", "该$t(terms.provider)无可用密钥"),
+        };
       }
       try {
         const netFetch: typeof fetch = (url, init) => net.fetch(url as string, init);

@@ -14,15 +14,18 @@ export type ResolvedModel =
 export function resolveAssistantModel(db: DB, encryptor: Encryptor): ResolvedModel {
   const assistant = getDefaultAssistant(db);
   if (!assistant.providerId)
-    return { ok: false, reason: t("errors.assistantNoProvider", "助手未配置 provider") };
+    return { ok: false, reason: t("errors.assistantNoProvider", "助手未配置$t(terms.provider)") };
   if (!assistant.model)
     return { ok: false, reason: t("errors.assistantNoModel", "助手未配置模型") };
 
   const provider = loadProvider(db, assistant.providerId);
   if (!provider)
-    return { ok: false, reason: t("errors.assistantProviderNotFound", "未找到所配置的 provider") };
+    return {
+      ok: false,
+      reason: t("errors.assistantProviderNotFound", "未找到所配置的$t(terms.provider)"),
+    };
   if (!provider.apiKeyEncrypted)
-    return { ok: false, reason: t("errors.assistantNoApiKey", "provider 未设置密钥") };
+    return { ok: false, reason: t("errors.assistantNoApiKey", "$t(terms.provider)未设置密钥") };
   if (!encryptor.isAvailable())
     return {
       ok: false,

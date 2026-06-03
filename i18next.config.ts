@@ -18,5 +18,8 @@ export default defineConfig({
     nsSeparator: false,
     defaultValue: "",
     sort: true,
+    // 术语键只被其他文案的 $t(terms.provider) 嵌套引用、无源码 t() 调用，
+    // 默认会被 removeUnusedKeys 剪掉；用 preservePatterns 保住整个 terms.* 子树。
+    preservePatterns: ["terms.*"],
   },
 });
