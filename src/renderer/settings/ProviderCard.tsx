@@ -10,7 +10,7 @@ import { Button } from "@renderer/components/ui/button";
 const BRAND_KEY: Record<string, string> = {
   OpenAI: "openai",
   Anthropic: "anthropic",
-  Gemini: "gemini",
+  Gemini: "google", // ProviderIcon 的 provider key 是 "google"（"gemini" 是 model 级、ProviderIcon 不认）
 };
 
 function keyText(p: ProviderDto): string {
