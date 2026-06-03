@@ -24,6 +24,8 @@ export const providers = sqliteTable(
     baseUrl: text("base_url"),
     apiKeyEncrypted: blob("api_key_encrypted", { mode: "buffer" }),
     models: text("models", { mode: "json" }).$type<string[]>(),
+    // 内置（启动时按 DEFAULT_PROVIDERS 补齐）provider：type / label / baseUrl 不可改、不可删（仅 key + models 可编辑）。
+    isBuiltin: integer("is_builtin", { mode: "boolean" }).notNull().default(false),
     createdAt: nowMs(),
   },
   (t) => [

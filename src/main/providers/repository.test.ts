@@ -1,6 +1,7 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { createDb, runMigrations } from "@main/db/client";
+import { providers } from "@main/db/schema";
 import type { Encryptor } from "@main/secrets/encryptor";
 import type { ProviderTester } from "@main/secrets/tester";
 import {
@@ -228,5 +229,67 @@ describe("provider repository", () => {
       });
       expect(JSON.stringify(r)).not.toContain("sk-abcdefghij"); // 结果不得携带明文
     });
+  });
+});
+
+describe("builtin provider immutability", () => {
+  /** 直插一个内置 provider（仓储无创建内置的函数；内置只由播种产生）。 */
+  function insertBuiltin(db: ReturnType<typeof freshDb>): string {
+    const row = db
+      .insert(providers)
+      .values({
+        type: "openai",
+        label: "OpenAI",
+        baseUrl: null,
+        models: ["gpt-4o"],
+        isBuiltin: true,
+      })
+      .returning()
+      .get();
+    return row.id;
+  }
+
+  it("toDto exposes isBuiltin (false for user-created)", () => {
+    const db = freshDb();
+    const dto = upsertProvider(db, fakeEncryptor, { type: "anthropic", label: "Mine" });
+    expect(dto.isBuiltin).toBe(false);
+  });
+
+  it("listProviders reports isBuiltin=true for builtin rows", () => {
+    const db = freshDb();
+    insertBuiltin(db);
+    expect(listProviders(db, fakeEncryptor)[0]?.isBuiltin).toBe(true);
+  });
+
+  it("allows editing key + models on a builtin", () => {
+    const db = freshDb();
+    const id = insertBuiltin(db);
+    const dto = upsertProvider(db, fakeEncryptor, {
+      id,
+      type: "openai",
+      apiKey: "sk-builtinkey1",
+      models: ["gpt-4o", "gpt-4o-mini"],
+    });
+    expect(dto.models).toEqual(["gpt-4o", "gpt-4o-mini"]);
+    expect(revealProviderKey(db, fakeEncryptor, id)).toBe("sk-builtinkey1");
+  });
+
+  it("rejects changing type / label / baseUrl on a builtin", () => {
+    const db = freshDb();
+    const id = insertBuiltin(db);
+    expect(() => upsertProvider(db, fakeEncryptor, { id, type: "anthropic" })).toThrow();
+    expect(() =>
+      upsertProvider(db, fakeEncryptor, { id, type: "openai", label: "Renamed" }),
+    ).toThrow();
+    expect(() =>
+      upsertProvider(db, fakeEncryptor, { id, type: "openai", baseUrl: "https://x" }),
+    ).toThrow();
+  });
+
+  it("refuses to remove a builtin provider", () => {
+    const db = freshDb();
+    const id = insertBuiltin(db);
+    expect(() => removeProvider(db, id)).toThrow();
+    expect(getProviderRow(db, id)).toBeDefined(); // 仍在
   });
 });

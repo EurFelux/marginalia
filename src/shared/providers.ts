@@ -68,6 +68,8 @@ export interface ProviderDto {
   baseUrl: string | null;
   key: ProviderKeyState;
   models: string[];
+  /** 内置 provider（启动时按 DEFAULT_PROVIDERS 补齐）：type/label/baseUrl 不可改、不可删。 */
+  isBuiltin: boolean;
   createdAt: number;
 }
 

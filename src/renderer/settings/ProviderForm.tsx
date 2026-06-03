@@ -37,6 +37,8 @@ export function ProviderForm({
   const [f, setF] = useState<ProviderFormState>(() => initial(provider));
   const [editingKey, setEditingKey] = useState(provider == null || provider.key.status === "none");
   const baseRequired = f.type === "openai-compatible";
+  // 内置 provider：type/label/baseUrl 锁定（仅密钥 + 模型可改）。UI 防御，main 仓储也会拦。
+  const locked = provider?.isBuiltin ?? false;
 
   const save = useMutation({
     mutationFn: () => window.api.settings.providers.upsert(providerFormToUpsertInput(f)),
@@ -55,6 +57,7 @@ export function ProviderForm({
         <span className="text-xs text-muted-foreground">类型</span>
         <Select
           value={f.type}
+          disabled={locked}
           onValueChange={(v) => {
             if (v) setF({ ...f, type: v as ProviderType });
           }}
@@ -77,12 +80,14 @@ export function ProviderForm({
         <Input
           value={f.label}
           onChange={(e) => setF({ ...f, label: e.target.value })}
+          disabled={locked}
           placeholder="（必填）"
         />
         <span className="text-xs text-muted-foreground">baseURL</span>
         <Input
           value={f.baseUrl}
           onChange={(e) => setF({ ...f, baseUrl: e.target.value })}
+          disabled={locked}
           placeholder={DEFAULT_BASE_URL[f.type] ?? "https://你的网关/v1（必填）"}
         />
         <span className="text-xs text-muted-foreground">API Key</span>
@@ -104,6 +109,9 @@ export function ProviderForm({
           />
         )}
       </div>
+      {locked && (
+        <p className="text-[11px] text-muted-foreground">内置 provider：仅可编辑密钥与模型。</p>
+      )}
       <ModelEditor
         models={f.models}
         onChange={(models) => setF({ ...f, models })}

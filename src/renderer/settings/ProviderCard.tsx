@@ -55,9 +55,11 @@ export function ProviderCard({
           >
             <PlugZap className="size-4" />
           </Button>
-          <Button variant="ghost" size="sm" onClick={onRemove} aria-label="移除">
-            <Trash2 className="size-4" />
-          </Button>
+          {!provider.isBuiltin && (
+            <Button variant="ghost" size="sm" onClick={onRemove} aria-label="移除">
+              <Trash2 className="size-4" />
+            </Button>
+          )}
         </div>
       </div>
       <div className="mt-1 text-xs text-muted-foreground">

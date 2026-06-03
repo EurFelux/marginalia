@@ -2,7 +2,7 @@ import path from "node:path";
 import { app } from "electron";
 import { createDb, runMigrations, type DB } from "@main/db/client";
 import { resetStuckSummaries } from "@main/ai/summary";
-import { seedDefaultProviders } from "@main/providers/default-providers";
+import { ensureBuiltinProviders } from "@main/providers/default-providers";
 
 let db: DB | undefined;
 
@@ -17,7 +17,7 @@ export function initDb(): DB {
     : path.join(__dirname, "db/migrations");
   const candidate = createDb(dbPath);
   runMigrations(candidate, migrationsFolder);
-  seedDefaultProviders(candidate); // 空表则播种默认 provider（OpenAI/Anthropic/Gemini）
+  ensureBuiltinProviders(candidate); // 补齐缺失的内置 provider（OpenAI/Anthropic/Gemini）
   resetStuckSummaries(candidate); // 复位上次崩溃残留的 "generating" 章节摘要
   db = candidate;
   return db;

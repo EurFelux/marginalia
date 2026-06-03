@@ -34,6 +34,7 @@ function toDto(row: ProviderRow, encryptor: Encryptor): ProviderDto {
     baseUrl: row.baseUrl ?? null,
     key: keyState(row.apiKeyEncrypted, row, encryptor),
     models: row.models ?? [],
+    isBuiltin: row.isBuiltin,
     createdAt: row.createdAt,
   };
 }
@@ -67,12 +68,25 @@ export function upsertProvider(
   }
 
   if (input.id) {
+    const existing = getProviderRow(db, input.id);
+    if (!existing) throw new Error(`provider ${input.id} not found`);
+    // 内置 provider：type / label / baseUrl 不可改（仅 key + models 可变）。main 侧防御非法改动。
+    if (existing.isBuiltin) {
+      if (input.type !== existing.type) throw new Error("内置 provider 的类型不可修改");
+      if (input.label != null && input.label !== existing.label) {
+        throw new Error("内置 provider 的名称不可修改");
+      }
+      if (input.baseUrl != null && input.baseUrl !== existing.baseUrl) {
+        throw new Error("内置 provider 的 baseUrl 不可修改");
+      }
+    }
+    const locked = existing.isBuiltin;
     const row = db
       .update(providers)
       .set({
-        type: input.type,
-        ...(input.label !== undefined ? { label: input.label } : {}),
-        ...(input.baseUrl !== undefined ? { baseUrl: input.baseUrl } : {}),
+        ...(locked ? {} : { type: input.type }),
+        ...(!locked && input.label !== undefined ? { label: input.label } : {}),
+        ...(!locked && input.baseUrl !== undefined ? { baseUrl: input.baseUrl } : {}),
         ...(encrypted !== undefined ? { apiKeyEncrypted: encrypted } : {}),
         ...(input.models !== undefined ? { models: input.models } : {}),
       })
@@ -98,7 +112,9 @@ export function upsertProvider(
 }
 
 export function removeProvider(db: DB, id: string): void {
-  if (!getProviderRow(db, id)) throw new Error(`provider ${id} not found`);
+  const row = getProviderRow(db, id);
+  if (!row) throw new Error(`provider ${id} not found`);
+  if (row.isBuiltin) throw new Error("内置 provider 不可删除");
   db.transaction((tx) => {
     // 先解除默认 Assistant 对该 provider 的引用，避免外键约束失败。
     tx.update(assistants).set({ providerId: null }).where(eq(assistants.providerId, id)).run();
