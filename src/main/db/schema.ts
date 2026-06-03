@@ -49,6 +49,9 @@ export const books = sqliteTable("books", {
   author: text("author"),
   cover: blob("cover", { mode: "buffer" }),
   toc: text("toc", { mode: "json" }).$type<TocNode[]>(),
+  // 全书摘要正文：唯一持久化的事实。状态（pending/generating/ready/unavailable）是运行时派生，
+  // 不入 DB——summary!=null=ready，内存 inFlight=generating，内存 failed=unavailable，否则 pending。
+  summary: text("summary"),
   addedAt: integer("added_at")
     .notNull()
     .$defaultFn(() => Date.now()),

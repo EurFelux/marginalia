@@ -1,15 +1,22 @@
 // src/main/ai/summary.test.ts
 import path from "node:path";
 import { eq } from "drizzle-orm";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { MockLanguageModelV3 } from "ai/test";
 import { makeFixtureEpub } from "@marginalia/epub-parser";
 import { createDb, runMigrations } from "@main/db/client";
-import { chapters } from "@main/db/schema";
+import { books, chapters } from "@main/db/schema";
 import { importBook, resolveChapterByHref } from "@main/library/repository";
 import type { ResolvedModel } from "@main/ai/assistant-model";
 import type { LoadBytes } from "@main/ai/tools";
-import { ensureChapterSummary, resetStuckSummaries, type SummaryDeps } from "@main/ai/summary";
+import {
+  __resetBookSummaryRuntime,
+  ensureBookSummary,
+  ensureChapterSummary,
+  getBookSummaryView,
+  resetStuckSummaries,
+  type SummaryDeps,
+} from "@main/ai/summary";
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
 
@@ -104,5 +111,67 @@ describe("resetStuckSummaries", () => {
     const row = statusOf(db, ch1.id);
     expect(row.summaryStatus).toBe("ready");
     expect(row.summary).toBe("kept");
+  });
+});
+
+describe("ensureBookSummary / getBookSummaryView (derived status)", () => {
+  // book.id 由 fixture 确定、跨用例相同 → 清进程内运行时集保证隔离。
+  beforeEach(() => __resetBookSummaryRuntime());
+
+  it("derives pending for a fresh book with no summary", () => {
+    const { db, book } = setup({ ok: false, reason: "x" });
+    expect(getBookSummaryView(db, book.id)).toEqual({ status: "pending", summary: null });
+  });
+
+  it("generates and stores the whole-book summary, deriving ready", async () => {
+    const { db, book, deps } = setup({
+      ok: true,
+      model: genModel("Whole-book summary."),
+      modelId: "mock",
+    });
+    await ensureBookSummary(deps, book.id);
+    expect(getBookSummaryView(db, book.id)).toEqual({
+      status: "ready",
+      summary: "Whole-book summary.",
+    });
+  });
+
+  it("is a no-op when the book summary already exists", async () => {
+    const { db, book, deps } = setup({ ok: true, model: genModel("new"), modelId: "mock" });
+    db.update(books).set({ summary: "cached" }).where(eq(books.id, book.id)).run();
+    await ensureBookSummary(deps, book.id);
+    expect(getBookSummaryView(db, book.id).summary).toBe("cached");
+  });
+
+  it("derives unavailable (in-memory failed set) when generation throws", async () => {
+    const failModel = new MockLanguageModelV3({
+      doGenerate: async () => {
+        throw new Error("model exploded");
+      },
+    });
+    const { db, book, deps } = setup({ ok: true, model: failModel, modelId: "mock" });
+    await ensureBookSummary(deps, book.id);
+    expect(getBookSummaryView(db, book.id).status).toBe("unavailable");
+  });
+
+  it("stays pending (no write) when no model is configured", async () => {
+    const { db, book, deps } = setup({ ok: false, reason: "not configured" });
+    await ensureBookSummary(deps, book.id);
+    expect(getBookSummaryView(db, book.id)).toEqual({ status: "pending", summary: null });
+  });
+
+  it("restart semantics: clearing runtime sets vanishes generating/failed; stored summary still derives ready", async () => {
+    const failModel = new MockLanguageModelV3({
+      doGenerate: async () => {
+        throw new Error("boom");
+      },
+    });
+    const { db, book, deps } = setup({ ok: true, model: failModel, modelId: "mock" });
+    await ensureBookSummary(deps, book.id);
+    expect(getBookSummaryView(db, book.id).status).toBe("unavailable");
+    __resetBookSummaryRuntime(); // 模拟重启：进程内集清空
+    expect(getBookSummaryView(db, book.id).status).toBe("pending"); // failed 消失 → 可重试
+    db.update(books).set({ summary: "S" }).where(eq(books.id, book.id)).run();
+    expect(getBookSummaryView(db, book.id).status).toBe("ready"); // summary 在 → ready
   });
 });

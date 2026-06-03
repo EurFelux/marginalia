@@ -3,7 +3,13 @@ import { describe, expect, it } from "vitest";
 import { createDb, runMigrations } from "@main/db/client";
 import { chapters } from "@main/db/schema";
 import { importBook, resolveChapterByHref } from "@main/library/repository";
-import { getChapterSummary, getToc, listChapters, readChapterText } from "@main/library/content";
+import {
+  getChapterSummary,
+  getToc,
+  listChapters,
+  readBookText,
+  readChapterText,
+} from "@main/library/content";
 import { makeFixtureEpub } from "@marginalia/epub-parser";
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
@@ -78,5 +84,21 @@ describe("content service", () => {
       .run();
     const chs = listChapters(db, book.id);
     expect(chs.map((c) => c.href)).toEqual(["OEBPS/ch1.xhtml", "OEBPS/ch2.xhtml"]);
+  });
+
+  it("readBookText concatenates all chapters in spine order", () => {
+    const { db, bytes, book } = setup();
+    const r = readBookText(db, bytes, book.id, { maxChars: 100_000 });
+    expect(r.truncated).toBe(false);
+    expect(r.text).toContain("Hello world."); // ch1
+    expect(r.text).toContain("The end."); // ch2
+    expect(r.text.indexOf("Hello world.")).toBeLessThan(r.text.indexOf("The end.")); // 顺序
+  });
+
+  it("readBookText truncates at maxChars and flags truncated", () => {
+    const { db, bytes, book } = setup();
+    const r = readBookText(db, bytes, book.id, { maxChars: 5 });
+    expect(r.truncated).toBe(true);
+    expect(r.text.length).toBeLessThanOrEqual(5);
   });
 });
