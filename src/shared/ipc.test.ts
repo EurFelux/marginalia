@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { appGetInfoResult, C, IPC, pingInput, pingResult, type Contract } from "@shared/ipc";
+import { appGetInfoResult, C, pingInput, pingResult, type Contract } from "@shared/ipc";
 
 describe("ipc schemas", () => {
   it("exposes channel names", () => {
-    expect(IPC.appGetInfo).toBe("app:get-info");
-    expect(IPC.ping).toBe("ping");
+    expect(C.appGetInfo.channel).toBe("app:get-info");
+    expect(C.ping.channel).toBe("ping");
   });
 
   it("ping input rejects non-string msg", () => {
