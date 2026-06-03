@@ -8,6 +8,7 @@ import {
   importBookInput,
   readChapterTextInput,
   saveProgressInput,
+  type BookSummaryContentDto,
   type BookSummaryDto,
   type ChapterRefDto,
   type ChapterTextSlice,
@@ -24,7 +25,7 @@ import {
   readChapterText,
   type ChapterSummary,
 } from "@main/library/content";
-import { ensureChapterSummary } from "@main/ai/summary";
+import { ensureBookSummary, ensureChapterSummary, getBookSummaryView } from "@main/ai/summary";
 import { makeSummaryDeps } from "@main/ai/send-deps";
 import { handle } from "@main/ipc/registry";
 
@@ -115,6 +116,23 @@ export function registerLibraryHandlers(): void {
         console.warn("[content] generate chapter summary failed:", err),
       );
       return getChapterSummary(db, input.bookId, input.chapterId);
+    },
+  );
+
+  handle<{ bookId: string }, BookSummaryContentDto>(IPC.contentBookSummary, bookIdInput, (input) =>
+    getBookSummaryView(getDb(), input.bookId),
+  );
+
+  // 触发全书摘要懒生成（书卡手动按钮）。fire-and-forget；同步前缀置 inFlight，故返回即为 generating。
+  handle<{ bookId: string }, BookSummaryContentDto>(
+    IPC.contentGenerateBookSummary,
+    bookIdInput,
+    (input) => {
+      const db = getDb();
+      void ensureBookSummary(makeSummaryDeps(), input.bookId).catch((err) =>
+        console.warn("[content] generate book summary failed:", err),
+      );
+      return getBookSummaryView(db, input.bookId);
     },
   );
 

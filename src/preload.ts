@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 import { IPC, type AppGetInfoResult, type PingInput, type PingResult } from "@shared/ipc";
 import type {
   BookIdInput,
+  BookSummaryContentDto,
   BookSummaryDto,
   ChapterRefDto,
   ChapterRefInput,
@@ -71,6 +72,10 @@ const api = {
       ipcRenderer.invoke(IPC.contentChapterSummary, input),
     generateChapterSummary: (input: ChapterRefInput): Promise<ChapterSummaryDto> =>
       ipcRenderer.invoke(IPC.contentGenerateChapterSummary, input),
+    bookSummary: (input: BookIdInput): Promise<BookSummaryContentDto> =>
+      ipcRenderer.invoke(IPC.contentBookSummary, input),
+    generateBookSummary: (input: BookIdInput): Promise<BookSummaryContentDto> =>
+      ipcRenderer.invoke(IPC.contentGenerateBookSummary, input),
   },
 
   annotations: {

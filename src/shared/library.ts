@@ -55,3 +55,12 @@ export interface ChapterSummaryDto {
   status: SummaryStatus;
   summary: string | null;
 }
+
+/**
+ * content:book-summary 返回：全书摘要状态 + 正文（ready 时非空）。
+ * status 在主进程**读取时派生**（books 只持久化 summary；见 book-summary spec），形状同 chapter 版。
+ */
+export interface BookSummaryContentDto {
+  status: SummaryStatus;
+  summary: string | null;
+}
