@@ -46,7 +46,8 @@ function ScrollBar({
       data-slot="scroll-area-scrollbar"
       orientation={orientation}
       className={cn(
-        "z-10 flex touch-none select-none opacity-0 transition-opacity duration-300 data-[hovering]:opacity-100 data-[scrolling]:opacity-100 data-[scrolling]:duration-0",
+        // macOS 式：仅滚动时显示（data-scrolling 瞬现），停手后经 duration-300 渐隐；不认 data-hovering（悬停整区不显）。
+        "z-10 flex touch-none select-none opacity-0 transition-opacity duration-300 data-[scrolling]:opacity-100 data-[scrolling]:duration-0",
         orientation === "vertical" && "h-full w-2.5 justify-center",
         orientation === "horizontal" && "h-2.5 w-full flex-col items-center",
         className,
