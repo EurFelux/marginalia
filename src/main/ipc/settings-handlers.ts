@@ -1,14 +1,19 @@
 import { z } from "zod";
+import { net } from "electron";
 import { IPC } from "@shared/ipc";
 import {
+  listModelsInput,
   providerIdInput,
   testProviderInput,
   upsertProviderInput,
+  type ListModelsInput,
+  type ListModelsResult,
   type ProviderDto,
   type RevealResult,
   type TestResult,
   type UpsertProviderInput,
 } from "@shared/providers";
+import { fetchProviderModels, mapModelsError } from "@main/providers/provider-models";
 import {
   updateAssistantInput,
   type AssistantDto,
@@ -46,6 +51,29 @@ export function registerSettingsHandlers(): void {
 
   handle<{ id: string }, void>(IPC.providersRemove, providerIdInput, (input) =>
     removeProvider(getDb(), input.id),
+  );
+
+  handle<ListModelsInput, ListModelsResult>(
+    IPC.providersListModels,
+    listModelsInput,
+    async (input) => {
+      let apiKey: string;
+      try {
+        apiKey = input.apiKey ?? revealProviderKey(getDb(), safeStorageEncryptor, input.id ?? "");
+      } catch {
+        return { ok: false, message: "No API key available for this provider" };
+      }
+      try {
+        const netFetch: typeof fetch = (url, init) => net.fetch(url as string, init);
+        const models = await fetchProviderModels(
+          { type: input.type, baseUrl: input.baseUrl ?? null, apiKey },
+          netFetch,
+        );
+        return { ok: true, models };
+      } catch (err) {
+        return { ok: false, ...mapModelsError(err, undefined) };
+      }
+    },
   );
 
   handle<void, AssistantDto>(IPC.assistantGetDefault, z.void(), () => getDefaultAssistant(getDb()));

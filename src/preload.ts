@@ -14,8 +14,11 @@ import type {
 } from "@shared/library";
 import type { TocNode } from "@shared/types";
 import type {
+  ListModelsInput,
+  ListModelsResult,
   ProviderDto,
   ProviderIdInput,
+  RevealResult,
   TestProviderInput,
   TestResult,
   UpsertProviderInput,
@@ -109,10 +112,14 @@ const api = {
       list: (): Promise<ProviderDto[]> => ipcRenderer.invoke(IPC.providersList),
       upsert: (input: UpsertProviderInput): Promise<ProviderDto> =>
         ipcRenderer.invoke(IPC.providersUpsert, input),
+      reveal: (input: ProviderIdInput): Promise<RevealResult> =>
+        ipcRenderer.invoke(IPC.providersReveal, input),
       test: (input: TestProviderInput): Promise<TestResult> =>
         ipcRenderer.invoke(IPC.providersTest, input),
       remove: (input: ProviderIdInput): Promise<void> =>
         ipcRenderer.invoke(IPC.providersRemove, input),
+      listModels: (input: ListModelsInput): Promise<ListModelsResult> =>
+        ipcRenderer.invoke(IPC.providersListModels, input),
     },
     assistant: {
       getDefault: (): Promise<AssistantDto> => ipcRenderer.invoke(IPC.assistantGetDefault),

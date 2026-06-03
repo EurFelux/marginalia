@@ -25,6 +25,7 @@ export const IPC = {
   providersRemove: "providers:remove",
   assistantGetDefault: "assistant:get-default",
   assistantUpdate: "assistant:update",
+  providersListModels: "providers:list-models",
   conversationsListByBook: "conversations:list-by-book",
   conversationsCreate: "conversations:create",
   conversationsGet: "conversations:get",
