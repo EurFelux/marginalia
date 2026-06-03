@@ -41,7 +41,9 @@
 
 **API key 明文落库已交付**（2026-06-04）：`providers.api_key_encrypted`（BLOB）→ `api_key`（TEXT）；`Encryptor` 与 `safeStorage` 依赖退役；`ProviderDto.keyMask` 由 `ProviderKeyState` 判别联合（`none`/`set`/`undecryptable`）降为 `keyMask: string | null`（有则掩码、无则 null）。根因：safeStorage 按签名身份隔离，dev/打包身份不同无法互解，且钥匙串加密内容无法随 DB 备份恢复——与「备份必须能恢复 key」的硬约束根本矛盾。详见 `specs/2026-06-04-plaintext-api-key-storage-design.md`。
 
-**下一目标候选**：RA4 收尾（**M-d 全书摘要**——RA4 已交付）、设置/产品 backlog（最大并发数 / 代理 / stepLimit / 独立摘要模型 / **自动命名会话** / onboarding 引导）、其余延后项（选区工具栏/ChipBar → Base UI 原语、自绘窗口 chrome、嵌套 TOC / 章内分页）。类型设计债清理 ✅、颜色模式 ✅、`preferences` ✅、RA5 ✅、RA1-full「精度/内存 pass」✅、IPC 契约注册表 #8 ✅、类 macOS 自绘滚动条 ✅、**会话 tab ✅** 均已完成。
+**ReaderView 三向可收起布局已交付**（2026-06-04）：header / 左栏 / AI 面板均可收起——新组件 `CollapsiblePane`（UP1 `PeekDrawer` 的**单挂载点**版：钉住=文档流占位、收起=同一元素切贴边浮层抽屉，children 树位置不变故开合不卸载——AIPanel `useChat` 流式状态/侧栏滚动位置保活；收起未唤出时 `inert` 挡 Tab/指针）。收起后边缘留 3px 热区 + 1px 把手，hover 滑出浮层、移开 200ms 收回（`duration-200 ease-out`，热区 z-30/抽屉 z-40）；组件内统一**物理类**（left/right/top 定位 + translate + border-r/l/b——transform 无逻辑变体，与 start/end 混用会 RTL 错位）。三态收口 `readerLayout` 单 preference key（`{sidebarOpen,panelOpen,headerOpen}` 落盘+hydrate，首启默认左开/顶开/右关）；`chat-store.panelOpen` **迁** prefs-store（选区提问/`openConversation` 自动弹面板、Composer 聚焦、SummaryPill 门控语义不变；跨 store `getState()` 调用循 navigation-store 既有惯例）。header 按钮重排：左=左栏开关+返回书库；右=ReaderPrefs+AI 面板开关（PanelRight 系图标替代 MessageSquare）+设置+顶栏开关（最右）。workspace 容器 `overflow-hidden` 防收起抽屉撑出横滚。schema/store headless 单测，peek 交互真机手测。详见 `specs/2026-06-04-reader-collapsible-layout-design.md` / `plans/2026-06-04-reader-collapsible-layout.md`。
+
+**下一目标候选**：RA4 收尾（**M-d 全书摘要**——RA4 已交付）、设置/产品 backlog（最大并发数 / 代理 / stepLimit / 独立摘要模型 / **自动命名会话** / onboarding 引导）、其余延后项（选区工具栏/ChipBar → Base UI 原语、自绘窗口 chrome、嵌套 TOC / 章内分页）。类型设计债清理 ✅、颜色模式 ✅、`preferences` ✅、RA5 ✅、RA1-full「精度/内存 pass」✅、IPC 契约注册表 #8 ✅、类 macOS 自绘滚动条 ✅、会话 tab ✅、**三向可收起布局 ✅** 均已完成。
 
 ---
 
