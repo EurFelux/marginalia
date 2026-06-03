@@ -1,5 +1,5 @@
 import i18next from "i18next";
-import { resources } from "@shared/i18n/resources";
+import { sharedInitOptions } from "@shared/i18n/resources";
 import type { UILanguage } from "@shared/i18n/language";
 
 // 主进程独立的 vanilla i18next 实例（不依赖 react）。只用于本地化「自产」错误消息。
@@ -8,12 +8,7 @@ const main = i18next.createInstance();
 /** 启动时按解析出的语言同步 init（幂等）。 */
 export function initMainI18n(language: UILanguage): void {
   if (!main.isInitialized) {
-    void main.init({
-      resources,
-      lng: language,
-      fallbackLng: "en",
-      interpolation: { escapeValue: false },
-    });
+    void main.init({ ...sharedInitOptions, lng: language });
   } else {
     void main.changeLanguage(language);
   }

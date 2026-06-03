@@ -11,8 +11,11 @@ export default defineConfig({
     // 切勿改回 mergeNamespaces:true——那会把键塞进 `translation` 顶层键、并因形状不匹配把 en 译文清空。
     defaultNS: false,
     primaryLanguage: "zh-CN",
-    keySeparator: ".",
-    nsSeparator: ":",
+    // 扁平点分键：键不嵌套，输出 `"errors.providerNotFound": "..."`。便于全文搜索——
+    // 搜 `errors.providerNotFound` 同时命中源码 t() 调用处与 locale 定义处。运行时 init
+    // 与 i18next.d.ts 的 CustomTypeOptions 必须同样 keySeparator/nsSeparator:false 才能对上。
+    keySeparator: false,
+    nsSeparator: false,
     defaultValue: "",
     sort: true,
   },
