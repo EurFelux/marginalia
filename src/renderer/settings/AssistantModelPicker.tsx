@@ -78,6 +78,7 @@ export function AssistantModelPicker() {
         <span className="text-xs text-muted-foreground">模型</span>
         <Select
           value={model || null}
+          disabled={!providerId}
           onValueChange={(m) => {
             if (m) {
               save.mutate({ model: m });
