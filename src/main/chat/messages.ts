@@ -104,3 +104,18 @@ export function getLastParagraphContent(db: DB, conversationId: string): string 
   }
   return null;
 }
+
+/**
+ * 崩溃恢复派生（DD-§3.1）：会话尾消息是 user 行（其后无 assistant）即「未获回复的未完成轮」。
+ * 进程硬崩溃流到一半时不落 assistant，故只靠此读时派生识别——无需持久化任何运行态。
+ */
+export function isLastTurnIncomplete(db: DB, conversationId: string): boolean {
+  const last = db
+    .select({ role: messages.role })
+    .from(messages)
+    .where(eq(messages.conversationId, conversationId))
+    .orderBy(desc(messages.seq))
+    .limit(1)
+    .get();
+  return last?.role === "user";
+}

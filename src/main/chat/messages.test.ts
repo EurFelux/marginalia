@@ -4,7 +4,12 @@ import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { createDb, runMigrations } from "@main/db/client";
 import { assistants, books, conversations } from "@main/db/schema";
-import { appendMessage, getLastParagraphContent, listMessages } from "@main/chat/messages";
+import {
+  appendMessage,
+  getLastParagraphContent,
+  isLastTurnIncomplete,
+  listMessages,
+} from "@main/chat/messages";
 import { buildChips, dedupeParagraph } from "@main/ai/chips";
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
@@ -213,5 +218,33 @@ describe("getLastParagraphContent", () => {
     });
     const deduped = dedupeParagraph(buildChips(input), getLastParagraphContent(db, cid));
     expect(deduped.map((c) => c.id)).toEqual(["selection"]);
+  });
+});
+
+describe("isLastTurnIncomplete", () => {
+  it("returns false for an empty conversation", () => {
+    const db = freshDb();
+    const cid = seedConversation(db);
+    expect(isLastTurnIncomplete(db, cid)).toBe(false);
+  });
+
+  it("returns true when the last message is a user turn (crash before assistant reply)", () => {
+    const db = freshDb();
+    const cid = seedConversation(db);
+    appendMessage(db, { conversationId: cid, role: "user", parts: [{ type: "text", text: "q" }] });
+    expect(isLastTurnIncomplete(db, cid)).toBe(true);
+  });
+
+  it("returns false when an assistant reply follows the user turn", () => {
+    const db = freshDb();
+    const cid = seedConversation(db);
+    appendMessage(db, { conversationId: cid, role: "user", parts: [{ type: "text", text: "q" }] });
+    appendMessage(db, {
+      conversationId: cid,
+      role: "assistant",
+      parts: [{ type: "text", text: "a" }],
+      status: "complete",
+    });
+    expect(isLastTurnIncomplete(db, cid)).toBe(false);
   });
 });
