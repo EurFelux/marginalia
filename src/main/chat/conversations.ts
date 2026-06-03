@@ -37,6 +37,11 @@ export function getConversation(db: DB, id: string): ConversationDto | null {
   return row ? toDto(row) : null;
 }
 
+/** 设置会话标题（首建会话落「随便起」标题 / 未来自动命名覆盖）。 */
+export function setConversationTitle(db: DB, id: string, title: string): void {
+  db.update(conversations).set({ title }).where(eq(conversations.id, id)).run();
+}
+
 /** 列出某书的会话，最近更新在前。 */
 export function listConversationsByBook(db: DB, bookId: string): ConversationDto[] {
   return db
