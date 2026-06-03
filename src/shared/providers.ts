@@ -67,7 +67,7 @@ export type TestProviderInput = z.infer<typeof testProviderInput>;
  * 新建（无 id）或更新（带 id）一个 provider。
  * apiKey 两态语义（schema 仅允许这两态）：
  *  - 省略（undefined）→ 更新时保留既有密钥；新建时无密钥。
- *  - 提供非空字符串 → 加密后替换。
+ *  - 提供非空字符串 → 替换（明文直存）。
  * 不支持把 key 清空为 null（schema 拒 null/空串；如需移除整条记录用 remove）。
  */
 export const upsertProviderInput = z.object({
@@ -83,17 +83,6 @@ export type UpsertProviderInput = z.infer<typeof upsertProviderInput>;
 // type 派生、db 存 null 即合法），故不在此 input schema 里 refine，而在 repository.upsertProvider 按
 // effective baseUrl（resolveProviderBaseUrl）判定。
 
-/**
- * 密钥存在性的判别联合（仅这三态合法，非法组合不可表示）：
- *  - `none`：密文不存在。
- *  - `set`：密文存在且本机可解密，附掩码预览（如 "sk-…1234"）。
- *  - `undecryptable`：密文存在但本机无法解密（跨机器迁移 / safeStorage 不可用）。
- */
-export type ProviderKeyState =
-  | { status: "none" }
-  | { status: "set"; mask: string }
-  | { status: "undecryptable" };
-
 /** 发往 renderer 的 provider 视图：绝不含明文 / 密文，只含掩码预览。 */
 export interface ProviderDto {
   id: string;
@@ -103,7 +92,8 @@ export interface ProviderDto {
   compatibleApis: AiProviderApiType[];
   label: string | null;
   baseUrl: string | null;
-  key: ProviderKeyState;
+  /** null = 未配置；非 null = 已配置，值为掩码预览（如 "sk-…1234"）。绝不含明文。 */
+  keyMask: string | null;
   models: string[];
   /** 内置 provider（启动时按 DEFAULT_PROVIDERS 补齐）：label/baseUrl 不可改、不可删；type 仅可在 compatibleApis 内切。 */
   isBuiltin: boolean;
@@ -114,7 +104,7 @@ export interface ProviderDto {
 export const revealResult = z.object({ apiKey: z.string() });
 export type RevealResult = z.infer<typeof revealResult>;
 
-/** 列 provider 可用模型入参：key 解析 = 表单现填 apiKey ?? 由 id 解密的存储 key。 */
+/** 列 provider 可用模型入参：key 解析 = 表单现填 apiKey ?? 由 id 读取的存储 key。 */
 export const listModelsInput = z.object({
   type: aiProviderApiType,
   baseUrl: z.string().min(1).nullish(),

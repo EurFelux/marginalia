@@ -11,30 +11,25 @@ import {
   upsertProvider,
 } from "@main/providers/repository";
 import { getDefaultAssistant, updateDefaultAssistant } from "@main/providers/assistant";
-import { safeStorageEncryptor } from "@main/secrets/safe-storage-encryptor";
 import { aiSdkTester } from "@main/secrets/ai-sdk-tester";
 import { bind, register, type Binding } from "@main/ipc/registry";
 import type { ListModelsResult } from "@shared/providers";
 
 export const settingsBindings: Binding[] = [
-  bind(C.providersList, () => listProviders(getDb(), safeStorageEncryptor)),
+  bind(C.providersList, () => listProviders(getDb())),
 
-  bind(C.providersUpsert, (input) => upsertProvider(getDb(), safeStorageEncryptor, input)),
+  bind(C.providersUpsert, (input) => upsertProvider(getDb(), input)),
 
-  bind(C.providersReveal, (input) => ({
-    apiKey: revealProviderKey(getDb(), safeStorageEncryptor, input.id),
-  })),
+  bind(C.providersReveal, (input) => ({ apiKey: revealProviderKey(getDb(), input.id) })),
 
-  bind(C.providersTest, (input) =>
-    testProvider(getDb(), safeStorageEncryptor, aiSdkTester, input.id, input.model),
-  ),
+  bind(C.providersTest, (input) => testProvider(getDb(), aiSdkTester, input.id, input.model)),
 
   bind(C.providersRemove, (input) => removeProvider(getDb(), input.id)),
 
   bind(C.providersListModels, async (input): Promise<ListModelsResult> => {
     let apiKey: string;
     try {
-      apiKey = input.apiKey ?? revealProviderKey(getDb(), safeStorageEncryptor, input.id ?? "");
+      apiKey = input.apiKey ?? revealProviderKey(getDb(), input.id ?? "");
     } catch {
       return {
         ok: false,

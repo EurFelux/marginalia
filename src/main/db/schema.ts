@@ -26,7 +26,7 @@ export const providers = sqliteTable(
     compatibleApis: text("compatible_apis", { mode: "json" }).$type<AiProviderApiType[]>(),
     label: text("label"),
     baseUrl: text("base_url"),
-    apiKeyEncrypted: blob("api_key_encrypted", { mode: "buffer" }),
+    apiKey: text("api_key"),
     models: text("models", { mode: "json" }).$type<string[]>(),
     // 内置（启动时按 DEFAULT_PROVIDERS 补齐）provider：label / baseUrl 不可改、不可删；type 仅可在 compatibleApis 内切。
     isBuiltin: integer("is_builtin", { mode: "boolean" }).notNull().default(false),

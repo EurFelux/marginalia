@@ -9,7 +9,7 @@ function row(over: Partial<ProviderRow>): ProviderRow {
     compatibleApis: null,
     label: null,
     baseUrl: null,
-    apiKeyEncrypted: null,
+    apiKey: null,
     models: null,
     isBuiltin: false,
     createdAt: 0,

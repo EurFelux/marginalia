@@ -43,7 +43,7 @@ export function ProviderForm({
   const { t } = useTranslation();
   const qc = useQueryClient();
   const [f, setF] = useState<ProviderFormState>(() => initial(provider));
-  const [editingKey, setEditingKey] = useState(provider == null || provider.key.status === "none");
+  const [editingKey, setEditingKey] = useState(provider == null || provider.keyMask === null);
   // 用户自建（非内置）必须填 baseUrl；内置走默认端点 / 工厂派生，免填。
   const baseRequired = !(provider?.isBuiltin ?? false);
   // 内置 provider：label/baseUrl 锁定（仅密钥 + 模型可改）。UI 防御，main 仓储也会拦。
@@ -114,12 +114,10 @@ export function ProviderForm({
         <span className="text-xs text-muted-foreground">
           {t("settings.provider.apiKey", "API Key")}
         </span>
-        {!editingKey && provider && provider.key.status !== "none" ? (
+        {!editingKey && provider && provider.keyMask !== null ? (
           <div className="flex items-center gap-2">
             <span className="flex-1 truncate font-mono text-sm text-muted-foreground">
-              {provider.key.status === "set"
-                ? provider.key.mask
-                : t("settings.provider.keyUndecryptable", "本机无法解密")}
+              {provider.keyMask}
             </span>
             <Button type="button" variant="outline" size="sm" onClick={() => setEditingKey(true)}>
               {t("common.edit", "编辑")}
