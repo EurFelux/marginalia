@@ -36,7 +36,7 @@ export function ReaderView() {
   });
 
   // 开章自动生成摘要（设置开启时）：停在某章 ~800ms 才触发，避免快速翻阅时为每章都生成。
-  // 注：当前章 id 现由 EpubReader 据滚动位置回写（onTopIndexChange），不再在此回填首章——
+  // 注：当前章 id 现由 EpubReader 据滚动位置回写（onTopSectionChange），不再在此回填首章——
   // 否则开书时强设首章会覆盖 EpubReader 的 CFI 进度恢复（initialIndex）。
   // 主进程 ensureChapterSummary 仅从 pending 起，故对已就绪章重复触发是廉价 no-op。
   useEffect(() => {
