@@ -15,6 +15,9 @@ const KEEP_NODE_MODULES = ["better-sqlite3", "bindings", "file-uri-to-path"];
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    // 不带扩展名：Packager 按平台自动补 .icns（macOS）/.ico（Windows）。当前仅生成了 .icns（见
+    // scripts/make-icons.sh，源 assets/icon.svg）；Windows/Linux 分发时再补 .ico/.png 与 maker 配置。
+    icon: "./assets/icons/icon",
     // 迁移 SQL 不经 Vite 打包；复制整个迁移目录进 resources/，生产启动经 process.resourcesPath 读取（见 instance.ts）。
     extraResource: ["./src/main/db/migrations"],
     // Forge Vite plugin 默认令 ignore 排除「除 .vite/ 外一切」（含整个 node_modules），会丢掉被
