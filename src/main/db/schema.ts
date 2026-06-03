@@ -144,11 +144,15 @@ export const messages = sqliteTable(
     role: text("role", { enum: ["system", "user", "assistant"] }).notNull(),
     parts: text("parts", { mode: "json" }).$type<UIMessage["parts"]>().notNull(),
     metadata: text("metadata", { mode: "json" }).$type<MessageMetadata>(),
+    status: text("status", { enum: ["complete", "error", "aborted"] })
+      .notNull()
+      .default("complete"),
     seq: integer("seq").notNull(),
     createdAt: nowMs(),
   },
   (t) => [
     check("messages_role_check", sql`${t.role} in ('system','user','assistant')`),
+    check("messages_status_check", sql`${t.status} in ('complete','error','aborted')`),
     unique("messages_conversation_seq_unique").on(t.conversationId, t.seq),
     index("messages_conversation_id_idx").on(t.conversationId),
   ],

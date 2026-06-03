@@ -115,6 +115,28 @@ describe("appendMessage / listMessages", () => {
     expect(listMessages(db, a.id).map((m) => m.seq)).toEqual([0, 1]);
     expect(listMessages(db, b.id).map((m) => m.seq)).toEqual([0]);
   });
+
+  it("defaults status to 'complete' when not provided", () => {
+    const db = freshDb();
+    const cid = seedConversation(db);
+    appendMessage(db, { conversationId: cid, role: "user", parts: [{ type: "text", text: "hi" }] });
+    expect(listMessages(db, cid)[0].status).toBe("complete");
+  });
+
+  it("persists an explicit terminal status and error metadata", () => {
+    const db = freshDb();
+    const cid = seedConversation(db);
+    appendMessage(db, {
+      conversationId: cid,
+      role: "assistant",
+      parts: [],
+      status: "error",
+      metadata: { error: { name: "AI_APICallError", message: "quota exceeded" } },
+    });
+    const [msg] = listMessages(db, cid);
+    expect(msg.status).toBe("error");
+    expect(msg.metadata?.error).toEqual({ name: "AI_APICallError", message: "quota exceeded" });
+  });
 });
 
 describe("getLastParagraphContent", () => {

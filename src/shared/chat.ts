@@ -2,7 +2,7 @@
 import { z } from "zod";
 import type { UIMessage, UIMessageChunk } from "ai";
 import { chipIdSchema } from "@shared/types";
-import type { MessageMetadata, MessageRole } from "@shared/types";
+import type { MessageMetadata, MessageRole, MessageStatus } from "@shared/types";
 
 /** 上下文 chip（live 形态，供 renderer 渲染；持久化快照只取 {id,content,tokenCount}，见 messageMetadataSchema） */
 export const chipSchema = z.object({
@@ -65,6 +65,7 @@ export interface MessageDto {
   role: MessageRole;
   parts: UIMessage["parts"];
   metadata: MessageMetadata | null;
+  status: MessageStatus;
   seq: number;
   createdAt: number;
 }

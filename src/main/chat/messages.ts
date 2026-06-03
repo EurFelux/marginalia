@@ -4,7 +4,12 @@ import type { UIMessage } from "ai";
 import type { DB } from "@main/db/client";
 import { conversations, messages } from "@main/db/schema";
 import type { MessageDto } from "@shared/chat";
-import { messageMetadataSchema, type MessageMetadata, type MessageRole } from "@shared/types";
+import {
+  messageMetadataSchema,
+  type MessageMetadata,
+  type MessageRole,
+  type MessageStatus,
+} from "@shared/types";
 
 type MessageRow = typeof messages.$inferSelect;
 
@@ -24,6 +29,7 @@ function toDto(row: MessageRow): MessageDto {
     role: row.role,
     parts: row.parts,
     metadata: parseMetadata(row.metadata),
+    status: row.status,
     seq: row.seq,
     createdAt: row.createdAt,
   };
@@ -34,6 +40,8 @@ export interface AppendMessageInput {
   role: MessageRole;
   parts: UIMessage["parts"];
   metadata?: MessageMetadata | null;
+  /** 终态；省略默认 complete（user/system 行恒 complete）。 */
+  status?: MessageStatus;
 }
 
 /** 追加一条消息：事务内取下一 seq、插入、并推进 conversations.updatedAt。 */
@@ -54,6 +62,7 @@ export function appendMessage(db: DB, input: AppendMessageInput): MessageDto {
         role: input.role,
         parts: input.parts,
         metadata: input.metadata ?? null,
+        status: input.status ?? "complete",
         seq: nextSeq,
       })
       .returning()
