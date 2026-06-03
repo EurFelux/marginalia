@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { IPC } from "@shared/ipc";
+import { C } from "@shared/ipc";
 import { pumpStream } from "@main/ipc/ai-handlers";
 import type { SendResult } from "@main/ai/send";
 
@@ -33,9 +33,9 @@ describe("pumpStream", () => {
       new AbortController().signal,
     );
     expect(sender.send.mock.calls).toEqual([
-      [IPC.aiChunk, { streamId: "s1", type: "chunk", chunk: { type: "x" } }],
-      [IPC.aiChunk, { streamId: "s1", type: "chunk", chunk: { type: "y" } }],
-      [IPC.aiChunk, { streamId: "s1", type: "finish" }],
+      [C.aiChunk.channel, { streamId: "s1", type: "chunk", chunk: { type: "x" } }],
+      [C.aiChunk.channel, { streamId: "s1", type: "chunk", chunk: { type: "y" } }],
+      [C.aiChunk.channel, { streamId: "s1", type: "finish" }],
     ]);
   });
 
@@ -48,7 +48,10 @@ describe("pumpStream", () => {
     const result = { ...okResult([]), stream: boom() } as OkResult;
     await pumpStream(sender, "s2", result, new AbortController().signal);
     const calls = sender.send.mock.calls;
-    expect(calls.at(-1)).toEqual([IPC.aiChunk, { streamId: "s2", type: "error", message: "boom" }]);
+    expect(calls.at(-1)).toEqual([
+      C.aiChunk.channel,
+      { streamId: "s2", type: "error", message: "boom" },
+    ]);
   });
 
   it("emits finish (not error) when aborted mid-stream", async () => {
@@ -62,7 +65,7 @@ describe("pumpStream", () => {
     const result = { ...okResult([]), stream: boom() } as OkResult;
     await pumpStream(sender, "s3", result, controller.signal);
     expect(sender.send.mock.calls.at(-1)).toEqual([
-      IPC.aiChunk,
+      C.aiChunk.channel,
       { streamId: "s3", type: "finish" },
     ]);
   });
