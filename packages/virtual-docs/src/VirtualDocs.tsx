@@ -2,10 +2,12 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { SectionFrame, type SectionSelectEvent } from "./SectionFrame";
 import type { ViewportRect } from "./geometry";
-import { estimateHeight } from "./precision";
+import { estimateHeight, sectionsToUnload } from "./precision";
 
 /** 未缓存 section 的默认占位高度（px）；缓存命中后用真实测高。 */
 const DEFAULT_ESTIMATE = 600;
+/** active range 两侧各保留的 section 数；超出即 unload。 */
+const KEEP_DISTANCE = 5;
 
 export interface VirtualDocsHandle {
   scrollToIndex: (index: number) => void;
@@ -32,6 +34,8 @@ export interface VirtualDocsProps {
   decorate?: (index: number, doc: Document) => void;
   onHighlightClick?: (annoId: string, rect: ViewportRect) => void;
   onContentMouseDown?: () => void;
+  /** 某 section 离开「active range ± KEEP_DISTANCE」时回调一次，供消费方释放其资源。 */
+  onUnloadSection?: (index: number) => void;
 }
 
 export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(function VirtualDocs(
@@ -46,6 +50,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
     decorate,
     onHighlightClick,
     onContentMouseDown,
+    onUnloadSection,
   },
   ref,
 ) {
@@ -61,6 +66,8 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
   );
 
   const heightCache = useRef<Map<number, number>>(new Map());
+  // 已 unload 的 section 集：避免重复 unload；section 重新进入保留区时移除（届时会 reload）。
+  const unloaded = useRef<Set<number>>(new Set());
   // styleCss（排版偏好/主题）变更会改变所有 section 高度 → 整体失效缓存。
   useEffect(() => {
     heightCache.current.clear();
@@ -95,7 +102,20 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
       totalCount={count}
       initialTopMostItemIndex={initialIndex ?? 0}
       itemContent={itemContent}
-      rangeChanged={({ startIndex }) => onTopIndexChange?.(startIndex)}
+      rangeChanged={(range) => {
+        onTopIndexChange?.(range.startIndex);
+        // 保留区内的从 unloaded 移除（将/已 reload）
+        const lo = Math.max(0, range.startIndex - KEEP_DISTANCE);
+        const hi = Math.min(count - 1, range.endIndex + KEEP_DISTANCE);
+        for (let i = lo; i <= hi; i++) unloaded.current.delete(i);
+        // 保留区外、尚未 unload 的 → unload 一次
+        for (const i of sectionsToUnload(range, count, KEEP_DISTANCE)) {
+          if (!unloaded.current.has(i)) {
+            unloaded.current.add(i);
+            onUnloadSection?.(i);
+          }
+        }
+      }}
     />
   );
 });
