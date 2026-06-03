@@ -21,6 +21,7 @@ describe("preferences schemas", () => {
     expect(Object.keys(PREFERENCE_SCHEMAS).sort()).toEqual([
       "autoSummarize",
       "colorMode",
+      "language",
       "lastHighlightStyle",
       "readerPrefs",
     ]);
@@ -53,5 +54,16 @@ describe("preferences schemas", () => {
       setPreferenceInput.safeParse({ key: "readerPrefs", value: { fontScale: 1 } }).success,
     ).toBe(false);
     expect(setPreferenceInput.safeParse({ key: "unknownKey", value: 1 }).success).toBe(false);
+  });
+});
+
+describe("language preference", () => {
+  it("preferenceKey includes language", () => {
+    expect(preferenceKey.options).toContain("language");
+  });
+  it("setPreferenceInput accepts a valid language, rejects junk", () => {
+    expect(setPreferenceInput.safeParse({ key: "language", value: "en" }).success).toBe(true);
+    expect(setPreferenceInput.safeParse({ key: "language", value: "zh-CN" }).success).toBe(true);
+    expect(setPreferenceInput.safeParse({ key: "language", value: "fr" }).success).toBe(false);
   });
 });

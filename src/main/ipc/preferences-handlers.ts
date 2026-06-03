@@ -28,6 +28,8 @@ export function registerPreferenceHandlers(): void {
         return setPreference(getDb(), input.key, input.value);
       case "colorMode":
         return setPreference(getDb(), input.key, input.value);
+      case "language":
+        return setPreference(getDb(), input.key, input.value);
     }
   });
 }

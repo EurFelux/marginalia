@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { annotationStyle } from "@shared/annotations";
+import { uiLanguage } from "@shared/i18n/language";
 
 /** 阅读排版偏好（字号倍率 / 行距 / 栏宽 px）。@renderer/types 的 ReaderPrefs 由此推导，单一源。 */
 export const readerPrefsSchema = z.object({
@@ -22,6 +23,7 @@ export const PREFERENCE_SCHEMAS = {
   lastHighlightStyle: annotationStyle,
   autoSummarize: z.boolean(),
   colorMode,
+  language: uiLanguage,
 } as const;
 
 export type PreferenceKey = keyof typeof PREFERENCE_SCHEMAS;
@@ -44,5 +46,6 @@ export const setPreferenceInput = z.discriminatedUnion("key", [
   z.object({ key: z.literal("lastHighlightStyle"), value: annotationStyle }),
   z.object({ key: z.literal("autoSummarize"), value: z.boolean() }),
   z.object({ key: z.literal("colorMode"), value: colorMode }),
+  z.object({ key: z.literal("language"), value: uiLanguage }),
 ]);
 export type SetPreferenceInput = z.infer<typeof setPreferenceInput>;
