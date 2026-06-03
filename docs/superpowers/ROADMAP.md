@@ -25,7 +25,7 @@
 
 **书库拖拽导入已交付**（2026-06-03）：拖 ePub 到书库即导入——`useEpubDrop` 拖拽状态机 + `DropOverlay` 居中投放卡 + `epub-drop` 纯 helper（过滤/basename）+ `library.pathForFile`（preload 经 `webUtils.getPathForFile`）+ sonner toast 即时反馈；文案已 i18n 化。详见 `specs/2026-06-03-library-drag-drop-import-design.md`。**待办**：导入卡顿（主进程同步解析 ePub）待挪 worker。
 
-**#9 DB 生命周期规则进行中**：spec（`specs/2026-06-03-db-lifecycle-rules-design.md`）把五块 DB 债定义成规则并拆成 4 份 plan。**P1 章节摘要派生态已实现**（去 `summary_status` 列、状态读时派生）；**P2**（AI 终态模型）/ **P3**（删除+文件簇：FK 级联 / 文件自有化 / 删书）/ **P4**（迁移打包）plan 已就绪、待实现（`plans/2026-06-03-p{1..4}-*.md`）。
+**#9 DB 生命周期规则进行中**：spec（`specs/2026-06-03-db-lifecycle-rules-design.md`）把五块 DB 债定义成规则并拆成 4 份 plan。**P1 章节摘要派生态**（去 `summary_status` 列、状态读时派生）与 **P2 AI 终态模型**（`messages.status` 终态 + usage/error 落库 + 尾-user 崩溃派生）**已实现**；**P3**（删除+文件簇：FK 级联 / 文件自有化 / 删书）/ **P4**（迁移打包）plan 已就绪、待实现（`plans/2026-06-03-p{3,4}-*.md`）。
 
 **下一目标候选**：**类型设计债清理**（已定为下一步）、RA4 收尾（M-d 全书摘要 / M-c 跨章）、`preferences` 持久化表、RA1-full「精度/内存 pass」（图片延时 / 当前章高亮滞后 / 长书 section 内存，见 backlog）。颜色模式（dark / light / system）✅ 已完成。RA5 ✅ 已完成。
 
