@@ -6,11 +6,6 @@ import { resolveChapterByHref } from "@main/library/repository";
 import { tocNodeSchema, type TocNode } from "@shared/types";
 import type { ChapterRefDto, ChapterTextSlice } from "@shared/library";
 
-export interface ChapterSummary {
-  status: "pending" | "generating" | "ready" | "unavailable";
-  summary: string | null;
-}
-
 export function getToc(db: DB, bookId: string): TocNode[] {
   const row = db.select({ toc: books.toc }).from(books).where(eq(books.id, bookId)).get();
   // parse-on-read：DB JSON 列做一次 Zod 校验（防 JSON 漂移）
@@ -18,16 +13,6 @@ export function getToc(db: DB, bookId: string): TocNode[] {
   // entire top-level entry to be dropped — intentional defensive degradation for now; surgical
   // subtree pruning is a future follow-up.
   return (row?.toc ?? []).filter((n) => tocNodeSchema.safeParse(n).success);
-}
-
-export function getChapterSummary(db: DB, bookId: string, chapterId: string): ChapterSummary {
-  const row = db
-    .select({ summary: chapters.summary, status: chapters.summaryStatus })
-    .from(chapters)
-    .where(and(eq(chapters.bookId, bookId), eq(chapters.id, chapterId)))
-    .get();
-  if (!row) throw new Error(`content: chapter ${chapterId} not found in book ${bookId}`);
-  return { status: row.status, summary: row.summary ?? null };
 }
 
 export function readChapterText(

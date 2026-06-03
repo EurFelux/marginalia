@@ -4,7 +4,8 @@ import { z } from "zod";
 import { and, eq } from "drizzle-orm";
 import type { DB } from "@main/db/client";
 import { chapters } from "@main/db/schema";
-import { getChapterSummary, listChapters, readChapterText } from "@main/library/content";
+import { listChapters, readChapterText } from "@main/library/content";
+import { getChapterSummaryView } from "@main/ai/summary";
 import { resolveChapterByHref } from "@main/library/repository";
 
 /** 取某书原始字节（生产实现读 books.path；测试注入 fixture 字节）。 */
@@ -47,7 +48,7 @@ export function createReadingTools(deps: ReadingToolsDeps) {
         "Get the cached AI summary (and its status) of a chapter by its id (from getToc).",
       inputSchema: z.object({ chapterId: z.string().min(1) }),
       execute: async ({ chapterId }) =>
-        getChapterSummary(db, bookId, resolveChapterRef(db, bookId, chapterId)),
+        getChapterSummaryView(db, bookId, resolveChapterRef(db, bookId, chapterId)),
     }),
     readChapterText: tool({
       description:

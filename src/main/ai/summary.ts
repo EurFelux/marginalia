@@ -19,10 +19,43 @@ export interface SummaryDeps {
   resolveModel: () => ResolvedModel;
 }
 
-// 进程内并发去重：同一章节正在生成时，后续调用直接跳过。
-const inFlight = new Set<string>();
+// 章节摘要的进程内运行时状态（不持久化；重启清空，镜像全书摘要）：
+// summary!=null=ready，inFlightChapters=generating，failedChapters=unavailable，否则 pending。
+const inFlightChapters = new Set<string>();
+const failedChapters = new Set<string>();
 
-/** 懒生成某章摘要（设计文档 §11）。仅从 pending 触发；非阻塞调用方 fire-and-forget。 */
+/**
+ * 读某章摘要正文 + 派生状态（状态不入 DB，镜像 getBookSummaryView）。
+ * 章节摘要非流式，故 generating 无 partial（summary: null）。
+ */
+export function getChapterSummaryView(
+  db: DB,
+  bookId: string,
+  chapterId: string,
+): { status: SummaryStatus; summary: string | null } {
+  const row = db
+    .select({ summary: chapters.summary })
+    .from(chapters)
+    .where(and(eq(chapters.bookId, bookId), eq(chapters.id, chapterId)))
+    .get();
+  if (!row) throw new Error(`summary: chapter ${chapterId} not found in book ${bookId}`);
+  if (inFlightChapters.has(chapterId)) return { status: "generating", summary: null };
+  const summary = row.summary ?? null;
+  const status: SummaryStatus =
+    summary != null ? "ready" : failedChapters.has(chapterId) ? "unavailable" : "pending";
+  return { status, summary };
+}
+
+/** 仅供测试：清空章节摘要的进程内运行时态，保证用例隔离（chapter.id 由 fixture 确定、跨用例相同）。 */
+export function __resetChapterSummaryRuntime(): void {
+  inFlightChapters.clear();
+  failedChapters.clear();
+}
+
+/**
+ * 懒生成某章摘要（设计文档 §11；状态派生，不入 DB）。非阻塞调用方 fire-and-forget。
+ * 失败章节下次触发会自动重试（开头清 failedChapters），重启后进程内集清空亦自愈——故无需 resetStuckSummaries。
+ */
 export async function ensureChapterSummary(
   deps: SummaryDeps,
   bookId: string,
@@ -31,22 +64,20 @@ export async function ensureChapterSummary(
   const { db, loadBytes, resolveModel } = deps;
   let claimed = false;
   try {
-    const row = db
-      .select({ status: chapters.summaryStatus })
+    if (inFlightChapters.has(chapterId)) return; // 并发去重
+    const stored = db
+      .select({ summary: chapters.summary })
       .from(chapters)
       .where(and(eq(chapters.bookId, bookId), eq(chapters.id, chapterId)))
       .get();
-    if (!row || row.status !== "pending") return; // 仅从 pending 生成
-    if (inFlight.has(chapterId)) return; // 并发去重
+    if (!stored) return; // 章不存在
+    if (stored.summary != null) return; // 已 ready，跳过
     const resolved = resolveModel();
     if (!resolved.ok) return; // 模型未配置 → 保持 pending，配置后重试
 
-    inFlight.add(chapterId);
+    failedChapters.delete(chapterId); // 清前次失败标记 → 可重试
+    inFlightChapters.add(chapterId); // 同步前缀：使 generate handler 即时派生 generating
     claimed = true;
-    db.update(chapters)
-      .set({ summaryStatus: "generating" })
-      .where(eq(chapters.id, chapterId))
-      .run();
     const bytes = await loadBytes(bookId);
     const slice = readChapterText(db, bytes, bookId, chapterId, {
       maxChars: SUMMARY_INPUT_MAX_CHARS,
@@ -58,25 +89,13 @@ export async function ensureChapterSummary(
       maxOutputTokens: 512,
       maxRetries: 1,
     });
-    db.update(chapters)
-      .set({ summary: text, summaryStatus: "ready" })
-      .where(eq(chapters.id, chapterId))
-      .run();
+    db.update(chapters).set({ summary: text }).where(eq(chapters.id, chapterId)).run();
   } catch (err) {
-    // 自含全部 reject（fire-and-forget 端口为 => void）。已 claim 的标记 unavailable；标记本身也防御性 guard。
+    // 自含全部 reject（fire-and-forget 端口为 => void）。已 claim 的标记 failed（派生 unavailable）。
     console.warn(`[summary] chapter ${chapterId} ensure failed:`, err);
-    if (claimed) {
-      try {
-        db.update(chapters)
-          .set({ summaryStatus: "unavailable" })
-          .where(eq(chapters.id, chapterId))
-          .run();
-      } catch (markErr) {
-        console.warn(`[summary] chapter ${chapterId} could not be marked unavailable:`, markErr);
-      }
-    }
+    if (claimed) failedChapters.add(chapterId);
   } finally {
-    if (claimed) inFlight.delete(chapterId);
+    if (claimed) inFlightChapters.delete(chapterId);
   }
 }
 
@@ -175,16 +194,4 @@ export async function ensureBookSummary(
       streamingBookSummaries.delete(bookId); // partial 已落库或丢弃
     }
   }
-}
-
-/**
- * 启动恢复：把上次进程崩溃残留的 "generating" 复位为 "pending"，否则该章摘要因 pending-check
- * 永不重试。应用启动（initDb）时调用一次。inFlight 是进程内态，重启即清空，故只需复位 DB。
- * 注：全书摘要无需此复位——其状态本就运行时派生，重启时 inFlightBooks 自然为空。
- */
-export function resetStuckSummaries(db: DB): void {
-  db.update(chapters)
-    .set({ summaryStatus: "pending" })
-    .where(eq(chapters.summaryStatus, "generating"))
-    .run();
 }

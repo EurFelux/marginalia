@@ -3,13 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createDb, runMigrations } from "@main/db/client";
 import { chapters } from "@main/db/schema";
 import { importBook, resolveChapterByHref } from "@main/library/repository";
-import {
-  getChapterSummary,
-  getToc,
-  listChapters,
-  readBookText,
-  readChapterText,
-} from "@main/library/content";
+import { getToc, listChapters, readBookText, readChapterText } from "@main/library/content";
 import { makeFixtureEpub } from "@marginalia/epub-parser";
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
@@ -36,17 +30,6 @@ describe("content service", () => {
     expect(r.text).toContain("Hello world.");
     expect(r.hasMore).toBe(false);
   });
-  it("getChapterSummary returns pending by default", () => {
-    const { db, book } = setup();
-    const ch1 = resolveChapterByHref(db, book.id, "OEBPS/ch1.xhtml")!;
-    expect(getChapterSummary(db, book.id, ch1.id)).toEqual({ status: "pending", summary: null });
-  });
-
-  it("getChapterSummary throws for an unknown chapterId", () => {
-    const { db, book } = setup();
-    expect(() => getChapterSummary(db, book.id, "nonexistent-id")).toThrow(/not found/);
-  });
-
   it("readChapterText throws for an unknown chapterId", () => {
     const { db, bytes, book } = setup();
     expect(() => readChapterText(db, bytes, book.id, "nonexistent-id", {})).toThrow(/not found/);

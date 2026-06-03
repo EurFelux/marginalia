@@ -11,6 +11,7 @@ import {
   type BookSummaryContentDto,
   type BookSummaryDto,
   type ChapterRefDto,
+  type ChapterSummaryDto,
   type ChapterTextSlice,
 } from "@shared/library";
 import type { TocNode } from "@shared/types";
@@ -18,14 +19,13 @@ import { getDb } from "@main/db/instance";
 import { getBook, importBook, listBooks } from "@main/library/repository";
 import { readBookBytes } from "@main/library/book-bytes";
 import { getProgress, saveProgress } from "@main/library/progress";
+import { getToc, listChapters, readChapterText } from "@main/library/content";
 import {
-  getChapterSummary,
-  getToc,
-  listChapters,
-  readChapterText,
-  type ChapterSummary,
-} from "@main/library/content";
-import { ensureBookSummary, ensureChapterSummary, getBookSummaryView } from "@main/ai/summary";
+  ensureBookSummary,
+  ensureChapterSummary,
+  getBookSummaryView,
+  getChapterSummaryView,
+} from "@main/ai/summary";
 import { makeSummaryDeps } from "@main/ai/send-deps";
 import { handle } from "@main/ipc/registry";
 
@@ -99,15 +99,15 @@ export function registerLibraryHandlers(): void {
     return listChapters(db, input.bookId);
   });
 
-  handle<{ bookId: string; chapterId: string }, ChapterSummary>(
+  handle<{ bookId: string; chapterId: string }, ChapterSummaryDto>(
     IPC.contentChapterSummary,
     chapterRefInput,
-    (input) => getChapterSummary(getDb(), input.bookId, input.chapterId),
+    (input) => getChapterSummaryView(getDb(), input.bookId, input.chapterId),
   );
 
   // 触发本章摘要懒生成（开章自动 / pill 手动按钮）。fire-and-forget：ensureChapterSummary
-  // 仅从 pending 起、内部自含 reject 兜底；同步前缀会把 pending 置 generating，故返回当前状态即时反馈。
-  handle<{ bookId: string; chapterId: string }, ChapterSummary>(
+  // 内部自含 reject 兜底；同步前缀会把状态派生为 generating，故返回当前派生状态即时反馈。
+  handle<{ bookId: string; chapterId: string }, ChapterSummaryDto>(
     IPC.contentGenerateChapterSummary,
     chapterRefInput,
     (input) => {
@@ -115,7 +115,7 @@ export function registerLibraryHandlers(): void {
       void ensureChapterSummary(makeSummaryDeps(), input.bookId, input.chapterId).catch((err) =>
         console.warn("[content] generate chapter summary failed:", err),
       );
-      return getChapterSummary(db, input.bookId, input.chapterId);
+      return getChapterSummaryView(db, input.bookId, input.chapterId);
     },
   );
 

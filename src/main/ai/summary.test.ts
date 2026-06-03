@@ -11,10 +11,11 @@ import type { ResolvedModel } from "@main/ai/assistant-model";
 import type { LoadBytes } from "@main/ai/tools";
 import {
   __resetBookSummaryRuntime,
+  __resetChapterSummaryRuntime,
   ensureBookSummary,
   ensureChapterSummary,
   getBookSummaryView,
-  resetStuckSummaries,
+  getChapterSummaryView,
   type SummaryDeps,
 } from "@main/ai/summary";
 
@@ -73,34 +74,45 @@ function setup(model: ResolvedModel) {
   return { db, book, ch1, deps };
 }
 
-function statusOf(db: ReturnType<typeof createDb>, chapterId: string) {
-  return db.select().from(chapters).where(eq(chapters.id, chapterId)).get()!;
-}
+describe("ensureChapterSummary / getChapterSummaryView (derived status)", () => {
+  // chapter.id 由 fixture 确定、跨用例相同 → 清进程内运行时集保证隔离。
+  beforeEach(() => __resetChapterSummaryRuntime());
 
-describe("ensureChapterSummary", () => {
-  it("generates and stores the summary when the chapter is pending", async () => {
+  it("derives pending for a fresh chapter with no summary", () => {
+    const { db, book, ch1, deps: _deps } = setup({ ok: false, reason: "x" });
+    void _deps;
+    expect(getChapterSummaryView(db, book.id, ch1.id)).toEqual({
+      status: "pending",
+      summary: null,
+    });
+  });
+
+  it("throws for an unknown chapterId", () => {
+    const { db, book } = setup({ ok: false, reason: "x" });
+    expect(() => getChapterSummaryView(db, book.id, "nonexistent-id")).toThrow(/not found/);
+  });
+
+  it("generates and stores the summary, deriving ready", async () => {
     const { db, book, ch1, deps } = setup({
       ok: true,
       model: genModel("A concise summary."),
       modelId: "mock",
     });
     await ensureChapterSummary(deps, book.id, ch1.id);
-    const row = statusOf(db, ch1.id);
-    expect(row.summaryStatus).toBe("ready");
-    expect(row.summary).toBe("A concise summary.");
+    expect(getChapterSummaryView(db, book.id, ch1.id)).toEqual({
+      status: "ready",
+      summary: "A concise summary.",
+    });
   });
 
-  it("is a no-op when the chapter is not pending (already ready)", async () => {
-    const { db, book, ch1, deps } = setup({ ok: true, model: genModel("X"), modelId: "mock" });
-    db.update(chapters)
-      .set({ summaryStatus: "ready", summary: "cached" })
-      .where(eq(chapters.id, ch1.id))
-      .run();
+  it("is a no-op when the summary already exists", async () => {
+    const { db, book, ch1, deps } = setup({ ok: true, model: genModel("new"), modelId: "mock" });
+    db.update(chapters).set({ summary: "cached" }).where(eq(chapters.id, ch1.id)).run();
     await ensureChapterSummary(deps, book.id, ch1.id);
-    expect(statusOf(db, ch1.id).summary).toBe("cached"); // unchanged
+    expect(getChapterSummaryView(db, book.id, ch1.id).summary).toBe("cached"); // unchanged
   });
 
-  it("marks the chapter unavailable when generation throws", async () => {
+  it("derives unavailable when generation throws", async () => {
     const failModel = new MockLanguageModelV3({
       doGenerate: async () => {
         throw new Error("model exploded");
@@ -108,34 +120,28 @@ describe("ensureChapterSummary", () => {
     });
     const { db, book, ch1, deps } = setup({ ok: true, model: failModel, modelId: "mock" });
     await ensureChapterSummary(deps, book.id, ch1.id);
-    expect(statusOf(db, ch1.id).summaryStatus).toBe("unavailable");
+    expect(getChapterSummaryView(db, book.id, ch1.id).status).toBe("unavailable");
   });
 
-  it("leaves the chapter pending when no model is configured", async () => {
+  it("stays pending when no model is configured", async () => {
     const { db, book, ch1, deps } = setup({ ok: false, reason: "not configured" });
     await ensureChapterSummary(deps, book.id, ch1.id);
-    expect(statusOf(db, ch1.id).summaryStatus).toBe("pending");
-  });
-});
-
-describe("resetStuckSummaries", () => {
-  it("resets leftover 'generating' chapters back to 'pending'", () => {
-    const { db, ch1 } = setup({ ok: false, reason: "x" });
-    db.update(chapters).set({ summaryStatus: "generating" }).where(eq(chapters.id, ch1.id)).run();
-    resetStuckSummaries(db);
-    expect(statusOf(db, ch1.id).summaryStatus).toBe("pending");
+    expect(getChapterSummaryView(db, book.id, ch1.id).status).toBe("pending");
   });
 
-  it("leaves ready/unavailable/pending chapters untouched", () => {
-    const { db, ch1 } = setup({ ok: false, reason: "x" });
-    db.update(chapters)
-      .set({ summaryStatus: "ready", summary: "kept" })
-      .where(eq(chapters.id, ch1.id))
-      .run();
-    resetStuckSummaries(db);
-    const row = statusOf(db, ch1.id);
-    expect(row.summaryStatus).toBe("ready");
-    expect(row.summary).toBe("kept");
+  it("restart semantics: clearing runtime vanishes generating/failed; stored summary still derives ready", async () => {
+    const failModel = new MockLanguageModelV3({
+      doGenerate: async () => {
+        throw new Error("boom");
+      },
+    });
+    const { db, book, ch1, deps } = setup({ ok: true, model: failModel, modelId: "mock" });
+    await ensureChapterSummary(deps, book.id, ch1.id);
+    expect(getChapterSummaryView(db, book.id, ch1.id).status).toBe("unavailable");
+    __resetChapterSummaryRuntime(); // 模拟重启：进程内集清空
+    expect(getChapterSummaryView(db, book.id, ch1.id).status).toBe("pending"); // failed 消失 → 可重试
+    db.update(chapters).set({ summary: "S" }).where(eq(chapters.id, ch1.id)).run();
+    expect(getChapterSummaryView(db, book.id, ch1.id).status).toBe("ready"); // summary 在 → ready
   });
 });
 

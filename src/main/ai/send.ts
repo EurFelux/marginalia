@@ -4,7 +4,7 @@ import { and, eq } from "drizzle-orm";
 import type { DB } from "@main/db/client";
 import { chapters } from "@main/db/schema";
 import { getDefaultAssistant } from "@main/providers/assistant";
-import { getChapterSummary } from "@main/library/content";
+import { getChapterSummaryView } from "@main/ai/summary";
 import { assemblePrompt } from "@main/ai/prompt";
 import { dedupeParagraph, toContextChips } from "@main/ai/chips";
 import { createReadingTools, type LoadBytes } from "@main/ai/tools";
@@ -59,7 +59,7 @@ export function runSend(
   const resolved = resolveModel();
   if (!resolved.ok) return { ok: false, reason: resolved.reason };
 
-  // 1b. 校验章节属于本书——在任何写入前拦截（§16 无孤儿）。否则步骤6 getChapterSummary 会在
+  // 1b. 校验章节属于本书——在任何写入前拦截（§16 无孤儿）。否则步骤6 getChapterSummaryView 会在
   //     已建会话 + 已落 user 消息之后裸抛（章节存在于别的书时 FK 不报错，但 book 作用域查询无行）。
   const chapterRow = getChapter(db, input.bookId, input.currentChapterId);
   if (!chapterRow) return { ok: false, reason: t("errors.chapterNotInBook", "本书中未找到该章节") };
@@ -87,7 +87,7 @@ export function runSend(
   });
 
   // 6. 章节摘要：ready 则注入当前轮（生成由「开章自动/手动」触发，不再由发消息触发）
-  const summary = getChapterSummary(db, input.bookId, input.currentChapterId);
+  const summary = getChapterSummaryView(db, input.bookId, input.currentChapterId);
   const chapter =
     summary.status === "ready" && summary.summary
       ? { title: chapterRow.title, summary: summary.summary }
