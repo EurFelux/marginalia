@@ -78,3 +78,38 @@ export function extractChapterText(
   const nextOffset = Math.min(offset + slice.length, full.length);
   return { text: slice, hasMore: nextOffset < full.length, nextOffset };
 }
+
+/**
+ * 从 ePub 字节里按 href 顺序取全书纯文本，拼接到 `maxChars`。**只解压一次**（关键：逐章调
+ * extractChapterText 会每次全解压 epub，N 章 = N 次全解压、同步阻塞主进程）。纯函数：不碰 DB/fs。
+ */
+export function extractBookText(
+  bytes: Uint8Array,
+  hrefs: string[],
+  opts: { maxChars: number },
+): { text: string; truncated: boolean } {
+  const files = unzipSync(bytes); // 只解压一次
+  const parts: string[] = [];
+  let used = 0;
+  let truncated = false;
+  for (const href of hrefs) {
+    const remaining = opts.maxChars - used;
+    if (remaining <= 0) {
+      truncated = true;
+      break;
+    }
+    const entry = files[href];
+    if (!entry) continue; // spine 列了但 zip 缺失 → 容错跳过
+    const full = htmlToText(strFromU8(entry));
+    const slice = full.slice(0, remaining);
+    if (slice.length > 0) {
+      parts.push(slice);
+      used += slice.length;
+    }
+    if (slice.length < full.length) {
+      truncated = true; // 该章被预算截断 → 停
+      break;
+    }
+  }
+  return { text: parts.join("\n\n"), truncated };
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractChapterText, htmlToText } from "./content";
+import { extractBookText, extractChapterText, htmlToText } from "./content";
 import { makeFixtureEpub } from "./fixture";
 
 describe("htmlToText", () => {
@@ -55,5 +55,27 @@ describe("extractChapterText", () => {
     // nextOffset must not exceed the actual chapter text length
     const chapterFull = extractChapterText(bytes, "OEBPS/ch1.xhtml", {}).text;
     expect(r.nextOffset).toBeLessThanOrEqual(chapterFull.length);
+  });
+});
+
+describe("extractBookText", () => {
+  const bytes = makeFixtureEpub();
+  it("concatenates the given hrefs in order (single unzip)", () => {
+    const r = extractBookText(bytes, ["OEBPS/ch1.xhtml", "OEBPS/ch2.xhtml"], { maxChars: 100_000 });
+    expect(r.truncated).toBe(false);
+    expect(r.text).toContain("Hello world."); // ch1
+    expect(r.text).toContain("The end."); // ch2
+    expect(r.text.indexOf("Hello world.")).toBeLessThan(r.text.indexOf("The end."));
+  });
+  it("truncates at maxChars across chapters", () => {
+    const r = extractBookText(bytes, ["OEBPS/ch1.xhtml", "OEBPS/ch2.xhtml"], { maxChars: 5 });
+    expect(r.truncated).toBe(true);
+    expect(r.text.length).toBeLessThanOrEqual(5);
+  });
+  it("skips hrefs missing from the zip (fault-tolerant)", () => {
+    const r = extractBookText(bytes, ["OEBPS/nope.xhtml", "OEBPS/ch1.xhtml"], {
+      maxChars: 100_000,
+    });
+    expect(r.text).toContain("Hello world.");
   });
 });

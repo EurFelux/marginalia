@@ -1,5 +1,5 @@
 import { and, asc, eq } from "drizzle-orm";
-import { extractChapterText, type ReadOptions } from "@marginalia/epub-parser";
+import { extractBookText, extractChapterText, type ReadOptions } from "@marginalia/epub-parser";
 import type { DB } from "@main/db/client";
 import { books, chapters } from "@main/db/schema";
 import { resolveChapterByHref } from "@main/library/repository";
@@ -46,11 +46,10 @@ export function readChapterText(
   return extractChapterText(bytes, ch.href, opts);
 }
 
-const BOOK_TEXT_SEPARATOR = "\n\n";
-
 /**
  * 取全书正文：按 spine 顺序（orderIndex）拼接所有章节正文，累计到 `maxChars` 截断。
- * 供全书摘要一次性喂模型（用户决策「直接喂整本书」）。超预算时前载截断，`truncated` 标记。
+ * 供全书摘要一次性喂模型（用户决策「直接喂整本书」）。委托 `extractBookText`——**只解压一次**
+ * （逐章 extractChapterText 会每次全解压 epub，N 章 = N 次、同步阻塞主进程，导致重新生成时 app 卡死）。
  */
 export function readBookText(
   db: DB,
@@ -58,32 +57,14 @@ export function readBookText(
   bookId: string,
   opts: { maxChars: number },
 ): { text: string; truncated: boolean } {
-  const rows = db
+  const hrefs = db
     .select({ href: chapters.href })
     .from(chapters)
     .where(eq(chapters.bookId, bookId))
     .orderBy(asc(chapters.orderIndex))
-    .all();
-  const parts: string[] = [];
-  let used = 0;
-  let truncated = false;
-  for (const { href } of rows) {
-    const remaining = opts.maxChars - used;
-    if (remaining <= 0) {
-      truncated = true;
-      break;
-    }
-    const slice = extractChapterText(bytes, href, { maxChars: remaining });
-    if (slice.text.length > 0) {
-      parts.push(slice.text);
-      used += slice.text.length;
-    }
-    if (slice.hasMore) {
-      truncated = true; // 该章被预算截断 → 已到上限，停
-      break;
-    }
-  }
-  return { text: parts.join(BOOK_TEXT_SEPARATOR), truncated };
+    .all()
+    .map((r) => r.href);
+  return extractBookText(bytes, hrefs, opts);
 }
 
 /**
