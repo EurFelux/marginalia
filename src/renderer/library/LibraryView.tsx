@@ -43,6 +43,25 @@ export function LibraryView() {
     },
   });
 
+  // 删书：调既有 library:delete IPC（主进程级联删 DB + unlink epub 副本），成功后失效刷新书库 + toast。
+  const deleteBook = useMutation({
+    mutationFn: (b: BookSummaryDto) => window.api.library.delete({ bookId: b.id }),
+    onSuccess: (_r, b) => {
+      void qc.invalidateQueries({ queryKey: qk.library });
+      toast.success(t("library.deleted", "已删除《{{title}}》", { title: b.title ?? b.id }));
+    },
+    onError: (e, b) => {
+      // 透传主进程真实错误（honest-error），不自动消失。
+      toast.error(
+        t("library.deleteFailed", "{{title}} 删除失败：{{error}}", {
+          title: b.title ?? b.id,
+          error: (e as Error).message,
+        }),
+        { closeButton: true, duration: Infinity },
+      );
+    },
+  });
+
   // 即时 toast 反馈：新增 / 已在库（幂等复用）/ 忽略非 epub / 失败（透传主进程真实错误，不自动消失）。
   const runImport = async (items: ImportItem[], ignored: string[]) => {
     if (items.length === 0 && ignored.length === 0) return;
@@ -138,7 +157,11 @@ export function LibraryView() {
         <ul className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-5">
           {books.data?.map((b) => (
             <li key={b.id}>
-              <BookCover book={b} onOpen={() => openBook(b.id)} />
+              <BookCover
+                book={b}
+                onOpen={() => openBook(b.id)}
+                onDelete={() => deleteBook.mutate(b)}
+              />
             </li>
           ))}
         </ul>
