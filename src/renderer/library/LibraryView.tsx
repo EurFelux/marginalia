@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { BookOpen, FolderOpen, Settings } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { BookSummaryDto } from "@shared/library";
 import { Button } from "@renderer/components/ui/button";
 import { qk } from "@renderer/query/keys";
@@ -16,6 +17,7 @@ interface ImportItem {
 }
 
 export function LibraryView() {
+  const { t, i18n } = useTranslation();
   const qc = useQueryClient();
   const openBook = useReaderStore((s) => s.openBook);
   const openSettings = useSettingsStore((s) => s.setOpen);
@@ -48,13 +50,27 @@ export function LibraryView() {
     const added = r.ok.filter((b) => !existing.has(b.id)).length;
     const duplicate = r.ok.length - added;
 
-    if (added > 0) toast.success(`已导入 ${added} 本`);
-    if (duplicate > 0) toast.info(`${duplicate} 本已在书库`);
+    if (added > 0) toast.success(t("library.imported", "已导入 {{count}} 本", { count: added }));
+    if (duplicate > 0) {
+      toast.info(t("library.duplicate", "{{count}} 本已在书库", { count: duplicate }));
+    }
     if (ignored.length > 0) {
-      toast.warning(`已忽略 ${ignored.length} 个非 ePub：${ignored.join("、")}`);
+      // 列表分隔符按当前 UI 语言本地化（中文顿号 / 英文逗号），勿硬编码。
+      const names = new Intl.ListFormat(i18n.language, { style: "narrow", type: "unit" }).format(
+        ignored,
+      );
+      toast.warning(
+        t("library.ignored", "已忽略 {{count}} 个非 ePub：{{names}}", {
+          count: ignored.length,
+          names,
+        }),
+      );
     }
     for (const f of r.failed) {
-      toast.error(`${f.name} 导入失败：${f.error}`, { closeButton: true, duration: Infinity });
+      toast.error(
+        t("library.importFailed", "{{name}} 导入失败：{{error}}", { name: f.name, error: f.error }),
+        { closeButton: true, duration: Infinity },
+      );
     }
   };
 
@@ -83,17 +99,19 @@ export function LibraryView() {
       className="flex h-screen flex-col bg-background font-sans text-foreground"
     >
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-6">
-        <h1 className="font-serif text-xl font-semibold">Marginalia</h1>
+        <h1 className="font-serif text-xl font-semibold">{t("library.title", "Marginalia")}</h1>
         <div className="flex items-center gap-2">
           <Button onClick={() => void onPick()} disabled={importBooks.isPending}>
             <FolderOpen />
-            {importBooks.isPending ? "导入中…" : "导入 ePub"}
+            {importBooks.isPending
+              ? t("library.importPending", "导入中…")
+              : t("library.import", "导入 ePub")}
           </Button>
           <Button
             variant="ghost"
             size="icon"
             onClick={() => openSettings(true)}
-            aria-label="设置"
+            aria-label={t("settings.title", "设置")}
             className="text-muted-foreground"
           >
             <Settings />
@@ -102,12 +120,18 @@ export function LibraryView() {
       </header>
 
       <main className="flex-1 overflow-y-auto p-6">
-        {books.isPending && <p className="text-sm text-muted-foreground">加载书库…</p>}
-        {books.isError && <p className="text-sm text-destructive">读取书库失败</p>}
+        {books.isPending && (
+          <p className="text-sm text-muted-foreground">{t("library.loading", "加载书库…")}</p>
+        )}
+        {books.isError && (
+          <p className="text-sm text-destructive">{t("library.loadError", "读取书库失败")}</p>
+        )}
         {books.data?.length === 0 && (
           <div className="mt-20 text-center text-muted-foreground">
             <BookOpen className="mx-auto mb-3 size-10 opacity-40" />
-            <p className="text-sm">书库为空，点右上角「导入 ePub」或把 .epub 拖进窗口开始。</p>
+            <p className="text-sm">
+              {t("library.empty", "书库为空，点右上角「导入 ePub」或把 .epub 拖进窗口开始。")}
+            </p>
           </div>
         )}
         <ul className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
@@ -123,7 +147,7 @@ export function LibraryView() {
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-medium">{b.title ?? b.id}</span>
                   <span className="block truncate text-xs text-muted-foreground">
-                    {b.author ?? "未知作者"}
+                    {b.author ?? t("library.unknownAuthor", "未知作者")}
                   </span>
                 </span>
               </button>
