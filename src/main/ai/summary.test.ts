@@ -2,7 +2,7 @@
 import path from "node:path";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { MockLanguageModelV3 } from "ai/test";
+import { MockLanguageModelV3, simulateReadableStream } from "ai/test";
 import { makeFixtureEpub } from "@marginalia/epub-parser";
 import { createDb, runMigrations } from "@main/db/client";
 import { books, chapters } from "@main/db/schema";
@@ -33,6 +33,31 @@ function genModel(text: string) {
         outputTokens: { total: 1, text: undefined, reasoning: undefined },
       },
       warnings: [],
+    }),
+  });
+}
+
+const STREAM_USAGE = {
+  inputTokens: { total: 1, noCache: undefined, cacheRead: undefined, cacheWrite: undefined },
+  outputTokens: { total: 1, text: undefined, reasoning: undefined },
+};
+
+// 流式模型 mock（ensureBookSummary 用 streamText）：发一段 text-delta 后正常结束。
+function streamModel(text: string) {
+  return new MockLanguageModelV3({
+    doStream: async () => ({
+      stream: simulateReadableStream({
+        chunks: [
+          { type: "text-start", id: "t1" },
+          { type: "text-delta", id: "t1", delta: text },
+          { type: "text-end", id: "t1" },
+          {
+            type: "finish",
+            finishReason: { unified: "stop", raw: undefined },
+            usage: STREAM_USAGE,
+          },
+        ],
+      }),
     }),
   });
 }
@@ -123,10 +148,10 @@ describe("ensureBookSummary / getBookSummaryView (derived status)", () => {
     expect(getBookSummaryView(db, book.id)).toEqual({ status: "pending", summary: null });
   });
 
-  it("generates and stores the whole-book summary, deriving ready", async () => {
+  it("streams and stores the whole-book summary, deriving ready", async () => {
     const { db, book, deps } = setup({
       ok: true,
-      model: genModel("Whole-book summary."),
+      model: streamModel("Whole-book summary."),
       modelId: "mock",
     });
     await ensureBookSummary(deps, book.id);
@@ -136,17 +161,24 @@ describe("ensureBookSummary / getBookSummaryView (derived status)", () => {
     });
   });
 
-  it("is a no-op when the book summary already exists", async () => {
-    const { db, book, deps } = setup({ ok: true, model: genModel("new"), modelId: "mock" });
+  it("is a no-op when the book summary already exists (force=false)", async () => {
+    const { db, book, deps } = setup({ ok: true, model: streamModel("new"), modelId: "mock" });
     db.update(books).set({ summary: "cached" }).where(eq(books.id, book.id)).run();
     await ensureBookSummary(deps, book.id);
     expect(getBookSummaryView(db, book.id).summary).toBe("cached");
   });
 
-  it("derives unavailable (in-memory failed set) when generation throws", async () => {
+  it("force=true regenerates over an existing summary", async () => {
+    const { db, book, deps } = setup({ ok: true, model: streamModel("fresh"), modelId: "mock" });
+    db.update(books).set({ summary: "old" }).where(eq(books.id, book.id)).run();
+    await ensureBookSummary(deps, book.id, true);
+    expect(getBookSummaryView(db, book.id).summary).toBe("fresh");
+  });
+
+  it("derives unavailable when streaming errors (keeps old summary unwritten)", async () => {
     const failModel = new MockLanguageModelV3({
-      doGenerate: async () => {
-        throw new Error("model exploded");
+      doStream: async () => {
+        throw new Error("stream boom");
       },
     });
     const { db, book, deps } = setup({ ok: true, model: failModel, modelId: "mock" });
@@ -162,7 +194,7 @@ describe("ensureBookSummary / getBookSummaryView (derived status)", () => {
 
   it("restart semantics: clearing runtime sets vanishes generating/failed; stored summary still derives ready", async () => {
     const failModel = new MockLanguageModelV3({
-      doGenerate: async () => {
+      doStream: async () => {
         throw new Error("boom");
       },
     });

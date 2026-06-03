@@ -36,7 +36,8 @@ export function BookCard({ bookId }: { bookId: string }) {
   const summary = useQuery({
     queryKey: qk.bookSummary(bookId),
     queryFn: () => window.api.content.bookSummary({ bookId }),
-    refetchInterval: (q) => (q.state.data?.status === "generating" ? 2500 : false),
+    // 生成中以 ~400ms 轮询，让累积的 partial 流式长出来（复用 query，无需新事件通道）。
+    refetchInterval: (q) => (q.state.data?.status === "generating" ? 400 : false),
   });
   const generate = useMutation({
     mutationFn: () => window.api.content.generateBookSummary({ bookId }),
@@ -45,7 +46,9 @@ export function BookCard({ bookId }: { bookId: string }) {
 
   const status = summary.data?.status ?? "pending";
   const badge = BADGE[status];
-  const canGenerate = status === "pending" || status === "unavailable";
+  const text = summary.data?.summary ?? null; // ready=全文；generating=累积 partial（流式）
+  const genLabel =
+    status === "ready" ? "重新生成" : status === "unavailable" ? "重试生成" : "生成摘要";
 
   return (
     <div className="shrink-0 border-b border-border p-3">
@@ -77,23 +80,24 @@ export function BookCard({ bookId }: { bookId: string }) {
             </span>
           </div>
           <div className="max-h-96 overflow-y-auto text-sm leading-relaxed text-foreground">
-            {status === "ready" ? (
-              // Streamdown 自带 markdown 排版（同 AI 消息）；全书摘要常含 ## 主题/人物/结构 等结构
-              <Streamdown>{summary.data?.summary ?? ""}</Streamdown>
+            {text ? (
+              // Streamdown 渲染 markdown（同 AI 消息）；生成中即流式渲染累积的 partial
+              <Streamdown>{text}</Streamdown>
             ) : (
               <p className="whitespace-pre-wrap text-xs text-muted-foreground">
                 {PLACEHOLDER[status]}
               </p>
             )}
           </div>
-          {canGenerate && (
+          {status !== "generating" && (
             <Button
               size="sm"
+              variant={status === "ready" ? "outline" : "default"}
               onClick={() => generate.mutate()}
               disabled={generate.isPending}
               className="mt-2"
             >
-              {generate.isPending ? "生成中…" : "生成摘要"}
+              {generate.isPending ? "生成中…" : genLabel}
             </Button>
           )}
         </PopoverContent>

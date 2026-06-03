@@ -129,7 +129,8 @@ export function registerLibraryHandlers(): void {
     bookIdInput,
     (input) => {
       const db = getDb();
-      void ensureBookSummary(makeSummaryDeps(), input.bookId).catch((err) =>
+      // force=true：书卡「生成/重新生成」总是（重）生成，覆盖旧摘要。
+      void ensureBookSummary(makeSummaryDeps(), input.bookId, true).catch((err) =>
         console.warn("[content] generate book summary failed:", err),
       );
       return getBookSummaryView(db, input.bookId);

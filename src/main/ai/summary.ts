@@ -1,5 +1,5 @@
 // src/main/ai/summary.ts
-import { generateText } from "ai";
+import { generateText, streamText } from "ai";
 import { and, eq } from "drizzle-orm";
 import type { DB } from "@main/db/client";
 import { books, chapters } from "@main/db/schema";
@@ -88,61 +88,92 @@ const BOOK_SUMMARY_INPUT_MAX_CHARS = 180_000; // 喂模型的全书正文上限�
 // 全书摘要的运行时状态（不持久化；重启清空）：summary!=null=ready，inFlight=generating，failed=unavailable，否则 pending。
 const inFlightBooks = new Set<string>();
 const failedBooks = new Set<string>();
+const streamingBookSummaries = new Map<string, string>(); // 生成中累积的 partial 文本（供流式渲染）
 
-/** 读全书摘要正文 + 派生状态（状态不入 DB，由 summary 存在性 + 进程内集派生）。 */
+/**
+ * 读全书摘要正文 + 派生状态（状态不入 DB）。
+ * 生成中（inFlight）返回累积的 partial（供 BookCard 用 Streamdown 流式渲染），状态 generating——
+ * inFlight 优先于 summary 存在性，故重新生成（旧 summary 还在）也显示 generating + 流式新文本。
+ */
 export function getBookSummaryView(
   db: DB,
   bookId: string,
 ): { status: SummaryStatus; summary: string | null } {
   const row = db.select({ summary: books.summary }).from(books).where(eq(books.id, bookId)).get();
   if (!row) throw new Error(`summary: book ${bookId} not found`);
+  if (inFlightBooks.has(bookId)) {
+    return { status: "generating", summary: streamingBookSummaries.get(bookId) ?? null };
+  }
   const summary = row.summary ?? null;
-  // inFlight 优先于 summary 存在性：重新生成（旧 summary 还在 + 正在重生）应显示 generating。
-  const status: SummaryStatus = inFlightBooks.has(bookId)
-    ? "generating"
-    : summary != null
-      ? "ready"
-      : failedBooks.has(bookId)
-        ? "unavailable"
-        : "pending";
+  const status: SummaryStatus =
+    summary != null ? "ready" : failedBooks.has(bookId) ? "unavailable" : "pending";
   return { status, summary };
 }
 
-/** 仅供测试：清空全书摘要的进程内运行时态（inFlight/failed），保证用例隔离（book.id 由 fixture 确定、跨用例相同）。 */
+/** 仅供测试：清空全书摘要的进程内运行时态，保证用例隔离（book.id 由 fixture 确定、跨用例相同）。 */
 export function __resetBookSummaryRuntime(): void {
   inFlightBooks.clear();
   failedBooks.clear();
+  streamingBookSummaries.clear();
 }
 
-/** 懒生成全书摘要（用户决策「直接喂整本书」）。仅在未 ready 时生成；非阻塞调用方 fire-and-forget。 */
-export async function ensureBookSummary(deps: SummaryDeps, bookId: string): Promise<void> {
+/**
+ * 懒生成全书摘要（用户决策「直接喂整本书」），**流式**累积 partial 供渲染。
+ * `force=true`（书卡「重新生成」）跳过 ready-skip、覆盖旧摘要。非阻塞调用方 fire-and-forget。
+ */
+export async function ensureBookSummary(
+  deps: SummaryDeps,
+  bookId: string,
+  force = false,
+): Promise<void> {
   const { db, loadBytes, resolveModel } = deps;
   let claimed = false;
   try {
-    if (getBookSummaryView(db, bookId).summary != null) return; // 已 ready
     if (inFlightBooks.has(bookId)) return; // 并发去重
+    const stored = db
+      .select({ summary: books.summary })
+      .from(books)
+      .where(eq(books.id, bookId))
+      .get();
+    if (!force && stored?.summary != null) return; // 已 ready，非强制跳过
     const resolved = resolveModel();
     if (!resolved.ok) return; // 模型未配置 → 保持 pending，配置后重试
 
     failedBooks.delete(bookId);
+    streamingBookSummaries.delete(bookId);
     inFlightBooks.add(bookId); // 同步前缀：使 generate handler 即时派生出 generating
     claimed = true;
     const bytes = await loadBytes(bookId);
     const { text } = readBookText(db, bytes, bookId, { maxChars: BOOK_SUMMARY_INPUT_MAX_CHARS });
-    const { text: summary } = await generateText({
+    // streamText 遇错发 error chunk 并正常关流（textStream 不 throw），故用 onError 标志兜——否则会把半截落库。
+    let hadError = false;
+    const result = streamText({
       model: resolved.model,
       system: BOOK_SUMMARY_SYSTEM,
       prompt: text,
       maxOutputTokens: 4096, // 全书摘要（主题/人物/结构、多段）比单章长，给足额度避免输出截断
       maxRetries: 1,
+      onError: ({ error }) => {
+        hadError = true;
+        console.warn(`[summary] book ${bookId} stream error:`, error);
+      },
     });
-    db.update(books).set({ summary }).where(eq(books.id, bookId)).run();
+    let acc = "";
+    for await (const delta of result.textStream) {
+      acc += delta;
+      streamingBookSummaries.set(bookId, acc); // partial 供 getBookSummaryView 轮询读取
+    }
+    if (hadError)
+      failedBooks.add(bookId); // 不落库（保留旧 summary 不变）
+    else db.update(books).set({ summary: acc }).where(eq(books.id, bookId)).run();
   } catch (err) {
-    // 自含全部 reject（端口 => void）。失败标记进程内 failedBooks（→ 派生 unavailable；重启清空即可重试）。
     console.warn(`[summary] book ${bookId} ensure failed:`, err);
     if (claimed) failedBooks.add(bookId);
   } finally {
-    if (claimed) inFlightBooks.delete(bookId);
+    if (claimed) {
+      inFlightBooks.delete(bookId);
+      streamingBookSummaries.delete(bookId); // partial 已落库或丢弃
+    }
   }
 }
 
