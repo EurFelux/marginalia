@@ -6,6 +6,7 @@ import type { AnnotationDto } from "@shared/annotations";
 import type { ChapterRefDto } from "@shared/library";
 import { cn } from "@renderer/lib/utils";
 import { Button } from "@renderer/components/ui/button";
+import { ScrollArea } from "@renderer/components/ui/scroll-area";
 import { qk } from "@renderer/query/keys";
 import { useAnnotationStore } from "@renderer/store/annotation-store";
 import { STYLE_STRIPE } from "./highlight";
@@ -71,17 +72,19 @@ export function AnnotationsList({ bookId }: { bookId: string }) {
   };
 
   return (
-    <div className="h-full space-y-1.5 overflow-y-auto p-2">
-      {sorted.map((a) => (
-        <AnnoItem
-          key={a.id}
-          a={a}
-          chapter={chapterTitle(a.cfiRange)}
-          onGoto={() => requestScroll(a.cfiRange)}
-          onDelete={() => deleteM.mutate({ id: a.id })}
-        />
-      ))}
-    </div>
+    <ScrollArea className="h-full">
+      <div className="space-y-1.5 p-2">
+        {sorted.map((a) => (
+          <AnnoItem
+            key={a.id}
+            a={a}
+            chapter={chapterTitle(a.cfiRange)}
+            onGoto={() => requestScroll(a.cfiRange)}
+            onDelete={() => deleteM.mutate({ id: a.id })}
+          />
+        ))}
+      </div>
+    </ScrollArea>
   );
 }
 
