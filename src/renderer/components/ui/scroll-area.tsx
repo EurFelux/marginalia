@@ -28,7 +28,9 @@ function ScrollArea({
         data-slot="scroll-area-viewport"
         className={cn("size-full", viewportClassName)}
       >
-        <ScrollAreaPrimitive.Content>{children}</ScrollAreaPrimitive.Content>
+        {/* Base UI Content 自带内联 min-width: fit-content（为横向增长内容设计），会被 truncate/nowrap
+            的固有宽度撑爆致横向溢出；本仓库 ScrollArea 全部为纵向滚动场景，故用 ! 盖过内联样式压回 0。 */}
+        <ScrollAreaPrimitive.Content className="min-w-0!">{children}</ScrollAreaPrimitive.Content>
       </ScrollAreaPrimitive.Viewport>
       <ScrollBar />
       <ScrollAreaPrimitive.Corner />
