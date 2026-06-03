@@ -118,7 +118,7 @@ export function EpubReader({ bookId, chapters }: Props) {
   };
   const onSelectionCleared = () => setSelection(null);
 
-  const onTopIndexChange = (index: number) => {
+  const onTopSectionChange = (index: number) => {
     if (!book) return;
     // 当前章高亮
     const href = book.hrefAtIndex(index);
@@ -217,7 +217,8 @@ export function EpubReader({ bookId, chapters }: Props) {
           readerThemeCss(resolvedTheme === "dark")
         }
         initialIndex={initialIndex}
-        onTopIndexChange={onTopIndexChange}
+        onTopSectionChange={onTopSectionChange}
+        onUnloadSection={(i) => book.unloadSection(i)}
         onSelect={onSelect}
         onSelectionCleared={onSelectionCleared}
         decorate={decorate}
