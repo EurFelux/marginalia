@@ -28,3 +28,16 @@ describe("chat-store", () => {
     expect(useChatStore.getState().panelOpen).toBe(true);
   });
 });
+
+describe("openConversation", () => {
+  it("sets active + opens panel + bumps openCommand nonce", () => {
+    useChatStore.setState(CHAT_INITIAL);
+    useChatStore.getState().openConversation("conv-1");
+    const s1 = useChatStore.getState();
+    expect(s1.activeConversationId).toBe("conv-1");
+    expect(s1.panelOpen).toBe(true);
+    expect(s1.openCommand).toEqual({ conversationId: "conv-1", nonce: 1 });
+    useChatStore.getState().openConversation("conv-1");
+    expect(useChatStore.getState().openCommand?.nonce).toBe(2); // 同会话重开也递增 → 触发重载
+  });
+});

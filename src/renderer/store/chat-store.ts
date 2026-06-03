@@ -6,12 +6,20 @@ interface ChatState {
   draftText: string;
   draftChips: Chip[];
   panelOpen: boolean;
+  /**
+   * 一次性命令信号（非状态）：nonce 递增触发 AIPanel 载入该会话历史。
+   * 与 activeConversationId 解耦——发消息 ack 路径只设 activeConversationId、不发本命令，
+   * 故发消息不会触发历史重载（避免覆盖刚流式出来的内容）。镜像 annotation-store.scrollCommand。
+   */
+  openCommand: { conversationId: string; nonce: number } | null;
 }
 interface ChatActions {
   setActiveConversation: (id: string | null) => void;
   setDraftText: (text: string) => void;
   setDraftChips: (chips: Chip[]) => void;
   setPanelOpen: (open: boolean) => void;
+  /** 重开会话：发命令信号（触发载历史）+ 设 active（高亮）+ 开面板。 */
+  openConversation: (id: string) => void;
 }
 
 export const CHAT_INITIAL: ChatState = {
@@ -19,6 +27,7 @@ export const CHAT_INITIAL: ChatState = {
   draftText: "",
   draftChips: [],
   panelOpen: false,
+  openCommand: null,
 };
 
 export const useChatStore = create<ChatState & ChatActions>((set) => ({
@@ -27,4 +36,10 @@ export const useChatStore = create<ChatState & ChatActions>((set) => ({
   setDraftText: (draftText) => set({ draftText }),
   setDraftChips: (draftChips) => set({ draftChips }),
   setPanelOpen: (panelOpen) => set({ panelOpen }),
+  openConversation: (id) =>
+    set((s) => ({
+      activeConversationId: id,
+      panelOpen: true,
+      openCommand: { conversationId: id, nonce: (s.openCommand?.nonce ?? 0) + 1 },
+    })),
 }));
