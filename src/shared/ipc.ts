@@ -102,6 +102,7 @@ export const C = {
   libraryGet: def("library:get", "invoke", bookIdInput, out<BookSummaryDto | null>()),
   libraryPickEpub: def("library:pick-epub", "invoke", z.void(), out<string | null>()),
   libraryReadEpubBytes: def("library:read-epub-bytes", "invoke", bookIdInput, out<Uint8Array>()),
+  libraryDelete: def("library:delete", "invoke", bookIdInput, out<void>()),
 
   // progress
   progressGet: def("progress:get", "invoke", bookIdInput, out<{ cfi: string } | null>()),
