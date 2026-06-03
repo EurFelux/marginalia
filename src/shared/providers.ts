@@ -6,7 +6,7 @@ export type ProviderType = z.infer<typeof providerType>;
 /** 各 type 官方默认端点：UI baseUrl 占位符 + 拉模型兜底共用（不注入生成路径——那交 SDK 自带默认）。 */
 export const DEFAULT_BASE_URL: Record<ProviderType, string | null> = {
   openai: "https://api.openai.com/v1",
-  anthropic: "https://api.anthropic.com",
+  anthropic: "https://api.anthropic.com/v1",
   google: "https://generativelanguage.googleapis.com/v1beta",
   "openai-compatible": null,
 };

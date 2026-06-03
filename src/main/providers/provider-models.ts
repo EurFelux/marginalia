@@ -12,15 +12,18 @@ export function buildModelsRequest(
   baseUrl: string | null,
   apiKey: string,
 ): ModelsRequest {
-  const base = baseUrl ?? DEFAULT_BASE_URL[type];
-  if (!base) throw new Error("baseUrl is required for this provider");
+  const raw = baseUrl ?? DEFAULT_BASE_URL[type];
+  if (!raw) throw new Error("baseUrl is required for this provider");
+  // baseUrl 约定：含版本路径（openai `/v1`、anthropic `/v1`、google `/v1beta`），拉模型只拼 `/models`，
+  // 与 model-factory 生成路径的 baseURL 约定一致（自建代理填同一个 base 两处都对）。去尾斜杠避免 `//models`。
+  const base = raw.replace(/\/+$/, "");
   switch (type) {
     case "openai":
     case "openai-compatible":
       return { url: `${base}/models`, headers: { Authorization: `Bearer ${apiKey}` } };
     case "anthropic":
       return {
-        url: `${base}/v1/models`,
+        url: `${base}/models`,
         headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
       };
     case "google":
@@ -39,10 +42,13 @@ const looseItem = z.object({ id: z.string() }).passthrough();
 /** 先 Zod 校验外部响应（API 边界），再按 type 归一为 model id 列表。openai-compatible 放宽 best-effort。 */
 export function adaptModelsResponse(type: ProviderType, json: unknown): string[] {
   if (type === "google") {
-    return googleSchema
-      .parse(json)
-      .models.filter((m) => m.supportedGenerationMethods?.includes("generateContent") ?? true)
-      .map((m) => m.name.replace(/^models\//, ""));
+    return (
+      googleSchema
+        .parse(json)
+        // 缺 supportedGenerationMethods 字段时默认保留（include）：宁可多列让用户试，也不静默漏掉。
+        .models.filter((m) => m.supportedGenerationMethods?.includes("generateContent") ?? true)
+        .map((m) => m.name.replace(/^models\//, ""))
+    );
   }
   if (type === "openai-compatible") {
     const data = (json as { data?: unknown })?.data;

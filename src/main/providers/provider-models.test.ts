@@ -23,6 +23,11 @@ describe("buildModelsRequest", () => {
     );
     expect(() => buildModelsRequest("openai-compatible", null, "sk-z")).toThrow();
   });
+  it("strips trailing slash on base to avoid //models", () => {
+    expect(buildModelsRequest("openai-compatible", "https://gw/v1/", "sk").url).toBe(
+      "https://gw/v1/models",
+    );
+  });
 });
 
 describe("adaptModelsResponse", () => {
@@ -42,6 +47,11 @@ describe("adaptModelsResponse", () => {
       ],
     };
     expect(adaptModelsResponse("google", json)).toEqual(["gemini-1.5-flash"]);
+  });
+  it("google: includes a model lacking supportedGenerationMethods (don't silently drop)", () => {
+    expect(adaptModelsResponse("google", { models: [{ name: "models/gemini-x" }] })).toEqual([
+      "gemini-x",
+    ]);
   });
   it("strict types throw on malformed response", () => {
     expect(() => adaptModelsResponse("openai", { foo: 1 })).toThrow();
