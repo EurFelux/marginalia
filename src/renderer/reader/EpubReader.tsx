@@ -9,6 +9,7 @@ import {
 import type { ChapterRefDto } from "@shared/library";
 import { useNavigationStore } from "@renderer/store/navigation-store";
 import { useReaderStore } from "@renderer/store/reader-store";
+import { useAnnotationStore } from "@renderer/store/annotation-store";
 import { qk } from "../query/keys";
 import { chapterIdByHref } from "./chapter-id-by-href";
 import { createEpubBook, type EpubBook } from "./epub-book";
@@ -36,10 +37,10 @@ export function EpubReader({ bookId, chapters }: Props) {
   const currentChapterId = useNavigationStore((s) => s.currentChapterId);
   const setCurrentChapter = useNavigationStore((s) => s.setCurrentChapter);
   const prefs = useReaderStore((s) => s.prefs);
-  const setSelection = useReaderStore((s) => s.setSelection);
-  const openStyleBar = useReaderStore((s) => s.openStyleBar);
-  const closeStyleBar = useReaderStore((s) => s.closeStyleBar);
-  const scrollToCfi = useReaderStore((s) => s.scrollToCfi);
+  const setSelection = useAnnotationStore((s) => s.setSelection);
+  const openStyleBar = useAnnotationStore((s) => s.openStyleBar);
+  const closeStyleBar = useAnnotationStore((s) => s.closeStyleBar);
+  const scrollCommand = useAnnotationStore((s) => s.scrollCommand);
   const qc = useQueryClient();
 
   // 防循环：记录最近一次「由滚动得出的顶部章 id」；跳章 effect 只在目标≠它时滚动。
@@ -169,10 +170,10 @@ export function EpubReader({ bookId, chapters }: Props) {
 
   // 侧栏列表点击 → 滚到该标注所在 section（best-effort：稍后把 mark 滚入视口）。
   useEffect(() => {
-    if (!book || !scrollToCfi) return;
-    const idx = book.indexOfCfi(scrollToCfi.cfi);
+    if (!book || !scrollCommand) return;
+    const idx = book.indexOfCfi(scrollCommand.cfi);
     if (idx >= 0) vRef.current?.scrollToIndex(idx);
-  }, [book, scrollToCfi]);
+  }, [book, scrollCommand]);
 
   // 滚动即放弃：工具栏/样式栏锚定于选区视口坐标，滚动后位置失真，故关样式栏并清选区。
   // 捕获阶段监听 document——scroll 不冒泡，但能捕获到 Virtuoso 滚动容器的滚动。

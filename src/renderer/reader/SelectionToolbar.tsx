@@ -7,6 +7,7 @@ import { Button } from "@renderer/components/ui/button";
 import { qk } from "@renderer/query/keys";
 import { useNavigationStore } from "@renderer/store/navigation-store";
 import { useReaderStore } from "@renderer/store/reader-store";
+import { useAnnotationStore } from "@renderer/store/annotation-store";
 import { useAiActions, type PresetId } from "@renderer/ai/use-ai-actions";
 
 const PRESETS: { id: PresetId; icon: typeof BookOpen }[] = [
@@ -17,12 +18,12 @@ const PRESETS: { id: PresetId; icon: typeof BookOpen }[] = [
 
 export function SelectionToolbar() {
   const { t } = useTranslation();
-  const selection = useReaderStore((s) => s.selection);
-  const openStyleBar = useReaderStore((s) => s.openStyleBar);
-  const openNoteModal = useReaderStore((s) => s.openNoteModal);
-  const setSelection = useReaderStore((s) => s.setSelection);
-  const styleBar = useReaderStore((s) => s.styleBar);
-  const noteModal = useReaderStore((s) => s.noteModal);
+  const selection = useAnnotationStore((s) => s.selection);
+  const openStyleBar = useAnnotationStore((s) => s.openStyleBar);
+  const openNoteModal = useAnnotationStore((s) => s.openNoteModal);
+  const setSelection = useAnnotationStore((s) => s.setSelection);
+  const styleBar = useAnnotationStore((s) => s.styleBar);
+  const noteModal = useAnnotationStore((s) => s.noteModal);
   const bookId = useNavigationStore((s) => s.currentBookId);
   const lastStyle = useReaderStore((s) => s.lastHighlightStyle);
   const { startAiAction } = useAiActions();

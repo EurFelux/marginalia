@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { useReaderStore } from "@renderer/store/reader-store";
+import { useAnnotationStore } from "@renderer/store/annotation-store";
 import { useChatStore } from "@renderer/store/chat-store";
 import i18n from "@renderer/i18n";
 
@@ -19,7 +19,7 @@ function resolvePresetPrompt(preset: PresetId): string {
 
 export function useAiActions() {
   const startAiAction = useCallback(async (preset: PresetId | null) => {
-    const { selection, setSelection } = useReaderStore.getState();
+    const { selection, setSelection } = useAnnotationStore.getState();
     const { setDraftChips, setDraftText, setPanelOpen } = useChatStore.getState();
     if (!selection) return;
     const chips = await window.api.ai.buildChips({

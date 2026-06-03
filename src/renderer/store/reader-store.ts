@@ -1,59 +1,29 @@
 import { create } from "zustand";
 import type { AnnotationStyle } from "@shared/annotations";
-import type { ReaderPrefs, SelectionInfo } from "@renderer/types";
+import type { ReaderPrefs } from "@renderer/types";
 import { persistPreference } from "@renderer/store/persist-preference";
 
-export type AnnoTarget = { type: "create" } | { type: "edit"; annotationId: string };
-export interface StyleBarState {
-  rect: { x: number; y: number; width: number; height: number };
-  target: AnnoTarget;
-}
-export interface NoteModalState {
-  target: AnnoTarget;
-  /**
-   * create 模式的选区快照（cfiRange/selectedText）；edit 模式不需要（读标注）。
-   * 快照避免 save 时依赖易失的 `store.selection`——笔记过长时 textarea 内部滚动会被
-   * EpubReader 的捕获阶段 scroll 监听清掉选区，若 save 仍读 selection 会静默丢笔记。
-   */
-  anchor?: { cfiRange: string; selectedText: string };
-}
-
 interface ReaderState {
-  selection: SelectionInfo | null;
   prefs: ReaderPrefs;
   sidebarOpen: boolean;
-  styleBar: StyleBarState | null;
-  noteModal: NoteModalState | null;
-  scrollToCfi: { cfi: string; nonce: number } | null;
   /** 上次选用的高亮样式；选「高亮标记」时直接套用（Apple Books 式记忆，会话内）。 */
   lastHighlightStyle: AnnotationStyle;
 }
 
 interface ReaderActions {
-  setSelection: (selection: SelectionInfo | null) => void;
   updatePrefs: (patch: Partial<ReaderPrefs>) => void;
   setSidebarOpen: (open: boolean) => void;
-  openStyleBar: (s: StyleBarState) => void;
-  closeStyleBar: () => void;
-  openNoteModal: (s: NoteModalState) => void;
-  closeNoteModal: () => void;
-  requestScrollToCfi: (cfi: string) => void;
   setLastHighlightStyle: (style: AnnotationStyle) => void;
 }
 
 export const READER_INITIAL: ReaderState = {
-  selection: null,
   prefs: { fontScale: 1, lineHeight: 1.9, maxWidth: 640 },
   sidebarOpen: true,
-  styleBar: null,
-  noteModal: null,
-  scrollToCfi: null,
   lastHighlightStyle: "yellow",
 };
 
 export const useReaderStore = create<ReaderState & ReaderActions>((set) => ({
   ...READER_INITIAL,
-  setSelection: (selection) => set({ selection }),
   updatePrefs: (patch) =>
     set((s) => {
       const prefs = { ...s.prefs, ...patch };
@@ -61,12 +31,6 @@ export const useReaderStore = create<ReaderState & ReaderActions>((set) => ({
       return { prefs };
     }),
   setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
-  openStyleBar: (styleBar) => set({ styleBar }),
-  closeStyleBar: () => set({ styleBar: null }),
-  openNoteModal: (noteModal) => set({ noteModal }),
-  closeNoteModal: () => set({ noteModal: null }),
-  requestScrollToCfi: (cfi) =>
-    set((s) => ({ scrollToCfi: { cfi, nonce: (s.scrollToCfi?.nonce ?? 0) + 1 } })),
   setLastHighlightStyle: (lastHighlightStyle) => {
     persistPreference({ key: "lastHighlightStyle", value: lastHighlightStyle });
     set({ lastHighlightStyle });

@@ -15,13 +15,14 @@ import { Button } from "@renderer/components/ui/button";
 import { qk } from "@renderer/query/keys";
 import { useNavigationStore } from "@renderer/store/navigation-store";
 import { useReaderStore } from "@renderer/store/reader-store";
+import { useAnnotationStore } from "@renderer/store/annotation-store";
 
 /** 居中笔记 modal：create 来自选区（默认 yellow），edit 来自已有标注。 */
 export function NoteModal() {
   const { t } = useTranslation();
-  const noteModal = useReaderStore((s) => s.noteModal);
-  const closeNoteModal = useReaderStore((s) => s.closeNoteModal);
-  const setSelection = useReaderStore((s) => s.setSelection);
+  const noteModal = useAnnotationStore((s) => s.noteModal);
+  const closeNoteModal = useAnnotationStore((s) => s.closeNoteModal);
+  const setSelection = useAnnotationStore((s) => s.setSelection);
   const lastStyle = useReaderStore((s) => s.lastHighlightStyle);
   const bookId = useNavigationStore((s) => s.currentBookId);
   const qc = useQueryClient();

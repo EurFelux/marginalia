@@ -7,7 +7,7 @@ import type { ChapterRefDto } from "@shared/library";
 import { cn } from "@renderer/lib/utils";
 import { Button } from "@renderer/components/ui/button";
 import { qk } from "@renderer/query/keys";
-import { useReaderStore } from "@renderer/store/reader-store";
+import { useAnnotationStore } from "@renderer/store/annotation-store";
 import { STYLE_STRIPE } from "./highlight";
 
 const cfiCompare = new EpubCFI();
@@ -21,7 +21,7 @@ function spineOf(cfi: string): number {
 
 export function AnnotationsList({ bookId }: { bookId: string }) {
   const { t } = useTranslation();
-  const requestScrollToCfi = useReaderStore((s) => s.requestScrollToCfi);
+  const requestScroll = useAnnotationStore((s) => s.requestScroll);
   const qc = useQueryClient();
   const annos = useQuery({
     queryKey: qk.annotations(bookId),
@@ -77,7 +77,7 @@ export function AnnotationsList({ bookId }: { bookId: string }) {
           key={a.id}
           a={a}
           chapter={chapterTitle(a.cfiRange)}
-          onGoto={() => requestScrollToCfi(a.cfiRange)}
+          onGoto={() => requestScroll(a.cfiRange)}
           onDelete={() => deleteM.mutate({ id: a.id })}
         />
       ))}
