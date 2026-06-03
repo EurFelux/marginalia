@@ -1,22 +1,31 @@
 import { z } from "zod";
 
-export const providerType = z.enum(["openai", "anthropic", "google", "openai-compatible"]);
-export type ProviderType = z.infer<typeof providerType>;
+/**
+ * AI provider 的 **API 端点格式**（按实际协议区分，非公司名）。一个 provider 可兼容多种（compatibleApis）。
+ * `google-interactions`（Google 新 Interactions API）尚 beta，待 GA 再加。
+ */
+export const aiProviderApiType = z.enum([
+  "openai-responses",
+  "openai-chat-completions",
+  "anthropic",
+  "google-generate-content",
+]);
+export type AiProviderApiType = z.infer<typeof aiProviderApiType>;
 
-/** 各 type 官方默认端点：UI baseUrl 占位符 + 拉模型兜底共用（不注入生成路径——那交 SDK 自带默认）。 */
-export const DEFAULT_BASE_URL: Record<ProviderType, string | null> = {
-  openai: "https://api.openai.com/v1",
+/** 各 API type 官方默认端点：UI baseUrl 占位符 + 拉模型兜底共用（不注入生成路径——那交 SDK 自带默认）。 */
+export const DEFAULT_BASE_URL: Record<AiProviderApiType, string | null> = {
+  "openai-responses": "https://api.openai.com/v1",
+  "openai-chat-completions": null, // 兼容端点无默认（自建网关，必填）
   anthropic: "https://api.anthropic.com/v1",
-  google: "https://generativelanguage.googleapis.com/v1beta",
-  "openai-compatible": null,
+  "google-generate-content": "https://generativelanguage.googleapis.com/v1beta",
 };
 
-/** provider type 的 UI 显示名（枚举值不变；按其讲的 API 命名）。 */
-export const PROVIDER_TYPE_LABEL: Record<ProviderType, string> = {
-  openai: "OpenAI Responses",
-  "openai-compatible": "OpenAI Chat Completions",
+/** API type 的 UI 显示名。 */
+export const PROVIDER_TYPE_LABEL: Record<AiProviderApiType, string> = {
+  "openai-responses": "OpenAI Responses",
+  "openai-chat-completions": "OpenAI Chat Completions",
   anthropic: "Anthropic",
-  google: "Google Gemini",
+  "google-generate-content": "Gemini",
 };
 
 /** 只含一个 provider id 的入参（reveal / remove 共用）。 */
@@ -37,14 +46,14 @@ export type TestProviderInput = z.infer<typeof testProviderInput>;
 export const upsertProviderInput = z
   .object({
     id: z.string().min(1).optional(),
-    type: providerType,
+    type: aiProviderApiType,
     label: z.string().nullish(),
     baseUrl: z.string().min(1).nullish(),
     apiKey: z.string().min(1).optional(),
     models: z.array(z.string().min(1)).optional(),
   })
-  .refine((v) => v.type !== "openai-compatible" || v.baseUrl != null, {
-    message: "baseUrl is required for openai-compatible providers",
+  .refine((v) => v.type !== "openai-chat-completions" || v.baseUrl != null, {
+    message: "baseUrl is required for openai-chat-completions providers",
     path: ["baseUrl"],
   });
 export type UpsertProviderInput = z.infer<typeof upsertProviderInput>;
@@ -63,12 +72,15 @@ export type ProviderKeyState =
 /** 发往 renderer 的 provider 视图：绝不含明文 / 密文，只含掩码预览。 */
 export interface ProviderDto {
   id: string;
-  type: ProviderType;
+  /** 当前选用的 API 端点格式（须 ∈ compatibleApis）。 */
+  type: AiProviderApiType;
+  /** 此 provider 兼容的 API 格式集合。length>1 时（且内置）允许在其中切换 type；否则 type 锁定。 */
+  compatibleApis: AiProviderApiType[];
   label: string | null;
   baseUrl: string | null;
   key: ProviderKeyState;
   models: string[];
-  /** 内置 provider（启动时按 DEFAULT_PROVIDERS 补齐）：type/label/baseUrl 不可改、不可删。 */
+  /** 内置 provider（启动时按 DEFAULT_PROVIDERS 补齐）：label/baseUrl 不可改、不可删；type 仅可在 compatibleApis 内切。 */
   isBuiltin: boolean;
   createdAt: number;
 }
@@ -79,7 +91,7 @@ export type RevealResult = z.infer<typeof revealResult>;
 
 /** 列 provider 可用模型入参：key 解析 = 表单现填 apiKey ?? 由 id 解密的存储 key。 */
 export const listModelsInput = z.object({
-  type: providerType,
+  type: aiProviderApiType,
   baseUrl: z.string().min(1).nullish(),
   apiKey: z.string().min(1).optional(),
   id: z.string().min(1).optional(),

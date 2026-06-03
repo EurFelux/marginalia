@@ -4,7 +4,7 @@ import { resolveLanguageModel } from "@main/ai/model-factory";
 describe("resolveLanguageModel", () => {
   it("builds an openai model carrying the given model id", () => {
     const m = resolveLanguageModel({
-      type: "openai",
+      type: "openai-responses",
       baseUrl: null,
       apiKey: "sk",
       model: "gpt-4o-mini",
@@ -22,7 +22,7 @@ describe("resolveLanguageModel", () => {
   });
   it("builds a google model", () => {
     const m = resolveLanguageModel({
-      type: "google",
+      type: "google-generate-content",
       baseUrl: null,
       apiKey: "sk",
       model: "gemini-2.0-flash",
@@ -31,7 +31,7 @@ describe("resolveLanguageModel", () => {
   });
   it("builds an openai-compatible model when baseUrl is provided", () => {
     const m = resolveLanguageModel({
-      type: "openai-compatible",
+      type: "openai-chat-completions",
       baseUrl: "http://localhost:1234/v1",
       apiKey: "sk",
       model: "llama-3.2",
@@ -40,7 +40,7 @@ describe("resolveLanguageModel", () => {
   });
   it("throws for openai-compatible without a baseUrl", () => {
     expect(() =>
-      resolveLanguageModel({ type: "openai-compatible", baseUrl: null, apiKey: "sk", model: "x" }),
+      resolveLanguageModel({ type: "openai-chat-completions", baseUrl: null, apiKey: "sk", model: "x" }),
     ).toThrow(/baseUrl/i);
   });
 });

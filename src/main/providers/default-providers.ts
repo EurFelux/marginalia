@@ -1,19 +1,37 @@
 import { and, eq } from "drizzle-orm";
 import type { DB } from "@main/db/client";
 import { providers } from "@main/db/schema";
-import type { ProviderType } from "@shared/providers";
+import type { AiProviderApiType } from "@shared/providers";
 
-/** 内置默认 provider 的单一源（不含 openai-compatible——用户手动加）。models 为预填常用起始型号；
- *  baseUrl=null（用各 type 默认端点）、无 apiKey。**以 label 作内置身份**（label 内置不可改）。
- *  往此数组加一条 → 下次启动 `ensureBuiltinProviders` 自动补齐。 */
-export const DEFAULT_PROVIDERS: { type: ProviderType; label: string; models: string[] }[] = [
-  { type: "openai", label: "OpenAI", models: ["gpt-4o", "gpt-4o-mini"] },
+interface DefaultProvider {
+  type: AiProviderApiType;
+  /** 兼容的 API 格式；length>1 才允许切 type。当前三个内置均单一原生。 */
+  compatibleApis: AiProviderApiType[];
+  label: string;
+  models: string[];
+}
+
+/** 内置默认 provider 的单一源。models 为预填常用起始型号；baseUrl=null（用各 type 默认端点）、无 apiKey。
+ *  **以 label 作内置身份**（label 内置不可改）。往此数组加一条 → 下次启动 `ensureBuiltinProviders` 自动补齐。 */
+export const DEFAULT_PROVIDERS: DefaultProvider[] = [
+  {
+    type: "openai-responses",
+    compatibleApis: ["openai-responses"],
+    label: "OpenAI",
+    models: ["gpt-4o", "gpt-4o-mini"],
+  },
   {
     type: "anthropic",
+    compatibleApis: ["anthropic"],
     label: "Anthropic",
     models: ["claude-3-5-sonnet-latest", "claude-3-5-haiku-latest"],
   },
-  { type: "google", label: "Gemini", models: ["gemini-1.5-flash", "gemini-1.5-pro"] },
+  {
+    type: "google-generate-content",
+    compatibleApis: ["google-generate-content"],
+    label: "Gemini",
+    models: ["gemini-1.5-flash", "gemini-1.5-pro"],
+  },
 ];
 
 /**
@@ -31,7 +49,13 @@ export function ensureBuiltinProviders(db: DB): void {
       .all();
     if (exists.length > 0) continue;
     db.insert(providers)
-      .values({ type: p.type, label: p.label, models: p.models, isBuiltin: true })
+      .values({
+        type: p.type,
+        compatibleApis: p.compatibleApis,
+        label: p.label,
+        models: p.models,
+        isBuiltin: true,
+      })
       .run();
   }
 }

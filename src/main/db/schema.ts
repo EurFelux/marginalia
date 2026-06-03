@@ -2,6 +2,7 @@ import { blob, check, index, integer, sqliteTable, text, unique } from "drizzle-
 import { sql } from "drizzle-orm";
 import { v7 as uuidv7 } from "uuid";
 import type { UIMessage } from "ai";
+import type { AiProviderApiType } from "@shared/providers";
 import type { MessageMetadata, TocNode } from "@shared/types";
 
 const pkUuid = () =>
@@ -17,21 +18,24 @@ export const providers = sqliteTable(
   "providers",
   {
     id: pkUuid(),
+    // 当前选用的 API 端点格式（须 ∈ compatibleApis）。
     type: text("type", {
-      enum: ["openai", "anthropic", "google", "openai-compatible"],
+      enum: ["openai-responses", "openai-chat-completions", "anthropic", "google-generate-content"],
     }).notNull(),
+    // 兼容的 API 格式集合（JSON）；内置且 length>1 时允许在其中切 type。
+    compatibleApis: text("compatible_apis", { mode: "json" }).$type<AiProviderApiType[]>(),
     label: text("label"),
     baseUrl: text("base_url"),
     apiKeyEncrypted: blob("api_key_encrypted", { mode: "buffer" }),
     models: text("models", { mode: "json" }).$type<string[]>(),
-    // 内置（启动时按 DEFAULT_PROVIDERS 补齐）provider：type / label / baseUrl 不可改、不可删（仅 key + models 可编辑）。
+    // 内置（启动时按 DEFAULT_PROVIDERS 补齐）provider：label / baseUrl 不可改、不可删；type 仅可在 compatibleApis 内切。
     isBuiltin: integer("is_builtin", { mode: "boolean" }).notNull().default(false),
     createdAt: nowMs(),
   },
   (t) => [
     check(
       "providers_type_check",
-      sql`${t.type} in ('openai','anthropic','google','openai-compatible')`,
+      sql`${t.type} in ('openai-responses','openai-chat-completions','anthropic','google-generate-content')`,
     ),
   ],
 );

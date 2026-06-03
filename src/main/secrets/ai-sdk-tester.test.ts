@@ -101,7 +101,7 @@ describe("createAiSdkTester", () => {
     const probe: GenerateProbe = async () => {};
     const tester = createAiSdkTester(probe);
     const r = await tester.test({
-      type: "openai",
+      type: "openai-responses",
       baseUrl: null,
       apiKey: "sk",
       model: "gpt-4o-mini",
@@ -116,7 +116,7 @@ describe("createAiSdkTester", () => {
     };
     const tester = createAiSdkTester(probe);
     const r = await tester.test({
-      type: "openai",
+      type: "openai-responses",
       baseUrl: null,
       apiKey: "bad",
       model: "gpt-4o-mini",
@@ -128,7 +128,7 @@ describe("createAiSdkTester", () => {
     const probe: GenerateProbe = async () => {};
     const tester = createAiSdkTester(probe);
     const r = await tester.test({
-      type: "openai-compatible",
+      type: "openai-chat-completions",
       baseUrl: null,
       apiKey: "sk",
       model: "x",

@@ -8,7 +8,7 @@ import {
 
 describe("buildModelsRequest", () => {
   it("openai: /models with Bearer; default base", () => {
-    const r = buildModelsRequest("openai", null, "sk-x");
+    const r = buildModelsRequest("openai-responses", null, "sk-x");
     expect(r.url).toBe("https://api.openai.com/v1/models");
     expect(r.headers.Authorization).toBe("Bearer sk-x");
   });
@@ -19,17 +19,17 @@ describe("buildModelsRequest", () => {
     expect(r.headers["anthropic-version"]).toBe("2023-06-01");
   });
   it("google: /models?key=", () => {
-    const r = buildModelsRequest("google", null, "k1");
+    const r = buildModelsRequest("google-generate-content", null, "k1");
     expect(r.url).toBe("https://generativelanguage.googleapis.com/v1beta/models?key=k1");
   });
   it("openai-compatible: uses given base; throws when base missing", () => {
-    expect(buildModelsRequest("openai-compatible", "https://gw/v1", "sk-z").url).toBe(
+    expect(buildModelsRequest("openai-chat-completions", "https://gw/v1", "sk-z").url).toBe(
       "https://gw/v1/models",
     );
-    expect(() => buildModelsRequest("openai-compatible", null, "sk-z")).toThrow();
+    expect(() => buildModelsRequest("openai-chat-completions", null, "sk-z")).toThrow();
   });
   it("strips trailing slash on base to avoid //models", () => {
-    expect(buildModelsRequest("openai-compatible", "https://gw/v1/", "sk").url).toBe(
+    expect(buildModelsRequest("openai-chat-completions", "https://gw/v1/", "sk").url).toBe(
       "https://gw/v1/models",
     );
   });
@@ -38,7 +38,7 @@ describe("buildModelsRequest", () => {
 describe("adaptModelsResponse", () => {
   it("openai/anthropic: data[].id", () => {
     expect(
-      adaptModelsResponse("openai", { data: [{ id: "gpt-4o" }, { id: "gpt-4o-mini" }] }),
+      adaptModelsResponse("openai-responses", { data: [{ id: "gpt-4o" }, { id: "gpt-4o-mini" }] }),
     ).toEqual(["gpt-4o", "gpt-4o-mini"]);
     expect(adaptModelsResponse("anthropic", { data: [{ id: "claude-3-5-haiku-latest" }] })).toEqual(
       ["claude-3-5-haiku-latest"],
@@ -51,22 +51,22 @@ describe("adaptModelsResponse", () => {
         { name: "models/embedding-001", supportedGenerationMethods: ["embedContent"] },
       ],
     };
-    expect(adaptModelsResponse("google", json)).toEqual(["gemini-1.5-flash"]);
+    expect(adaptModelsResponse("google-generate-content", json)).toEqual(["gemini-1.5-flash"]);
   });
   it("google: includes a model lacking supportedGenerationMethods (don't silently drop)", () => {
-    expect(adaptModelsResponse("google", { models: [{ name: "models/gemini-x" }] })).toEqual([
+    expect(adaptModelsResponse("google-generate-content", { models: [{ name: "models/gemini-x" }] })).toEqual([
       "gemini-x",
     ]);
   });
   it("strict types throw on malformed response", () => {
-    expect(() => adaptModelsResponse("openai", { foo: 1 })).toThrow();
+    expect(() => adaptModelsResponse("openai-responses", { foo: 1 })).toThrow();
     expect(() => adaptModelsResponse("anthropic", { data: "x" })).toThrow();
   });
   it("openai-compatible best-effort: salvages valid ids, tolerates junk, [] when no data", () => {
     expect(
-      adaptModelsResponse("openai-compatible", { data: [{ id: "a", extra: 1 }, { noId: true }] }),
+      adaptModelsResponse("openai-chat-completions", { data: [{ id: "a", extra: 1 }, { noId: true }] }),
     ).toEqual(["a"]);
-    expect(adaptModelsResponse("openai-compatible", { whatever: 1 })).toEqual([]);
+    expect(adaptModelsResponse("openai-chat-completions", { whatever: 1 })).toEqual([]);
   });
 });
 
@@ -85,7 +85,7 @@ describe("fetchProviderModels", () => {
     const fetchImpl = async () => jsonResponse({ data: [{ id: "gpt-4o" }] });
     await expect(
       fetchProviderModels(
-        { type: "openai", baseUrl: null, apiKey: "sk" },
+        { type: "openai-responses", baseUrl: null, apiKey: "sk" },
         fetchImpl as typeof fetch,
       ),
     ).resolves.toEqual(["gpt-4o"]);
@@ -95,7 +95,7 @@ describe("fetchProviderModels", () => {
       jsonResponse({ error: { message: "bad key" } }, { status: 401, ok: false });
     await expect(
       fetchProviderModels(
-        { type: "openai", baseUrl: null, apiKey: "x" },
+        { type: "openai-responses", baseUrl: null, apiKey: "x" },
         fetchImpl as typeof fetch,
       ),
     ).rejects.toThrow("bad key");

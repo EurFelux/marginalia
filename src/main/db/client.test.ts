@@ -23,9 +23,9 @@ describe("db client", () => {
     const db = createDb(":memory:");
     runMigrations(db, MIGRATIONS);
 
-    db.insert(providers).values({ type: "openai", label: "test" }).run();
+    db.insert(providers).values({ type: "openai-responses", label: "test" }).run();
 
-    const rows = db.select().from(providers).where(eq(providers.type, "openai")).all();
+    const rows = db.select().from(providers).where(eq(providers.type, "openai-responses")).all();
     expect(rows).toHaveLength(1);
     expect(rows[0].label).toBe("test");
     expect(rows[0].id).toMatch(

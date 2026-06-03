@@ -18,7 +18,7 @@ describe("ensureBuiltinProviders", () => {
     const rows = db.select().from(providers).all();
     expect(rows).toHaveLength(DEFAULT_PROVIDERS.length);
     const byLabel = Object.fromEntries(rows.map((r) => [r.label, r]));
-    expect(byLabel.OpenAI.type).toBe("openai");
+    expect(byLabel.OpenAI.type).toBe("openai-responses");
     expect(byLabel.OpenAI.models).toEqual(["gpt-4o", "gpt-4o-mini"]);
     expect(byLabel.OpenAI.apiKeyEncrypted).toBeNull();
     expect(byLabel.OpenAI.baseUrl).toBeNull();
@@ -38,7 +38,7 @@ describe("ensureBuiltinProviders", () => {
     const db = freshDb();
     // 预置一个内置 OpenAI（用户已填 key/改 models 的等价物）；只缺 Anthropic/Gemini。
     db.insert(providers)
-      .values({ type: "openai", label: "OpenAI", models: ["custom-model"], isBuiltin: true })
+      .values({ type: "openai-responses", label: "OpenAI", models: ["custom-model"], isBuiltin: true })
       .run();
     ensureBuiltinProviders(db);
     const rows = db.select().from(providers).all();

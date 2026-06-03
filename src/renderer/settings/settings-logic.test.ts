@@ -23,7 +23,7 @@ describe("providerFormToUpsertInput", () => {
   it("omits apiKey when not re-keyed; empty baseUrl -> null; passes models", () => {
     const out = providerFormToUpsertInput({
       id: "p1",
-      type: "openai",
+      type: "openai-responses",
       label: "L",
       baseUrl: "",
       apiKey: "",
@@ -31,7 +31,7 @@ describe("providerFormToUpsertInput", () => {
     });
     expect(out).toEqual({
       id: "p1",
-      type: "openai",
+      type: "openai-responses",
       label: "L",
       baseUrl: null,
       models: ["gpt-4o"],

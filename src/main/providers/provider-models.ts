@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DEFAULT_BASE_URL, type ProviderType } from "@shared/providers";
+import { DEFAULT_BASE_URL, type AiProviderApiType } from "@shared/providers";
 
 export interface ModelsRequest {
   url: string;
@@ -8,7 +8,7 @@ export interface ModelsRequest {
 
 /** 按 type 构造 /models 请求（url + 鉴权头）。base = baseUrl ?? 默认端点；openai-compatible 无默认必须给 base。 */
 export function buildModelsRequest(
-  type: ProviderType,
+  type: AiProviderApiType,
   baseUrl: string | null,
   apiKey: string,
 ): ModelsRequest {
@@ -18,15 +18,15 @@ export function buildModelsRequest(
   // 与 model-factory 生成路径的 baseURL 约定一致（自建代理填同一个 base 两处都对）。去尾斜杠避免 `//models`。
   const base = raw.replace(/\/+$/, "");
   switch (type) {
-    case "openai":
-    case "openai-compatible":
+    case "openai-responses":
+    case "openai-chat-completions":
       return { url: `${base}/models`, headers: { Authorization: `Bearer ${apiKey}` } };
     case "anthropic":
       return {
         url: `${base}/models`,
         headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
       };
-    case "google":
+    case "google-generate-content":
       return { url: `${base}/models?key=${encodeURIComponent(apiKey)}`, headers: {} };
   }
 }
@@ -40,7 +40,7 @@ const googleSchema = z.object({
 const looseItem = z.object({ id: z.string() }).passthrough();
 
 export interface FetchModelsParams {
-  type: ProviderType;
+  type: AiProviderApiType;
   baseUrl: string | null;
   apiKey: string;
 }
@@ -105,9 +105,9 @@ export async function fetchProviderModels(
   return adaptModelsResponse(p.type, body);
 }
 
-/** 先 Zod 校验外部响应（API 边界），再按 type 归一为 model id 列表。openai-compatible 放宽 best-effort。 */
-export function adaptModelsResponse(type: ProviderType, json: unknown): string[] {
-  if (type === "google") {
+/** 先 Zod 校验外部响应（API 边界），再按 type 归一为 model id 列表。openai-chat-completions 放宽 best-effort。 */
+export function adaptModelsResponse(type: AiProviderApiType, json: unknown): string[] {
+  if (type === "google-generate-content") {
     return (
       googleSchema
         .parse(json)
@@ -116,7 +116,7 @@ export function adaptModelsResponse(type: ProviderType, json: unknown): string[]
         .map((m) => m.name.replace(/^models\//, ""))
     );
   }
-  if (type === "openai-compatible") {
+  if (type === "openai-chat-completions") {
     const data = (json as { data?: unknown })?.data;
     if (!Array.isArray(data)) return [];
     return data.flatMap((it) => {
@@ -124,6 +124,6 @@ export function adaptModelsResponse(type: ProviderType, json: unknown): string[]
       return p.success ? [p.data.id] : [];
     });
   }
-  // openai / anthropic：严格 data[].id
+  // openai-responses / anthropic：严格 data[].id
   return openaiLike.parse(json).data.map((m) => m.id);
 }

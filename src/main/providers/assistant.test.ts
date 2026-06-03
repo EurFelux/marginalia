@@ -49,7 +49,7 @@ describe("default assistant", () => {
 
   it("accepts a valid providerId and can unset it with null", () => {
     const db = freshDb();
-    const prov = db.insert(providers).values({ type: "openai" }).returning().get();
+    const prov = db.insert(providers).values({ type: "openai-responses" }).returning().get();
     getDefaultAssistant(db);
     expect(updateDefaultAssistant(db, { providerId: prov.id }).providerId).toBe(prov.id);
     expect(updateDefaultAssistant(db, { providerId: null }).providerId).toBeNull();

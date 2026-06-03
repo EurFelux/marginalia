@@ -1,8 +1,8 @@
-import type { ProviderType, UpsertProviderInput } from "@shared/providers";
+import type { AiProviderApiType, UpsertProviderInput } from "@shared/providers";
 
 export interface ProviderFormState {
   id: string | undefined; // 有=编辑，无=新建
-  type: ProviderType;
+  type: AiProviderApiType;
   label: string;
   baseUrl: string;
   apiKey: string; // 空=不改 key（编辑保留 / 新建无 key）

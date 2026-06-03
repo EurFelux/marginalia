@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { ProviderDto, ProviderType } from "@shared/providers";
-import { DEFAULT_BASE_URL, PROVIDER_TYPE_LABEL, providerType } from "@shared/providers";
+import type { AiProviderApiType, ProviderDto } from "@shared/providers";
+import { aiProviderApiType, DEFAULT_BASE_URL, PROVIDER_TYPE_LABEL } from "@shared/providers";
 import { qk } from "@renderer/query/keys";
 import { Button } from "@renderer/components/ui/button";
 import { Input } from "@renderer/components/ui/input";
@@ -18,7 +18,7 @@ import { providerFormToUpsertInput, type ProviderFormState } from "./settings-lo
 function initial(p: ProviderDto | null): ProviderFormState {
   return {
     id: p?.id,
-    type: p?.type ?? "openai",
+    type: p?.type ?? "openai-responses",
     label: p?.label ?? "",
     baseUrl: p?.baseUrl ?? "",
     apiKey: "",
@@ -36,9 +36,13 @@ export function ProviderForm({
   const qc = useQueryClient();
   const [f, setF] = useState<ProviderFormState>(() => initial(provider));
   const [editingKey, setEditingKey] = useState(provider == null || provider.key.status === "none");
-  const baseRequired = f.type === "openai-compatible";
-  // 内置 provider：type/label/baseUrl 锁定（仅密钥 + 模型可改）。UI 防御，main 仓储也会拦。
+  const baseRequired = f.type === "openai-chat-completions";
+  // 内置 provider：label/baseUrl 锁定（仅密钥 + 模型可改）。UI 防御，main 仓储也会拦。
   const locked = provider?.isBuiltin ?? false;
+  // type：非内置自由选（全部）；内置仅可在 compatibleApis 内切，单一则锁定。
+  const compatibleApis = provider?.compatibleApis ?? aiProviderApiType.options;
+  const typeOptions = provider?.isBuiltin ? compatibleApis : aiProviderApiType.options;
+  const typeLocked = (provider?.isBuiltin ?? false) && compatibleApis.length <= 1;
 
   const save = useMutation({
     mutationFn: () => window.api.settings.providers.upsert(providerFormToUpsertInput(f)),
@@ -57,19 +61,19 @@ export function ProviderForm({
         <span className="text-xs text-muted-foreground">类型</span>
         <Select
           value={f.type}
-          disabled={locked}
+          disabled={typeLocked}
           onValueChange={(v) => {
-            if (v) setF({ ...f, type: v as ProviderType });
+            if (v) setF({ ...f, type: v as AiProviderApiType });
           }}
         >
           <SelectTrigger className="h-9 w-full">
-            {/* value 是 type 裸值（如 "openai"）；用函数 child 映射成显示名（OpenAI Responses 等）。 */}
+            {/* value 是 type 裸值（如 "openai-responses"）；用函数 child 映射成显示名。 */}
             <SelectValue>
-              {(v) => (typeof v === "string" ? PROVIDER_TYPE_LABEL[v as ProviderType] : null)}
+              {(v) => (typeof v === "string" ? PROVIDER_TYPE_LABEL[v as AiProviderApiType] : null)}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            {providerType.options.map((t) => (
+            {typeOptions.map((t) => (
               <SelectItem key={t} value={t}>
                 {PROVIDER_TYPE_LABEL[t]}
               </SelectItem>
@@ -110,7 +114,9 @@ export function ProviderForm({
         )}
       </div>
       {locked && (
-        <p className="text-[11px] text-muted-foreground">内置 provider：仅可编辑密钥与模型。</p>
+        <p className="text-[11px] text-muted-foreground">
+          内置 provider：名称 / baseURL 不可改（密钥、模型可编辑）。
+        </p>
       )}
       <ModelEditor
         models={f.models}

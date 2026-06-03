@@ -3,7 +3,7 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import type { LanguageModelV3 } from "@ai-sdk/provider";
-import type { ProviderType } from "@shared/providers";
+import type { AiProviderApiType } from "@shared/providers";
 
 /**
  * AI SDK 语言模型实例类型：四家 provider 工厂均返回 `@ai-sdk/provider` 的 `LanguageModelV3`
@@ -12,7 +12,7 @@ import type { ProviderType } from "@shared/providers";
 export type ChatModel = LanguageModelV3;
 
 export interface ResolveModelParams {
-  type: ProviderType;
+  type: AiProviderApiType;
   baseUrl: string | null;
   apiKey: string;
   model: string;
@@ -35,16 +35,16 @@ export function resolveLanguageModel(p: ResolveModelParams): ChatModel {
   const withBase = (base: string | null) => (base ? { baseURL: base } : {});
   const fetch = injectedFetch;
   switch (p.type) {
-    case "openai":
+    case "openai-responses":
       return createOpenAI({ apiKey: p.apiKey, fetch, ...withBase(p.baseUrl) })(p.model);
     case "anthropic":
       return createAnthropic({ apiKey: p.apiKey, fetch, ...withBase(p.baseUrl) })(p.model);
-    case "google":
+    case "google-generate-content":
       return createGoogleGenerativeAI({ apiKey: p.apiKey, fetch, ...withBase(p.baseUrl) })(p.model);
-    case "openai-compatible":
-      if (!p.baseUrl) throw new Error("openai-compatible provider requires a baseUrl");
+    case "openai-chat-completions":
+      if (!p.baseUrl) throw new Error("openai-chat-completions provider requires a baseUrl");
       return createOpenAICompatible({
-        name: "openai-compatible",
+        name: "openai-chat-completions",
         apiKey: p.apiKey,
         fetch,
         baseURL: p.baseUrl,

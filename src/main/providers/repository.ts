@@ -30,6 +30,7 @@ function toDto(row: ProviderRow, encryptor: Encryptor): ProviderDto {
   return {
     id: row.id,
     type: row.type,
+    compatibleApis: row.compatibleApis ?? [row.type],
     label: row.label ?? null,
     baseUrl: row.baseUrl ?? null,
     key: keyState(row.apiKeyEncrypted, row, encryptor),
@@ -70,9 +71,12 @@ export function upsertProvider(
   if (input.id) {
     const existing = getProviderRow(db, input.id);
     if (!existing) throw new Error(`provider ${input.id} not found`);
-    // 内置 provider：type / label / baseUrl 不可改（仅 key + models 可变）。main 侧防御非法改动。
+    // 内置 provider：label / baseUrl 不可改；type 仅可在 compatibleApis 内切换。main 侧防御非法改动。
     if (existing.isBuiltin) {
-      if (input.type !== existing.type) throw new Error("内置 provider 的类型不可修改");
+      const compat = existing.compatibleApis ?? [existing.type];
+      if (input.type !== existing.type && !compat.includes(input.type)) {
+        throw new Error("内置 provider 的类型只能在兼容 API 内切换");
+      }
       if (input.label != null && input.label !== existing.label) {
         throw new Error("内置 provider 的名称不可修改");
       }
@@ -80,15 +84,17 @@ export function upsertProvider(
         throw new Error("内置 provider 的 baseUrl 不可修改");
       }
     }
-    const locked = existing.isBuiltin;
+    const lockedMeta = existing.isBuiltin; // label / baseUrl 锁定
     const row = db
       .update(providers)
       .set({
-        ...(locked ? {} : { type: input.type }),
-        ...(!locked && input.label !== undefined ? { label: input.label } : {}),
-        ...(!locked && input.baseUrl !== undefined ? { baseUrl: input.baseUrl } : {}),
+        type: input.type, // type 已校验（内置限 compatibleApis；非内置自由）
+        ...(!lockedMeta && input.label !== undefined ? { label: input.label } : {}),
+        ...(!lockedMeta && input.baseUrl !== undefined ? { baseUrl: input.baseUrl } : {}),
         ...(encrypted !== undefined ? { apiKeyEncrypted: encrypted } : {}),
         ...(input.models !== undefined ? { models: input.models } : {}),
+        // 非内置：compatibleApis 跟随当前 type（内置 compatibleApis 由 config 固定，不动）。
+        ...(!existing.isBuiltin ? { compatibleApis: [input.type] } : {}),
       })
       .where(eq(providers.id, input.id))
       .returning()
@@ -101,6 +107,7 @@ export function upsertProvider(
     .insert(providers)
     .values({
       type: input.type,
+      compatibleApis: [input.type], // 用户自建：单一当前 type
       label: input.label ?? null,
       baseUrl: input.baseUrl ?? null,
       apiKeyEncrypted: encrypted ?? null,

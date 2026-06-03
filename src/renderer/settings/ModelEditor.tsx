@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Download, Plus, X } from "lucide-react";
-import type { ProviderType } from "@shared/providers";
+import type { AiProviderApiType } from "@shared/providers";
 import { Button } from "@renderer/components/ui/button";
 import { Input } from "@renderer/components/ui/input";
 import { Checkbox } from "@renderer/components/ui/checkbox";
@@ -16,7 +16,7 @@ export function ModelEditor({
 }: {
   models: string[];
   onChange: (m: string[]) => void;
-  type: ProviderType;
+  type: AiProviderApiType;
   baseUrl: string;
   apiKey: string;
   id: string | undefined;
@@ -60,8 +60,8 @@ export function ModelEditor({
     }
   }
 
-  // openai-compatible 无默认端点：没填 baseUrl 拉不了（buildModelsRequest 会抛），直接禁用更干净。
-  const cannotPull = type === "openai-compatible" && !baseUrl.trim();
+  // openai-chat-completions 无默认端点：没填 baseUrl 拉不了（buildModelsRequest 会抛），直接禁用更干净。
+  const cannotPull = type === "openai-chat-completions" && !baseUrl.trim();
 
   return (
     <div className="space-y-2">
