@@ -1,5 +1,4 @@
 export default {
-  common: { appName: "Marginalia" },
   errors: {
     assistantNoApiKey: "provider 未设置密钥",
     assistantNoModel: "助手未配置模型",
