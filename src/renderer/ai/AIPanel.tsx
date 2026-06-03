@@ -6,12 +6,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@renderer/components/ui/button";
 import { ScrollArea } from "@renderer/components/ui/scroll-area";
 import { useChatStore } from "@renderer/store/chat-store";
+import { useNavigationStore } from "@renderer/store/navigation-store";
 import { createIpcChatTransport } from "@renderer/ai/ipc-chat-transport";
 import type { ChatUIMessage } from "@renderer/ai/types";
 import { MessageList } from "@renderer/ai/MessageList";
 import { Composer } from "@renderer/ai/Composer";
 import { SummaryPill } from "@renderer/ai/SummaryPill";
 import { messagesToUI } from "@renderer/ai/message-history";
+import type { Chip } from "@shared/chat";
 
 export function AIPanel() {
   const { t } = useTranslation();
@@ -22,6 +24,7 @@ export function AIPanel() {
   const setActiveConversation = useChatStore((s) => s.setActiveConversation);
   const setPanelOpen = useChatStore((s) => s.setPanelOpen);
   const openCommand = useChatStore((s) => s.openCommand);
+  const activeConversationId = useChatStore((s) => s.activeConversationId);
   const qc = useQueryClient();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const prevStatus = useRef(status);
@@ -58,9 +61,33 @@ export function AIPanel() {
     prevStatus.current = status;
   }, [status, qc]);
 
+  // active 置空（划词跨章进入无 active / 新对话 / 开书）→ 清面板；初始即空时为 no-op。
+  useEffect(() => {
+    if (activeConversationId === null) setMessages([]);
+  }, [activeConversationId, setMessages]);
+
   const newConversation = () => {
     setMessages([]);
     setActiveConversation(null);
+  };
+
+  const handleSend = (text: string, chips: Chip[]) => {
+    // 防御：跨章自由输入（未经划词路径）→ 只清面板起新，**不**在此 null 化 active——
+    // 否则「active===null → 清面板」effect 会在 React 提交后触发，把 sendMessage 刚加入的
+    // 用户消息一并擦掉（ack 异步设新 id 晚于 effect）。路由交给主进程防御分支
+    // （active 不同章 → 建新），ack 回写即纠正 active 与所属章。
+    const { currentChapterId } = useNavigationStore.getState();
+    const { activeConversationId: activeId, activeConversationChapterId: activeChapter } =
+      useChatStore.getState();
+    if (
+      activeId &&
+      activeChapter !== null &&
+      currentChapterId &&
+      activeChapter !== currentChapterId
+    ) {
+      setMessages([]);
+    }
+    void sendMessage({ text, metadata: { contextChips: chips } });
   };
 
   return (
@@ -105,11 +132,7 @@ export function AIPanel() {
         </div>
       )}
 
-      <Composer
-        status={status}
-        onStop={stop}
-        onSend={(text, chips) => void sendMessage({ text, metadata: { contextChips: chips } })}
-      />
+      <Composer status={status} onStop={stop} onSend={handleSend} />
     </div>
   );
 }

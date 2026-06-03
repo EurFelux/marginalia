@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { useAnnotationStore } from "@renderer/store/annotation-store";
 import { useChatStore } from "@renderer/store/chat-store";
+import { useNavigationStore } from "@renderer/store/navigation-store";
 import i18n from "@renderer/i18n";
 
 export type PresetId = "explain" | "translate" | "summarize";
@@ -22,6 +23,19 @@ export function useAiActions() {
     const { selection, setSelection } = useAnnotationStore.getState();
     const { setDraftChips, setDraftText, setPanelOpen } = useChatStore.getState();
     if (!selection) return;
+    // 不同章划词 = 进入无 active 状态（不建会话——会话只在 send 时由 routeConversation 创建）。
+    // active 为独立会话（chapter null）或同章时不清，照常追加。
+    const { activeConversationId, activeConversationChapterId, setActiveConversation } =
+      useChatStore.getState();
+    const { currentChapterId } = useNavigationStore.getState();
+    if (
+      activeConversationId &&
+      activeConversationChapterId !== null &&
+      currentChapterId &&
+      activeConversationChapterId !== currentChapterId
+    ) {
+      setActiveConversation(null);
+    }
     const chips = await window.api.ai.buildChips({
       selection: selection.selectionText,
       paragraphBefore: selection.paragraphBefore,
