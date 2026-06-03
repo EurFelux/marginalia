@@ -23,7 +23,7 @@ describe("ensureBuiltinProviders", () => {
     expect(byLabel.OpenAI.models).toEqual(
       DEFAULT_PROVIDERS.find((p) => p.label === "OpenAI")?.models,
     );
-    expect(byLabel.OpenAI.apiKeyEncrypted).toBeNull();
+    expect(byLabel.OpenAI.apiKey).toBeNull();
     expect(byLabel.OpenAI.baseUrl).toBeNull();
     expect(byLabel.OpenAI.isBuiltin).toBe(true);
     expect(byLabel.Anthropic.type).toBe("anthropic");

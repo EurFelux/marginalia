@@ -1,41 +1,27 @@
 import { asc, eq } from "drizzle-orm";
 import type { DB } from "@main/db/client";
 import { assistants, providers } from "@main/db/schema";
-import type { Encryptor } from "@main/secrets/encryptor";
 import type { ProviderTester } from "@main/secrets/tester";
 import { maskKey } from "@main/providers/mask";
 import { createProvider, type Provider } from "@main/providers/provider-factory";
 import { t } from "@main/i18n";
-import type {
-  ProviderDto,
-  ProviderKeyState,
-  TestResult,
-  UpsertProviderInput,
-} from "@shared/providers";
+import type { ProviderDto, TestResult, UpsertProviderInput } from "@shared/providers";
 
 export type ProviderRow = typeof providers.$inferSelect;
 
-/** 在 main 内解密以产生掩码，明文绝不离开 main。解密失败则优雅降级为 undecryptable。 */
-function keyState(cipher: Buffer | null, row: ProviderRow, encryptor: Encryptor): ProviderKeyState {
-  if (cipher == null) return { status: "none" };
-  try {
-    return { status: "set", mask: maskKey(encryptor.decrypt(cipher)) };
-  } catch (err) {
-    // 跨机迁移属预期；但真实 encryptor 故障也走这里——记日志以便区分（err 来自 OS 钥匙串，不含明文）。
-    console.warn(`[providers] toDto: decrypt failed for provider ${row.id}:`, err);
-    return { status: "undecryptable" };
-  }
-}
-
-/** Provider → DTO（密钥存在性收敛为判别联合 key）。入参经工厂解析，故 baseUrl 已按 type 派生。 */
-function toDto(provider: Provider, encryptor: Encryptor): ProviderDto {
+/**
+ * Provider → DTO（明文仅在 main；DTO 只携掩码）。入参经工厂解析，故 baseUrl 已按 type 派生。
+ * apiKey 两态：省略=保留既有，提供=替换（明文直存，见 2026-06-04 spec）。
+ * label / baseUrl 同理：省略=保留，显式 null=清空（两态；新建时 ?? null 回退正确）。
+ */
+function toDto(provider: Provider): ProviderDto {
   return {
     id: provider.id,
     type: provider.type,
     compatibleApis: provider.compatibleApis ?? [provider.type],
     label: provider.label ?? null,
     baseUrl: provider.baseUrl, // 工厂已派生（DeepSeek 等内置不再是 db 里的 null）
-    key: keyState(provider.apiKeyEncrypted, provider, encryptor),
+    keyMask: provider.apiKey == null ? null : maskKey(provider.apiKey),
     models: provider.models ?? [],
     isBuiltin: provider.isBuiltin,
     createdAt: provider.createdAt,
@@ -52,13 +38,13 @@ export function loadProvider(db: DB, id: string): Provider | undefined {
   return row ? createProvider(row) : undefined;
 }
 
-export function listProviders(db: DB, encryptor: Encryptor): ProviderDto[] {
+export function listProviders(db: DB): ProviderDto[] {
   return db
     .select()
     .from(providers)
     .orderBy(asc(providers.createdAt))
     .all()
-    .map((r) => toDto(createProvider(r), encryptor));
+    .map((r) => toDto(createProvider(r)));
 }
 
 /**
@@ -72,21 +58,7 @@ function assertUsableBaseUrl(p: { isBuiltin: boolean; baseUrl: string | null }):
   }
 }
 
-export function upsertProvider(
-  db: DB,
-  encryptor: Encryptor,
-  input: UpsertProviderInput,
-): ProviderDto {
-  // 仅当传入新明文 key 时加密；省略 apiKey = 保留既有密钥。
-  // label / baseUrl 同理：省略=保留，显式 null=清空（两态；新建时 ?? null 回退正确）。
-  let encrypted: Buffer | undefined;
-  if (input.apiKey !== undefined) {
-    if (!encryptor.isAvailable()) {
-      throw new Error(t("errors.secureStorageUnavailable", "无法存储密钥：系统安全存储不可用"));
-    }
-    encrypted = encryptor.encrypt(input.apiKey);
-  }
-
+export function upsertProvider(db: DB, input: UpsertProviderInput): ProviderDto {
   if (input.id) {
     const existing = getProviderRow(db, input.id);
     if (!existing)
@@ -124,7 +96,7 @@ export function upsertProvider(
         type: input.type, // type 已校验（内置限 compatibleApis；非内置自由）
         ...(!lockedMeta && input.label !== undefined ? { label: input.label } : {}),
         ...(!lockedMeta && input.baseUrl !== undefined ? { baseUrl: input.baseUrl } : {}),
-        ...(encrypted !== undefined ? { apiKeyEncrypted: encrypted } : {}),
+        ...(input.apiKey !== undefined ? { apiKey: input.apiKey } : {}),
         ...(input.models !== undefined ? { models: input.models } : {}),
         // 非内置：compatibleApis 跟随当前 type（内置 compatibleApis 由 config 固定，不动）。
         ...(!existing.isBuiltin ? { compatibleApis: [input.type] } : {}),
@@ -136,7 +108,7 @@ export function upsertProvider(
       throw new Error(
         t("errors.providerNotFound", "未找到$t(terms.provider) {{id}}", { id: input.id }),
       );
-    return toDto(createProvider(row), encryptor);
+    return toDto(createProvider(row));
   }
 
   // 用户自建（非内置）：必须显式给 baseUrl（无默认端点 / 工厂派生豁免）。
@@ -148,12 +120,12 @@ export function upsertProvider(
       compatibleApis: [input.type], // 用户自建：单一当前 type
       label: input.label ?? null,
       baseUrl: input.baseUrl ?? null,
-      apiKeyEncrypted: encrypted ?? null,
+      apiKey: input.apiKey ?? null,
       models: input.models ?? [],
     })
     .returning()
     .get();
-  return toDto(createProvider(inserted), encryptor);
+  return toDto(createProvider(inserted));
 }
 
 export function removeProvider(db: DB, id: string): void {
@@ -169,20 +141,19 @@ export function removeProvider(db: DB, id: string): void {
   });
 }
 
-export function revealProviderKey(db: DB, encryptor: Encryptor, id: string): string {
+export function revealProviderKey(db: DB, id: string): string {
   const row = getProviderRow(db, id);
   if (!row)
     throw new Error(t("errors.providerNotFound", "未找到$t(terms.provider) {{id}}", { id }));
-  if (row.apiKeyEncrypted == null)
+  if (row.apiKey == null)
     throw new Error(
       t("errors.providerHasNoApiKey", "$t(terms.provider) {{id}} 未配置密钥", { id }),
     );
-  return encryptor.decrypt(row.apiKeyEncrypted);
+  return row.apiKey;
 }
 
 export async function testProvider(
   db: DB,
-  encryptor: Encryptor,
   tester: ProviderTester,
   id: string,
   model: string,
@@ -190,16 +161,14 @@ export async function testProvider(
   const provider = loadProvider(db, id);
   if (!provider)
     throw new Error(t("errors.providerNotFound", "未找到$t(terms.provider) {{id}}", { id }));
-  if (provider.apiKeyEncrypted == null) {
+  if (provider.apiKey == null) {
     return { ok: false, message: t("errors.noApiKeySet", "该$t(terms.provider)未配置密钥") };
   }
-  let apiKey: string;
-  try {
-    apiKey = encryptor.decrypt(provider.apiKeyEncrypted);
-  } catch (err) {
-    console.warn(`[providers] testProvider: decrypt failed for provider ${id}:`, err);
-    return { ok: false, message: t("errors.keyUndecryptable", "本机无法解密已存密钥") };
-  }
   // provider.baseUrl 已由工厂按 type 派生（DeepSeek 特判集中在此一处）。
-  return tester.test({ type: provider.type, baseUrl: provider.baseUrl, apiKey, model });
+  return tester.test({
+    type: provider.type,
+    baseUrl: provider.baseUrl,
+    apiKey: provider.apiKey,
+    model,
+  });
 }

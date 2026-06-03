@@ -38,10 +38,7 @@ export function ProviderCard({
   });
 
   function keyText(p: ProviderDto): string {
-    if (p.key.status === "set") return p.key.mask;
-    if (p.key.status === "undecryptable")
-      return t("settings.provider.keyUndecryptable", "本机无法解密");
-    return t("settings.provider.keyNotSet", "未配置");
+    return p.keyMask ?? t("settings.provider.keyNotSet", "未配置");
   }
 
   return (

@@ -2,7 +2,6 @@ import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { createDb, runMigrations } from "@main/db/client";
 import { providers } from "@main/db/schema";
-import type { Encryptor } from "@main/secrets/encryptor";
 import type { ProviderTester } from "@main/secrets/tester";
 import {
   getProviderRow,
@@ -28,83 +27,69 @@ const freshDb = () => {
   return db;
 };
 
-// 可逆 fake：明文 utf8 ↔ buffer，足够验证存取与掩码。
-const fakeEncryptor: Encryptor = {
-  isAvailable: () => true,
-  encrypt: (p) => Buffer.from(p, "utf8"),
-  decrypt: (c) => c.toString("utf8"),
-};
-const unavailableEncryptor: Encryptor = {
-  isAvailable: () => false,
-  encrypt: () => {
-    throw new Error("unavailable");
-  },
-  decrypt: () => {
-    throw new Error("unavailable");
-  },
-};
-const brokenDecryptEncryptor: Encryptor = {
-  isAvailable: () => true,
-  encrypt: (p) => Buffer.from(p, "utf8"),
-  decrypt: () => {
-    throw new Error("cannot decrypt");
-  },
-};
 const okTester: ProviderTester = { test: async () => ({ ok: true }) };
 
 describe("provider repository", () => {
-  it("creates a provider with an encrypted key and exposes only a masked preview", () => {
+  it("creates a provider with a plaintext key and exposes only a masked preview", () => {
     const db = freshDb();
-    const dto = upsertProvider(db, fakeEncryptor, {
+    const dto = upsertProvider(db, {
       type: "openai-responses",
       baseUrl: "https://api.openai.com/v1",
       apiKey: "sk-abcdefghij",
     });
     expect(dto.type).toBe("openai-responses");
-    expect(dto.key).toEqual({ status: "set", mask: "sk-…ghij" });
+    expect(dto.keyMask).toBe("sk-…ghij");
     const row = getProviderRow(db, dto.id);
-    expect(row?.apiKeyEncrypted).toBeInstanceOf(Buffer);
-    expect(row?.apiKeyEncrypted?.toString("utf8")).toBe("sk-abcdefghij");
-    // DTO 绝不暴露密文或明文字段
-    expect(dto).not.toHaveProperty("apiKeyEncrypted");
+    expect(row?.apiKey).toBe("sk-abcdefghij"); // 明文落库（spec 决策）
+    // DTO 绝不暴露明文字段
     expect(dto).not.toHaveProperty("apiKey");
     expect(dto.createdAt).toBeGreaterThan(0);
   });
 
   it("creates a provider without a key", () => {
     const db = freshDb();
-    const dto = upsertProvider(db, fakeEncryptor, {
+    const dto = upsertProvider(db, {
       type: "anthropic",
       baseUrl: "https://api.anthropic.com/v1",
     });
-    expect(dto.key).toEqual({ status: "none" });
+    expect(dto.keyMask).toBeNull();
+  });
+
+  it("masks short keys (≤8 chars) entirely", () => {
+    const db = freshDb();
+    const dto = upsertProvider(db, {
+      type: "openai-responses",
+      baseUrl: "https://api.openai.com/v1",
+      apiKey: "sk-short", // 8 字符
+    });
+    expect(dto.keyMask).toBe("••••");
   });
 
   it("update without apiKey keeps the existing key", () => {
     const db = freshDb();
-    const created = upsertProvider(db, fakeEncryptor, {
+    const created = upsertProvider(db, {
       type: "openai-responses",
       baseUrl: "https://api.openai.com/v1",
       apiKey: "sk-original99",
     });
-    const updated = upsertProvider(db, fakeEncryptor, {
+    const updated = upsertProvider(db, {
       id: created.id,
       type: "openai-responses",
       label: "Renamed",
     });
     expect(updated.label).toBe("Renamed");
-    expect(revealProviderKey(db, fakeEncryptor, created.id)).toBe("sk-original99");
+    expect(revealProviderKey(db, created.id)).toBe("sk-original99");
   });
 
   it("update preserves baseUrl/label when those fields are omitted", () => {
     const db = freshDb();
-    const created = upsertProvider(db, fakeEncryptor, {
+    const created = upsertProvider(db, {
       type: "openai-responses",
       baseUrl: "https://custom.example/v1",
       label: "Original",
       apiKey: "sk-abcdefghij",
     });
-    const updated = upsertProvider(db, fakeEncryptor, {
+    const updated = upsertProvider(db, {
       id: created.id,
       type: "openai-responses",
       label: "Renamed",
@@ -115,73 +100,52 @@ describe("provider repository", () => {
 
   it("update with apiKey replaces the key", () => {
     const db = freshDb();
-    const created = upsertProvider(db, fakeEncryptor, {
+    const created = upsertProvider(db, {
       type: "openai-responses",
       baseUrl: "https://api.openai.com/v1",
       apiKey: "sk-original99",
     });
-    upsertProvider(db, fakeEncryptor, {
+    upsertProvider(db, {
       id: created.id,
       type: "openai-responses",
       apiKey: "sk-replaced77",
     });
-    expect(revealProviderKey(db, fakeEncryptor, created.id)).toBe("sk-replaced77");
+    expect(revealProviderKey(db, created.id)).toBe("sk-replaced77");
   });
 
   it("lists all providers", () => {
     const db = freshDb();
-    upsertProvider(db, fakeEncryptor, {
+    upsertProvider(db, {
       type: "openai-responses",
       baseUrl: "https://api.openai.com/v1",
       apiKey: "sk-aaaaaaaa11",
     });
-    upsertProvider(db, fakeEncryptor, {
+    upsertProvider(db, {
       type: "anthropic",
       baseUrl: "https://api.anthropic.com/v1",
       apiKey: "sk-bbbbbbbb22",
     });
-    expect(listProviders(db, fakeEncryptor)).toHaveLength(2);
+    expect(listProviders(db)).toHaveLength(2);
   });
 
   it("reveal returns the plaintext key; throws when no key", () => {
     const db = freshDb();
-    const withKey = upsertProvider(db, fakeEncryptor, {
+    const withKey = upsertProvider(db, {
       type: "openai-responses",
       baseUrl: "https://api.openai.com/v1",
       apiKey: "sk-secretkey1",
     });
-    expect(revealProviderKey(db, fakeEncryptor, withKey.id)).toBe("sk-secretkey1");
-    const noKey = upsertProvider(db, fakeEncryptor, {
+    expect(revealProviderKey(db, withKey.id)).toBe("sk-secretkey1");
+    const noKey = upsertProvider(db, {
       type: "openai-responses",
       baseUrl: "https://api.openai.com/v1",
     });
-    expect(() => revealProviderKey(db, fakeEncryptor, noKey.id)).toThrow(/no API key/i);
-  });
-
-  it("refuses to store a key when secure storage is unavailable", () => {
-    const db = freshDb();
-    expect(() =>
-      upsertProvider(db, unavailableEncryptor, {
-        type: "openai-responses",
-        apiKey: "sk-whatever12",
-      }),
-    ).toThrow(/secure storage is unavailable/i);
-  });
-
-  it("reports key status 'undecryptable' when decryption fails", () => {
-    const db = freshDb();
-    const created = upsertProvider(db, fakeEncryptor, {
-      type: "openai-responses",
-      baseUrl: "https://api.openai.com/v1",
-      apiKey: "sk-abcdefghij",
-    });
-    const listed = listProviders(db, brokenDecryptEncryptor).find((p) => p.id === created.id);
-    expect(listed?.key).toEqual({ status: "undecryptable" });
+    expect(() => revealProviderKey(db, noKey.id)).toThrow(/no API key/i);
   });
 
   it("removeProvider deletes it and clears assistant references", () => {
     const db = freshDb();
-    const prov = upsertProvider(db, fakeEncryptor, {
+    const prov = upsertProvider(db, {
       type: "openai-responses",
       baseUrl: "https://api.openai.com/v1",
       apiKey: "sk-abcdefghij",
@@ -201,12 +165,12 @@ describe("provider repository", () => {
 
   it("removeProvider only clears assistant refs to the removed provider", () => {
     const db = freshDb();
-    const provA = upsertProvider(db, fakeEncryptor, {
+    const provA = upsertProvider(db, {
       type: "openai-responses",
       baseUrl: "https://api.openai.com/v1",
       apiKey: "sk-aaaaaaaa11",
     });
-    const provB = upsertProvider(db, fakeEncryptor, {
+    const provB = upsertProvider(db, {
       type: "anthropic",
       baseUrl: "https://api.anthropic.com/v1",
       apiKey: "sk-bbbbbbbb22",
@@ -220,18 +184,17 @@ describe("provider repository", () => {
 
   it("upsert sets models; omit preserves; [] clears; toDto returns [] for null", () => {
     const db = freshDb();
-    const enc = fakeEncryptor;
-    const a = upsertProvider(db, enc, {
+    const a = upsertProvider(db, {
       type: "openai-responses",
       baseUrl: "https://api.openai.com/v1",
       models: ["gpt-4o"],
     });
     expect(a.models).toEqual(["gpt-4o"]);
-    const b = upsertProvider(db, enc, { id: a.id, type: "openai-responses" }); // 省略 models
+    const b = upsertProvider(db, { id: a.id, type: "openai-responses" }); // 省略 models
     expect(b.models).toEqual(["gpt-4o"]); // 保留
-    const c = upsertProvider(db, enc, { id: a.id, type: "openai-responses", models: [] }); // 清空
+    const c = upsertProvider(db, { id: a.id, type: "openai-responses", models: [] }); // 清空
     expect(c.models).toEqual([]);
-    const d = upsertProvider(db, enc, {
+    const d = upsertProvider(db, {
       type: "anthropic",
       baseUrl: "https://api.anthropic.com/v1",
     });
@@ -241,46 +204,28 @@ describe("provider repository", () => {
   it("rejects creating a custom (non-builtin) provider without a baseUrl, even for a type with an official default endpoint", () => {
     const db = freshDb();
     // anthropic 有官方默认端点，但非内置仍必须显式给 baseUrl（规则按 isBuiltin，而非 type）。
-    expect(() => upsertProvider(db, fakeEncryptor, { type: "anthropic" })).toThrow(
-      /baseUrl is required/i,
-    );
+    expect(() => upsertProvider(db, { type: "anthropic" })).toThrow(/baseUrl is required/i);
   });
 
   describe("testProvider", () => {
     it("throws when the provider does not exist", async () => {
       const db = freshDb();
-      await expect(
-        testProvider(db, fakeEncryptor, okTester, "nope", "gpt-4o-mini"),
-      ).rejects.toThrow(/not found/i);
+      await expect(testProvider(db, okTester, "nope", "gpt-4o-mini")).rejects.toThrow(/not found/i);
     });
 
     it("returns ok:false when the provider has no key", async () => {
       const db = freshDb();
-      const noKey = upsertProvider(db, fakeEncryptor, {
+      const noKey = upsertProvider(db, {
         type: "openai-responses",
         baseUrl: "https://api.openai.com/v1",
       });
-      const r = await testProvider(db, fakeEncryptor, okTester, noKey.id, "gpt-4o-mini");
+      const r = await testProvider(db, okTester, noKey.id, "gpt-4o-mini");
       expect(r).toEqual({ ok: false, message: "No API key set for this provider" });
-    });
-
-    it("returns ok:false when the key cannot be decrypted", async () => {
-      const db = freshDb();
-      const p = upsertProvider(db, fakeEncryptor, {
-        type: "openai-responses",
-        baseUrl: "https://api.openai.com/v1",
-        apiKey: "sk-abcdefghij",
-      });
-      const r = await testProvider(db, brokenDecryptEncryptor, okTester, p.id, "gpt-4o-mini");
-      expect(r).toEqual({
-        ok: false,
-        message: "Stored API key cannot be decrypted on this machine",
-      });
     });
 
     it("delegates to the tester with the full provider config + model, and the result leaks no plaintext", async () => {
       const db = freshDb();
-      const p = upsertProvider(db, fakeEncryptor, {
+      const p = upsertProvider(db, {
         type: "openai-chat-completions",
         baseUrl: "http://localhost:1234/v1",
         apiKey: "sk-abcdefghij",
@@ -297,7 +242,7 @@ describe("provider repository", () => {
           return { ok: true };
         },
       };
-      const r = await testProvider(db, fakeEncryptor, spyTester, p.id, "llama-3.2");
+      const r = await testProvider(db, spyTester, p.id, "llama-3.2");
       expect(r).toEqual({ ok: true });
       expect(seen).toEqual({
         type: "openai-chat-completions",
@@ -318,7 +263,7 @@ describe("provider repository", () => {
           baseUrl: null,
           isBuiltin: true,
           compatibleApis: ["openai-chat-completions", "anthropic"],
-          apiKeyEncrypted: fakeEncryptor.encrypt("sk-deepseek0001"),
+          apiKey: "sk-deepseek0001",
         })
         .returning()
         .get().id;
@@ -329,7 +274,7 @@ describe("provider repository", () => {
           return { ok: true };
         },
       };
-      await testProvider(db, fakeEncryptor, spy, id, "deepseek-v4-pro");
+      await testProvider(db, spy, id, "deepseek-v4-pro");
       expect(seenBase).toBe("https://api.deepseek.com/anthropic"); // 工厂按 type 派生
     });
   });
@@ -354,7 +299,7 @@ describe("builtin provider immutability", () => {
 
   it("toDto exposes isBuiltin (false for user-created)", () => {
     const db = freshDb();
-    const dto = upsertProvider(db, fakeEncryptor, {
+    const dto = upsertProvider(db, {
       type: "anthropic",
       baseUrl: "https://api.anthropic.com/v1",
       label: "Mine",
@@ -365,7 +310,7 @@ describe("builtin provider immutability", () => {
   it("listProviders reports isBuiltin=true for builtin rows", () => {
     const db = freshDb();
     insertBuiltin(db);
-    expect(listProviders(db, fakeEncryptor)[0]?.isBuiltin).toBe(true);
+    expect(listProviders(db)[0]?.isBuiltin).toBe(true);
   });
 
   it("toDto derives a builtin DeepSeek's baseUrl from its type (db null → derived)", () => {
@@ -379,7 +324,7 @@ describe("builtin provider immutability", () => {
         compatibleApis: ["openai-chat-completions", "anthropic"],
       })
       .run();
-    const dto = listProviders(db, fakeEncryptor).find((p) => p.label === "DeepSeek");
+    const dto = listProviders(db).find((p) => p.label === "DeepSeek");
     expect(dto?.baseUrl).toBe("https://api.deepseek.com"); // 经工厂派生，非 db 的 null
   });
 
@@ -396,7 +341,7 @@ describe("builtin provider immutability", () => {
       })
       .returning()
       .get().id;
-    const dto = upsertProvider(db, fakeEncryptor, {
+    const dto = upsertProvider(db, {
       id,
       type: "openai-chat-completions",
       label: "DeepSeek",
@@ -409,25 +354,23 @@ describe("builtin provider immutability", () => {
   it("allows editing key + models on a builtin", () => {
     const db = freshDb();
     const id = insertBuiltin(db);
-    const dto = upsertProvider(db, fakeEncryptor, {
+    const dto = upsertProvider(db, {
       id,
       type: "openai-responses",
       apiKey: "sk-builtinkey1",
       models: ["gpt-4o", "gpt-4o-mini"],
     });
     expect(dto.models).toEqual(["gpt-4o", "gpt-4o-mini"]);
-    expect(revealProviderKey(db, fakeEncryptor, id)).toBe("sk-builtinkey1");
+    expect(revealProviderKey(db, id)).toBe("sk-builtinkey1");
   });
 
   it("rejects changing type / label / baseUrl on a builtin", () => {
     const db = freshDb();
     const id = insertBuiltin(db);
-    expect(() => upsertProvider(db, fakeEncryptor, { id, type: "anthropic" })).toThrow();
+    expect(() => upsertProvider(db, { id, type: "anthropic" })).toThrow();
+    expect(() => upsertProvider(db, { id, type: "openai-responses", label: "Renamed" })).toThrow();
     expect(() =>
-      upsertProvider(db, fakeEncryptor, { id, type: "openai-responses", label: "Renamed" }),
-    ).toThrow();
-    expect(() =>
-      upsertProvider(db, fakeEncryptor, { id, type: "openai-responses", baseUrl: "https://x" }),
+      upsertProvider(db, { id, type: "openai-responses", baseUrl: "https://x" }),
     ).toThrow();
   });
 
@@ -451,10 +394,8 @@ describe("builtin provider immutability", () => {
       })
       .returning()
       .get();
-    const ok = upsertProvider(db, fakeEncryptor, { id: row.id, type: "anthropic" });
+    const ok = upsertProvider(db, { id: row.id, type: "anthropic" });
     expect(ok.type).toBe("anthropic"); // 切到 compatibleApis 内 → 成功
-    expect(() =>
-      upsertProvider(db, fakeEncryptor, { id: row.id, type: "google-generate-content" }),
-    ).toThrow(); // 切到 compatibleApis 外 → 抛
+    expect(() => upsertProvider(db, { id: row.id, type: "google-generate-content" })).toThrow(); // 切到 compatibleApis 外 → 抛
   });
 });
