@@ -3,27 +3,6 @@ import type { z } from "zod";
 import { validateInput } from "@main/ipc/validate";
 import type { Contract } from "@shared/ipc";
 
-/**
- * 注册一个经 Zod 校验的 invoke handler。
- * handler 第二参为 IpcMainInvokeEvent（流式通道需要 event.sender）；不需要的 handler 忽略即可。
- * @deprecated 迁移期保留；全部 handler 改用 bind/register 后由 Task 10 删除。
- */
-export function handle<I, O>(
-  channel: string,
-  inputSchema: z.ZodType<I>,
-  handler: (input: I, event: IpcMainInvokeEvent) => O | Promise<O>,
-): void {
-  ipcMain.handle(channel, async (event, raw: unknown) => {
-    try {
-      const input = validateInput(channel, inputSchema, raw);
-      return await handler(input, event);
-    } catch (err) {
-      console.error(`[ipc] ${channel} failed:`, err);
-      throw err;
-    }
-  });
-}
-
 /** 声明式绑定：契约 + 业务 fn，纯数据、不碰 Electron（供 headless 覆盖测试读取）。 */
 export interface Binding {
   contract: Contract;
