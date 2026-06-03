@@ -5,6 +5,7 @@ import { hydratePreferences } from "@renderer/store/hydrate-preferences";
 import { LibraryView } from "@renderer/library/LibraryView";
 import { ReaderView } from "@renderer/reader/ReaderView";
 import { SettingsPanel } from "@renderer/settings/SettingsPanel";
+import { ThemeController } from "@renderer/theme/ThemeController";
 
 export function App() {
   const view = useReaderStore((s) => s.view);
@@ -14,6 +15,7 @@ export function App() {
   }, []);
   return (
     <TooltipProvider>
+      <ThemeController />
       {view === "reader" ? <ReaderView /> : <LibraryView />}
       <SettingsPanel />
     </TooltipProvider>
