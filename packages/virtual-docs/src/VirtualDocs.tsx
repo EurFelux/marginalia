@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { SectionFrame, type SectionSelectEvent } from "./SectionFrame";
 import type { ViewportRect } from "./geometry";
@@ -96,15 +96,23 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
 
   const ioSupported = typeof IntersectionObserver !== "undefined";
 
-  // 注册/注销由 LazySection 在挂载/卸载时调用。
-  const registerSection = (index: number, el: HTMLElement) => {
+  // virtual-docs 不过 React Compiler（renderer 才过；本包经 node_modules 软链被 babel 的
+  // /node_modules/ 默认 exclude 排除）→ 传给 virtuoso/子组件的回调必须手动 useCallback 稳定身份。
+  // 注册/注销由 LazySection 在挂载/卸载时调用；不稳定会让其注册 effect 每渲染重跑。
+  const registerSection = useCallback((index: number, el: HTMLElement) => {
     observedEls.current.set(index, el);
     io.current?.observe(el);
-  };
-  const unregisterSection = (index: number, el: HTMLElement) => {
+  }, []);
+  const unregisterSection = useCallback((index: number, el: HTMLElement) => {
     observedEls.current.delete(index);
     io.current?.unobserve(el);
-  };
+  }, []);
+  // scrollerRef 必须稳定身份：virtuoso 把它当 callback ref，内联身份每渲染变会触发
+  // detach/attach → setScrollerReady → 重渲 → … 无限循环（Maximum update depth）。
+  const handleScrollerRef = useCallback((el: HTMLElement | null | Window) => {
+    scrollerEl.current = el instanceof HTMLElement ? el : null;
+    setScrollerReady((n) => n + 1);
+  }, []);
 
   // scroller 就绪后建 IO，observe 已注册的元素。
   useEffect(() => {
@@ -127,28 +135,41 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
     heightCache.current.clear();
   }, [styleCss]);
 
-  // onMeasured / itemContent 故意不手写 useCallback——virtual-docs 经 React Compiler 编译
-  //（renderer 的 vite babel 覆盖工作区源码包：symlink 解析为 packages/ 真实路径、不含 node_modules，
-  // 故被 RC 处理），由其自动记忆保持身份稳定。否则身份每次渲染变化会让 Virtuoso 重渲全部在挂行。
-  const onMeasured = (i: number, h: number) => {
+  // itemContent 身份每渲染变会让 virtuoso 重渲全部在挂行 → 手动 useCallback 稳定（见上）。
+  const onMeasured = useCallback((i: number, h: number) => {
     heightCache.current.set(i, h);
-  };
-  const itemContent = (index: number) => (
-    <LazySection
-      index={index}
-      loadSection={loadSection}
-      styleCss={styleCss}
-      onSelect={onSelect}
-      onSelectionCleared={onSelectionCleared}
-      decorate={decorate}
-      onHighlightClick={onHighlightClick}
-      decorateNonce={decorateNonce}
-      onContentMouseDown={onContentMouseDown}
-      estimatedHeight={estimateHeight(heightCache.current, index, DEFAULT_ESTIMATE)}
-      onMeasured={onMeasured}
-      registerSection={registerSection}
-      unregisterSection={unregisterSection}
-    />
+  }, []);
+  const itemContent = useCallback(
+    (index: number) => (
+      <LazySection
+        index={index}
+        loadSection={loadSection}
+        styleCss={styleCss}
+        onSelect={onSelect}
+        onSelectionCleared={onSelectionCleared}
+        decorate={decorate}
+        onHighlightClick={onHighlightClick}
+        decorateNonce={decorateNonce}
+        onContentMouseDown={onContentMouseDown}
+        estimatedHeight={estimateHeight(heightCache.current, index, DEFAULT_ESTIMATE)}
+        onMeasured={onMeasured}
+        registerSection={registerSection}
+        unregisterSection={unregisterSection}
+      />
+    ),
+    [
+      loadSection,
+      styleCss,
+      onSelect,
+      onSelectionCleared,
+      decorate,
+      onHighlightClick,
+      decorateNonce,
+      onContentMouseDown,
+      onMeasured,
+      registerSection,
+      unregisterSection,
+    ],
   );
 
   return (
@@ -158,10 +179,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
       totalCount={count}
       initialTopMostItemIndex={initialIndex ?? 0}
       itemContent={itemContent}
-      scrollerRef={(el) => {
-        scrollerEl.current = el instanceof HTMLElement ? el : null;
-        setScrollerReady((n) => n + 1);
-      }}
+      scrollerRef={handleScrollerRef}
       rangeChanged={(range) => {
         if (!ioSupported) onTopSectionChange?.(range.startIndex); // fallback：近似
         const lo = Math.max(0, range.startIndex - KEEP_DISTANCE);
