@@ -73,7 +73,7 @@ export interface Contract<S extends z.ZodType = z.ZodType, O = unknown> {
 
 export type ContractMap = Record<string, Contract>;
 
-export type InferIn<C> = C extends Contract<infer S, unknown> ? z.infer<S> : never;
+export type InferIn<C> = C extends Contract<infer S, infer _O> ? z.infer<S> : never;
 export type InferOut<C> = C extends Contract<z.ZodType, infer O> ? O : never;
 
 /** 定义一条契约，保留 S/O 的精确推导（供 bind/invoker 推类型）。 */
