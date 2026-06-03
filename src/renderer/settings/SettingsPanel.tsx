@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, X } from "lucide-react";
+import { Check, Monitor, Moon, Sun, X } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@renderer/components/ui/dialog";
 import { Input } from "@renderer/components/ui/input";
 import { Checkbox } from "@renderer/components/ui/checkbox";
 import { Button } from "@renderer/components/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "@renderer/components/ui/toggle-group";
 import { qk } from "@renderer/query/keys";
 import { useSettingsStore } from "@renderer/store/settings-store";
 import { usePrefsStore } from "@renderer/store/prefs-store";
+import { useThemeStore } from "@renderer/store/theme-store";
+import { colorMode as colorModeSchema } from "@shared/preferences";
 
 export function SettingsPanel() {
   const open = useSettingsStore((s) => s.open);
@@ -16,6 +19,8 @@ export function SettingsPanel() {
   const setTestResult = useSettingsStore((s) => s.setTestResult);
   const autoSummarize = usePrefsStore((s) => s.autoSummarize);
   const setAutoSummarize = usePrefsStore((s) => s.setAutoSummarize);
+  const colorMode = useThemeStore((s) => s.colorMode);
+  const setColorMode = useThemeStore((s) => s.setColorMode);
   const qc = useQueryClient();
 
   const providers = useQuery({
@@ -159,6 +164,31 @@ export function SettingsPanel() {
             <Button onClick={() => save.mutate()} disabled={save.isPending || !canSave}>
               {save.isPending ? "保存中…" : "保存"}
             </Button>
+          </div>
+
+          <div className="mt-1 flex items-center justify-between gap-3 border-t border-border pt-3">
+            <span className="text-sm font-medium">外观</span>
+            <ToggleGroup
+              value={[colorMode]}
+              onValueChange={(g) => {
+                // Base UI ToggleGroup 回传 string[]；用 colorMode 枚举收窄到合法档（避免 as 断言，
+                // 非法/空值不写——既挡未来的 item value 笔误，又防清空选中态丢档）。
+                const parsed = colorModeSchema.safeParse(g[0]);
+                if (parsed.success) setColorMode(parsed.data);
+              }}
+              variant="outline"
+              size="sm"
+            >
+              <ToggleGroupItem value="light" aria-label="浅色">
+                <Sun />
+              </ToggleGroupItem>
+              <ToggleGroupItem value="system" aria-label="跟随系统">
+                <Monitor />
+              </ToggleGroupItem>
+              <ToggleGroupItem value="dark" aria-label="深色">
+                <Moon />
+              </ToggleGroupItem>
+            </ToggleGroup>
           </div>
 
           <div className="mt-1 flex items-start justify-between gap-3 border-t border-border pt-3">
