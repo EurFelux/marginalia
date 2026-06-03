@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { useChat } from "@ai-sdk/react";
 import { Plus, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@renderer/components/ui/button";
 import { ScrollArea } from "@renderer/components/ui/scroll-area";
 import { useChatStore } from "@renderer/store/chat-store";
@@ -10,6 +11,7 @@ import type { ChatUIMessage } from "@renderer/ai/types";
 import { MessageList } from "@renderer/ai/MessageList";
 import { Composer } from "@renderer/ai/Composer";
 import { SummaryPill } from "@renderer/ai/SummaryPill";
+import { messagesToUI } from "@renderer/ai/message-history";
 
 export function AIPanel() {
   const { t } = useTranslation();
@@ -19,12 +21,42 @@ export function AIPanel() {
   });
   const setActiveConversation = useChatStore((s) => s.setActiveConversation);
   const setPanelOpen = useChatStore((s) => s.setPanelOpen);
+  const openCommand = useChatStore((s) => s.openCommand);
+  const qc = useQueryClient();
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const prevStatus = useRef(status);
 
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, [messages]);
+
+  // 重开会话：openCommand.nonce 变 → 先中止在跑的流（避免增量灌入将被替换的历史、streamId 串台）→ 载历史 → setMessages。
+  // 只认 openCommand（一次性命令信号），不认 activeConversationId——后者也被发消息 ack 写入，监听它会在发完消息后误重载。
+  useEffect(() => {
+    if (!openCommand) return;
+    const { conversationId } = openCommand;
+    let cancelled = false;
+    void stop();
+    void window.api.chat.messages
+      .listByConversation({ conversationId })
+      .then((dtos) => {
+        if (!cancelled) setMessages(messagesToUI(dtos));
+      })
+      .catch((err: unknown) => console.warn("[ai] load conversation history failed:", err));
+    return () => {
+      cancelled = true;
+    };
+  }, [openCommand, stop, setMessages]);
+
+  // 一轮发送结束（曾 streaming/submitted → 回 ready/error）→ 刷新会话列表（新会话 / 标题 / updatedAt）。
+  // 用前缀 ["conversations"] 失效（不需 bookId），匹配 qk.conversations(bookId)=["conversations",bookId]。
+  useEffect(() => {
+    if (prevStatus.current !== "ready" && (status === "ready" || status === "error")) {
+      void qc.invalidateQueries({ queryKey: ["conversations"] });
+    }
+    prevStatus.current = status;
+  }, [status, qc]);
 
   const newConversation = () => {
     setMessages([]);
