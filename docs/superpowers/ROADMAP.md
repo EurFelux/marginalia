@@ -25,6 +25,8 @@
 
 **书库拖拽导入已交付**（2026-06-03）：拖 ePub 到书库即导入——`useEpubDrop` 拖拽状态机 + `DropOverlay` 居中投放卡 + `epub-drop` 纯 helper（过滤/basename）+ `library.pathForFile`（preload 经 `webUtils.getPathForFile`）+ sonner toast 即时反馈；文案已 i18n 化。详见 `specs/2026-06-03-library-drag-drop-import-design.md`。**待办**：导入卡顿（主进程同步解析 ePub）待挪 worker。
 
+**#9 DB 生命周期规则进行中**：spec（`specs/2026-06-03-db-lifecycle-rules-design.md`）把五块 DB 债定义成规则并拆成 4 份 plan。**P1 章节摘要派生态已实现**（去 `summary_status` 列、状态读时派生）；**P2**（AI 终态模型）/ **P3**（删除+文件簇：FK 级联 / 文件自有化 / 删书）/ **P4**（迁移打包）plan 已就绪、待实现（`plans/2026-06-03-p{1..4}-*.md`）。
+
 **下一目标候选**：**类型设计债清理**（已定为下一步）、RA4 收尾（M-d 全书摘要 / M-c 跨章）、`preferences` 持久化表、RA1-full「精度/内存 pass」（图片延时 / 当前章高亮滞后 / 长书 section 内存，见 backlog）。颜色模式（dark / light / system）✅ 已完成。RA5 ✅ 已完成。
 
 ---
@@ -128,7 +130,7 @@
 | **更广 Tooltip 应用 + Card 化 composite**：Tooltip 现仅阅读页顶栏 2 按钮，可推广到其余图标按钮；书卡/章节项/标注项/消息气泡等 composite 仍手搓 Tailwind，可按需抽成 shadcn `Card`。                                                                                               | 🔴             | shadcn 重构延后（按需）                                               |
 | **shadcn tabs 的 data-orientation 适配**：shadcn tabs 用 `data-horizontal`/`data-vertical`，Base UI `Tabs.Root` 发 `data-orientation`，属性名错配致方向类惰性。现 Sidebar 显式 `flex-col` + TabsList `h-8` 兜底（仅水平 tabs）；若再用 tabs 或加竖向，补 `@custom-variant` 映射。 | 🔴             | shadcn 重构发现                                                       |
 
-| **chapters.summaryStatus 改派生态**：现 chapters 持久化 `summary_status`（运行时态），靠 `resetStuckSummaries` 复位崩溃残留的 generating。全书摘要已改派生（`summary!=null`=ready + 内存 inFlight/failed 集）；chapters 应同样重构——去 `summary_status` 列+CHECK（表重建迁移）、状态读时派生、删 `resetStuckSummaries`、改 `getChapterSummary`/`ensureChapterSummary`/`SummaryPill` + 测试。 | 🔴 | 全书摘要 spec 发现（用户 2026-06-03 记 backlog） |
+| **chapters.summaryStatus 改派生态**：去 `summary_status` 列+CHECK（表重建迁移）、状态读时派生（内存 `inFlightChapters`/`failedChapters` 集 + `getChapterSummaryView`，镜像全书摘要）、删 `resetStuckSummaries`。契约 `{status,summary}` 不变 → IPC/renderer 零改动。 | ✅ | #9 P1（spec §2 / plan `…-p1-…`） |
 
 ### 已由竖切解决（存档，勿重复开）
 
