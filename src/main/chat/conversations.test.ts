@@ -66,7 +66,7 @@ describe("createConversation / getConversation / listConversationsByBook", () =>
 });
 
 describe("routeConversation", () => {
-  it("creates a new chapter conversation when none exists and there is no active one", () => {
+  it("no active → creates a new chapter conversation", () => {
     const db = freshDb();
     const { ch1 } = seedBookWithChapters(db);
     const r = routeConversation(db, {
@@ -80,7 +80,26 @@ describe("routeConversation", () => {
     expect(getConversation(db, r.conversationId)?.chapterId).toBe(ch1);
   });
 
-  it("appends to the active conversation when it is bound to the current chapter", () => {
+  it("no active (second call) → creates ANOTHER new conversation (no resurrect)", () => {
+    const db = freshDb();
+    const { ch1 } = seedBookWithChapters(db);
+    const r1 = routeConversation(db, {
+      bookId: "book-1",
+      currentChapterId: ch1,
+      activeConversationId: null,
+    });
+    const r2 = routeConversation(db, {
+      bookId: "book-1",
+      currentChapterId: ch1,
+      activeConversationId: null,
+    });
+    expect(r2.created).toBe(true);
+    expect(r2.switchedFromActive).toBe(false);
+    // Two distinct conversation ids — no find-or-create / resurrect
+    expect(r2.conversationId).not.toBe(r1.conversationId);
+  });
+
+  it("active same chapter → appends (created:false, switchedFromActive:false)", () => {
     const db = freshDb();
     const { ch1 } = seedBookWithChapters(db);
     const active = createConversation(db, { bookId: "book-1", chapterId: ch1 });
@@ -92,7 +111,7 @@ describe("routeConversation", () => {
     expect(r).toEqual({ conversationId: active.id, created: false, switchedFromActive: false });
   });
 
-  it("appends to the active conversation when it is independent (chapterId null)", () => {
+  it("active independent (chapterId null) → appends from any chapter", () => {
     const db = freshDb();
     const { ch1 } = seedBookWithChapters(db);
     const active = createConversation(db, { bookId: "book-1", chapterId: null });
@@ -102,40 +121,32 @@ describe("routeConversation", () => {
       activeConversationId: active.id,
     });
     expect(r.conversationId).toBe(active.id);
+    expect(r.created).toBe(false);
     expect(r.switchedFromActive).toBe(false);
   });
 
-  it("switches away from an active conversation bound to a different chapter (creating if needed)", () => {
+  it("active different chapter → creates NEW conversation (never reuses existing ch1 convo)", () => {
     const db = freshDb();
     const { ch1, ch2 } = seedBookWithChapters(db);
+    // Pre-existing ch1 conversation that should NOT be reused
+    const preExisting = createConversation(db, { bookId: "book-1", chapterId: ch1 });
+    // Active is on ch2
     const active = createConversation(db, { bookId: "book-1", chapterId: ch2 });
     const r = routeConversation(db, {
       bookId: "book-1",
       currentChapterId: ch1,
       activeConversationId: active.id,
     });
-    expect(r.conversationId).not.toBe(active.id);
     expect(r.created).toBe(true);
     expect(r.switchedFromActive).toBe(true);
     expect(getConversation(db, r.conversationId)?.chapterId).toBe(ch1);
+    // Must NOT reuse the pre-existing ch1 conversation
+    expect(r.conversationId).not.toBe(preExisting.id);
+    // Must NOT be the abandoned active (ch2) conversation
+    expect(r.conversationId).not.toBe(active.id);
   });
 
-  it("switches to an existing chapter conversation rather than creating a duplicate", () => {
-    const db = freshDb();
-    const { ch1, ch2 } = seedBookWithChapters(db);
-    const existing = createConversation(db, { bookId: "book-1", chapterId: ch1 });
-    const active = createConversation(db, { bookId: "book-1", chapterId: ch2 });
-    const r = routeConversation(db, {
-      bookId: "book-1",
-      currentChapterId: ch1,
-      activeConversationId: active.id,
-    });
-    expect(r.conversationId).toBe(existing.id);
-    expect(r.created).toBe(false);
-    expect(r.switchedFromActive).toBe(true);
-  });
-
-  it("treats a stale (nonexistent) activeConversationId as no active conversation", () => {
+  it("stale (nonexistent) activeConversationId → creates new, switchedFromActive:false", () => {
     const db = freshDb();
     const { ch1 } = seedBookWithChapters(db);
     const r = routeConversation(db, {
@@ -147,7 +158,7 @@ describe("routeConversation", () => {
     expect(r.switchedFromActive).toBe(false);
   });
 
-  it("flags switchedFromActive when the active conversation belongs to a different book", () => {
+  it("active belongs to a different book → creates new, switchedFromActive:false (different book = no live same-book active)", () => {
     const db = freshDb();
     const { ch1 } = seedBookWithChapters(db);
     db.insert(books).values({ id: "book-2" }).run();
@@ -158,7 +169,9 @@ describe("routeConversation", () => {
       activeConversationId: otherBookConvo.id,
     });
     expect(r.conversationId).not.toBe(otherBookConvo.id);
-    expect(r.switchedFromActive).toBe(true);
+    expect(r.created).toBe(true);
+    // Different book → not a live same-book active → no switchedFromActive
+    expect(r.switchedFromActive).toBe(false);
   });
 });
 
