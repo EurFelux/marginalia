@@ -1,4 +1,6 @@
 import path from "node:path";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { createDb, runMigrations } from "@main/db/client";
@@ -11,7 +13,14 @@ import {
   messages,
   progress,
 } from "@main/db/schema";
-import { getBook, importBook, listBooks, resolveChapterByHref } from "@main/library/repository";
+import {
+  deleteBook,
+  getBook,
+  importBook,
+  listBooks,
+  resolveChapterByHref,
+} from "@main/library/repository";
+import { storedEpubPath } from "@main/library/book-files";
 import { makeFixtureEpub } from "@marginalia/epub-parser";
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
@@ -98,5 +107,47 @@ describe("library repository", () => {
     expect(db.select().from(messages).all()).toHaveLength(0);
     // assistant 是共享资源，不随书删
     expect(db.select().from(assistants).all()).toHaveLength(1);
+  });
+
+  it("deleteBook removes the book (cascading dependents) and unlinks the owned file", async () => {
+    const db = freshDb();
+    const booksDir = await mkdtemp(path.join(tmpdir(), "marginalia-del-"));
+    try {
+      const book = importBook(db, { bytes: makeFixtureEpub() });
+      await writeFile(storedEpubPath(booksDir, book.id), new Uint8Array([1]));
+
+      await deleteBook(db, booksDir, book.id);
+
+      expect(listBooks(db)).toHaveLength(0);
+      expect(db.select().from(chapters).all()).toHaveLength(0); // 级联
+      await expect(readFile(storedEpubPath(booksDir, book.id))).rejects.toMatchObject({
+        code: "ENOENT",
+      }); // 文件已删
+    } finally {
+      await rm(booksDir, { recursive: true, force: true });
+    }
+  });
+
+  it("deleteBook tolerates an already-missing file (best-effort unlink)", async () => {
+    const db = freshDb();
+    const booksDir = await mkdtemp(path.join(tmpdir(), "marginalia-del-"));
+    try {
+      const book = importBook(db, { bytes: makeFixtureEpub() }); // 未写文件
+      await expect(deleteBook(db, booksDir, book.id)).resolves.toBeUndefined();
+      expect(listBooks(db)).toHaveLength(0);
+    } finally {
+      await rm(booksDir, { recursive: true, force: true });
+    }
+  });
+
+  it("deleteBook is idempotent — deleting a non-existent book is a no-op (no throw)", async () => {
+    const db = freshDb();
+    const booksDir = await mkdtemp(path.join(tmpdir(), "marginalia-del-"));
+    try {
+      await expect(deleteBook(db, booksDir, "urn:uuid:does-not-exist")).resolves.toBeUndefined();
+      expect(listBooks(db)).toHaveLength(0);
+    } finally {
+      await rm(booksDir, { recursive: true, force: true });
+    }
   });
 });

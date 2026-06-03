@@ -16,7 +16,7 @@ import {
 } from "@shared/library";
 import type { TocNode } from "@shared/types";
 import { getBooksDir, getDb } from "@main/db/instance";
-import { getBook, importBook, listBooks } from "@main/library/repository";
+import { deleteBook, getBook, importBook, listBooks } from "@main/library/repository";
 import { readEpubFile, writeEpubFile } from "@main/library/book-files";
 import { getProgress, saveProgress } from "@main/library/progress";
 import { getToc, listChapters, readChapterText } from "@main/library/content";
@@ -69,6 +69,10 @@ export function registerLibraryHandlers(): void {
 
   handle<{ bookId: string }, Uint8Array>(IPC.libraryReadEpubBytes, bookIdInput, (input) =>
     readEpubFile(getBooksDir(), input.bookId),
+  );
+
+  handle<{ bookId: string }, void>(IPC.libraryDelete, bookIdInput, (input) =>
+    deleteBook(getDb(), getBooksDir(), input.bookId),
   );
 
   handle<{ bookId: string }, { cfi: string } | null>(IPC.progressGet, bookIdInput, (input) => {

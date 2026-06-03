@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { parseEpub, type TocNode } from "@marginalia/epub-parser";
 import type { DB } from "@main/db/client";
 import { books, chapters } from "@main/db/schema";
+import { deleteEpubFile } from "@main/library/book-files";
 
 export interface ImportInput {
   bytes: Uint8Array;
@@ -68,4 +69,14 @@ export function resolveChapterByHref(db: DB, bookId: string, href: string): Chap
     .from(chapters)
     .where(and(eq(chapters.bookId, bookId), eq(chapters.href, href)))
     .get();
+}
+
+/**
+ * 删书：先删 DB 行（真相源；依赖行靠 FK ON DELETE CASCADE 自动清，P3a），再 best-effort 删自有副本文件。
+ * 顺序不可反——指向已删文件的 DB 行 = 打不开的鬼书，比无主文件（可 GC）更糟（DD-§1.3）。
+ * 幂等：删不存在的书是 no-op（DELETE 命中 0 行 + unlink 吞 ENOENT），不抛——契合删书 UI 的重复点击 / 乐观删除竞态。
+ */
+export async function deleteBook(db: DB, booksDir: string, bookId: string): Promise<void> {
+  db.delete(books).where(eq(books.id, bookId)).run();
+  await deleteEpubFile(booksDir, bookId);
 }

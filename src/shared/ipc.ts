@@ -9,6 +9,7 @@ export const IPC = {
   libraryGet: "library:get",
   libraryPickEpub: "library:pick-epub",
   libraryReadEpubBytes: "library:read-epub-bytes",
+  libraryDelete: "library:delete",
   progressGet: "progress:get",
   progressSave: "progress:save",
   contentToc: "content:toc",
