@@ -10,6 +10,8 @@ packages:
 #   原生件（electron/better-sqlite3/esbuild）需编译故 true；core-js/es5-ext 的 postinstall
 #   只是募捐/广告信息（非功能必需），故 false——既挡掉无谓的第三方安装脚本，又消除 pnpm 的
 #   ERR_PNPM_IGNORED_BUILDS（epubjs 引入这两个传递依赖）。
+#   fs-xattr/macos-alias 是 maker-dmg → appdmg 的原生依赖（DMG 内 /Applications 别名与
+#   扩展属性），跑在 Forge CLI 的系统 Node 里（非 Electron），需编译故 true。
 # blockExoticSubdeps: false 允许 @electron/node-gyp 等 git 子依赖。
 nodeLinker: hoisted
 blockExoticSubdeps: false
@@ -21,3 +23,5 @@ allowBuilds:
   core-js: false
   es5-ext: false
   "@swc/core": true
+  fs-xattr: true
+  macos-alias: true
