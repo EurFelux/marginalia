@@ -142,6 +142,8 @@ describe("runSend", () => {
       .map((p) => p.text)
       .join("");
     expect(assistantText).toContain("It means hello.");
+    expect(msgs[1].status).toBe("complete");
+    expect(msgs[1].metadata?.usage).toEqual({ inputTokens: 1, outputTokens: 1 });
     expect(r.created).toBe(true);
   });
 
@@ -163,7 +165,7 @@ describe("runSend", () => {
     expect(JSON.stringify(assistant.parts)).toContain("Chapter One");
   });
 
-  it("does not persist an assistant message when streaming errors", async () => {
+  it("persists an error-status assistant message when streaming errors", async () => {
     const failModel = new MockLanguageModelV3({
       doStream: async () => {
         throw new Error("stream boom");
@@ -174,8 +176,11 @@ describe("runSend", () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     await r.finished;
-    const roles = listMessages(db, r.conversationId).map((m) => m.role);
-    expect(roles).toEqual(["user"]);
+    const msgs = listMessages(db, r.conversationId);
+    expect(msgs.map((m) => m.role)).toEqual(["user", "assistant"]); // 不再是孤儿 user turn
+    const assistant = msgs[1];
+    expect(assistant.status).toBe("error");
+    expect(assistant.metadata?.error?.message).toContain("stream boom");
   });
 
   it("injects a ready chapter summary into the prompt", async () => {
@@ -223,6 +228,32 @@ describe("runSend", () => {
     await r.finished;
     // 正常路径：user + assistant 两条都落库
     expect(listMessages(db, r.conversationId)).toHaveLength(2);
+  });
+
+  it("persists an aborted-status assistant message when the signal aborts mid-stream", async () => {
+    const controller = new AbortController();
+    // 延迟分片：abort 在分片尚未发完时触发 → onFinish 收 isAborted=true。
+    const slowModel = new MockLanguageModelV3({
+      doStream: async () => ({
+        stream: simulateReadableStream({
+          chunkDelayInMs: 50,
+          chunks: [
+            { type: "text-start", id: "t1" },
+            { type: "text-delta", id: "t1", delta: "partial" },
+            { type: "text-end", id: "t1" },
+            finishChunk("stop"),
+          ],
+        }),
+      }),
+    });
+    const { db, book, ch1, deps } = setup({ ok: true, model: slowModel, modelId: "mock" });
+    const r = runSend(deps, input(book.id, ch1.id), { abortSignal: controller.signal });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    controller.abort(); // runSend 同步返回后立即中止，分片仍在 50ms 延迟途中
+    await r.finished;
+    const assistant = listMessages(db, r.conversationId).find((m) => m.role === "assistant");
+    expect(assistant?.status).toBe("aborted");
   });
 
   it("omits the paragraph chip from the snapshot when it duplicates the conversation's last", async () => {

@@ -1,5 +1,11 @@
 // src/main/ai/send.ts
-import { stepCountIs, streamText, type ModelMessage, type UIMessageChunk } from "ai";
+import {
+  stepCountIs,
+  streamText,
+  type LanguageModelUsage,
+  type ModelMessage,
+  type UIMessageChunk,
+} from "ai";
 import { and, eq } from "drizzle-orm";
 import type { DB } from "@main/db/client";
 import { chapters } from "@main/db/schema";
@@ -115,6 +121,8 @@ export function runSend(
 
   // 8. streamText + tools + agent 循环
   const tools = createReadingTools({ db, bookId: input.bookId, loadBytes });
+  // 从 streamText 自身的 onFinish 旁路捕获跨步聚合用量（toUIMessageStream 的 onFinish 不带 usage）。
+  let capturedUsage: LanguageModelUsage | undefined;
   const result = streamText({
     model: resolved.model,
     system: systemPrompt,
@@ -122,36 +130,50 @@ export function runSend(
     tools,
     stopWhen: stepCountIs(stepLimit ?? 5),
     abortSignal: opts?.abortSignal,
+    onFinish: ({ totalUsage }) => {
+      capturedUsage = totalUsage;
+    },
   });
 
-  // 9. 完成时落 assistant 消息；出错不落半截
+  // 9. 一轮终止时落 assistant 消息——出生即终态（complete|error|aborted），设计文档 §3 / DD-§3.1 / DD-§3.2。
   let resolveDone!: () => void;
   const finished = new Promise<void>((res) => {
     resolveDone = res;
   });
 
-  // 创建 UI 流：onFinish 在流被完全消费时触发。
-  // 我们需要驱动这条流（而不是 result.consumeStream()），否则 onFinish 不会触发。
-  // tee 出两条流：一条内部消费（驱动 onFinish），一条暴露给调用方。
-  // 用标志追踪流中是否出现错误：streamText 遇到 doStream 错误时会发 error 类型 chunk
-  // 并正常关闭流（isAborted 仍为 false），因此需单独标志跳过 assistant 消息落库。
+  // streamText 遇 doStream 错误时发 error chunk 并正常关流（isAborted 仍 false），故用 streamHadError 标志区分；
+  // 用户中止经 abortSignal → onFinish 的 isAborted=true（SDK 权威信号，非嗅探 AbortError，DD-§3.2）。
+  // 两种终止都补落带终态的 assistant（不再用双守卫跳过 → 不再产生孤儿 user turn）。
   let streamHadError = false;
+  let errorInfo: { name: string; message: string } | undefined;
   const uiStream = result.toUIMessageStream({
     onError: (err) => {
       streamHadError = true;
+      errorInfo = {
+        name: err instanceof Error ? err.name : "Error",
+        message: err instanceof Error ? err.message : String(err),
+      };
       console.warn("[send] stream/model error:", err);
-      // onError 要求返回 string（作为 error chunk 的 errorText）
-      return err instanceof Error ? err.message : String(err);
+      // onError 要求返回 string（作为 error chunk 的 errorText，供 renderer 实时显示）
+      return errorInfo.message;
     },
     onFinish: ({ responseMessage, isAborted }) => {
-      if (!isAborted && !streamHadError) {
-        appendMessage(db, {
-          conversationId,
-          role: "assistant",
-          parts: responseMessage.parts,
-          metadata: { model: resolved.modelId },
-        });
-      }
+      const status = streamHadError ? "error" : isAborted ? "aborted" : "complete";
+      const usage =
+        capturedUsage?.inputTokens != null && capturedUsage.outputTokens != null
+          ? { inputTokens: capturedUsage.inputTokens, outputTokens: capturedUsage.outputTokens }
+          : undefined;
+      appendMessage(db, {
+        conversationId,
+        role: "assistant",
+        parts: responseMessage.parts, // 完整 / 中止前的 partial / 报错前已流出
+        status,
+        metadata: {
+          model: resolved.modelId,
+          usage,
+          error: streamHadError ? errorInfo : undefined,
+        },
+      });
     },
   });
 
@@ -167,8 +189,8 @@ export function runSend(
       }
     } catch (err) {
       // 防御性：仅当 UI 流在迭代中真正 reject 时到这（如 onFinish 内 appendMessage DB 写入抛错）。
-      // 正常的 doStream 抛错由 SDK 转成 error chunk 并正常关流、已被 streamHadError 拦截，不会进这里；
-      // 本里程碑未接 abortSignal，故亦无 user-abort 路径。记日志以便排查 DB 落库失败。
+      // 正常的 doStream 抛错（→ error chunk）与用户 abort（→ onFinish isAborted）都正常关流、
+      // 在 onFinish 落终态 assistant 消息，不会进这里。记日志以便排查 DB 落库失败。
       console.warn("[send] assistant persist / stream drain failed:", err);
     } finally {
       // 无论成功/错误，都 resolve finished，避免上层 await 永挂
