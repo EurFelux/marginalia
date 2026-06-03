@@ -258,9 +258,28 @@ git commit -m "feat(renderer): add readerLayout state to prefs-store with hydrat
 
 - [ ] **Step 1: 改 chat-store 与其测试**
 
-`src/renderer/store/chat-store.ts`：删 `ChatState.panelOpen`、`ChatActions.setPanelOpen`、`CHAT_INITIAL.panelOpen`、store 体的 `setPanelOpen` 实现——四处整行删除，其余不动。
+`src/renderer/store/chat-store.ts`：
 
-`src/renderer/store/chat-store.test.ts`：整块删除用例：
+① 删 `ChatState.panelOpen`、`ChatActions.setPanelOpen`、`CHAT_INITIAL.panelOpen`、store 体的 `setPanelOpen` 实现——四处整行删除。
+
+② **`openConversation` 的「开面板」语义保留**（main 上新增：重开历史会话要自动弹出面板）——其 `set()` 内的 `panelOpen: true,` 一行删除，改为在 `set()` 之前跨 store 调用。整个 action 改为：
+
+```ts
+  openConversation: (id, chapterId) => {
+    usePrefsStore.getState().updateLayout({ panelOpen: true });
+    return set((s) => ({
+      activeConversationId: id,
+      activeConversationChapterId: chapterId,
+      openCommand: { conversationId: id, nonce: (s.openCommand?.nonce ?? 0) + 1 },
+    }));
+  },
+```
+
+并加 import：`import { usePrefsStore } from "@renderer/store/prefs-store";`（无循环依赖——prefs-store 只 import persist-preference 与 types；persistPreference 在无 `window` 的 headless 测试里自动 no-op）。action 上方注释同步改为：`/** 重开会话：发命令信号（触发载历史）+ 设 active（高亮）+ 开面板（经 prefs-store 布局）。 */`
+
+`src/renderer/store/chat-store.test.ts`：
+
+① 整块删除用例：
 
 ```ts
 it("setPanelOpen toggles", () => {
@@ -269,9 +288,28 @@ it("setPanelOpen toggles", () => {
 });
 ```
 
-- [ ] **Step 2: 迁移 5 个消费方**
+② `describe("openConversation")` 两条用例改为断言 prefs-store（`panelOpen` 已不在 chat-store）。文件顶部加 import 与重置：
 
-① `src/renderer/ai/use-ai-actions.ts`：加 import `import { usePrefsStore } from "@renderer/store/prefs-store";`；解构行改为 `const { setDraftChips, setDraftText } = useChatStore.getState();`；`setPanelOpen(true);` 一行改为：
+```ts
+import { usePrefsStore, PREFS_INITIAL } from "@renderer/store/prefs-store";
+
+beforeEach(() => {
+  useChatStore.setState(CHAT_INITIAL);
+  usePrefsStore.setState(PREFS_INITIAL);
+});
+```
+
+（原 `beforeEach(() => useChatStore.setState(CHAT_INITIAL));` 替换为上面块。）两条用例中的 `expect(s1.panelOpen).toBe(true);` / `expect(s.panelOpen).toBe(true);` 均改为：
+
+```ts
+expect(usePrefsStore.getState().layout.panelOpen).toBe(true);
+```
+
+（用例内自带的 `useChatStore.setState(CHAT_INITIAL);` 行可顺手删——beforeEach 已覆盖。）
+
+- [ ] **Step 2: 迁移 5 个组件/hook 消费方**
+
+① `src/renderer/ai/use-ai-actions.ts`：加 import `import { usePrefsStore } from "@renderer/store/prefs-store";`；解构行（现第 24 行）改为 `const { setDraftChips, setDraftText } = useChatStore.getState();`；`setPanelOpen(true);`（现第 47 行）改为：
 
 ```ts
 usePrefsStore.getState().updateLayout({ panelOpen: true });
@@ -291,7 +329,7 @@ const panelOpen = usePrefsStore((s) => s.layout.panelOpen);
 const updateLayout = usePrefsStore((s) => s.updateLayout);
 ```
 
-关闭按钮 `onClick={() => setPanelOpen(false)}` 改为 `onClick={() => updateLayout({ panelOpen: false })}`。（`useChatStore` import 保留——`setActiveConversation` 仍用。）
+关闭按钮 `onClick={() => setPanelOpen(false)}`（现第 111 行）改为 `onClick={() => updateLayout({ panelOpen: false })}`。（`useChatStore` import 保留——`setActiveConversation`/`openCommand`/`activeConversationId` 仍用。）
 
 ④ `src/renderer/ai/SummaryPill.tsx`：`import { useChatStore } from "@renderer/store/chat-store";` 整行换为 `import { usePrefsStore } from "@renderer/store/prefs-store";`；`const panelOpen = useChatStore((s) => s.panelOpen);` 改为：
 
