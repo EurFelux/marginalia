@@ -15,7 +15,7 @@ const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
 function freshDb() {
   const db = createDb(":memory:");
   runMigrations(db, MIGRATIONS);
-  db.insert(books).values({ id: "book-1", path: "/tmp/a.epub" }).run();
+  db.insert(books).values({ id: "book-1" }).run();
   return db;
 }
 

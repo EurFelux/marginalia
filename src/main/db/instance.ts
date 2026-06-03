@@ -24,3 +24,8 @@ export function getDb(): DB {
   if (!db) throw new Error("DB not initialized");
   return db;
 }
+
+/** app 自有 ePub 副本根目录（Electron glue）。纯函数层通过此值注入 booksDir。 */
+export function getBooksDir(): string {
+  return path.join(app.getPath("userData"), "books");
+}

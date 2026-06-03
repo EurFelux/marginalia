@@ -20,7 +20,7 @@ function freshDb() {
 }
 
 function seedBookWithChapters(db: ReturnType<typeof freshDb>) {
-  db.insert(books).values({ id: "book-1", path: "/tmp/a.epub" }).run();
+  db.insert(books).values({ id: "book-1" }).run();
   const ch1 = db
     .insert(chapters)
     .values({ bookId: "book-1", href: "c1.html", orderIndex: 0, title: "Ch 1" })
@@ -149,7 +149,7 @@ describe("routeConversation", () => {
   it("flags switchedFromActive when the active conversation belongs to a different book", () => {
     const db = freshDb();
     const { ch1 } = seedBookWithChapters(db);
-    db.insert(books).values({ id: "book-2", path: "/tmp/b.epub" }).run();
+    db.insert(books).values({ id: "book-2" }).run();
     const otherBookConvo = createConversation(db, { bookId: "book-2", chapterId: null });
     const r = routeConversation(db, {
       bookId: "book-1",

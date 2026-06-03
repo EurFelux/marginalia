@@ -51,7 +51,6 @@ export const assistants = sqliteTable("assistants", {
 
 export const books = sqliteTable("books", {
   id: text("id").primaryKey(), // ePub 自然键，由导入流程提供（标识符缺失时回退文件哈希）
-  path: text("path").notNull(),
   title: text("title"),
   author: text("author"),
   cover: blob("cover", { mode: "buffer" }),

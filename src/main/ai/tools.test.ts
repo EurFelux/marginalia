@@ -13,7 +13,7 @@ function setup() {
   const db = createDb(":memory:");
   runMigrations(db, MIGRATIONS);
   const bytes = makeFixtureEpub();
-  const book = importBook(db, { bytes, filePath: "/b.epub" });
+  const book = importBook(db, { bytes });
   const loadBytes: LoadBytes = async () => bytes;
   const tools = createReadingTools({ db, bookId: book.id, loadBytes });
   const ch1 = resolveChapterByHref(db, book.id, "OEBPS/ch1.xhtml")!;

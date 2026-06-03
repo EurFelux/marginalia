@@ -94,7 +94,7 @@ function setup(model: ResolvedModel) {
   const db = createDb(":memory:");
   runMigrations(db, MIGRATIONS);
   const bytes = makeFixtureEpub();
-  const book = importBook(db, { bytes, filePath: "/b.epub" });
+  const book = importBook(db, { bytes });
   const ch1 = resolveChapterByHref(db, book.id, "OEBPS/ch1.xhtml")!;
   const loadBytes: LoadBytes = async () => bytes;
   const deps: SendDeps = { db, loadBytes, resolveModel: () => model };
@@ -206,7 +206,6 @@ describe("runSend", () => {
     // 另一本书的章节：chapters.id 合法（FK 不报错）但不属于 book
     const otherBook = importBook(db, {
       bytes: makeFixtureEpub({ identifier: "urn:uuid:other-book" }),
-      filePath: "/other.epub",
     });
     const otherCh = resolveChapterByHref(db, otherBook.id, "OEBPS/ch1.xhtml")!;
     const r = runSend(deps, input(book.id, otherCh.id));

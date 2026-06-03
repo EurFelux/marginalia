@@ -1,30 +1,33 @@
-import { describe, expect, it, vi } from "vitest";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createLoadBytes } from "@main/ai/send-deps";
-import type { DB } from "@main/db/client";
-
-const fakeDb = (_path: string | null) =>
-  ({
-    /* 仅供 getBook 经由 select().from().where().get() 使用，见下方 mock */
-  }) as unknown as DB;
-
-vi.mock("@main/library/repository", () => ({
-  getBook: (_db: unknown, id: string) =>
-    id === "known" ? { id, path: "/tmp/marginalia-test.epub" } : undefined,
-}));
-
-vi.mock("node:fs/promises", () => ({
-  readFile: vi.fn(async () => Buffer.from([1, 2, 3])),
-}));
+import { storedEpubPath } from "@main/library/book-files";
 
 describe("createLoadBytes", () => {
-  it("reads bytes for a known book", async () => {
-    const loadBytes = createLoadBytes(fakeDb("/tmp/marginalia-test.epub"));
-    const bytes = await loadBytes("known");
+  let dir: string;
+  beforeEach(async () => {
+    dir = await mkdtemp(path.join(tmpdir(), "marginalia-send-deps-"));
+  });
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("reads bytes for a book whose epub file exists", async () => {
+    const bookId = "known-book";
+    const expectedBytes = new Uint8Array([1, 2, 3]);
+    await writeFile(storedEpubPath(dir, bookId), expectedBytes);
+
+    const loadBytes = createLoadBytes(dir);
+    const bytes = await loadBytes(bookId);
     expect(bytes).toBeInstanceOf(Uint8Array);
     expect(Array.from(bytes)).toEqual([1, 2, 3]);
   });
-  it("throws for an unknown book", async () => {
-    const loadBytes = createLoadBytes(fakeDb(null));
-    await expect(loadBytes("missing")).rejects.toThrow(/missing/);
+
+  it("throws EpubFileMissingError for a book whose epub file is absent", async () => {
+    const loadBytes = createLoadBytes(dir);
+    const { EpubFileMissingError } = await import("@main/library/book-files");
+    await expect(loadBytes("missing")).rejects.toBeInstanceOf(EpubFileMissingError);
   });
 });

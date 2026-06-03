@@ -8,7 +8,7 @@ import { listChapters, readChapterText } from "@main/library/content";
 import { getChapterSummaryView } from "@main/ai/summary";
 import { resolveChapterByHref } from "@main/library/repository";
 
-/** 取某书原始字节（生产实现读 books.path；测试注入 fixture 字节）。 */
+/** 取某书原始字节（生产实现读 app 自有派生路径；测试注入 fixture 字节）。 */
 export type LoadBytes = (bookId: string) => Promise<Uint8Array>;
 
 export interface ReadingToolsDeps {

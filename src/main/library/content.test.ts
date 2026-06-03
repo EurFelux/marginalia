@@ -11,7 +11,7 @@ const setup = () => {
   const db = createDb(":memory:");
   runMigrations(db, MIGRATIONS);
   const bytes = makeFixtureEpub();
-  const book = importBook(db, { bytes, filePath: "/b.epub" });
+  const book = importBook(db, { bytes });
   return { db, bytes, book };
 };
 

@@ -6,7 +6,6 @@ import { books, chapters } from "@main/db/schema";
 
 export interface ImportInput {
   bytes: Uint8Array;
-  filePath: string;
 }
 export type BookRow = typeof books.$inferSelect;
 export type ChapterRow = typeof chapters.$inferSelect;
@@ -32,7 +31,6 @@ export function importBook(db: DB, input: ImportInput): BookRow {
     tx.insert(books)
       .values({
         id,
-        path: input.filePath,
         title: parsed.title ?? null,
         author: parsed.author ?? null,
         cover: parsed.cover ? Buffer.from(parsed.cover) : null,

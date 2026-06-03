@@ -67,7 +67,7 @@ function setup(model: ResolvedModel) {
   const db = createDb(":memory:");
   runMigrations(db, MIGRATIONS);
   const bytes = makeFixtureEpub();
-  const book = importBook(db, { bytes, filePath: "/b.epub" });
+  const book = importBook(db, { bytes });
   const ch1 = resolveChapterByHref(db, book.id, "OEBPS/ch1.xhtml")!;
   const loadBytes: LoadBytes = async () => bytes;
   const deps: SummaryDeps = { db, loadBytes, resolveModel: () => model };

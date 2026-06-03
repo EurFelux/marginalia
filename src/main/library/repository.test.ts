@@ -24,10 +24,9 @@ const freshDb = () => {
 describe("library repository", () => {
   it("imports a book and persists metadata + ordered chapters (pending)", () => {
     const db = freshDb();
-    const book = importBook(db, { bytes: makeFixtureEpub(), filePath: "/books/fixture.epub" });
+    const book = importBook(db, { bytes: makeFixtureEpub() });
     expect(book.id).toBe("urn:uuid:fixture-001");
     expect(book.title).toBe("Fixture Book");
-    expect(getBook(db, book.id)?.path).toBe("/books/fixture.epub");
     expect(listBooks(db)).toHaveLength(1);
 
     const ch1 = resolveChapterByHref(db, book.id, "OEBPS/ch1.xhtml");
@@ -44,7 +43,6 @@ describe("library repository", () => {
     const db = freshDb();
     const book = importBook(db, {
       bytes: makeFixtureEpub({ identifier: null }),
-      filePath: "/no-id.epub",
     });
     expect(book.id).toMatch(/^[0-9a-f]{64}$/);
     expect(getBook(db, book.id)).toBeDefined();
@@ -54,12 +52,12 @@ describe("library repository", () => {
     const db = freshDb();
     const bytes = makeFixtureEpub();
 
-    const book1 = importBook(db, { bytes, filePath: "/books/fixture.epub" });
+    const book1 = importBook(db, { bytes });
     const ch1AfterFirst = resolveChapterByHref(db, book1.id, "OEBPS/ch1.xhtml");
     const ch1Id = ch1AfterFirst?.id;
 
     // Second import of the same bytes
-    const book2 = importBook(db, { bytes, filePath: "/books/fixture.epub" });
+    const book2 = importBook(db, { bytes });
 
     expect(listBooks(db)).toHaveLength(1);
     const ch1AfterSecond = resolveChapterByHref(db, book2.id, "OEBPS/ch1.xhtml");
@@ -70,13 +68,13 @@ describe("library repository", () => {
 
   it("resolveChapterByHref returns undefined for a missing href", () => {
     const db = freshDb();
-    const book = importBook(db, { bytes: makeFixtureEpub(), filePath: "/books/fixture.epub" });
+    const book = importBook(db, { bytes: makeFixtureEpub() });
     expect(resolveChapterByHref(db, book.id, "OEBPS/nonexistent.xhtml")).toBeUndefined();
   });
 
   it("ON DELETE CASCADE removes all book-owned dependents", () => {
     const db = freshDb();
-    const book = importBook(db, { bytes: makeFixtureEpub(), filePath: "/b.epub" });
+    const book = importBook(db, { bytes: makeFixtureEpub() });
     const ch1 = resolveChapterByHref(db, book.id, "OEBPS/ch1.xhtml")!;
     const assistantId = db.insert(assistants).values({ name: "A" }).returning().get().id;
     db.insert(progress).values({ bookId: book.id, cfi: "epubcfi(/6/2)" }).run();

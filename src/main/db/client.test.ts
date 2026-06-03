@@ -61,7 +61,7 @@ describe("db client", () => {
   it("enforces UNIQUE(book_id, href) on chapters", () => {
     const db = createDb(":memory:");
     runMigrations(db, MIGRATIONS);
-    db.insert(books).values({ id: "b1", path: "/b.epub" }).run();
+    db.insert(books).values({ id: "b1" }).run();
     db.insert(chapters).values({ bookId: "b1", href: "ch1.xhtml" }).run();
     expect(() => db.insert(chapters).values({ bookId: "b1", href: "ch1.xhtml" }).run()).toThrow();
   });

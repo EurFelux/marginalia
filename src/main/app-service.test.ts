@@ -21,7 +21,7 @@ describe("app-service", () => {
   it("getAppInfo counts inserted books", () => {
     const db = createDb(":memory:");
     runMigrations(db, MIGRATIONS);
-    db.insert(books).values({ id: "b1", path: "/tmp/a.epub" }).run();
+    db.insert(books).values({ id: "b1" }).run();
     expect(getAppInfo(db, "1.0.0").bookCount).toBe(1);
   });
 });

@@ -15,9 +15,9 @@ import {
   type ChapterTextSlice,
 } from "@shared/library";
 import type { TocNode } from "@shared/types";
-import { getDb } from "@main/db/instance";
+import { getBooksDir, getDb } from "@main/db/instance";
 import { getBook, importBook, listBooks } from "@main/library/repository";
-import { readBookBytes } from "@main/library/book-bytes";
+import { readEpubFile, writeEpubFile } from "@main/library/book-files";
 import { getProgress, saveProgress } from "@main/library/progress";
 import { getToc, listChapters, readChapterText } from "@main/library/content";
 import {
@@ -29,16 +29,10 @@ import {
 import { makeSummaryDeps } from "@main/ai/send-deps";
 import { handle } from "@main/ipc/registry";
 
-const toDto = (b: {
-  id: string;
-  title: string | null;
-  author: string | null;
-  path: string;
-}): BookSummaryDto => ({
+const toDto = (b: { id: string; title: string | null; author: string | null }): BookSummaryDto => ({
   id: b.id,
   title: b.title,
   author: b.author,
-  path: b.path,
 });
 
 export function registerLibraryHandlers(): void {
@@ -50,7 +44,9 @@ export function registerLibraryHandlers(): void {
         throw new Error(`Cannot read epub file at "${input.filePath}": ${err.code ?? err.message}`);
       });
       const bytes = new Uint8Array(buf);
-      return toDto(importBook(getDb(), { bytes, filePath: input.filePath }));
+      const book = importBook(getDb(), { bytes });
+      await writeEpubFile(getBooksDir(), book.id, bytes); // 复制进 app 自有位置（relink/重导即覆盖）
+      return toDto(book);
     },
   );
 
@@ -72,7 +68,7 @@ export function registerLibraryHandlers(): void {
   });
 
   handle<{ bookId: string }, Uint8Array>(IPC.libraryReadEpubBytes, bookIdInput, (input) =>
-    readBookBytes(getDb(), input.bookId),
+    readEpubFile(getBooksDir(), input.bookId),
   );
 
   handle<{ bookId: string }, { cfi: string } | null>(IPC.progressGet, bookIdInput, (input) => {
@@ -144,12 +140,9 @@ export function registerLibraryHandlers(): void {
     const db = getDb();
     const book = getBook(db, input.bookId);
     if (!book) throw new Error(`content: book ${input.bookId} not found`);
-    const buf = await readFile(book.path).catch((err: NodeJS.ErrnoException) => {
-      throw new Error(
-        `Cannot read epub for book "${input.bookId}" at "${book.path}": ${err.code ?? err.message}. The file may have been moved or deleted.`,
-      );
-    });
-    const bytes = new Uint8Array(buf);
+    // readEpubFile 缺失即抛 EpubFileMissingError（message 已含 bookId），其他 OS 错误原样透传——
+    // 不再包一层「可能缺失/重新导入」的笼统文案（对非缺失错误属编造），与 readEpubBytes handler 一致。
+    const bytes = await readEpubFile(getBooksDir(), input.bookId);
     return readChapterText(db, bytes, input.bookId, input.chapterId, {
       offset: input.offset,
       maxChars: input.maxChars,

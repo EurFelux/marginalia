@@ -25,7 +25,7 @@ function seedAssistant(db: ReturnType<typeof freshDb>): string {
 }
 
 function seedConversation(db: ReturnType<typeof freshDb>): string {
-  db.insert(books).values({ id: "book-1", path: "/tmp/a.epub" }).run();
+  db.insert(books).values({ id: "book-1" }).run();
   const row = db
     .insert(conversations)
     .values({ bookId: "book-1", chapterId: null, assistantId: seedAssistant(db) })
@@ -90,7 +90,7 @@ describe("appendMessage / listMessages", () => {
 
   it("keeps seq independent per conversation", () => {
     const db = freshDb();
-    db.insert(books).values({ id: "book-1", path: "/tmp/a.epub" }).run();
+    db.insert(books).values({ id: "book-1" }).run();
     const assistantId = seedAssistant(db);
     const a = db
       .insert(conversations)

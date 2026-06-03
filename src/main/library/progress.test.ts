@@ -9,7 +9,7 @@ const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
 const setup = () => {
   const db = createDb(":memory:");
   runMigrations(db, MIGRATIONS);
-  const book = importBook(db, { bytes: makeFixtureEpub(), filePath: "/b.epub" });
+  const book = importBook(db, { bytes: makeFixtureEpub() });
   return { db, book };
 };
 
