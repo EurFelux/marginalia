@@ -8,6 +8,8 @@ export const qk = {
   annotations: (bookId: string) => ["annotations", bookId] as const,
   chapterSummary: (bookId: string, chapterId: string) =>
     ["chapter-summary", bookId, chapterId] as const,
+  book: (bookId: string) => ["book", bookId] as const,
+  bookSummary: (bookId: string) => ["book-summary", bookId] as const,
   providers: ["providers"] as const,
   assistantDefault: ["assistant", "default"] as const,
   conversations: (bookId: string) => ["conversations", bookId] as const,
