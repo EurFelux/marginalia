@@ -99,7 +99,9 @@
   --muted-foreground: oklch(0.705 0.015 286.067);
   --accent: oklch(0.274 0.006 286.033);
   --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.396 0.141 25.723);
+  /* 暗色 destructive 调亮以保证文字可访问性（text-destructive 压在近黑表面上）：
+     旧值 oklch(0.396 …) L 太低、对比不足；改用 shadcn neutral 现行暗色值（L≈0.70）。 */
+  --destructive: oklch(0.704 0.191 22.216);
   --destructive-foreground: oklch(0.637 0.237 25.331);
   --border: oklch(0.274 0.006 286.033);
   --input: oklch(0.274 0.006 286.033);
