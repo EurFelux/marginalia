@@ -2,11 +2,11 @@
   "name": "marginalia",
   "version": "1.0.0",
   "private": true,
-  "description": "My Electron application description",
+  "description": "Desktop ePub AI reader — select a passage and chat with a context-aware assistant in the margins.",
   "keywords": [],
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "author": {
-    "name": "icarus",
+    "name": "eurfelux",
     "email": "eurfelux@gmail.com"
   },
   "main": ".vite/build/main.js",
