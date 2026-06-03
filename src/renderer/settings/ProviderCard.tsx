@@ -1,4 +1,6 @@
-import { Pencil, PlugZap, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { Check, Pencil, PlugZap, Trash2, X } from "lucide-react";
 import type { ProviderDto } from "@shared/providers";
 import { PROVIDER_TYPE_LABEL } from "@shared/providers";
 import { Button } from "@renderer/components/ui/button";
@@ -9,17 +11,27 @@ function keyText(p: ProviderDto): string {
   return "未配置";
 }
 
+/**
+ * 单个 provider 卡片。测试连接是**卡片自有**状态（本地 mutation + 就地显示），不写共享 testResult——
+ * 否则会和「对话模型」区的测试结果互相覆盖、显示串位（见 RA5 review）。无模型时禁用测试（避免空 model 触发后端校验错）。
+ */
 export function ProviderCard({
   provider,
   onEdit,
-  onTest,
   onRemove,
 }: {
   provider: ProviderDto;
   onEdit: () => void;
-  onTest: () => void;
   onRemove: () => void;
 }) {
+  const [result, setResult] = useState<{ ok: boolean; message?: string } | null>(null);
+  const test = useMutation({
+    mutationFn: () =>
+      window.api.settings.providers.test({ id: provider.id, model: provider.models[0] ?? "" }),
+    onSuccess: (r) => setResult(r.ok ? { ok: true } : { ok: false, message: r.message }),
+    onError: (e) => setResult({ ok: false, message: (e as Error).message }),
+  });
+
   return (
     <div className="rounded-lg border border-border p-3">
       <div className="flex items-center justify-between gap-2">
@@ -33,7 +45,14 @@ export function ProviderCard({
           <Button variant="ghost" size="sm" onClick={onEdit} aria-label="编辑">
             <Pencil className="size-4" />
           </Button>
-          <Button variant="ghost" size="sm" onClick={onTest} aria-label="测试">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => test.mutate()}
+            disabled={provider.models.length === 0 || test.isPending}
+            aria-label="测试连接"
+            title={provider.models.length === 0 ? "先添加模型再测试" : "测试连接"}
+          >
             <PlugZap className="size-4" />
           </Button>
           <Button variant="ghost" size="sm" onClick={onRemove} aria-label="移除">
@@ -46,6 +65,29 @@ export function ProviderCard({
         <span>🔑 {keyText(provider)}</span>
         <span className="ml-2">· {provider.models.length} 个模型</span>
       </div>
+      {(test.isPending || result) && (
+        <p
+          className={
+            test.isPending
+              ? "mt-1 text-xs text-muted-foreground"
+              : result?.ok
+                ? "mt-1 flex items-center gap-1 text-xs text-primary"
+                : "mt-1 flex items-center gap-1 text-xs text-destructive"
+          }
+        >
+          {test.isPending ? (
+            "测试中…"
+          ) : result?.ok ? (
+            <>
+              <Check className="size-3.5" /> 连接成功
+            </>
+          ) : (
+            <>
+              <X className="size-3.5" /> 失败：{result?.message ?? ""}
+            </>
+          )}
+        </p>
+      )}
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { TooltipProvider } from "@renderer/components/ui/tooltip";
 import { hydratePreferences } from "@renderer/store/hydrate-preferences";
 import { LibraryView } from "@renderer/library/LibraryView";
 import { ReaderView } from "@renderer/reader/ReaderView";
-import { SettingsPanel } from "@renderer/settings/SettingsPanel";
+import { SettingsShell } from "@renderer/settings/SettingsShell";
 import { ThemeController } from "@renderer/theme/ThemeController";
 
 export function App() {
@@ -17,7 +17,7 @@ export function App() {
     <TooltipProvider>
       <ThemeController />
       {view === "reader" ? <ReaderView /> : <LibraryView />}
-      <SettingsPanel />
+      <SettingsShell />
     </TooltipProvider>
   );
 }
