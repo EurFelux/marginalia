@@ -22,6 +22,8 @@ export interface EpubBook {
   cfiFromRange: (index: number, range: Range) => string | null;
   /** CFI 区间串 → 给定 section 文档内的 DOM Range（高亮渲染）；失败返回 null。 */
   rangeFromCfi: (cfi: string, doc: Document) => Range | null;
+  /** 卸载第 index 个 section 的解析文档（释放内存）；幂等，未加载/越界为 no-op。仅对远离视口的 section 调用。 */
+  unloadSection: (index: number) => void;
   /** 释放 epubjs 资源（卸载书、blob URL）。 */
   destroy: () => void;
 }
@@ -145,6 +147,12 @@ export async function createEpubBook(bytes: Uint8Array): Promise<EpubBook> {
       } catch {
         return null;
       }
+    },
+
+    unloadSection: (index) => {
+      const s = sectionAt(index);
+      // s.document 未加载时 unload 为 no-op；epubjs Section.unload 已声明返回 void。
+      if (s) s.unload();
     },
 
     destroy: () => {
