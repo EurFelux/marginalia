@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BookOpen, FolderOpen, Settings } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@renderer/components/ui/button";
 import { qk } from "@renderer/query/keys";
 import { useReaderStore } from "@renderer/store/reader-store";
 import { useSettingsStore } from "@renderer/store/settings-store";
 
 export function LibraryView() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const openBook = useReaderStore((s) => s.openBook);
   const openSettings = useSettingsStore((s) => s.setOpen);
@@ -25,17 +27,19 @@ export function LibraryView() {
   return (
     <div className="flex h-screen flex-col bg-background font-sans text-foreground">
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-6">
-        <h1 className="font-serif text-xl font-semibold">Marginalia</h1>
+        <h1 className="font-serif text-xl font-semibold">{t("library.title", "Marginalia")}</h1>
         <div className="flex items-center gap-2">
           <Button onClick={() => importBook.mutate()} disabled={importBook.isPending}>
             <FolderOpen />
-            {importBook.isPending ? "导入中…" : "导入 ePub"}
+            {importBook.isPending
+              ? t("library.importPending", "导入中…")
+              : t("library.import", "导入 ePub")}
           </Button>
           <Button
             variant="ghost"
             size="icon"
             onClick={() => openSettings(true)}
-            aria-label="设置"
+            aria-label={t("settings.title", "设置")}
             className="text-muted-foreground"
           >
             <Settings />
@@ -46,15 +50,21 @@ export function LibraryView() {
       <main className="flex-1 overflow-y-auto p-6">
         {importBook.isError && (
           <p className="mb-4 text-sm text-destructive">
-            导入失败：{(importBook.error as Error).message}
+            {t("library.importError", "导入失败：{{message}}", {
+              message: (importBook.error as Error).message,
+            })}
           </p>
         )}
-        {books.isPending && <p className="text-sm text-muted-foreground">加载书库…</p>}
-        {books.isError && <p className="text-sm text-destructive">读取书库失败</p>}
+        {books.isPending && (
+          <p className="text-sm text-muted-foreground">{t("library.loading", "加载书库…")}</p>
+        )}
+        {books.isError && (
+          <p className="text-sm text-destructive">{t("library.loadError", "读取书库失败")}</p>
+        )}
         {books.data?.length === 0 && (
           <div className="mt-20 text-center text-muted-foreground">
             <BookOpen className="mx-auto mb-3 size-10 opacity-40" />
-            <p className="text-sm">书库为空，点右上角「导入 ePub」开始。</p>
+            <p className="text-sm">{t("library.empty", "书库为空，点右上角「导入 ePub」开始。")}</p>
           </div>
         )}
         <ul className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
@@ -70,7 +80,7 @@ export function LibraryView() {
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-medium">{b.title ?? b.id}</span>
                   <span className="block truncate text-xs text-muted-foreground">
-                    {b.author ?? "未知作者"}
+                    {b.author ?? t("library.unknownAuthor", "未知作者")}
                   </span>
                 </span>
               </button>
