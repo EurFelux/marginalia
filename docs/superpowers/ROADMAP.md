@@ -19,7 +19,9 @@
 
 **RA3 + M-b 已交付并合并**（标注与笔记，2026-06-03）：annotations 表/repository（headless 测）+ IPC/preload + CFI 高亮渲染（`ignoreClass` 防污染 + `rangeFromCfi`）+ 点击编辑（5 色 + 下划线，「高亮标记」即时套用上次样式）+ 段内笔记 modal（原文引用、⌘/Ctrl+Enter）+ 侧栏标注列表（阅读序 + 跳转）。真书手测通过；最终综合审查修掉跨任务接缝（笔记长文滚动丢失、样式栏死代码）。
 
-**下一目标候选**：**类型设计债清理**（已定为下一步）、RA4 收尾（M-d 全书摘要 / M-c 跨章）、`preferences` 持久化表、RA1-full「精度/内存 pass」（图片延时 / 当前章高亮滞后 / 长书 section 内存，见 backlog）。颜色模式（dark / light / system）✅ 已完成。
+**RA5 已交付并合并**（多 provider + baseUrl + 双栏设置 + 拉模型）：providers.models 字段 + seed 默认值 + `fetchProviderModels` + `list-models` IPC + 双栏 Settings UI 替换旧 modal；provider `baseUrl` 可配自定义 API 端点。
+
+**下一目标候选**：**类型设计债清理**（已定为下一步）、RA4 收尾（M-d 全书摘要 / M-c 跨章）、`preferences` 持久化表、RA1-full「精度/内存 pass」（图片延时 / 当前章高亮滞后 / 长书 section 内存，见 backlog）。颜色模式（dark / light / system）✅ 已完成。RA5 ✅ 已完成。
 
 ---
 
@@ -48,7 +50,7 @@
 | RA2      | 选区 → 工具栏 → chip → 流式聊天                 | ✅   | CFI 选区落地（epub-selection 块级取段 + `cfiRange`；AI 契约零改动）                                                        |
 | RA3      | 标注与笔记 UI                                   | ✅   | CFI 高亮(5 色+下划线)/点击编辑/笔记 modal/侧栏列表；即时套用上次样式                                                       |
 | RA4      | 摘要查看 + 跨章会话                             | 🟡   | 章节摘要 pill ✅；全书摘要书卡 ✅；跨章 🔴                                                                                 |
-| RA5      | Provider / 设置 UI                              | 🟡   | Anthropic ✅；多 provider 类型 🔴                                                                                          |
+| RA5      | Provider / 设置 UI                              | ✅   | 多 provider + baseUrl + 双栏设置 + 拉模型 ✅                                                                               |
 | D1       | 打包 / 迁移路径                                 | 🔴   | `electron-forge extraResources` 复制迁移 SQL                                                                               |
 
 > 全量分解与依赖 DAG 见 [`renderer-track-decomposition`](plans/2026-06-01-marginalia-renderer-track-decomposition.md)。
@@ -87,7 +89,7 @@
 | 结构化 `reason` 分类（现自由字符串，UI 要 i18n 时再做）                                                                | 🔴   | ma5-deferred #6                    |
 | onboarding/landing 引导用户先配 provider + 开自动摘要                                                                  | 🔴   | 记忆 onboarding-guide-auto-summary |
 | **书库样式改善 + 书封面**：书库视图美化；每本书显示封面（从 ePub 提取封面图，epub-parser 可能需补 cover 提取）。       | 🔴   | 用户 2026-06-03 指定               |
-| **provider `baseUrl` 设置**：每个 provider 可配自定义 API 端点（OpenAI 兼容代理 / 自建网关等）；关联 RA5 provider UI。 | 🔴   | 用户 2026-06-03 指定               |
+| **provider `baseUrl` 设置**：每个 provider 可配自定义 API 端点（OpenAI 兼容代理 / 自建网关等）；关联 RA5 provider UI。 | ✅   | 用户 2026-06-03 指定               |
 
 ### 基建 / 重构
 
