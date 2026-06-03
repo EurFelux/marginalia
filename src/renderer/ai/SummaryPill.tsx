@@ -5,7 +5,7 @@ import { qk } from "@renderer/query/keys";
 import { cn } from "@renderer/lib/utils";
 import { Button } from "@renderer/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@renderer/components/ui/popover";
-import { useReaderStore } from "@renderer/store/reader-store";
+import { useNavigationStore } from "@renderer/store/navigation-store";
 import { useChatStore } from "@renderer/store/chat-store";
 
 /**
@@ -14,8 +14,8 @@ import { useChatStore } from "@renderer/store/chat-store";
  */
 export function SummaryPill() {
   const { t } = useTranslation();
-  const bookId = useReaderStore((s) => s.currentBookId);
-  const chapterId = useReaderStore((s) => s.currentChapterId);
+  const bookId = useNavigationStore((s) => s.currentBookId);
+  const chapterId = useNavigationStore((s) => s.currentChapterId);
   const panelOpen = useChatStore((s) => s.panelOpen);
   const qc = useQueryClient();
 

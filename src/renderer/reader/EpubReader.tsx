@@ -7,7 +7,8 @@ import {
   type SectionSelectEvent,
 } from "@marginalia/virtual-docs";
 import type { ChapterRefDto } from "@shared/library";
-import { useReaderStore } from "../store/reader-store";
+import { useNavigationStore } from "@renderer/store/navigation-store";
+import { useReaderStore } from "@renderer/store/reader-store";
 import { qk } from "../query/keys";
 import { chapterIdByHref } from "./chapter-id-by-href";
 import { createEpubBook, type EpubBook } from "./epub-book";
@@ -32,8 +33,8 @@ export function EpubReader({ bookId, chapters }: Props) {
   const [parseError, setParseError] = useState<string | null>(null);
 
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
-  const currentChapterId = useReaderStore((s) => s.currentChapterId);
-  const setCurrentChapter = useReaderStore((s) => s.setCurrentChapter);
+  const currentChapterId = useNavigationStore((s) => s.currentChapterId);
+  const setCurrentChapter = useNavigationStore((s) => s.setCurrentChapter);
   const prefs = useReaderStore((s) => s.prefs);
   const setSelection = useReaderStore((s) => s.setSelection);
   const openStyleBar = useReaderStore((s) => s.openStyleBar);

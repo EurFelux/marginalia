@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import type { BookSummaryDto } from "@shared/library";
 import { Button } from "@renderer/components/ui/button";
 import { qk } from "@renderer/query/keys";
-import { useReaderStore } from "@renderer/store/reader-store";
+import { useNavigationStore } from "@renderer/store/navigation-store";
 import { useSettingsStore } from "@renderer/store/settings-store";
 import { fileNameOf, pickEpubFiles } from "./epub-drop";
 import { useEpubDrop } from "./use-epub-drop";
@@ -20,7 +20,7 @@ interface ImportItem {
 export function LibraryView() {
   const { t, i18n } = useTranslation();
   const qc = useQueryClient();
-  const openBook = useReaderStore((s) => s.openBook);
+  const openBook = useNavigationStore((s) => s.openBook);
   const openSettings = useSettingsStore((s) => s.setOpen);
   const books = useQuery({ queryKey: qk.library, queryFn: () => window.api.library.list() });
 

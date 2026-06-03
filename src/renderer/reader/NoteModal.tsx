@@ -13,6 +13,7 @@ import {
 import { Textarea } from "@renderer/components/ui/textarea";
 import { Button } from "@renderer/components/ui/button";
 import { qk } from "@renderer/query/keys";
+import { useNavigationStore } from "@renderer/store/navigation-store";
 import { useReaderStore } from "@renderer/store/reader-store";
 
 /** 居中笔记 modal：create 来自选区（默认 yellow），edit 来自已有标注。 */
@@ -22,7 +23,7 @@ export function NoteModal() {
   const closeNoteModal = useReaderStore((s) => s.closeNoteModal);
   const setSelection = useReaderStore((s) => s.setSelection);
   const lastStyle = useReaderStore((s) => s.lastHighlightStyle);
-  const bookId = useReaderStore((s) => s.currentBookId);
+  const bookId = useNavigationStore((s) => s.currentBookId);
   const qc = useQueryClient();
   const taRef = useRef<HTMLTextAreaElement | null>(null);
   const [text, setText] = useState("");

@@ -2,12 +2,12 @@ import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@renderer/lib/utils";
 import { qk } from "@renderer/query/keys";
-import { useReaderStore } from "@renderer/store/reader-store";
+import { useNavigationStore } from "@renderer/store/navigation-store";
 
 export function ChapterList({ bookId }: { bookId: string }) {
   const { t } = useTranslation();
-  const currentChapterId = useReaderStore((s) => s.currentChapterId);
-  const setCurrentChapter = useReaderStore((s) => s.setCurrentChapter);
+  const currentChapterId = useNavigationStore((s) => s.currentChapterId);
+  const setCurrentChapter = useNavigationStore((s) => s.setCurrentChapter);
   const chapters = useQuery({
     queryKey: qk.chapters(bookId),
     queryFn: () => window.api.content.chapters({ bookId }),

@@ -1,7 +1,7 @@
 import type { ChatTransport, UIMessageChunk } from "ai";
 import { v7 as uuidv7 } from "uuid";
 import type { AiStreamEvent } from "@shared/chat";
-import { useReaderStore } from "@renderer/store/reader-store";
+import { useNavigationStore } from "@renderer/store/navigation-store";
 import { useChatStore } from "@renderer/store/chat-store";
 import type { ChatUIMessage } from "@renderer/ai/types";
 
@@ -56,7 +56,7 @@ function lastUserText(messages: ChatUIMessage[]): string {
 export function createIpcChatTransport(): ChatTransport<ChatUIMessage> {
   return {
     async sendMessages({ messages, abortSignal }) {
-      const { currentBookId, currentChapterId } = useReaderStore.getState();
+      const { currentBookId, currentChapterId } = useNavigationStore.getState();
       const { activeConversationId } = useChatStore.getState();
       if (!currentBookId || !currentChapterId) {
         const { default: i18n } = await import("@renderer/i18n");

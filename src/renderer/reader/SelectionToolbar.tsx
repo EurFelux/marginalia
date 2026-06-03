@@ -5,6 +5,7 @@ import { BookOpen, FileText, Highlighter, Languages, Sparkles, StickyNote } from
 import { cn } from "@renderer/lib/utils";
 import { Button } from "@renderer/components/ui/button";
 import { qk } from "@renderer/query/keys";
+import { useNavigationStore } from "@renderer/store/navigation-store";
 import { useReaderStore } from "@renderer/store/reader-store";
 import { useAiActions, type PresetId } from "@renderer/ai/use-ai-actions";
 
@@ -22,7 +23,7 @@ export function SelectionToolbar() {
   const setSelection = useReaderStore((s) => s.setSelection);
   const styleBar = useReaderStore((s) => s.styleBar);
   const noteModal = useReaderStore((s) => s.noteModal);
-  const bookId = useReaderStore((s) => s.currentBookId);
+  const bookId = useNavigationStore((s) => s.currentBookId);
   const lastStyle = useReaderStore((s) => s.lastHighlightStyle);
   const { startAiAction } = useAiActions();
   const qc = useQueryClient();

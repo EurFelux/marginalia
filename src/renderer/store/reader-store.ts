@@ -2,7 +2,6 @@ import { create } from "zustand";
 import type { AnnotationStyle } from "@shared/annotations";
 import type { ReaderPrefs, SelectionInfo } from "@renderer/types";
 import { persistPreference } from "@renderer/store/persist-preference";
-import { useChatStore } from "@renderer/store/chat-store";
 
 export type AnnoTarget = { type: "create" } | { type: "edit"; annotationId: string };
 export interface StyleBarState {
@@ -20,9 +19,6 @@ export interface NoteModalState {
 }
 
 interface ReaderState {
-  view: "library" | "reader";
-  currentBookId: string | null;
-  currentChapterId: string | null;
   selection: SelectionInfo | null;
   prefs: ReaderPrefs;
   sidebarOpen: boolean;
@@ -34,9 +30,6 @@ interface ReaderState {
 }
 
 interface ReaderActions {
-  openBook: (bookId: string, chapterId?: string | null) => void;
-  backToLibrary: () => void;
-  setCurrentChapter: (chapterId: string) => void;
   setSelection: (selection: SelectionInfo | null) => void;
   updatePrefs: (patch: Partial<ReaderPrefs>) => void;
   setSidebarOpen: (open: boolean) => void;
@@ -49,9 +42,6 @@ interface ReaderActions {
 }
 
 export const READER_INITIAL: ReaderState = {
-  view: "library",
-  currentBookId: null,
-  currentChapterId: null,
   selection: null,
   prefs: { fontScale: 1, lineHeight: 1.9, maxWidth: 640 },
   sidebarOpen: true,
@@ -63,12 +53,6 @@ export const READER_INITIAL: ReaderState = {
 
 export const useReaderStore = create<ReaderState & ReaderActions>((set) => ({
   ...READER_INITIAL,
-  openBook: (bookId, chapterId = null) => {
-    set({ view: "reader", currentBookId: bookId, currentChapterId: chapterId });
-    useChatStore.getState().setActiveConversation(null);
-  },
-  backToLibrary: () => set({ view: "library" }),
-  setCurrentChapter: (currentChapterId) => set({ currentChapterId }),
   setSelection: (selection) => set({ selection }),
   updatePrefs: (patch) =>
     set((s) => {

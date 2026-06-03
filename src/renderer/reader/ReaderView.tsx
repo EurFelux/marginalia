@@ -6,7 +6,7 @@ import { qk } from "@renderer/query/keys";
 import { cn } from "@renderer/lib/utils";
 import { Button } from "@renderer/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@renderer/components/ui/tooltip";
-import { useReaderStore } from "@renderer/store/reader-store";
+import { useNavigationStore } from "@renderer/store/navigation-store";
 import { useChatStore } from "@renderer/store/chat-store";
 import { useSettingsStore } from "@renderer/store/settings-store";
 import { usePrefsStore } from "@renderer/store/prefs-store";
@@ -20,9 +20,9 @@ import { AIPanel } from "@renderer/ai/AIPanel";
 
 export function ReaderView() {
   const { t } = useTranslation();
-  const bookId = useReaderStore((s) => s.currentBookId);
-  const chapterId = useReaderStore((s) => s.currentChapterId);
-  const backToLibrary = useReaderStore((s) => s.backToLibrary);
+  const bookId = useNavigationStore((s) => s.currentBookId);
+  const chapterId = useNavigationStore((s) => s.currentChapterId);
+  const backToLibrary = useNavigationStore((s) => s.backToLibrary);
   const panelOpen = useChatStore((s) => s.panelOpen);
   const setPanelOpen = useChatStore((s) => s.setPanelOpen);
   const openSettings = useSettingsStore((s) => s.setOpen);

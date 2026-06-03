@@ -6,6 +6,7 @@ import type { AnnotationStyle } from "@shared/annotations";
 import { cn } from "@renderer/lib/utils";
 import { Button } from "@renderer/components/ui/button";
 import { qk } from "@renderer/query/keys";
+import { useNavigationStore } from "@renderer/store/navigation-store";
 import { useReaderStore } from "@renderer/store/reader-store";
 import { FILL_COLORS, FILL_SWATCH } from "./highlight";
 
@@ -17,7 +18,7 @@ export function HighlightStyleBar() {
   const openNoteModal = useReaderStore((s) => s.openNoteModal);
   const setSelection = useReaderStore((s) => s.setSelection);
   const setLastHighlightStyle = useReaderStore((s) => s.setLastHighlightStyle);
-  const bookId = useReaderStore((s) => s.currentBookId);
+  const bookId = useNavigationStore((s) => s.currentBookId);
   const qc = useQueryClient();
   const ref = useRef<HTMLDivElement | null>(null);
 
