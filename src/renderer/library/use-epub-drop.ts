@@ -23,7 +23,7 @@ export interface UseEpubDrop {
  * 书库文件拖拽状态机。
  * - 根节点计数器驱动 overlay 显隐：仅当拖拽负载含外部文件（isFilesDrag）才进入拖拽态。
  * - 卡片计数器驱动激活样式。两套计数器分别治 dragenter/dragleave 因子元素冒泡造成的闪烁。
- * - drop 落卡片 → onFiles(files)；落暗背景（冒泡到根）→ 取消、不导入。
+ * - drop 落 overlay 任意处 → onFiles(files)（卡片落点 stopPropagation 防重复导入）。
  * - dragover 必须 preventDefault 才允许 drop。
  */
 export function useEpubDrop(onFiles: (files: File[]) => void): UseEpubDrop {
@@ -37,6 +37,14 @@ export function useEpubDrop(onFiles: (files: File[]) => void): UseEpubDrop {
     zoneCount.current = 0;
     setDragging(false);
     setOverZone(false);
+  };
+
+  // 任意落点处理：读取文件（须在 await 前同步）→ 收起 overlay → 交给消费方。
+  const processDrop = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const files = Array.from(e.dataTransfer.files);
+    reset();
+    onFiles(files);
   };
 
   const rootHandlers: EpubDropHandlers = {
@@ -55,10 +63,7 @@ export function useEpubDrop(onFiles: (files: File[]) => void): UseEpubDrop {
       rootCount.current -= 1;
       if (rootCount.current <= 0) reset();
     },
-    onDrop: (e) => {
-      e.preventDefault(); // 落暗背景：取消
-      reset();
-    },
+    onDrop: processDrop,
   };
 
   const zoneHandlers: EpubDropHandlers = {
@@ -75,11 +80,9 @@ export function useEpubDrop(onFiles: (files: File[]) => void): UseEpubDrop {
       if (zoneCount.current <= 0) setOverZone(false);
     },
     onDrop: (e) => {
-      e.preventDefault();
-      e.stopPropagation(); // 阻止冒泡到 rootHandlers.onDrop（否则会被当成取消）
-      const files = Array.from(e.dataTransfer.files); // 必须在任何 await 前同步读取
-      reset();
-      onFiles(files);
+      // 卡片落点：阻止冒泡到 rootHandlers.onDrop，避免重复导入。
+      e.stopPropagation();
+      processDrop(e);
     },
   };
 

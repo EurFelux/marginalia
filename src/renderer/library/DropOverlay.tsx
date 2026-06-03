@@ -15,19 +15,19 @@ export function DropOverlay({
   zoneHandlers: EpubDropHandlers;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 font-sans">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-10 font-sans">
       <div
         {...zoneHandlers}
         className={cn(
-          "flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed px-12 py-10 text-center transition",
+          "flex min-h-[55vh] w-full max-w-2xl flex-col items-center justify-center gap-4 rounded-3xl border-2 border-dashed text-center transition",
           active
-            ? "scale-105 border-primary bg-primary/10 text-primary ring-4 ring-primary/25"
+            ? "scale-[1.02] border-primary bg-primary/10 text-primary ring-4 ring-primary/25"
             : "border-muted-foreground/40 bg-popover/60 text-muted-foreground",
         )}
       >
-        <Download className="size-10" />
-        <p className="text-base font-medium">{active ? "松手即导入" : "拖放 ePub 到此导入"}</p>
-        <p className="text-xs opacity-70">支持一次拖入多本，非 ePub 会被忽略</p>
+        <Download className="size-14" />
+        <p className="text-xl font-medium">{active ? "松手即导入" : "拖放 ePub 到此导入"}</p>
+        <p className="text-sm opacity-70">支持一次拖入多本，非 ePub 会被忽略</p>
       </div>
     </div>
   );
