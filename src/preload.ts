@@ -38,7 +38,18 @@ import type {
   CreateAnnotationInput,
   UpdateAnnotationInput,
 } from "@shared/annotations";
-import type { PreferencesSnapshot, SetPreferenceInput } from "@shared/preferences";
+import type { ColorMode, PreferencesSnapshot, SetPreferenceInput } from "@shared/preferences";
+import { resolveTheme } from "@shared/theme";
+
+/** 首帧前按持久化的颜色模式挂 .dark（system 经 matchMedia 解析）。 */
+function applyBootstrapTheme(mode: ColorMode): void {
+  const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches === true;
+  document.documentElement.classList.toggle("dark", resolveTheme(mode, prefersDark) === "dark");
+}
+
+// 首帧前同步读整份偏好快照（read 仅启动一次）：驱动主题 + 供渲染层同步 hydrate。
+const prefsSnapshot = ipcRenderer.sendSync(IPC.preferencesGetAllSync) as PreferencesSnapshot;
+applyBootstrapTheme(prefsSnapshot.colorMode ?? "system");
 
 const api = {
   app: {
@@ -91,7 +102,10 @@ const api = {
   },
 
   preferences: {
-    getAll: (): Promise<PreferencesSnapshot> => ipcRenderer.invoke(IPC.preferencesGetAll),
+    // 读同步（boot 时已取一次缓存于 prefsSnapshot）；写仍异步 fire-and-forget——非对称是有意的。
+    // 注意：返回的是**启动快照**，不反映运行时 set() 的写入（仅启动 hydrate / theme-store 初始化各调一次；
+    // 运行时态由各 store 在内存中持有）。勿在运行时重复调用 getAll() 当「当前值」读。
+    getAll: (): PreferencesSnapshot => prefsSnapshot,
     set: (input: SetPreferenceInput): Promise<void> =>
       ipcRenderer.invoke(IPC.preferencesSet, input),
   },

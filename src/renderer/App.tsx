@@ -10,7 +10,7 @@ export function App() {
   const view = useReaderStore((s) => s.view);
   // 启动时从主进程 DB 灌入持久化偏好（字号/行距/栏宽、上次高亮色、自动摘要）。
   useEffect(() => {
-    void hydratePreferences();
+    hydratePreferences();
   }, []);
   return (
     <TooltipProvider>

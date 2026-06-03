@@ -37,7 +37,7 @@ export const IPC = {
   annotationsCreate: "annotations:create",
   annotationsUpdate: "annotations:update",
   annotationsDelete: "annotations:delete",
-  preferencesGetAll: "preferences:get-all",
+  preferencesGetAllSync: "preferences:get-all-sync",
   preferencesSet: "preferences:set",
 } as const;
 
