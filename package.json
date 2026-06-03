@@ -24,7 +24,8 @@
     "test:watch": "ELECTRON_RUN_AS_NODE=1 electron node_modules/vitest/vitest.mjs",
     "test:all": "pnpm -r --include-workspace-root test",
     "db:generate": "drizzle-kit generate",
-    "db:rebuild:electron": "electron-rebuild -f -o better-sqlite3"
+    "db:rebuild:electron": "electron-rebuild -f -o better-sqlite3",
+    "postinstall": "pnpm db:rebuild:electron"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.81",
