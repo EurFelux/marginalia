@@ -12,7 +12,7 @@ export function BookCover({ book, onOpen }: { book: BookSummaryDto; onOpen: () =
       onClick={onOpen}
       aria-label={label}
       title={label}
-      className="block w-full overflow-hidden rounded-md shadow-md transition-transform hover:-translate-y-1 hover:shadow-xl"
+      className="block w-full overflow-hidden rounded-md shadow-md transition-transform hover:scale-[1.03] hover:shadow-xl"
     >
       {book.hasCover ? (
         <img
