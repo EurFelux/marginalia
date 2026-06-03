@@ -10,6 +10,8 @@ import { FuseV1Options, FuseVersion } from "@electron/fuses";
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    // 迁移 SQL 不经 Vite 打包；复制整个迁移目录进 resources/，生产启动经 process.resourcesPath 读取（见 instance.ts）。
+    extraResource: ["./src/main/db/migrations"],
   },
   rebuildConfig: {},
   makers: [new MakerSquirrel({}), new MakerZIP({}, ["darwin"]), new MakerRpm({}), new MakerDeb({})],
