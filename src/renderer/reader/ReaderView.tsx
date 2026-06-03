@@ -1,14 +1,23 @@
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, MessageSquare, Settings } from "lucide-react";
+import {
+  ArrowLeft,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
+  PanelTopClose,
+  PanelTopOpen,
+  Settings,
+} from "lucide-react";
 import { qk } from "@renderer/query/keys";
-import { cn } from "@renderer/lib/utils";
 import { Button } from "@renderer/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@renderer/components/ui/tooltip";
 import { useNavigationStore } from "@renderer/store/navigation-store";
 import { useSettingsStore } from "@renderer/store/settings-store";
 import { usePrefsStore } from "@renderer/store/prefs-store";
+import { CollapsiblePane } from "@renderer/reader/CollapsiblePane";
 import { Sidebar } from "@renderer/reader/Sidebar";
 import { EpubReader } from "@renderer/reader/EpubReader";
 import { ReaderPrefs } from "@renderer/reader/ReaderPrefs";
@@ -22,10 +31,10 @@ export function ReaderView() {
   const bookId = useNavigationStore((s) => s.currentBookId);
   const chapterId = useNavigationStore((s) => s.currentChapterId);
   const backToLibrary = useNavigationStore((s) => s.backToLibrary);
-  const panelOpen = usePrefsStore((s) => s.layout.panelOpen);
-  const updateLayout = usePrefsStore((s) => s.updateLayout);
   const openSettings = useSettingsStore((s) => s.setOpen);
   const autoSummarize = usePrefsStore((s) => s.autoSummarize);
+  const layout = usePrefsStore((s) => s.layout);
+  const updateLayout = usePrefsStore((s) => s.updateLayout);
   const qc = useQueryClient();
 
   const chapters = useQuery({
@@ -51,62 +60,129 @@ export function ReaderView() {
 
   if (!bookId) return null;
 
+  const sidebarLabel = layout.sidebarOpen
+    ? t("reader.collapseSidebar", "收起侧栏")
+    : t("reader.expandSidebar", "展开侧栏");
+  const panelLabel = layout.panelOpen
+    ? t("reader.collapseAiPanel", "收起 AI 面板")
+    : t("reader.expandAiPanel", "展开 AI 面板");
+  const headerLabel = layout.headerOpen
+    ? t("reader.collapseHeader", "收起顶栏")
+    : t("reader.expandHeader", "展开顶栏");
+
   return (
-    <div className="flex h-screen flex-col bg-background font-sans text-foreground">
-      <header className="flex h-12 shrink-0 items-center justify-between border-b border-border px-3">
-        <Button variant="ghost" size="sm" onClick={backToLibrary} className="text-muted-foreground">
-          <ArrowLeft />
-          {t("reader.backToLibrary", "书库")}
-        </Button>
-        <div className="flex items-center gap-1">
-          <ReaderPrefs />
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => updateLayout({ panelOpen: !panelOpen })}
-                  aria-label={t("reader.aiPanel", "AI 面板")}
-                  className={cn(panelOpen ? "text-primary" : "text-muted-foreground")}
-                />
-              }
+    <div className="relative flex h-screen flex-col bg-background font-sans text-foreground">
+      <CollapsiblePane
+        side="top"
+        open={layout.headerOpen}
+        sizeClass="h-12"
+        label={t("reader.expandHeader", "展开顶栏")}
+      >
+        <header className="flex h-full items-center justify-between px-3">
+          <div className="flex items-center gap-1">
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => updateLayout({ sidebarOpen: !layout.sidebarOpen })}
+                    aria-label={sidebarLabel}
+                    className="text-muted-foreground"
+                  />
+                }
+              >
+                {layout.sidebarOpen ? <PanelLeftClose /> : <PanelLeftOpen />}
+              </TooltipTrigger>
+              <TooltipContent>{sidebarLabel}</TooltipContent>
+            </Tooltip>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={backToLibrary}
+              className="text-muted-foreground"
             >
-              <MessageSquare />
-            </TooltipTrigger>
-            <TooltipContent>{t("reader.aiPanel", "AI 面板")}</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => openSettings(true)}
-                  aria-label={t("settings.title", "设置")}
-                  className="text-muted-foreground"
-                />
-              }
-            >
-              <Settings />
-            </TooltipTrigger>
-            <TooltipContent>{t("settings.title", "设置")}</TooltipContent>
-          </Tooltip>
-        </div>
-      </header>
-      <div className="flex min-h-0 flex-1">
-        <aside className="w-64 shrink-0 border-e border-border bg-muted/30">
+              <ArrowLeft />
+              {t("reader.backToLibrary", "书库")}
+            </Button>
+          </div>
+          <div className="flex items-center gap-1">
+            <ReaderPrefs />
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => updateLayout({ panelOpen: !layout.panelOpen })}
+                    aria-label={panelLabel}
+                    className="text-muted-foreground"
+                  />
+                }
+              >
+                {layout.panelOpen ? <PanelRightClose /> : <PanelRightOpen />}
+              </TooltipTrigger>
+              <TooltipContent>{panelLabel}</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => openSettings(true)}
+                    aria-label={t("settings.title", "设置")}
+                    className="text-muted-foreground"
+                  />
+                }
+              >
+                <Settings />
+              </TooltipTrigger>
+              <TooltipContent>{t("settings.title", "设置")}</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => updateLayout({ headerOpen: !layout.headerOpen })}
+                    aria-label={headerLabel}
+                    className="text-muted-foreground"
+                  />
+                }
+              >
+                {layout.headerOpen ? <PanelTopClose /> : <PanelTopOpen />}
+              </TooltipTrigger>
+              <TooltipContent>{headerLabel}</TooltipContent>
+            </Tooltip>
+          </div>
+        </header>
+      </CollapsiblePane>
+      {/* overflow-hidden：收起抽屉以 translate 藏出容器边缘，不裁剪会撑出横向滚动。 */}
+      <div className="relative flex min-h-0 flex-1 overflow-hidden">
+        <CollapsiblePane
+          side="left"
+          open={layout.sidebarOpen}
+          sizeClass="w-64"
+          className="bg-muted/30"
+          label={t("reader.expandSidebar", "展开侧栏")}
+        >
           <Sidebar bookId={bookId} />
-        </aside>
+        </CollapsiblePane>
         <main className="min-w-0 flex-1">
           {/* 无条件渲染：EpubReader 自管载入/错误态，并据 CFI 进度恢复初始位置（不门控在 chapterId 上，
               否则需先有当前章才渲染，与「开书即按进度连续渲染」相悖）。 */}
           <EpubReader bookId={bookId} chapters={chapters.data ?? []} />
         </main>
-        {/* 始终挂载，用 hidden 切换可见——保住 useChat 对话状态在开合间存活。 */}
-        <aside className={cn("w-96 shrink-0 border-s border-border", !panelOpen && "hidden")}>
+        <CollapsiblePane
+          side="right"
+          open={layout.panelOpen}
+          sizeClass="w-96"
+          label={t("reader.expandAiPanel", "展开 AI 面板")}
+        >
           <AIPanel />
-        </aside>
+        </CollapsiblePane>
       </div>
       <SelectionToolbar />
       <HighlightStyleBar />
