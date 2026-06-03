@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
+import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from "electron";
 import { IPC, type AppGetInfoResult, type PingInput, type PingResult } from "@shared/ipc";
 import type {
   BookIdInput,
@@ -66,6 +66,8 @@ const api = {
       ipcRenderer.invoke(IPC.libraryGet, input),
     readEpubBytes: (input: BookIdInput): Promise<Uint8Array> =>
       ipcRenderer.invoke(IPC.libraryReadEpubBytes, input),
+    /** 由拖入的 File 取磁盘路径（Electron 41 已移除 File.path，须经 webUtils）。同步、纯渲染端、非 IPC。 */
+    pathForFile: (file: File): string => webUtils.getPathForFile(file),
   },
 
   progress: {
