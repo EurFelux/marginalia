@@ -4,6 +4,7 @@ import { Lock } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { Chip } from "@shared/chat";
 import { chipLabel } from "@renderer/ai/chip-label";
+import { ScrollArea } from "@renderer/components/ui/scroll-area";
 
 interface HoverState {
   chip: Chip;
@@ -86,17 +87,21 @@ function ChipPopover({
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
       style={{ position: "fixed", left, bottom, zIndex: 60 }}
-      className="max-h-40 w-80 overflow-y-auto rounded-lg border border-border bg-popover p-3 text-xs leading-relaxed shadow-xl"
+      className="w-80 rounded-lg border border-border bg-popover text-xs leading-relaxed shadow-xl"
     >
-      <div className="mb-1 font-medium text-foreground">
-        {t("ai.chip.willSend", "将发送")} · {label}
-      </div>
-      <p className="whitespace-pre-wrap text-muted-foreground">{chip.content}</p>
-      {chip.required && (
-        <div className="mt-2 text-[11px] text-muted-foreground/70">
-          {t("ai.chip.requiredContext", "必备上下文，随消息一并发送。")}
+      <ScrollArea viewportClassName="max-h-40">
+        <div className="p-3">
+          <div className="mb-1 font-medium text-foreground">
+            {t("ai.chip.willSend", "将发送")} · {label}
+          </div>
+          <p className="whitespace-pre-wrap text-muted-foreground">{chip.content}</p>
+          {chip.required && (
+            <div className="mt-2 text-[11px] text-muted-foreground/70">
+              {t("ai.chip.requiredContext", "必备上下文，随消息一并发送。")}
+            </div>
+          )}
         </div>
-      )}
+      </ScrollArea>
     </div>,
     document.body,
   );
