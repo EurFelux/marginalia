@@ -15,6 +15,14 @@ import { registerAnnotationHandlers } from "@main/ipc/annotations-handlers";
 import { registerPreferenceHandlers } from "@main/ipc/preferences-handlers";
 import { registerCoverProtocol, registerCoverProtocolScheme } from "@main/library/cover-protocol";
 
+// dev 与 production 各用独立的 userData 目录 + 钥匙串命名空间，避免跨身份
+// （dev 的 Electron 二进制 vs 打包产物）共用 safeStorage 密钥导致解密失败。
+// 必须在任何 app.getPath("userData") 调用前生效（instance.ts 在 app.ready 才首次读取）；
+// setName 同时决定 userData 路径与 macOS 钥匙串 service 名（"<name> Safe Storage"）。
+if (!app.isPackaged) {
+  app.setName(`${app.getName()}-dev`); // marginalia → marginalia-dev
+}
+
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
   app.quit();
