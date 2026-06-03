@@ -47,10 +47,13 @@ import type { PreferencesSnapshot, SetPreferenceInput } from "@shared/preference
 // 注意：挂 .dark 的 DOM 操作放在 renderer 入口（src/renderer.tsx），不在此处——sandbox preload 模块求值时
 // document.documentElement 尚为 null，在此 toggle 会抛错并令整个 preload（含 contextBridge 暴露）失败。
 const prefsSnapshot = ipcRenderer.sendSync(IPC.preferencesGetAllSync) as PreferencesSnapshot;
+const appLocale = ipcRenderer.sendSync(IPC.appGetLocaleSync) as string;
 
 const api = {
   app: {
     getInfo: (): Promise<AppGetInfoResult> => ipcRenderer.invoke(IPC.appGetInfo),
+    /** 系统 locale（启动同步快照，供 i18n 决定默认语言）。 */
+    locale: appLocale,
   },
   ping: (input: PingInput): Promise<PingResult> => ipcRenderer.invoke(IPC.ping, input),
 
