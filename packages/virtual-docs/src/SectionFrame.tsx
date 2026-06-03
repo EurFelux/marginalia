@@ -23,9 +23,18 @@ interface Props {
   decorateNonce?: number;
   /** iframe 内任意 mousedown 时回调；同源 iframe 内部事件不冒泡到父文档，消费方借此关闭浮层。 */
   onContentMouseDown?: () => void;
+  /** 就绪前的占位高度（来自 VirtualDocs 测高缓存）；避免就绪前 0/默认高度造成跳变。 */
+  estimatedHeight?: number;
+  /** 内容就绪、测得稳定高度后回调（index, heightPx），供 VirtualDocs 写测高缓存。 */
+  onMeasured?: (index: number, height: number) => void;
 }
 
 const STYLE_ID = "vd-style";
+
+/** 等待图片/字体就绪的整体超时（ms），到时即用当前高度兜底，绝不无限等。 */
+const READY_TIMEOUT_MS = 2000;
+/** 就绪后真实内容变化（如改字号偏好）重测的 debounce（ms）。 */
+const RO_DEBOUNCE_MS = 100;
 
 /** 把（可能是片段或完整文档的）HTML 包成带注入 style 的完整文档串。 */
 function buildSrcDoc(html: string, styleCss?: string): string {
@@ -44,6 +53,8 @@ export function SectionFrame({
   onHighlightClick,
   decorateNonce,
   onContentMouseDown,
+  estimatedHeight,
+  onMeasured,
 }: Props) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   // 用 ref 持最新回调，避免回调身份变化触发 effect 重挂
@@ -53,14 +64,26 @@ export function SectionFrame({
     decorate,
     onHighlightClick,
     onContentMouseDown,
+    estimatedHeight,
+    onMeasured,
   });
-  cbRef.current = { onSelect, onSelectionCleared, decorate, onHighlightClick, onContentMouseDown };
+  cbRef.current = {
+    onSelect,
+    onSelectionCleared,
+    decorate,
+    onHighlightClick,
+    onContentMouseDown,
+    estimatedHeight,
+    onMeasured,
+  };
   const docRef = useRef<Document | null>(null);
 
   useEffect(() => {
     const iframe = iframeRef.current;
     if (!iframe) return;
     let ro: ResizeObserver | undefined;
+    let roTimer: ReturnType<typeof setTimeout> | undefined;
+    let readyTimeout: ReturnType<typeof setTimeout> | undefined;
     let doc: Document | null = null;
 
     const onMouseUp = () => {
@@ -121,6 +144,16 @@ export function SectionFrame({
     const detach = () => {
       ro?.disconnect();
       ro = undefined;
+      // 清理可能挂起的 debounce / 超时计时器：virtuoso 回收 item DOM 后，
+      // 已排期的 measure 会把错高度写进被复用的 iframe（正是要消除的跳变）。
+      if (roTimer) {
+        clearTimeout(roTimer);
+        roTimer = undefined;
+      }
+      if (readyTimeout) {
+        clearTimeout(readyTimeout);
+        readyTimeout = undefined;
+      }
       doc?.removeEventListener("mouseup", onMouseUp);
       doc?.removeEventListener("selectionchange", onSelChange);
       doc?.removeEventListener("click", onAnnoClick);
@@ -134,12 +167,39 @@ export function SectionFrame({
       detach();
       doc = iframe.contentDocument;
       if (!doc) return;
+      const d = doc; // 窄化给闭包
+      // 占位：就绪前先用估高，避免 iframe 默认高度造成的跳变。
+      iframe.style.height = `${cbRef.current.estimatedHeight ?? 0}px`;
+
       const measure = () => {
-        if (doc) iframe.style.height = `${doc.documentElement.scrollHeight}px`;
+        iframe.style.height = `${d.documentElement.scrollHeight}px`;
       };
-      measure();
-      ro = new ResizeObserver(measure);
-      ro.observe(doc.documentElement);
+      let settled = false;
+      const reportStable = () => {
+        if (settled) return;
+        settled = true;
+        const h = d.documentElement.scrollHeight;
+        iframe.style.height = `${h}px`;
+        cbRef.current.onMeasured?.(index, h);
+        // 就绪后才挂 ResizeObserver，服务后续真实内容变化（如改字号偏好），debounce 抑抖。
+        ro = new ResizeObserver(() => {
+          if (roTimer) clearTimeout(roTimer);
+          roTimer = setTimeout(measure, RO_DEBOUNCE_MS);
+        });
+        ro.observe(d.documentElement);
+      };
+
+      // 等所有图片 decode + 字体就绪；整体超时兜底，绝不无限等。
+      const imgs = Array.from(d.images);
+      const ready = Promise.all([
+        ...imgs.map((img) => img.decode().catch(() => undefined)),
+        d.fonts?.ready ?? Promise.resolve(),
+      ]).then(() => undefined);
+      const timeout = new Promise<void>((res) => {
+        readyTimeout = setTimeout(res, READY_TIMEOUT_MS);
+      });
+      void Promise.race([ready, timeout]).then(reportStable);
+
       doc.addEventListener("mouseup", onMouseUp);
       doc.addEventListener("selectionchange", onSelChange);
       docRef.current = doc;
