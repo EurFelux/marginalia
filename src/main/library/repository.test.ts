@@ -150,4 +150,28 @@ describe("library repository", () => {
       await rm(booksDir, { recursive: true, force: true });
     }
   });
+
+  it("listBooks derives hasCover and does not load the cover blob", () => {
+    const db = freshDb();
+    importBook(db, { bytes: makeFixtureEpub() }); // fixture 带封面
+    db.insert(books).values({ id: "no-cover", cover: null }).run();
+
+    const items = listBooks(db);
+    const withCover = items.find((b) => b.id !== "no-cover")!;
+    const noCover = items.find((b) => b.id === "no-cover")!;
+
+    expect(Boolean(withCover.hasCover)).toBe(true);
+    expect(Boolean(noCover.hasCover)).toBe(false);
+    // 不再把 blob 载进内存（listBooks 不选 cover 列）
+    expect(withCover).not.toHaveProperty("cover");
+  });
+
+  it("listBooks treats an empty cover blob as hasCover false", () => {
+    const db = freshDb();
+    db.insert(books)
+      .values({ id: "empty-cover", cover: Buffer.alloc(0) })
+      .run();
+    const item = listBooks(db).find((b) => b.id === "empty-cover")!;
+    expect(Boolean(item.hasCover)).toBe(false);
+  });
 });

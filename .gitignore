@@ -93,3 +93,6 @@ out/
 
 # IDE
 .zed/
+
+# Brainstorm visual companion (superpowers)
+.superpowers/

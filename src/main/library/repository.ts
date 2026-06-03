@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { parseEpub, type TocNode } from "@marginalia/epub-parser";
 import type { DB } from "@main/db/client";
 import { books, chapters } from "@main/db/schema";
@@ -57,8 +57,16 @@ export function importBook(db: DB, input: ImportInput): BookRow {
   });
 }
 
-export function listBooks(db: DB): BookRow[] {
-  return db.select().from(books).all();
+export function listBooks(db: DB) {
+  return db
+    .select({
+      id: books.id,
+      title: books.title,
+      author: books.author,
+      hasCover: sql<boolean>`${books.cover} is not null and length(${books.cover}) > 0`,
+    })
+    .from(books)
+    .all();
 }
 export function getBook(db: DB, id: string): BookRow | undefined {
   return db.select().from(books).where(eq(books.id, id)).get();

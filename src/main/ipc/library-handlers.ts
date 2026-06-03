@@ -29,10 +29,16 @@ import {
 import { makeSummaryDeps } from "@main/ai/send-deps";
 import { handle } from "@main/ipc/registry";
 
-const toDto = (b: { id: string; title: string | null; author: string | null }): BookSummaryDto => ({
+const toDto = (b: {
+  id: string;
+  title: string | null;
+  author: string | null;
+  hasCover: boolean;
+}): BookSummaryDto => ({
   id: b.id,
   title: b.title,
   author: b.author,
+  hasCover: Boolean(b.hasCover),
 });
 
 export function registerLibraryHandlers(): void {
@@ -46,7 +52,7 @@ export function registerLibraryHandlers(): void {
       const bytes = new Uint8Array(buf);
       const book = importBook(getDb(), { bytes });
       await writeEpubFile(getBooksDir(), book.id, bytes); // 复制进 app 自有位置（relink/重导即覆盖）
-      return toDto(book);
+      return toDto({ ...book, hasCover: book.cover != null && book.cover.length > 0 });
     },
   );
 
@@ -64,7 +70,7 @@ export function registerLibraryHandlers(): void {
 
   handle<{ bookId: string }, BookSummaryDto | null>(IPC.libraryGet, bookIdInput, (input) => {
     const b = getBook(getDb(), input.bookId);
-    return b ? toDto(b) : null;
+    return b ? toDto({ ...b, hasCover: b.cover != null && b.cover.length > 0 }) : null;
   });
 
   handle<{ bookId: string }, Uint8Array>(IPC.libraryReadEpubBytes, bookIdInput, (input) =>

@@ -10,6 +10,7 @@ import { useSettingsStore } from "@renderer/store/settings-store";
 import { fileNameOf, pickEpubFiles } from "./epub-drop";
 import { useEpubDrop } from "./use-epub-drop";
 import { DropOverlay } from "./DropOverlay";
+import { BookCover } from "./BookCover";
 
 interface ImportItem {
   filePath: string;
@@ -134,23 +135,10 @@ export function LibraryView() {
             </p>
           </div>
         )}
-        <ul className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
+        <ul className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-5">
           {books.data?.map((b) => (
             <li key={b.id}>
-              <button
-                onClick={() => openBook(b.id)}
-                className="flex w-full items-center gap-3 rounded-xl border border-border bg-card/60 p-3 text-left hover:bg-muted"
-              >
-                <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
-                  <BookOpen className="size-5" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-medium">{b.title ?? b.id}</span>
-                  <span className="block truncate text-xs text-muted-foreground">
-                    {b.author ?? t("library.unknownAuthor", "未知作者")}
-                  </span>
-                </span>
-              </button>
+              <BookCover book={b} onOpen={() => openBook(b.id)} />
             </li>
           ))}
         </ul>

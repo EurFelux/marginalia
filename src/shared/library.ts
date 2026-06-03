@@ -25,6 +25,7 @@ export interface BookSummaryDto {
   id: string;
   title: string | null;
   author: string | null;
+  hasCover: boolean;
 }
 
 /**

@@ -13,11 +13,15 @@ import { registerChatHandlers } from "@main/ipc/chat-handlers";
 import { registerAiHandlers } from "@main/ipc/ai-handlers";
 import { registerAnnotationHandlers } from "@main/ipc/annotations-handlers";
 import { registerPreferenceHandlers } from "@main/ipc/preferences-handlers";
+import { registerCoverProtocol, registerCoverProtocolScheme } from "@main/library/cover-protocol";
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
   app.quit();
 }
+
+// cover:// 自定义协议：scheme 注册须在 app.ready 前。
+registerCoverProtocolScheme();
 
 const createWindow = () => {
   // Create the browser window.
@@ -66,6 +70,7 @@ app.on("ready", () => {
   // AI 出站请求默认走系统代理：Electron net.fetch 经 Chromium 网络栈，默认采用系统代理设置。
   // （部分地区直连 api.anthropic.com 会被 403「Request not allowed」按区域拦截，须经系统代理出网。）
   setModelFetch((input, init) => net.fetch(input instanceof URL ? input.toString() : input, init));
+  registerCoverProtocol(); // cover:// handler 需 getDb()，故在 initDb 后
   registerAppHandlers();
   registerLibraryHandlers();
   registerSettingsHandlers();
