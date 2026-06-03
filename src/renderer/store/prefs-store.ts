@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { AnnotationStyle } from "@shared/annotations";
-import type { ReaderPrefs } from "@renderer/types";
+import type { ReaderLayout, ReaderPrefs } from "@renderer/types";
 import { persistPreference } from "@renderer/store/persist-preference";
 
 interface PrefsState {
@@ -10,17 +10,21 @@ interface PrefsState {
   prefs: ReaderPrefs;
   /** 上次选用的高亮样式；选「高亮标记」时直接套用（Apple Books 式记忆）。 */
   lastHighlightStyle: AnnotationStyle;
+  /** 阅读器三向布局开关（左栏 / AI 面板 / 顶栏）；落盘记忆，重启恢复。 */
+  layout: ReaderLayout;
 }
 interface PrefsActions {
   setAutoSummarize: (v: boolean) => void;
   updatePrefs: (patch: Partial<ReaderPrefs>) => void;
   setLastHighlightStyle: (style: AnnotationStyle) => void;
+  updateLayout: (patch: Partial<ReaderLayout>) => void;
 }
 
 export const PREFS_INITIAL: PrefsState = {
   autoSummarize: false,
   prefs: { fontScale: 1, lineHeight: 1.9, maxWidth: 640 },
   lastHighlightStyle: "yellow",
+  layout: { sidebarOpen: true, panelOpen: false, headerOpen: true },
 };
 
 /**
@@ -43,4 +47,10 @@ export const usePrefsStore = create<PrefsState & PrefsActions>()((set) => ({
     persistPreference({ key: "lastHighlightStyle", value: lastHighlightStyle });
     set({ lastHighlightStyle });
   },
+  updateLayout: (patch) =>
+    set((s) => {
+      const layout = { ...s.layout, ...patch };
+      persistPreference({ key: "readerLayout", value: layout });
+      return { layout };
+    }),
 }));

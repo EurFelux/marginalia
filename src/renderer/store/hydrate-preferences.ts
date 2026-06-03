@@ -10,6 +10,7 @@ export function hydratePreferences(): void {
   if (typeof window === "undefined" || !window.api?.preferences) return;
   const snap = window.api.preferences.getAll();
   if (snap.readerPrefs) usePrefsStore.setState({ prefs: snap.readerPrefs });
+  if (snap.readerLayout) usePrefsStore.setState({ layout: snap.readerLayout });
   if (snap.lastHighlightStyle) {
     usePrefsStore.setState({ lastHighlightStyle: snap.lastHighlightStyle });
   }
