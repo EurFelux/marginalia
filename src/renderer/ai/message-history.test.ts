@@ -14,12 +14,50 @@ const dto: MessageDto = {
 };
 
 describe("messageDtoToUIMessage", () => {
-  it("maps id/role/parts and omits metadata (MVP: no chip re-render)", () => {
+  it("hydrates metadata.contextChips back to live chips (labelKey derived from id)", () => {
     expect(messageDtoToUIMessage(dto)).toEqual({
       id: "m1",
       role: "user",
       parts: [{ type: "text", text: "你好" }],
+      metadata: {
+        contextChips: [
+          {
+            id: "selection",
+            labelKey: "chip.selection",
+            content: "x",
+            tokenCount: 1,
+            required: true,
+            enabled: true,
+          },
+        ],
+      },
     });
+  });
+  it("hydrates paragraph chips with chip.paragraph labelKey", () => {
+    const withParagraph: MessageDto = {
+      ...dto,
+      metadata: { contextChips: [{ id: "paragraph", content: "p", tokenCount: 2 }] },
+    };
+    expect(messageDtoToUIMessage(withParagraph).metadata?.contextChips).toEqual([
+      {
+        id: "paragraph",
+        labelKey: "chip.paragraph",
+        content: "p",
+        tokenCount: 2,
+        required: true,
+        enabled: true,
+      },
+    ]);
+  });
+  it("omits metadata when dto has none (assistant messages / chip-less sends)", () => {
+    expect(messageDtoToUIMessage({ ...dto, metadata: null })).toEqual({
+      id: "m1",
+      role: "user",
+      parts: [{ type: "text", text: "你好" }],
+    });
+    expect(
+      messageDtoToUIMessage({ ...dto, metadata: { contextChips: [] } }).metadata,
+    ).toBeUndefined();
   });
   it("messagesToUI maps a list in order", () => {
     expect(messagesToUI([dto, { ...dto, id: "m2", role: "assistant" }]).map((m) => m.id)).toEqual([
