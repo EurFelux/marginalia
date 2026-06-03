@@ -37,7 +37,7 @@
 
 **类 macOS 自绘滚动条已交付**（2026-06-04）：新增 `components/ui/scroll-area.tsx`（包 Base UI `@base-ui/react/scroll-area`：Root>Viewport>Content + Scrollbar>Thumb，thumb 原生可拖、a11y/键盘内置）。**阅读区（Virtuoso）彻底隐条**——经既有全局类 `no-scrollbar` 透传到 `<Virtuoso className>` 隐原生条、无 thumb（绕开虚拟化估高跳变，VirtualDocs 加 epub-agnostic `className` 透传）。**7 处外壳容器**（侧栏目录/标注、书库网格、AI 消息流、设置 nav+面板、书卡、ChipBar 浮卡）换 ScrollArea；`Composer` textarea / `Select` 弹层排除。**显示时机 = 滚动时 ∪ 指针在滚动条轨道上时**：`data-[scrolling]` 瞬现 + 滚动条**元素自身** CSS `hover:opacity-100`（非 Base UI 整区 `data-hovering`——整区 hover 太急、不符 macOS），停手/移开经 `duration-300` 渐隐；设置面板关闭按钮顺带提为固定悬浮。无新单测（行为由 Base UI 拥有），整体代码审查（读 Base UI 源码核实 ref 转发/`data-` 属性名/7 处高度上下文）+ 真机手测验收（滚动条手感经用户两轮微调定稿）。详见 `specs/2026-06-03-custom-scrollbar-design.md` / `plans/2026-06-03-custom-scrollbar.md`。
 
-**下一目标候选**：RA4 收尾（**M-c 跨章会话**——最后一个未绿 RA 单元）、设置/产品 backlog（最大并发数 / 代理 / stepLimit / 独立摘要模型 / onboarding 引导）、其余延后项（选区工具栏/ChipBar → Base UI 原语、自绘窗口 chrome、嵌套 TOC / 章内分页 / 会话历史初值）。类型设计债清理 ✅、颜色模式 ✅、`preferences` ✅、RA5 ✅、RA1-full「精度/内存 pass」✅、IPC 契约注册表 #8 ✅、**类 macOS 自绘滚动条 ✅** 均已完成。
+**下一目标候选**：RA4 收尾（**M-d 全书摘要**——RA4 已交付）、设置/产品 backlog（最大并发数 / 代理 / stepLimit / 独立摘要模型 / onboarding 引导）、其余延后项（选区工具栏/ChipBar → Base UI 原语、自绘窗口 chrome、嵌套 TOC / 章内分页 / 会话历史初值）。类型设计债清理 ✅、颜色模式 ✅、`preferences` ✅、RA5 ✅、RA1-full「精度/内存 pass」✅、IPC 契约注册表 #8 ✅、**类 macOS 自绘滚动条 ✅** 均已完成。
 
 ---
 
@@ -47,14 +47,14 @@
 
 ### 主进程
 
-| 单元    | 名称                                                          | 状态 | 备注                                                  |
-| ------- | ------------------------------------------------------------- | ---- | ----------------------------------------------------- |
-| MA1–MA5 | DB/IPC 脊柱 · ePub · Provider/密钥 · 会话/Prompt · 流式 Agent | ✅   | headless 测试覆盖                                     |
-| M-a     | 流式 IPC transport                                            | ✅   | 竖切落地（`ai:send`/`abort`/`chunk` + pump）          |
-| M-p     | preload / `window.api` 契约                                   | ✅   | 竖切落地（library/content/settings/chat/ai）          |
-| M-b     | annotations 持久化 + IPC + CFI                                | ✅   | annotations 表/repository（headless 测）+ IPC/preload |
-| M-c     | 跨章 `routeConversation(chapterIds[])`                        | 🔴   | 单章已支持；`chapterIds[]` 待扩展                     |
-| M-d     | `books.summary` 全书摘要                                      | ✅   | 派生态（不持久化 status）+ 整本喂 + 侧栏书卡 UI       |
+| 单元    | 名称                                                          | 状态 | 备注                                                                               |
+| ------- | ------------------------------------------------------------- | ---- | ---------------------------------------------------------------------------------- |
+| MA1–MA5 | DB/IPC 脊柱 · ePub · Provider/密钥 · 会话/Prompt · 流式 Agent | ✅   | headless 测试覆盖                                                                  |
+| M-a     | 流式 IPC transport                                            | ✅   | 竖切落地（`ai:send`/`abort`/`chunk` + pump）                                       |
+| M-p     | preload / `window.api` 契约                                   | ✅   | 竖切落地（library/content/settings/chat/ai）                                       |
+| M-b     | annotations 持久化 + IPC + CFI                                | ✅   | annotations 表/repository（headless 测）+ IPC/preload                              |
+| M-c     | 跨章 `routeConversation(chapterIds[])`                        | 🚫   | 跨章会话 descoped（2026-06-04 用户决定砍掉；独立会话只经显式入口、无跨章选区路由） |
+| M-d     | `books.summary` 全书摘要                                      | ✅   | 派生态（不持久化 status）+ 整本喂 + 侧栏书卡 UI                                    |
 
 ### 渲染层（RA 轨）
 
@@ -65,7 +65,7 @@
 | RA1-full | epub.js 真实渲染 / 分页 / CFI                   | ✅   | Plan A + Plan B 落地：真实渲染 + CFI 进度/恢复/跳章/当前章 + 选区桥，连续滚动；分页以连续滚动替代；精度/内存优化见 backlog |
 | RA2      | 选区 → 工具栏 → chip → 流式聊天                 | ✅   | CFI 选区落地（epub-selection 块级取段 + `cfiRange`；AI 契约零改动）                                                        |
 | RA3      | 标注与笔记 UI                                   | ✅   | CFI 高亮(5 色+下划线)/点击编辑/笔记 modal/侧栏列表；即时套用上次样式                                                       |
-| RA4      | 摘要查看 + 跨章会话                             | 🟡   | 章节摘要 pill ✅；全书摘要书卡 ✅；跨章 🔴                                                                                 |
+| RA4      | 摘要查看                                        | ✅   | 章节摘要 pill ✅；全书摘要书卡 ✅；跨章 descoped                                                                           |
 | RA5      | Provider / 设置 UI                              | ✅   | 多 provider + baseUrl + 双栏设置 + 拉模型 ✅                                                                               |
 | D1       | 打包 / 迁移路径                                 | ✅   | extraResource 复制迁移 SQL + 自定义 ignore/auto-unpack 把 better-sqlite3 native 打进 asar；打包冒烟验证迁移建全表（#9 P4） |
 
@@ -122,24 +122,24 @@
 
 ### 接缝 / 小修
 
-| 项                                                                                                                                                                                                                                                                                | 状态           | 来源                                      |
-| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | ----------------------------------------- |
-| 跨章选区 → 独立会话 + best-effort 组合摘要（M-c 的 UI 侧）                                                                                                                                                                                                                        | 🔴             | ma4-deferred #8                           |
-| `textOfParts` 历史回放丢弃 assistant 的 tool/reasoning part                                                                                                                                                                                                                       | 🟡 Phase1 有意 | ma4 #5 / ma5 #9                           |
-| `conversations:create` FK 友好预检（现抛原始 SQLITE_CONSTRAINT）                                                                                                                                                                                                                  | 🔴 cosmetic    | ma4-deferred #7                           |
-| 嵌套 TOC 层级目录渲染（现 `content.chapters` 扁平）                                                                                                                                                                                                                               | 🔴             | vslice p3                                 |
-| 章内完整分页（`hasMore` 续读 `nextOffset`）                                                                                                                                                                                                                                       | 🔴             | vslice p3 / p4                            |
-| 会话历史初值（重开会话载入 `messages.list-by-conversation`）                                                                                                                                                                                                                      | 🔴             | vslice p4                                 |
-| 虚拟滚动高度稳定性（向上滚闪 + 图片 section 跳变）→ SectionFrame 就绪后上报稳定高度 + 测高缓存占位                                                                                                                                                                                | ✅             | 阅读精度 pass（2026-06-03）               |
-| 当前章高亮滞后（overscan）→ VirtualDocs IntersectionObserver + topVisibleIndex 精确视口顶                                                                                                                                                                                         | ✅             | 阅读精度 pass（2026-06-03）               |
-| 长书 `section.document` 常驻内存 → 距视口阈值外 unloadSection、重进重渲                                                                                                                                                                                                           | ✅             | 阅读精度 pass（2026-06-03）               |
-| 全 schema 级 FK `ON DELETE CASCADE` 策略（6 个 book-owned FK 全加 `onDelete:cascade`；`assistants`/`providers` 共享资源不级联；表重建迁移）                                                                                                                                       | ✅             | #9 P3a                                    |
-| **移除阅读区原生滚动条**：阅读区（Virtuoso）经既有全局类 `no-scrollbar` 透传到 `<Virtuoso className>` 隐原生条、无 thumb。                                                                                                                                                        | ✅             | 自绘滚动条（2026-06-04）                  |
-| **类 macOS 自绘滚动条**：`components/ui/scroll-area.tsx` 包 Base UI ScrollArea（thumb 可拖、滚动 ∪ hover 轨道显示），7 处外壳容器换用；阅读区无条。                                                                                                                               | ✅             | 自绘滚动条（2026-06-04）                  |
-| **选区浮动工具栏迁 Base UI Popover**：`SelectionToolbar`/`HighlightStyleBar` 现保留 RA3 自定义 iframe 感知定位/消失逻辑（shadcn 重构期仅把内部按钮换成 Button 原语）；后续尝试迁到 Base UI Popover + virtual anchor 统一交互。                                                    | 🔴             | 用户 2026-06-03 指定（shadcn 重构期延后） |
-| **ChipBar 迁 Base UI PreviewCard**：现为自定义 hover 卡片（hover + 计时桥 + 自绘向上定位）；Base UI Popover 点击式不匹配 hover，留待 PreviewCard 原语化。                                                                                                                         | 🔴             | shadcn 重构延后                           |
-| **更广 Tooltip 应用 + Card 化 composite**：Tooltip 现仅阅读页顶栏 2 按钮，可推广到其余图标按钮；书卡/章节项/标注项/消息气泡等 composite 仍手搓 Tailwind，可按需抽成 shadcn `Card`。                                                                                               | 🔴             | shadcn 重构延后（按需）                   |
-| **shadcn tabs 的 data-orientation 适配**：shadcn tabs 用 `data-horizontal`/`data-vertical`，Base UI `Tabs.Root` 发 `data-orientation`，属性名错配致方向类惰性。现 Sidebar 显式 `flex-col` + TabsList `h-8` 兜底（仅水平 tabs）；若再用 tabs 或加竖向，补 `@custom-variant` 映射。 | 🔴             | shadcn 重构发现                           |
+| 项                                                                                                                                                                                                                                                                                | 状态           | 来源                                              |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | ------------------------------------------------- |
+| 跨章选区 → 独立会话 + best-effort 组合摘要（M-c 的 UI 侧）                                                                                                                                                                                                                        | 🚫             | ma4-deferred #8；descoped（跨章砍掉，2026-06-04） |
+| `textOfParts` 历史回放丢弃 assistant 的 tool/reasoning part                                                                                                                                                                                                                       | 🟡 Phase1 有意 | ma4 #5 / ma5 #9                                   |
+| `conversations:create` FK 友好预检（现抛原始 SQLITE_CONSTRAINT）                                                                                                                                                                                                                  | 🔴 cosmetic    | ma4-deferred #7                                   |
+| 嵌套 TOC 层级目录渲染（现 `content.chapters` 扁平）                                                                                                                                                                                                                               | 🔴             | vslice p3                                         |
+| 章内完整分页（`hasMore` 续读 `nextOffset`）                                                                                                                                                                                                                                       | 🔴             | vslice p3 / p4                                    |
+| 会话历史初值（重开会话载入 `messages.list-by-conversation`）                                                                                                                                                                                                                      | 🔴             | vslice p4                                         |
+| 虚拟滚动高度稳定性（向上滚闪 + 图片 section 跳变）→ SectionFrame 就绪后上报稳定高度 + 测高缓存占位                                                                                                                                                                                | ✅             | 阅读精度 pass（2026-06-03）                       |
+| 当前章高亮滞后（overscan）→ VirtualDocs IntersectionObserver + topVisibleIndex 精确视口顶                                                                                                                                                                                         | ✅             | 阅读精度 pass（2026-06-03）                       |
+| 长书 `section.document` 常驻内存 → 距视口阈值外 unloadSection、重进重渲                                                                                                                                                                                                           | ✅             | 阅读精度 pass（2026-06-03）                       |
+| 全 schema 级 FK `ON DELETE CASCADE` 策略（6 个 book-owned FK 全加 `onDelete:cascade`；`assistants`/`providers` 共享资源不级联；表重建迁移）                                                                                                                                       | ✅             | #9 P3a                                            |
+| **移除阅读区原生滚动条**：阅读区（Virtuoso）经既有全局类 `no-scrollbar` 透传到 `<Virtuoso className>` 隐原生条、无 thumb。                                                                                                                                                        | ✅             | 自绘滚动条（2026-06-04）                          |
+| **类 macOS 自绘滚动条**：`components/ui/scroll-area.tsx` 包 Base UI ScrollArea（thumb 可拖、滚动 ∪ hover 轨道显示），7 处外壳容器换用；阅读区无条。                                                                                                                               | ✅             | 自绘滚动条（2026-06-04）                          |
+| **选区浮动工具栏迁 Base UI Popover**：`SelectionToolbar`/`HighlightStyleBar` 现保留 RA3 自定义 iframe 感知定位/消失逻辑（shadcn 重构期仅把内部按钮换成 Button 原语）；后续尝试迁到 Base UI Popover + virtual anchor 统一交互。                                                    | 🔴             | 用户 2026-06-03 指定（shadcn 重构期延后）         |
+| **ChipBar 迁 Base UI PreviewCard**：现为自定义 hover 卡片（hover + 计时桥 + 自绘向上定位）；Base UI Popover 点击式不匹配 hover，留待 PreviewCard 原语化。                                                                                                                         | 🔴             | shadcn 重构延后                                   |
+| **更广 Tooltip 应用 + Card 化 composite**：Tooltip 现仅阅读页顶栏 2 按钮，可推广到其余图标按钮；书卡/章节项/标注项/消息气泡等 composite 仍手搓 Tailwind，可按需抽成 shadcn `Card`。                                                                                               | 🔴             | shadcn 重构延后（按需）                           |
+| **shadcn tabs 的 data-orientation 适配**：shadcn tabs 用 `data-horizontal`/`data-vertical`，Base UI `Tabs.Root` 发 `data-orientation`，属性名错配致方向类惰性。现 Sidebar 显式 `flex-col` + TabsList `h-8` 兜底（仅水平 tabs）；若再用 tabs 或加竖向，补 `@custom-variant` 映射。 | 🔴             | shadcn 重构发现                                   |
 
 | **chapters.summaryStatus 改派生态**：去 `summary_status` 列+CHECK（表重建迁移）、状态读时派生（内存 `inFlightChapters`/`failedChapters` 集 + `getChapterSummaryView`，镜像全书摘要）、删 `resetStuckSummaries`。契约 `{status,summary}` 不变 → IPC/renderer 零改动。 | ✅ | #9 P1（spec §2 / plan `…-p1-…`） |
 
