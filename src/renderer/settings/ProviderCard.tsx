@@ -6,6 +6,13 @@ import type { ProviderDto } from "@shared/providers";
 import { PROVIDER_TYPE_LABEL } from "@shared/providers";
 import { Button } from "@renderer/components/ui/button";
 
+/** 内置 provider 的 label → @lobehub/icons 品牌 key（仅内置显示图标；label 内置不可改，是稳定身份）。 */
+const BRAND_KEY: Record<string, string> = {
+  OpenAI: "openai",
+  Anthropic: "anthropic",
+  Gemini: "gemini",
+};
+
 function keyText(p: ProviderDto): string {
   if (p.key.status === "set") return p.key.mask;
   if (p.key.status === "undecryptable") return "本机无法解密";
@@ -38,7 +45,9 @@ export function ProviderCard({
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-1.5">
           {/* 内置 provider 显示品牌图标（@lobehub/icons；provider key = 我们的 type）。 */}
-          {provider.isBuiltin && <ProviderIcon provider={provider.type} type="color" size={18} />}
+          {provider.isBuiltin && provider.label && BRAND_KEY[provider.label] && (
+            <ProviderIcon provider={BRAND_KEY[provider.label]} type="color" size={18} />
+          )}
           <span className="truncate text-sm font-medium">{provider.label ?? "（未命名）"}</span>
           <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
             {PROVIDER_TYPE_LABEL[provider.type]}
