@@ -1,20 +1,7 @@
 import { readFile } from "node:fs/promises";
-import { z } from "zod";
 import { BrowserWindow, dialog } from "electron";
-import { IPC } from "@shared/ipc";
-import {
-  bookIdInput,
-  chapterRefInput,
-  importBookInput,
-  readChapterTextInput,
-  saveProgressInput,
-  type BookSummaryContentDto,
-  type BookSummaryDto,
-  type ChapterRefDto,
-  type ChapterSummaryDto,
-  type ChapterTextSlice,
-} from "@shared/library";
-import type { TocNode } from "@shared/types";
+import { C } from "@shared/ipc";
+import type { BookSummaryDto } from "@shared/library";
 import { getBooksDir, getDb } from "@main/db/instance";
 import { deleteBook, getBook, importBook, listBooks } from "@main/library/repository";
 import { readEpubFile, writeEpubFile } from "@main/library/book-files";
@@ -27,7 +14,7 @@ import {
   getChapterSummaryView,
 } from "@main/ai/summary";
 import { makeSummaryDeps } from "@main/ai/send-deps";
-import { handle } from "@main/ipc/registry";
+import { bind, register, type Binding } from "@main/ipc/registry";
 
 const toDto = (b: {
   id: string;
@@ -41,22 +28,18 @@ const toDto = (b: {
   hasCover: Boolean(b.hasCover),
 });
 
-export function registerLibraryHandlers(): void {
-  handle<{ filePath: string }, BookSummaryDto>(
-    IPC.libraryImport,
-    importBookInput,
-    async (input) => {
-      const buf = await readFile(input.filePath).catch((err: NodeJS.ErrnoException) => {
-        throw new Error(`Cannot read epub file at "${input.filePath}": ${err.code ?? err.message}`);
-      });
-      const bytes = new Uint8Array(buf);
-      const book = importBook(getDb(), { bytes });
-      await writeEpubFile(getBooksDir(), book.id, bytes); // 复制进 app 自有位置（relink/重导即覆盖）
-      return toDto({ ...book, hasCover: book.cover != null && book.cover.length > 0 });
-    },
-  );
+export const libraryBindings: Binding[] = [
+  bind(C.libraryImport, async (input) => {
+    const buf = await readFile(input.filePath).catch((err: NodeJS.ErrnoException) => {
+      throw new Error(`Cannot read epub file at "${input.filePath}": ${err.code ?? err.message}`);
+    });
+    const bytes = new Uint8Array(buf);
+    const book = importBook(getDb(), { bytes });
+    await writeEpubFile(getBooksDir(), book.id, bytes); // 复制进 app 自有位置（relink/重导即覆盖）
+    return toDto({ ...book, hasCover: book.cover != null && book.cover.length > 0 });
+  }),
 
-  handle<void, string | null>(IPC.libraryPickEpub, z.void(), async () => {
+  bind(C.libraryPickEpub, async () => {
     const win = BrowserWindow.getFocusedWindow();
     const opts = {
       properties: ["openFile" as const],
@@ -64,89 +47,70 @@ export function registerLibraryHandlers(): void {
     };
     const r = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts);
     return r.canceled || r.filePaths.length === 0 ? null : r.filePaths[0];
-  });
+  }),
 
-  handle<void, BookSummaryDto[]>(IPC.libraryList, z.void(), () => listBooks(getDb()).map(toDto));
+  bind(C.libraryList, () => listBooks(getDb()).map(toDto)),
 
-  handle<{ bookId: string }, BookSummaryDto | null>(IPC.libraryGet, bookIdInput, (input) => {
+  bind(C.libraryGet, (input) => {
     const b = getBook(getDb(), input.bookId);
     return b ? toDto({ ...b, hasCover: b.cover != null && b.cover.length > 0 }) : null;
-  });
+  }),
 
-  handle<{ bookId: string }, Uint8Array>(IPC.libraryReadEpubBytes, bookIdInput, (input) =>
-    readEpubFile(getBooksDir(), input.bookId),
-  );
+  bind(C.libraryReadEpubBytes, (input) => readEpubFile(getBooksDir(), input.bookId)),
 
-  handle<{ bookId: string }, void>(IPC.libraryDelete, bookIdInput, (input) =>
-    deleteBook(getDb(), getBooksDir(), input.bookId),
-  );
+  bind(C.libraryDelete, (input) => deleteBook(getDb(), getBooksDir(), input.bookId)),
 
-  handle<{ bookId: string }, { cfi: string } | null>(IPC.progressGet, bookIdInput, (input) => {
+  bind(C.progressGet, (input) => {
     const p = getProgress(getDb(), input.bookId);
     return p ? { cfi: p.cfi } : null;
-  });
+  }),
 
-  handle<{ bookId: string; cfi: string }, void>(IPC.progressSave, saveProgressInput, (input) => {
+  bind(C.progressSave, (input) => {
     const db = getDb();
     if (!getBook(db, input.bookId))
       throw new Error(`progress:save — book ${input.bookId} not found`);
     saveProgress(db, input.bookId, input.cfi);
-  });
+  }),
 
-  handle<{ bookId: string }, TocNode[]>(IPC.contentToc, bookIdInput, (input) => {
+  bind(C.contentToc, (input) => {
     const db = getDb();
     if (!getBook(db, input.bookId)) throw new Error(`content: book ${input.bookId} not found`);
     return getToc(db, input.bookId);
-  });
+  }),
 
-  handle<{ bookId: string }, ChapterRefDto[]>(IPC.contentChapters, bookIdInput, (input) => {
+  bind(C.contentChapters, (input) => {
     const db = getDb();
     if (!getBook(db, input.bookId)) throw new Error(`content: book ${input.bookId} not found`);
     return listChapters(db, input.bookId);
-  });
+  }),
 
-  handle<{ bookId: string; chapterId: string }, ChapterSummaryDto>(
-    IPC.contentChapterSummary,
-    chapterRefInput,
-    (input) => getChapterSummaryView(getDb(), input.bookId, input.chapterId),
-  );
+  bind(C.contentChapterSummary, (input) =>
+    getChapterSummaryView(getDb(), input.bookId, input.chapterId),
+  ),
 
   // 触发本章摘要懒生成（开章自动 / pill 手动按钮）。fire-and-forget：ensureChapterSummary
   // 内部自含 reject 兜底；同步前缀会把状态派生为 generating，故返回当前派生状态即时反馈。
-  handle<{ bookId: string; chapterId: string }, ChapterSummaryDto>(
-    IPC.contentGenerateChapterSummary,
-    chapterRefInput,
-    (input) => {
-      const db = getDb();
-      void ensureChapterSummary(makeSummaryDeps(), input.bookId, input.chapterId).catch((err) =>
-        console.warn("[content] generate chapter summary failed:", err),
-      );
-      return getChapterSummaryView(db, input.bookId, input.chapterId);
-    },
-  );
+  bind(C.contentGenerateChapterSummary, (input) => {
+    const db = getDb();
+    void ensureChapterSummary(makeSummaryDeps(), input.bookId, input.chapterId).catch((err) =>
+      console.warn("[content] generate chapter summary failed:", err),
+    );
+    return getChapterSummaryView(db, input.bookId, input.chapterId);
+  }),
 
-  handle<{ bookId: string }, BookSummaryContentDto>(IPC.contentBookSummary, bookIdInput, (input) =>
-    getBookSummaryView(getDb(), input.bookId),
-  );
+  bind(C.contentBookSummary, (input) => getBookSummaryView(getDb(), input.bookId)),
 
   // 触发全书摘要懒生成（书卡手动按钮）。fire-and-forget；同步前缀置 inFlight，故返回即为 generating。
-  handle<{ bookId: string }, BookSummaryContentDto>(
-    IPC.contentGenerateBookSummary,
-    bookIdInput,
-    (input) => {
-      const db = getDb();
-      // force=true：书卡「生成/重新生成」总是（重）生成，覆盖旧摘要。
-      void ensureBookSummary(makeSummaryDeps(), input.bookId, true).catch((err) =>
-        console.warn("[content] generate book summary failed:", err),
-      );
-      return getBookSummaryView(db, input.bookId);
-    },
-  );
+  bind(C.contentGenerateBookSummary, (input) => {
+    const db = getDb();
+    // force=true：书卡「生成/重新生成」总是（重）生成，覆盖旧摘要。
+    void ensureBookSummary(makeSummaryDeps(), input.bookId, true).catch((err) =>
+      console.warn("[content] generate book summary failed:", err),
+    );
+    return getBookSummaryView(db, input.bookId);
+  }),
 
-  handle<
-    { bookId: string; chapterId: string; offset?: number; maxChars?: number },
-    ChapterTextSlice
-  >(IPC.contentChapterText, readChapterTextInput, async (input) => {
+  bind(C.contentChapterText, async (input) => {
     const db = getDb();
     const book = getBook(db, input.bookId);
     if (!book) throw new Error(`content: book ${input.bookId} not found`);
@@ -157,5 +121,9 @@ export function registerLibraryHandlers(): void {
       offset: input.offset,
       maxChars: input.maxChars,
     });
-  });
+  }),
+];
+
+export function registerLibraryHandlers(): void {
+  register(libraryBindings);
 }
