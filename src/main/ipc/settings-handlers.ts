@@ -14,6 +14,7 @@ import { getDefaultAssistant, updateDefaultAssistant } from "@main/providers/ass
 import { safeStorageEncryptor } from "@main/secrets/safe-storage-encryptor";
 import { aiSdkTester } from "@main/secrets/ai-sdk-tester";
 import { bind, register, type Binding } from "@main/ipc/registry";
+import type { ListModelsResult } from "@shared/providers";
 
 export const settingsBindings: Binding[] = [
   bind(C.providersList, () => listProviders(getDb(), safeStorageEncryptor)),
@@ -30,13 +31,13 @@ export const settingsBindings: Binding[] = [
 
   bind(C.providersRemove, (input) => removeProvider(getDb(), input.id)),
 
-  bind(C.providersListModels, async (input) => {
+  bind(C.providersListModels, async (input): Promise<ListModelsResult> => {
     let apiKey: string;
     try {
       apiKey = input.apiKey ?? revealProviderKey(getDb(), safeStorageEncryptor, input.id ?? "");
     } catch {
       return {
-        ok: false as const,
+        ok: false,
         message: t("errors.noApiKeyAvailable", "该$t(terms.provider)无可用密钥"),
       };
     }
@@ -46,9 +47,9 @@ export const settingsBindings: Binding[] = [
         { type: input.type, baseUrl: input.baseUrl ?? null, apiKey },
         netFetch,
       );
-      return { ok: true as const, models };
+      return { ok: true, models };
     } catch (err) {
-      return { ok: false as const, ...mapModelsError(err, undefined) };
+      return { ok: false, ...mapModelsError(err, undefined) };
     }
   }),
 
