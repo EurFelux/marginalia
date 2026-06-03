@@ -207,6 +207,7 @@ export function EpubReader({ bookId, chapters }: Props) {
     <div className="h-full">
       <VirtualDocs
         ref={vRef}
+        className="no-scrollbar"
         count={book.count}
         loadSection={book.loadSection}
         styleCss={

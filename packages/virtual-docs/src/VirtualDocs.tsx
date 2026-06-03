@@ -36,6 +36,8 @@ export interface VirtualDocsProps {
   onContentMouseDown?: () => void;
   /** 某 section 离开「active range ± KEEP_DISTANCE」时回调一次，供消费方释放其资源。 */
   onUnloadSection?: (index: number) => void;
+  /** 透传给底层 Virtuoso 的 scroller 根元素的 className（如隐藏原生滚动条）。 */
+  className?: string;
 }
 
 export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(function VirtualDocs(
@@ -51,6 +53,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
     onHighlightClick,
     onContentMouseDown,
     onUnloadSection,
+    className,
   },
   ref,
 ) {
@@ -175,6 +178,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
   return (
     <Virtuoso
       ref={vRef}
+      className={className}
       style={{ height: "100%" }}
       totalCount={count}
       initialTopMostItemIndex={initialIndex ?? 0}
