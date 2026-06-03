@@ -117,6 +117,8 @@
 | **更广 Tooltip 应用 + Card 化 composite**：Tooltip 现仅阅读页顶栏 2 按钮，可推广到其余图标按钮；书卡/章节项/标注项/消息气泡等 composite 仍手搓 Tailwind，可按需抽成 shadcn `Card`。                                                                                               | 🔴             | shadcn 重构延后（按需）                                               |
 | **shadcn tabs 的 data-orientation 适配**：shadcn tabs 用 `data-horizontal`/`data-vertical`，Base UI `Tabs.Root` 发 `data-orientation`，属性名错配致方向类惰性。现 Sidebar 显式 `flex-col` + TabsList `h-8` 兜底（仅水平 tabs）；若再用 tabs 或加竖向，补 `@custom-variant` 映射。 | 🔴             | shadcn 重构发现                                                       |
 
+| **chapters.summaryStatus 改派生态**：现 chapters 持久化 `summary_status`（运行时态），靠 `resetStuckSummaries` 复位崩溃残留的 generating。全书摘要已改派生（`summary!=null`=ready + 内存 inFlight/failed 集）；chapters 应同样重构——去 `summary_status` 列+CHECK（表重建迁移）、状态读时派生、删 `resetStuckSummaries`、改 `getChapterSummary`/`ensureChapterSummary`/`SummaryPill` + 测试。 | 🔴 | 全书摘要 spec 发现（用户 2026-06-03 记 backlog） |
+
 ### 已由竖切解决（存档，勿重复开）
 
 M-a 流式 IPC · M-p 契约闭合 · `SendInput` Zod schema · `SendDeps`/`SummaryDeps` 生产工厂 · transport consume/cancel `callerStream` · `getChapterSummary` 补 `title` · chip 快照投影 · `presetId` 模板预填（解释/翻译/概括）· 工具章节 `id`/`href` 容错 · 摘要生成与发消息解耦（自动/手动触发）。

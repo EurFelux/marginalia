@@ -10,47 +10,53 @@
 
 ### 2.1 DB（`src/main/db/schema.ts` books）
 
-```ts
-summary: text("summary"),
-summaryStatus: text("summary_status", { enum: ["pending", "generating", "ready", "unavailable"] })
-  .notNull().default("pending"),
-// + CHECK books_summary_status_check（同 chapters）
-```
-
-`pnpm db:generate` → **ALTER TABLE ADD COLUMN ×2**（加列，非表重建 → 不触发 FK 事务坑）。注意 CHECK 约束在加列迁移里的生成——核验产物。
-
-### 2.2 取全书正文（`src/main/library/content.ts`）
+**只持久化 `summary` 正文**——状态是运行时派生，不入 DB（用户 2026-06-03 决策；持久化运行时态正是 chapters 那个 `resetStuckSummaries` 复位补丁的病根：进程崩在 `generating` 会永久卡住）。
 
 ```ts
-export function readBookText(
-  db,
-  bytes,
-  bookId,
-  opts: { maxChars: number },
-): { text: string; truncated: boolean };
+summary: text("summary"), // 唯一持久化事实；无 summaryStatus 列、无 CHECK
 ```
 
-按 `orderIndex` 升序遍历**所有 spine 章节**（非仅 TOC——全书覆盖），逐章 `extractChapterText(bytes, href, { maxChars: 剩余预算 })` 拼接（章间 `\n\n`），累计到 `maxChars` 截断。`BOOK_SUMMARY_INPUT_MAX_CHARS` 取较大值（如 180_000；CJK 最坏 ≈ token 数，留 system+output 余量适配 200k 上下文的摘要模型；超长书前载截断——仍覆盖开篇/主线/主要人物）。
+`pnpm db:generate` → 纯 **`ALTER TABLE books ADD summary text`**（加列、不重建、不碰 FK 坑）。已生成 `20260603011333_nebulous_ezekiel`。
 
-`getBookSummary(db, bookId): { status, summary }`（镜像 `getChapterSummary`，读 books 行）。
+### 2.2 状态派生（`src/main/ai/summary.ts`，与运行时集同处）
 
-### 2.3 生成（`src/main/ai/summary.ts` 加 `ensureBookSummary`）
+`SummaryStatus`（renderer 契约不变）在**读取时派生**，源 = DB 的 `summary` 是否存在 + 进程内两个 Set：
 
-镜像 `ensureChapterSummary`，差异：
+```ts
+// summary.ts 模块级
+const inFlightBooks = new Set<string>(); //  正在生成（纯进程态，重启清空）
+const failedBooks = new Set<string>(); //    本进程生成报错（重启清空 → 重启即可重试）
 
-- 主体 keyed by `bookId`（独立 `inFlight` set 或复用同一 set 加前缀，避免与章节 id 撞）；
-- `BOOK_SUMMARY_SYSTEM`：「概括整本书，覆盖核心主题、主要人物、结构脉络；忠实、数段、仅输出摘要」；
-- 输入 = `readBookText(db, bytes, bookId, { maxChars: BOOK_SUMMARY_INPUT_MAX_CHARS }).text`；
-- `maxOutputTokens` 适当放大（如 1024，全书摘要比单章长）；
-- 状态机同章节：仅从 `pending` 起、`inFlight` 并发去重、`resolveModel` 未配置则保持 pending、同步前缀置 `generating`（使 handler 即时返回 generating）、成功 `ready`、异常 `unavailable`、自含 reject。
+export function getBookSummaryView(db, bookId): { status: SummaryStatus; summary: string | null } {
+  const summary = <读 books.summary> ?? null;
+  const status = summary != null ? "ready"
+    : inFlightBooks.has(bookId) ? "generating"
+    : failedBooks.has(bookId) ? "unavailable"
+    : "pending";
+  return { status, summary };
+}
+```
 
-`resetStuckSummaries(db)` 扩展：把 books 的 `generating`→`pending`（与 chapters 一并，启动 `initDb` 时复位）。
+派生函数与 `inFlightBooks`/`failedBooks` 同模块（需读这两个 Set），故放 `summary.ts` 而非 `content.ts`。**不需要 `resetStuckSummaries` for books**——重启时 `inFlightBooks` 自然为空，状态从 `summary` 正确派生。
+
+### 2.3 取全书正文 + 生成（`content.ts` + `summary.ts`）
+
+`content.ts` `readBookText(db, bytes, bookId, { maxChars }): { text; truncated }`：按 `orderIndex` 升序遍历**所有 spine 章节**（全书覆盖），逐章 `extractChapterText(bytes, href, { maxChars: 剩余预算 })` 拼接（章间 `\n\n`），累计到 `maxChars` 截断。`BOOK_SUMMARY_INPUT_MAX_CHARS ≈ 180_000`（适配 200k 上下文摘要模型，超长书前载截断）。
+
+`summary.ts` `ensureBookSummary(deps, bookId)`：
+
+- `getBookSummaryView` 已 `ready`（summary 非空）或 `inFlightBooks.has` → 跳过；
+- `resolveModel` 未配置 → 跳过（保持 pending，配置后可重试）；
+- **同步前缀**：`failedBooks.delete(bookId)` + `inFlightBooks.add(bookId)`（使 generate handler 即时派生出 `generating`）；
+- 输入 = `readBookText(..., { maxChars: BOOK_SUMMARY_INPUT_MAX_CHARS }).text`，`BOOK_SUMMARY_SYSTEM`「概括整本书，覆盖核心主题/主要人物/结构脉络；忠实、数段、仅输出摘要」，`maxOutputTokens ≈ 1024`；
+- 成功：`db.update(books).set({ summary: text })`（→ 派生 ready）；异常：`failedBooks.add(bookId)`（→ 派生 unavailable）+ 日志；
+- `finally`：`inFlightBooks.delete(bookId)`。自含全部 reject（端口 `=> void`）。
 
 ### 2.4 IPC / DTO / preload
 
 - 通道：`contentBookSummary: "content:book-summary"`（get，`bookIdInput` → `BookSummaryContentDto`）、`contentGenerateBookSummary: "content:generate-book-summary"`（触发，`bookIdInput` → `BookSummaryContentDto`）。
 - `src/shared/library.ts`：`export interface BookSummaryContentDto { status: SummaryStatus; summary: string | null }`。
-- `library-handlers.ts`：两 handler 镜像章节版（generate 版 fire-and-forget `ensureBookSummary(makeSummaryDeps(), bookId)` + 返回 `getBookSummary`）。
+- `library-handlers.ts`：get handler 返回 `getBookSummaryView(getDb(), bookId)`；generate handler fire-and-forget `ensureBookSummary(makeSummaryDeps(), bookId)` + 同步返回 `getBookSummaryView`（同步前缀已置 generating）。
 - `preload.ts`：`content.bookSummary(input)` / `content.generateBookSummary(input)`。
 
 ### 2.5 UI（侧栏书卡）
@@ -59,8 +65,8 @@ export function readBookText(
 
 ## 3. 测试（headless）
 
-- `content.test.ts`：`readBookText` 按序拼接多章、到 `maxChars` 截断（`truncated:true`）；`getBookSummary` 往返/未生成 pending。
-- `summary.test.ts`：`ensureBookSummary` pending→ready（mock model）；ready 则跳过（不重生）；模型未配置保持 pending；异常→unavailable；`resetStuckSummaries` 复位 books 的 generating。
+- `content.test.ts`：`readBookText` 按序拼接多章、到 `maxChars` 截断（`truncated:true`）。
+- `summary.test.ts`：`getBookSummaryView` 未生成→`pending`、summary 非空→`ready`；`ensureBookSummary` pending→写入 summary（mock model，派生 ready）；已 ready 则跳过（不重生）；模型未配置保持 pending（不写）；异常→`failedBooks` 派生 `unavailable`；**重启语义**：清空内存 Set 后 summary 仍在→派生 ready、generating/failed 自然消失（无需 resetStuck）。
 - 回归：现 192 测试不破 + 新增全绿；typecheck/lint 绿。
 
 ## 4. 非目标
