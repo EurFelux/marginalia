@@ -47,6 +47,8 @@
 
 **空摘要防御 + 章节摘要重新生成已交付**（2026-06-04）：provider 异常（content-filter/空 completion）不抛错返回空文本，曾原样落库 → 派生 ready 永不重试。写入侧：章节 `generateText`/全书 `streamText` 空产出一律不落库、标 failed（unavailable 可重试）；全书 force 重生成空产出保留旧摘要。读取侧自愈：新谓词 `hasText`（空/全空白≠有效摘要）用于派生与 ensure 的 ready-skip——既有脏行读出即 pending、下次触发直接重生成覆盖，无需数据清洗。重新生成：`ensureChapterSummary` 加 `force`（镜像全书）；`generate-chapter-summary` IPC input 加可选 `force`——pill 手动按钮恒 `force:true`、开章自动触发不带（已 ready 廉价 no-op，防自动路径反复烧钱）。SummaryPill 弹卡收敛到 BookCard 设计语言：按钮居标题行右上（ready→outline「重新生成」/unavailable→「重试」/生成中→文字），删弹卡内冗余状态徽标（触发器 pill 已表达）。8 个 headless 新用例（空产出/全空白/脏行自愈/force 重生成）。
 
+**GitHub Release 发布流程已交付**（2026-06-04）：`pnpm release` 一条命令 make → 上传 dmg/zip 到 GitHub draft release（`@electron-forge/publisher-github@7.11`，`EurFelux/marginalia`，draft + prerelease；token 经 `gh auth token` 现取不落盘）。版本号 `1.0.0` → `0.1.0`（semver 0.x 开发期）；删 `publish` script（`pnpm publish` 是 pnpm **内置命令**＝发 npm，内置优先于同名 script，`private: true` 双保险）。操作要点：draft 不打 tag，正式 publish 前须先推 origin/main（tag 指向默认分支 HEAD）；release notes 网页补 Gatekeeper 说明（产物未签名，签名/公证仍在 backlog）。dry-run 全链路已验。详见 `specs/2026-06-04-github-release-publish-design.md`。
+
 **下一目标候选**：RA4 收尾（**M-d 全书摘要**——RA4 已交付）、设置/产品 backlog（最大并发数 / 代理 / stepLimit / 独立摘要模型 / **自动命名会话** / onboarding 引导）、其余延后项（选区工具栏/ChipBar → Base UI 原语、自绘窗口 chrome、嵌套 TOC / 章内分页）。类型设计债清理 ✅、颜色模式 ✅、`preferences` ✅、RA5 ✅、RA1-full「精度/内存 pass」✅、IPC 契约注册表 #8 ✅、类 macOS 自绘滚动条 ✅、会话 tab ✅、**三向可收起布局 ✅** 均已完成。
 
 ---
@@ -78,6 +80,7 @@
 | RA4      | 摘要查看                                        | ✅   | 章节摘要 pill ✅；全书摘要书卡 ✅；跨章 descoped                                                                           |
 | RA5      | Provider / 设置 UI                              | ✅   | 多 provider + baseUrl + 双栏设置 + 拉模型 ✅                                                                               |
 | D1       | 打包 / 迁移路径                                 | ✅   | extraResource 复制迁移 SQL + 自定义 ignore/auto-unpack 把 better-sqlite3 native 打进 asar；打包冒烟验证迁移建全表（#9 P4） |
+| D2       | GitHub Release 发布（`pnpm release`）           | ✅   | publisher-github：make → draft+prerelease 上传 dmg/zip；dry-run 已验，签名/公证留 backlog                                  |
 
 > 全量分解与依赖 DAG 见 [`renderer-track-decomposition`](plans/2026-06-01-marginalia-renderer-track-decomposition.md)。
 
