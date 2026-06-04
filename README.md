@@ -10,9 +10,7 @@ English · [简体中文](README.zh-CN.md)
 
 </div>
 
-> 🖼️ _Hero screenshot placeholder — `docs/assets/hero.png` (TODO)_
-
-<!-- ![Marginalia](docs/assets/hero.png) -->
+![Reading in Marginalia — select a passage and the AI answers in the side panel, context in hand](assets/reader.png)
 
 ## What is Marginalia
 
@@ -42,6 +40,8 @@ Real, continuously-scrolling typography that remembers and restores your place. 
 
 An Apple Books-style cover wall to spot your books at a glance. **Drag an ePub into the window** to import it; books without a cover get a tasteful generated tile.
 
+![The library — an Apple Books-style cover wall](assets/library.jpg)
+
 ### 🔌 Bring your own key, any provider
 
 Connect OpenAI, Anthropic, Google, or any **OpenAI-compatible endpoint** (self-hosted gateway or proxy). Define multiple "Assistant" personas — literary analysis, language learning, philosophy — each with its own prompt and model.
@@ -56,26 +56,11 @@ A bilingual interface (English / 简体中文) that follows your system language
 2. **Select text, hit "Ask AI"** — the side panel picks up the passage's context automatically.
 3. **Watch the answer stream in** — read, annotate, follow up, and summarize, all in one window.
 
-> 🖼️ _Flow screenshot placeholder — `docs/assets/flow.png` (TODO)_
-
-<!-- ![Getting started](docs/assets/flow.png) -->
-
 ## 🧭 Principles
 
 - **Transparent context** — every piece of context sent to the AI is shown and switchable.
 - **Local-first** — books, progress, notes, and conversations stay on your own machine.
 - **No lock-in** — bring your own API key, switch models and providers freely.
-
-## 🖼️ Screenshots
-
-<!-- Uncomment once screenshots are added -->
-<!--
-| Library | Reading + selection | Settings |
-|:---:|:---:|:---:|
-| ![Library](docs/assets/library.png) | ![Reading](docs/assets/reading.png) | ![Settings](docs/assets/settings.png) |
--->
-
-> TODO — `docs/assets/library.png` · `docs/assets/reading.png` · `docs/assets/settings.png`
 
 ## License
 

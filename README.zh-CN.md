@@ -10,9 +10,7 @@
 
 </div>
 
-> 🖼️ _Hero 截图占位 — `docs/assets/hero.png`（待补）_
-
-<!-- ![Marginalia](docs/assets/hero.png) -->
+![在 Marginalia 中阅读——选中一段文字，AI 带着上下文在侧栏作答](assets/reader-zh-CN.png)
 
 ## Marginalia 是什么
 
@@ -42,6 +40,8 @@ Marginalia（页边批注）把 AI 放进了阅读的「页边」。读到一句
 
 Apple Books 风的封面墙，一眼找到你的书。把 ePub 文件**拖进窗口**即导入；没有封面的书也会生成好看的配色占位。
 
+![书库——Apple Books 风格的封面墙](assets/library-zh-CN.jpg)
+
 ### 🔌 自带 key，多服务商
 
 接 OpenAI、Anthropic、Google，或任意 **OpenAI 兼容端点**（自建网关 / 代理皆可）。还能定制多个「助手」人设——文学分析、语言学习、哲学讨论，各用各的提示词与模型。
@@ -56,26 +56,11 @@ Apple Books 风的封面墙，一眼找到你的书。把 ePub 文件**拖进窗
 2. **选中文字，点「问 AI」** —— 浮动工具栏一点，侧栏自动带上这句话的上下文。
 3. **看 AI 流式回答** —— 边读边聊，标注、追问、概括都在同一个窗口里完成。
 
-> 🖼️ _流程截图占位 — `docs/assets/flow.png`（待补）_
-
-<!-- ![三步上手](docs/assets/flow.png) -->
-
 ## 🧭 设计理念
 
 - **上下文透明** —— 喂给 AI 的每一块内容都摆在明面上，可见、可关。
 - **本地优先** —— 书、进度、笔记、对话都存在你自己的电脑里。
 - **不锁定** —— 自带 API key，自由切换模型与服务商，你说了算。
-
-## 🖼️ 截图
-
-<!-- 截图补好后取消下方注释即可 -->
-<!--
-| 书库 | 阅读 + 划词 | 设置 |
-|:---:|:---:|:---:|
-| ![书库](docs/assets/library.png) | ![阅读](docs/assets/reading.png) | ![设置](docs/assets/settings.png) |
--->
-
-> 截图待补 —— `docs/assets/library.png` · `docs/assets/reading.png` · `docs/assets/settings.png`
 
 ## 许可证
 
