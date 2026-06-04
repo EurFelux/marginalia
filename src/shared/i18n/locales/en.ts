@@ -8,6 +8,7 @@ export default {
   "ai.chip.willSend": "Will send",
   "ai.closePanel": "Close panel",
   "ai.composer.placeholder": "Ask anything… (Enter to send, Shift+Enter for newline)",
+  "ai.conversationSuffix": "{{title}} · Conversation",
   "ai.emptyHint": "Select text and tap 「Ask AI」, or just ask below.",
   "ai.newConversation": "New conversation",
   "ai.noChapterToSend": "No chapter is open; cannot send.",

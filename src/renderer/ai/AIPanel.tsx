@@ -8,6 +8,7 @@ import { ScrollArea } from "@renderer/components/ui/scroll-area";
 import { useChatStore } from "@renderer/store/chat-store";
 import { usePrefsStore } from "@renderer/store/prefs-store";
 import { useNavigationStore } from "@renderer/store/navigation-store";
+import { useChapterTitle } from "@renderer/query/use-chapter-title";
 import { createIpcChatTransport } from "@renderer/ai/ipc-chat-transport";
 import type { ChatUIMessage } from "@renderer/ai/types";
 import { MessageList } from "@renderer/ai/MessageList";
@@ -26,6 +27,11 @@ export function AIPanel() {
   const updateLayout = usePrefsStore((s) => s.updateLayout);
   const openCommand = useChatStore((s) => s.openCommand);
   const activeConversationId = useChatStore((s) => s.activeConversationId);
+  const activeConversationChapterId = useChatStore((s) => s.activeConversationChapterId);
+  const currentChapterId = useNavigationStore((s) => s.currentChapterId);
+  // header 第二行章节名（移植 UP1 AIPanel）：优先会话归属章（与面板内消息一致），
+  // 无活跃会话回退当前阅读章（新会话将归属它）。title 缺失则整行隐藏。
+  const chapterTitle = useChapterTitle(activeConversationChapterId ?? currentChapterId);
   const qc = useQueryClient();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const prevStatus = useRef(status);
@@ -94,8 +100,15 @@ export function AIPanel() {
   return (
     <div className="flex h-full flex-col bg-muted/30 font-sans">
       <header className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
-        <span className="text-xs font-semibold">{t("ai.panelTitle", "AI 助手")}</span>
-        <div className="ms-auto flex items-center gap-1.5">
+        <div className="flex min-w-0 flex-col">
+          <span className="truncate text-xs font-semibold">{t("ai.panelTitle", "AI 助手")}</span>
+          {chapterTitle && (
+            <span className="truncate text-[11px] text-muted-foreground">
+              {t("ai.conversationSuffix", "{{title}} · 会话", { title: chapterTitle })}
+            </span>
+          )}
+        </div>
+        <div className="ms-auto flex shrink-0 items-center gap-1.5">
           <SummaryPill />
           <Button
             variant="ghost"

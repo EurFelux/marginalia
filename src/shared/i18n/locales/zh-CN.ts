@@ -8,6 +8,7 @@ export default {
   "ai.chip.willSend": "将发送",
   "ai.closePanel": "关闭面板",
   "ai.composer.placeholder": "问点什么…（Enter 发送，Shift+Enter 换行）",
+  "ai.conversationSuffix": "{{title}} · 会话",
   "ai.emptyHint": "划选正文后点「AI 问」，或直接在下方提问。",
   "ai.newConversation": "新对话",
   "ai.noChapterToSend": "没有正在阅读的章节，无法发送。",

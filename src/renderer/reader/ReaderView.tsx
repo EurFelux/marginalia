@@ -43,6 +43,13 @@ export function ReaderView() {
     enabled: bookId != null,
   });
 
+  // 顶栏面包屑用书名：与 BookCard 同 key（qk.book），React Query 去重，零额外 IPC。
+  const book = useQuery({
+    queryKey: qk.book(bookId ?? ""),
+    queryFn: () => window.api.library.get({ bookId: bookId! }),
+    enabled: bookId != null,
+  });
+
   // 开章自动生成摘要（设置开启时）：停在某章 ~800ms 才触发，避免快速翻阅时为每章都生成。
   // 注：当前章 id 现由 EpubReader 据滚动位置回写（onTopSectionChange），不再在此回填首章——
   // 否则开书时强设首章会覆盖 EpubReader 的 CFI 进度恢复（initialIndex）。
@@ -70,6 +77,10 @@ export function ReaderView() {
     ? t("reader.collapseHeader", "收起顶栏")
     : t("reader.expandHeader", "展开顶栏");
 
+  // 顶栏面包屑「书名 · 章节名」（移植 UP1 TopBar）：任一为 null（如 epub 无 TOC 时章节 title 缺失）则只显示有的部分。
+  const chapterTitle = chapters.data?.find((c) => c.id === chapterId)?.title ?? null;
+  const breadcrumb = [book.data?.title, chapterTitle].filter(Boolean).join(" · ");
+
   return (
     <div className="relative flex h-screen flex-col bg-background font-sans text-foreground">
       <CollapsiblePane
@@ -79,7 +90,7 @@ export function ReaderView() {
         label={t("reader.expandHeader", "展开顶栏")}
       >
         <header className="flex h-full items-center justify-between px-3">
-          <div className="flex items-center gap-1">
+          <div className="flex min-w-0 items-center gap-1">
             <Tooltip>
               <TooltipTrigger
                 render={
@@ -105,8 +116,14 @@ export function ReaderView() {
               <ArrowLeft />
               {t("reader.backToLibrary", "书库")}
             </Button>
+            {breadcrumb && (
+              <div className="ms-2 hidden min-w-0 items-center gap-2 text-xs text-muted-foreground sm:flex">
+                <span className="size-1 shrink-0 rounded-full bg-border" />
+                <span className="truncate">{breadcrumb}</span>
+              </div>
+            )}
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-1">
             <ReaderPrefs />
             <Tooltip>
               <TooltipTrigger
