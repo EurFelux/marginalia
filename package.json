@@ -15,6 +15,7 @@
     "package": "electron-forge package",
     "make": "electron-forge make",
     "release": "GITHUB_TOKEN=$(gh auth token) electron-forge publish",
+    "release:notes": "node scripts/release-notes.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
