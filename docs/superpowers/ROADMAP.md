@@ -45,6 +45,8 @@
 
 **章节名显示已交付**（2026-06-04，移植 UP1）：顶栏左组「书库」按钮后加「书名 · 章节名」面包屑（圆点分隔 + `truncate`，`sm` 以下隐藏）；AI 面板 header 改两行堆叠，第二行「章节名 · 会话」——章节取**会话归属章优先**（与面板内消息一致）、无 active 回退当前阅读章（新会话将归属它）。新共享 hook `query/use-chapter-title.ts` 复用 `qk.chapters` 缓存（与 ReaderView 同 key，React Query 去重零额外 IPC）；顶栏书名同理复用 `qk.book`（BookCard 同 key）。`title: null`（epub 无 TOC 兜底路径）优雅降级：面包屑只显书名、面板第二行整行隐藏。新 i18n key `ai.conversationSuffix`（extract 对非 primary 语言只占位空串，en 手补——`i18n:lint` 不报此漏）。
 
+**空摘要防御 + 章节摘要重新生成已交付**（2026-06-04）：provider 异常（content-filter/空 completion）不抛错返回空文本，曾原样落库 → 派生 ready 永不重试。写入侧：章节 `generateText`/全书 `streamText` 空产出一律不落库、标 failed（unavailable 可重试）；全书 force 重生成空产出保留旧摘要。读取侧自愈：新谓词 `hasText`（空/全空白≠有效摘要）用于派生与 ensure 的 ready-skip——既有脏行读出即 pending、下次触发直接重生成覆盖，无需数据清洗。重新生成：`ensureChapterSummary` 加 `force`（镜像全书）；`generate-chapter-summary` IPC input 加可选 `force`——pill 手动按钮恒 `force:true`、开章自动触发不带（已 ready 廉价 no-op，防自动路径反复烧钱）。SummaryPill 弹卡收敛到 BookCard 设计语言：按钮居标题行右上（ready→outline「重新生成」/unavailable→「重试」/生成中→文字），删弹卡内冗余状态徽标（触发器 pill 已表达）。8 个 headless 新用例（空产出/全空白/脏行自愈/force 重生成）。
+
 **下一目标候选**：RA4 收尾（**M-d 全书摘要**——RA4 已交付）、设置/产品 backlog（最大并发数 / 代理 / stepLimit / 独立摘要模型 / **自动命名会话** / onboarding 引导）、其余延后项（选区工具栏/ChipBar → Base UI 原语、自绘窗口 chrome、嵌套 TOC / 章内分页）。类型设计债清理 ✅、颜色模式 ✅、`preferences` ✅、RA5 ✅、RA1-full「精度/内存 pass」✅、IPC 契约注册表 #8 ✅、类 macOS 自绘滚动条 ✅、会话 tab ✅、**三向可收起布局 ✅** 均已完成。
 
 ---
