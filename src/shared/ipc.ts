@@ -10,6 +10,7 @@ import type {
 import {
   bookIdInput,
   chapterRefInput,
+  generateChapterSummaryInput,
   importBookInput,
   readChapterTextInput,
   saveProgressInput,
@@ -126,7 +127,7 @@ export const C = {
   contentGenerateChapterSummary: def(
     "content:generate-chapter-summary",
     "invoke",
-    chapterRefInput,
+    generateChapterSummaryInput,
     out<ChapterSummaryDto>(),
   ),
   contentBookSummary: def(

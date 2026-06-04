@@ -23,8 +23,10 @@ export default {
   "ai.summary.heading": "Chapter summary",
   "ai.summary.placeholderGenerating": "Chapter summary is generating…",
   "ai.summary.placeholderPending":
-    'No chapter summary yet. Click "Generate summary" below, or enable "Auto-generate on chapter open" in Settings. Once ready it will be sent to the AI alongside your question.',
+    'No chapter summary yet. Click "Generate summary" in the top right, or enable "Auto-generate on chapter open" in Settings. Once ready it will be sent to the AI alongside your question.',
   "ai.summary.placeholderUnavailable": "Chapter summary failed or is unavailable. You can retry.",
+  "ai.summary.regenerate": "Regenerate",
+  "ai.summary.retry": "Retry",
   "ai.summary.statusGenerating": "Summary generating",
   "ai.summary.statusPending": "Summary pending",
   "ai.summary.statusReady": "Summary ready",

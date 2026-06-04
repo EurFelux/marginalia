@@ -41,7 +41,7 @@ export function SummaryPill() {
   const PLACEHOLDER: Record<SummaryStatus, string> = {
     pending: t(
       "ai.summary.placeholderPending",
-      "本章摘要尚未生成。点下方「生成摘要」，或在设置里开启「开章自动生成」。就绪后会随提问一并提供给 AI。",
+      "本章摘要尚未生成。点右上「生成摘要」，或在设置里开启「开章自动生成」。就绪后会随提问一并提供给 AI。",
     ),
     generating: t("ai.summary.placeholderGenerating", "本章摘要正在生成…"),
     ready: "",
@@ -58,16 +58,26 @@ export function SummaryPill() {
     },
   });
 
+  // 手动点击总是 force：跳过 ready-skip 重新生成（镜像全书摘要按钮语义）；开章自动触发不走这里、不带 force。
   const generate = useMutation({
     mutationFn: () =>
-      window.api.content.generateChapterSummary({ bookId: bookId!, chapterId: chapterId! }),
+      window.api.content.generateChapterSummary({
+        bookId: bookId!,
+        chapterId: chapterId!,
+        force: true,
+      }),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.chapterSummary(bookId!, chapterId!) }),
   });
 
   if (!bookId || !chapterId) return null;
   const status = summary.data?.status ?? "pending";
   const badge = BADGE[status];
-  const canGenerate = status === "pending" || status === "unavailable";
+  const genLabel =
+    status === "ready"
+      ? t("ai.summary.regenerate", "重新生成")
+      : status === "unavailable"
+        ? t("ai.summary.retry", "重试")
+        : t("ai.summary.generate", "生成摘要");
 
   return (
     <Popover>
@@ -87,25 +97,26 @@ export function SummaryPill() {
           <span className="truncate text-xs font-semibold">
             {t("ai.summary.heading", "本章摘要")}
           </span>
-          <span className={cn("shrink-0 rounded-full px-1.5 py-0.5 text-[10px]", badge.cls)}>
-            {badge.label}
-          </span>
+          {/* 右上角放生成/重新生成按钮（状态已由触发器 pill 表达，镜像 BookCard）；生成中显示一行提示 */}
+          {status === "generating" ? (
+            <span className="shrink-0 text-[10px] text-muted-foreground">
+              {t("ai.summary.generating", "生成中…")}
+            </span>
+          ) : (
+            <Button
+              size="xs"
+              variant={status === "ready" ? "outline" : "default"}
+              onClick={() => generate.mutate()}
+              disabled={generate.isPending}
+              className="shrink-0"
+            >
+              {generate.isPending ? "…" : genLabel}
+            </Button>
+          )}
         </div>
         <p className="whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">
           {status === "ready" ? summary.data?.summary : PLACEHOLDER[status]}
         </p>
-        {canGenerate && (
-          <Button
-            size="sm"
-            onClick={() => generate.mutate()}
-            disabled={generate.isPending}
-            className="mt-2"
-          >
-            {generate.isPending
-              ? t("ai.summary.generating", "生成中…")
-              : t("ai.summary.generate", "生成摘要")}
-          </Button>
-        )}
       </PopoverContent>
     </Popover>
   );

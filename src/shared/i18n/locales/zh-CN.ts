@@ -22,8 +22,10 @@ export default {
   "ai.summary.heading": "本章摘要",
   "ai.summary.placeholderGenerating": "本章摘要正在生成…",
   "ai.summary.placeholderPending":
-    "本章摘要尚未生成。点下方「生成摘要」，或在设置里开启「开章自动生成」。就绪后会随提问一并提供给 AI。",
+    "本章摘要尚未生成。点右上「生成摘要」，或在设置里开启「开章自动生成」。就绪后会随提问一并提供给 AI。",
   "ai.summary.placeholderUnavailable": "本章摘要生成失败或暂不可用，可重试生成。",
+  "ai.summary.regenerate": "重新生成",
+  "ai.summary.retry": "重试",
   "ai.summary.statusGenerating": "摘要生成中",
   "ai.summary.statusPending": "摘要待生成",
   "ai.summary.statusReady": "摘要就绪",

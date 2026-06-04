@@ -143,6 +143,57 @@ describe("ensureChapterSummary / getChapterSummaryView (derived status)", () => 
     db.update(chapters).set({ summary: "S" }).where(eq(chapters.id, ch1.id)).run();
     expect(getChapterSummaryView(db, book.id, ch1.id).status).toBe("ready"); // summary 在 → ready
   });
+
+  it("does not store an empty generation; derives unavailable (retryable)", async () => {
+    const { db, book, ch1, deps } = setup({ ok: true, model: genModel(""), modelId: "mock" });
+    await ensureChapterSummary(deps, book.id, ch1.id);
+    const row = db
+      .select({ summary: chapters.summary })
+      .from(chapters)
+      .where(eq(chapters.id, ch1.id))
+      .get();
+    expect(row?.summary).toBeNull(); // 空产出不落库
+    expect(getChapterSummaryView(db, book.id, ch1.id).status).toBe("unavailable");
+  });
+
+  it("treats whitespace-only generation as empty (not stored)", async () => {
+    const { db, book, ch1, deps } = setup({
+      ok: true,
+      model: genModel("  \n\t "),
+      modelId: "mock",
+    });
+    await ensureChapterSummary(deps, book.id, ch1.id);
+    expect(getChapterSummaryView(db, book.id, ch1.id)).toEqual({
+      status: "unavailable",
+      summary: null,
+    });
+  });
+
+  it("derives pending for a stored empty summary (self-heals legacy bad rows on read)", () => {
+    const { db, book, ch1 } = setup({ ok: false, reason: "x" });
+    db.update(chapters).set({ summary: "" }).where(eq(chapters.id, ch1.id)).run();
+    expect(getChapterSummaryView(db, book.id, ch1.id)).toEqual({
+      status: "pending",
+      summary: null,
+    });
+  });
+
+  it("regenerates over a stored empty summary instead of skipping", async () => {
+    const { db, book, ch1, deps } = setup({ ok: true, model: genModel("fresh"), modelId: "mock" });
+    db.update(chapters).set({ summary: "" }).where(eq(chapters.id, ch1.id)).run();
+    await ensureChapterSummary(deps, book.id, ch1.id);
+    expect(getChapterSummaryView(db, book.id, ch1.id)).toEqual({
+      status: "ready",
+      summary: "fresh",
+    });
+  });
+
+  it("force=true regenerates over an existing summary", async () => {
+    const { db, book, ch1, deps } = setup({ ok: true, model: genModel("fresh"), modelId: "mock" });
+    db.update(chapters).set({ summary: "cached" }).where(eq(chapters.id, ch1.id)).run();
+    await ensureChapterSummary(deps, book.id, ch1.id, true);
+    expect(getChapterSummaryView(db, book.id, ch1.id).summary).toBe("fresh");
+  });
 });
 
 describe("ensureBookSummary / getBookSummaryView (derived status)", () => {
@@ -211,5 +262,25 @@ describe("ensureBookSummary / getBookSummaryView (derived status)", () => {
     expect(getBookSummaryView(db, book.id).status).toBe("pending"); // failed 消失 → 可重试
     db.update(books).set({ summary: "S" }).where(eq(books.id, book.id)).run();
     expect(getBookSummaryView(db, book.id).status).toBe("ready"); // summary 在 → ready
+  });
+
+  it("does not store an empty stream output (forced regen keeps old summary, derives ready)", async () => {
+    const { db, book, deps } = setup({ ok: true, model: streamModel(""), modelId: "mock" });
+    db.update(books).set({ summary: "old" }).where(eq(books.id, book.id)).run();
+    await ensureBookSummary(deps, book.id, true);
+    // 空产出不覆盖旧摘要；旧摘要仍有效 → 派生 ready（与 stream error 保留旧摘要的语义一致）
+    expect(getBookSummaryView(db, book.id)).toEqual({ status: "ready", summary: "old" });
+  });
+
+  it("does not store an empty stream output; derives unavailable when no old summary exists", async () => {
+    const { db, book, deps } = setup({ ok: true, model: streamModel(""), modelId: "mock" });
+    await ensureBookSummary(deps, book.id);
+    expect(getBookSummaryView(db, book.id)).toEqual({ status: "unavailable", summary: null });
+  });
+
+  it("derives pending for a stored empty book summary (self-heals legacy bad rows on read)", () => {
+    const { db, book } = setup({ ok: false, reason: "x" });
+    db.update(books).set({ summary: "" }).where(eq(books.id, book.id)).run();
+    expect(getBookSummaryView(db, book.id)).toEqual({ status: "pending", summary: null });
   });
 });

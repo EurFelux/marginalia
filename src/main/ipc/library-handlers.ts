@@ -90,11 +90,15 @@ export const libraryBindings: Binding[] = [
 
   // 触发本章摘要懒生成（开章自动 / pill 手动按钮）。fire-and-forget：ensureChapterSummary
   // 内部自含 reject 兜底；同步前缀会把状态派生为 generating，故返回当前派生状态即时反馈。
+  // force（pill「重新生成」）跳过 ready-skip；自动触发不传——否则每次开章都会重生成已 ready 的摘要。
   bind(C.contentGenerateChapterSummary, (input) => {
     const db = getDb();
-    void ensureChapterSummary(makeSummaryDeps(), input.bookId, input.chapterId).catch((err) =>
-      console.warn("[content] generate chapter summary failed:", err),
-    );
+    void ensureChapterSummary(
+      makeSummaryDeps(),
+      input.bookId,
+      input.chapterId,
+      input.force ?? false,
+    ).catch((err) => console.warn("[content] generate chapter summary failed:", err));
     return getChapterSummaryView(db, input.bookId, input.chapterId);
   }),
 

@@ -21,6 +21,12 @@ export const readChapterTextInput = chapterRefInput.extend({
 });
 export type ReadChapterTextInput = z.infer<typeof readChapterTextInput>;
 
+/** 手动（重）生成传 `force: true` 跳过 ready-skip；自动触发（开章）不传，已 ready 即廉价 no-op。 */
+export const generateChapterSummaryInput = chapterRefInput.extend({
+  force: z.boolean().optional(),
+});
+export type GenerateChapterSummaryInput = z.infer<typeof generateChapterSummaryInput>;
+
 export interface BookSummaryDto {
   id: string;
   title: string | null;

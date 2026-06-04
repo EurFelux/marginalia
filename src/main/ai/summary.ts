@@ -20,9 +20,17 @@ export interface SummaryDeps {
 }
 
 // 章节摘要的进程内运行时状态（不持久化；重启清空，镜像全书摘要）：
-// summary!=null=ready，inFlightChapters=generating，failedChapters=unavailable，否则 pending。
+// 有效 summary=ready，inFlightChapters=generating，failedChapters=unavailable，否则 pending。
 const inFlightChapters = new Set<string>();
 const failedChapters = new Set<string>();
+
+/**
+ * 空/全空白文本不算有效摘要。provider 异常（content-filter、空 completion）可能不抛错而返回空文本，
+ * 历史版本曾把它落库 → 派生 ready 永不重试；读取/skip 一律用本谓词，使既有脏行派生回 pending 自愈。
+ */
+function hasText(s: string | null | undefined): s is string {
+  return s != null && s.trim() !== "";
+}
 
 /**
  * 读某章摘要正文 + 派生状态（状态不入 DB，镜像 getBookSummaryView）。
@@ -40,7 +48,7 @@ export function getChapterSummaryView(
     .get();
   if (!row) throw new Error(`summary: chapter ${chapterId} not found in book ${bookId}`);
   if (inFlightChapters.has(chapterId)) return { status: "generating", summary: null };
-  const summary = row.summary ?? null;
+  const summary = hasText(row.summary) ? row.summary : null;
   const status: SummaryStatus =
     summary != null ? "ready" : failedChapters.has(chapterId) ? "unavailable" : "pending";
   return { status, summary };
@@ -55,11 +63,13 @@ export function __resetChapterSummaryRuntime(): void {
 /**
  * 懒生成某章摘要（设计文档 §11；状态派生，不入 DB）。非阻塞调用方 fire-and-forget。
  * 失败章节下次触发会自动重试（开头清 failedChapters），重启后进程内集清空亦自愈——故无需 resetStuckSummaries。
+ * `force=true`（pill「重新生成」）跳过 ready-skip、覆盖旧摘要；自动触发（开章）不传 force。
  */
 export async function ensureChapterSummary(
   deps: SummaryDeps,
   bookId: string,
   chapterId: string,
+  force = false,
 ): Promise<void> {
   const { db, loadBytes, resolveModel } = deps;
   let claimed = false;
@@ -71,7 +81,7 @@ export async function ensureChapterSummary(
       .where(and(eq(chapters.bookId, bookId), eq(chapters.id, chapterId)))
       .get();
     if (!stored) return; // 章不存在
-    if (stored.summary != null) return; // 已 ready，跳过
+    if (!force && hasText(stored.summary)) return; // 已 ready，非强制跳过（空文本脏行不算，自愈重生成）
     const resolved = resolveModel();
     if (!resolved.ok) return; // 模型未配置 → 保持 pending，配置后重试
 
@@ -89,6 +99,12 @@ export async function ensureChapterSummary(
       maxOutputTokens: 512,
       maxRetries: 1,
     });
+    if (!hasText(text)) {
+      // provider 不抛错但产出空文本 → 视为失败：不落库（否则派生 ready 永不重试），标 unavailable 可重试
+      console.warn(`[summary] chapter ${chapterId} generated empty text, treated as failure`);
+      failedChapters.add(chapterId);
+      return;
+    }
     db.update(chapters).set({ summary: text }).where(eq(chapters.id, chapterId)).run();
   } catch (err) {
     // 自含全部 reject（fire-and-forget 端口为 => void）。已 claim 的标记 failed（派生 unavailable）。
@@ -123,7 +139,7 @@ export function getBookSummaryView(
   if (inFlightBooks.has(bookId)) {
     return { status: "generating", summary: streamingBookSummaries.get(bookId) ?? null };
   }
-  const summary = row.summary ?? null;
+  const summary = hasText(row.summary) ? row.summary : null;
   const status: SummaryStatus =
     summary != null ? "ready" : failedBooks.has(bookId) ? "unavailable" : "pending";
   return { status, summary };
@@ -154,7 +170,7 @@ export async function ensureBookSummary(
       .from(books)
       .where(eq(books.id, bookId))
       .get();
-    if (!force && stored?.summary != null) return; // 已 ready，非强制跳过
+    if (!force && hasText(stored?.summary)) return; // 已 ready，非强制跳过（空文本脏行不算，自愈重生成）
     const resolved = resolveModel();
     if (!resolved.ok) return; // 模型未配置 → 保持 pending，配置后重试
 
@@ -182,9 +198,12 @@ export async function ensureBookSummary(
       acc += delta;
       streamingBookSummaries.set(bookId, acc); // partial 供 getBookSummaryView 轮询读取
     }
-    if (hadError)
-      failedBooks.add(bookId); // 不落库（保留旧 summary 不变）
-    else db.update(books).set({ summary: acc }).where(eq(books.id, bookId)).run();
+    if (hadError || !hasText(acc)) {
+      // 流错误或空产出（provider 不报错但 0 字符）均不落库（保留旧 summary 不变），标 failed 可重试
+      if (!hadError)
+        console.warn(`[summary] book ${bookId} generated empty text, treated as failure`);
+      failedBooks.add(bookId);
+    } else db.update(books).set({ summary: acc }).where(eq(books.id, bookId)).run();
   } catch (err) {
     console.warn(`[summary] book ${bookId} ensure failed:`, err);
     if (claimed) failedBooks.add(bookId);
