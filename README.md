@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/icon.svg" width="128" alt="Marginalia app icon">
+
 # Marginalia
 
 **Talk to AI in the margins.**

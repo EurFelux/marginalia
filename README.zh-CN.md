@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/icon.svg" width="128" alt="Marginalia 应用图标">
+
 # Marginalia
 
 **在书页边上，和 AI 对话。**
