@@ -8,6 +8,7 @@ import { readEpubFile, writeEpubFile } from "@main/library/book-files";
 import { getProgress, saveProgress } from "@main/library/progress";
 import { getToc, listChapters, readChapterText } from "@main/library/content";
 import {
+  assertSummaryModelReady,
   ensureBookSummary,
   ensureChapterSummary,
   getBookSummaryView,
@@ -91,14 +92,14 @@ export const libraryBindings: Binding[] = [
   // 触发本章摘要懒生成（开章自动 / pill 手动按钮）。fire-and-forget：ensureChapterSummary
   // 内部自含 reject 兜底；同步前缀会把状态派生为 generating，故返回当前派生状态即时反馈。
   // force（pill「重新生成」）跳过 ready-skip；自动触发不传——否则每次开章都会重生成已 ready 的摘要。
+  // 预检：模型未配置 → reject 带 reason（pill toast 透传；自动触发侧 catch 静默），不再静默装死。
   bind(C.contentGenerateChapterSummary, (input) => {
     const db = getDb();
-    void ensureChapterSummary(
-      makeSummaryDeps(),
-      input.bookId,
-      input.chapterId,
-      input.force ?? false,
-    ).catch((err) => console.warn("[content] generate chapter summary failed:", err));
+    const deps = makeSummaryDeps();
+    assertSummaryModelReady(deps.resolveModel);
+    void ensureChapterSummary(deps, input.bookId, input.chapterId, input.force ?? false).catch(
+      (err) => console.warn("[content] generate chapter summary failed:", err),
+    );
     return getChapterSummaryView(db, input.bookId, input.chapterId);
   }),
 
@@ -107,8 +108,10 @@ export const libraryBindings: Binding[] = [
   // 触发全书摘要懒生成（书卡手动按钮）。fire-and-forget；同步前缀置 inFlight，故返回即为 generating。
   bind(C.contentGenerateBookSummary, (input) => {
     const db = getDb();
+    const deps = makeSummaryDeps();
+    assertSummaryModelReady(deps.resolveModel); // 模型未配置 → reject 带 reason（书卡 toast 透传）
     // force=true：书卡「生成/重新生成」总是（重）生成，覆盖旧摘要。
-    void ensureBookSummary(makeSummaryDeps(), input.bookId, true).catch((err) =>
+    void ensureBookSummary(deps, input.bookId, true).catch((err) =>
       console.warn("[content] generate book summary failed:", err),
     );
     return getBookSummaryView(db, input.bookId);

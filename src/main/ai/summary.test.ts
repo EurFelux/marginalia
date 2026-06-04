@@ -12,6 +12,7 @@ import type { LoadBytes } from "@main/ai/tools";
 import {
   __resetBookSummaryRuntime,
   __resetChapterSummaryRuntime,
+  assertSummaryModelReady,
   ensureBookSummary,
   ensureChapterSummary,
   getBookSummaryView,
@@ -282,5 +283,20 @@ describe("ensureBookSummary / getBookSummaryView (derived status)", () => {
     const { db, book } = setup({ ok: false, reason: "x" });
     db.update(books).set({ summary: "" }).where(eq(books.id, book.id)).run();
     expect(getBookSummaryView(db, book.id)).toEqual({ status: "pending", summary: null });
+  });
+});
+
+describe("assertSummaryModelReady", () => {
+  it("throws the resolver's reason when no model is configured", () => {
+    // 手动生成入口的预检（镜像聊天的发送前拦截）：模型未配置不再静默保持 pending——
+    // handler 据此 reject，渲染层 toast 透传真实原因（如「Provider 未设置密钥」）。
+    expect(() => assertSummaryModelReady(() => ({ ok: false, reason: "no key" }))).toThrow(
+      "no key",
+    );
+  });
+
+  it("is a no-op when the model resolves", () => {
+    const { deps } = setup({ ok: true, model: genModel("s"), modelId: "mock" });
+    expect(() => assertSummaryModelReady(deps.resolveModel)).not.toThrow();
   });
 });

@@ -19,6 +19,7 @@ export default {
     "(Make sure you have configured an Anthropic API Key and model in Settings.)",
   "ai.stop": "Stop",
   "ai.summary.generate": "Generate summary",
+  "ai.summary.generateFailed": "Failed to generate summary: {{error}}",
   "ai.summary.generating": "Generating…",
   "ai.summary.heading": "Chapter summary",
   "ai.summary.placeholderGenerating": "Chapter summary is generating…",
@@ -95,6 +96,7 @@ export default {
   "reader.annotations": "Annotations",
   "reader.backToLibrary": "Library",
   "reader.bookSummary.generate": "Generate",
+  "reader.bookSummary.generateFailed": "Failed to generate book summary: {{error}}",
   "reader.bookSummary.generatingLabel": "Generating…",
   "reader.bookSummary.panelTitle": "Full-book summary",
   "reader.bookSummary.placeholderGenerating":

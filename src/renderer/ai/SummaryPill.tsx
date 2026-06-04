@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import type { SummaryStatus } from "@shared/library";
 import { qk } from "@renderer/query/keys";
+import { chapterSummaryQuery } from "@renderer/query/summary-queries";
 import { cn } from "@renderer/lib/utils";
 import { Button } from "@renderer/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@renderer/components/ui/popover";
@@ -10,7 +12,8 @@ import { usePrefsStore } from "@renderer/store/prefs-store";
 
 /**
  * AI 面板头部的本章摘要 pill（移植 UP1 SummaryPill）：显示摘要状态，点开弹卡看正文。
- * 摘要由发送消息时在主进程懒生成（pending→generating→ready），故 pending/generating 时轮询刷新。
+ * 摘要在主进程懒生成（pill 按钮手动 / 开章自动触发，pending→generating→ready）；
+ * query 配置见 chapterSummaryQuery——派生状态必须绕开全局 staleTime=∞，非终态轮询刷新。
  */
 export function SummaryPill() {
   const { t } = useTranslation();
@@ -49,13 +52,8 @@ export function SummaryPill() {
   };
 
   const summary = useQuery({
-    queryKey: qk.chapterSummary(bookId ?? "", chapterId ?? ""),
-    queryFn: () => window.api.content.chapterSummary({ bookId: bookId!, chapterId: chapterId! }),
+    ...chapterSummaryQuery(bookId ?? "", chapterId ?? ""),
     enabled: panelOpen && bookId != null && chapterId != null,
-    refetchInterval: (q) => {
-      const s = q.state.data?.status;
-      return s === "pending" || s === "generating" ? 2500 : false;
-    },
   });
 
   // 手动点击总是 force：跳过 ready-skip 重新生成（镜像全书摘要按钮语义）；开章自动触发不走这里、不带 force。
@@ -67,6 +65,13 @@ export function SummaryPill() {
         force: true,
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.chapterSummary(bookId!, chapterId!) }),
+    onError: (e) => {
+      // 模型未配置（handler 预检 reject）等失败透传真实原因（honest-error），不自动消失。
+      toast.error(
+        t("ai.summary.generateFailed", "生成摘要失败：{{error}}", { error: (e as Error).message }),
+        { closeButton: true, duration: Infinity },
+      );
+    },
   });
 
   if (!bookId || !chapterId) return null;

@@ -1,8 +1,10 @@
 import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { Streamdown } from "streamdown";
 import type { SummaryStatus } from "@shared/library";
 import { qk } from "@renderer/query/keys";
+import { bookSummaryQuery } from "@renderer/query/summary-queries";
 import { cn } from "@renderer/lib/utils";
 import { Button } from "@renderer/components/ui/button";
 import { ScrollArea } from "@renderer/components/ui/scroll-area";
@@ -26,15 +28,21 @@ export function BookCard({ bookId }: { bookId: string }) {
     queryKey: qk.book(bookId),
     queryFn: () => window.api.library.get({ bookId }),
   });
-  const summary = useQuery({
-    queryKey: qk.bookSummary(bookId),
-    queryFn: () => window.api.content.bookSummary({ bookId }),
-    // 生成中以 ~400ms 轮询，让累积的 partial 流式长出来（复用 query，无需新事件通道）。
-    refetchInterval: (q) => (q.state.data?.status === "generating" ? 400 : false),
-  });
+  // 生成中以 ~400ms 轮询让累积的 partial 流式长出来；staleTime:0 使换书回来时重拉真实状态
+  //（派生状态不能吃全局 staleTime=∞ 的缓存快照），均见 bookSummaryQuery。
+  const summary = useQuery(bookSummaryQuery(bookId));
   const generate = useMutation({
     mutationFn: () => window.api.content.generateBookSummary({ bookId }),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.bookSummary(bookId) }),
+    onError: (e) => {
+      // 模型未配置（handler 预检 reject）等失败透传真实原因（honest-error），不自动消失。
+      toast.error(
+        t("reader.bookSummary.generateFailed", "生成全书摘要失败：{{error}}", {
+          error: (e as Error).message,
+        }),
+        { closeButton: true, duration: Infinity },
+      );
+    },
   });
 
   const status = summary.data?.status ?? "pending";

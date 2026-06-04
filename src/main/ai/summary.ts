@@ -19,6 +19,17 @@ export interface SummaryDeps {
   resolveModel: () => ResolvedModel;
 }
 
+/**
+ * 手动生成入口的预检（镜像聊天的发送前拦截）：模型未配置时抛带 reason 的错误，
+ * 使 generate handler reject、渲染层 toast 透传真实原因（如「Provider 未设置密钥」）。
+ * 没有它，ensure* 的 `!resolved.ok → return` 静默保持 pending——点击零反馈、零日志，无从排查。
+ * 自动触发（开章）共用同一 handler，渲染层以 catch 静默消化，不弹窗。
+ */
+export function assertSummaryModelReady(resolveModel: () => ResolvedModel): void {
+  const resolved = resolveModel();
+  if (!resolved.ok) throw new Error(resolved.reason);
+}
+
 // 章节摘要的进程内运行时状态（不持久化；重启清空，镜像全书摘要）：
 // 有效 summary=ready，inFlightChapters=generating，failedChapters=unavailable，否则 pending。
 const inFlightChapters = new Set<string>();
