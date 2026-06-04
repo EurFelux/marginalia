@@ -46,7 +46,7 @@ Apple Books 风的封面墙，一眼找到你的书。把 ePub 文件**拖进窗
 
 ### 🔌 自带 key，多服务商
 
-接 OpenAI、Anthropic、Google，或任意 **OpenAI 兼容端点**（自建网关 / 代理皆可）。还能定制多个「助手」人设——文学分析、语言学习、哲学讨论，各用各的提示词与模型。
+接 OpenAI、Anthropic、Google，或任意 **OpenAI 兼容端点**（自建网关 / 代理皆可）。
 
 ### 🌍 本地优先 · 双语
 

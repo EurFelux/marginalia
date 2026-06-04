@@ -46,7 +46,7 @@ An Apple Books-style cover wall to spot your books at a glance. **Drag an ePub i
 
 ### 🔌 Bring your own key, any provider
 
-Connect OpenAI, Anthropic, Google, or any **OpenAI-compatible endpoint** (self-hosted gateway or proxy). Define multiple "Assistant" personas — literary analysis, language learning, philosophy — each with its own prompt and model.
+Connect OpenAI, Anthropic, Google, or any **OpenAI-compatible endpoint** (self-hosted gateway or proxy).
 
 ### 🌍 Local-first · bilingual
 
