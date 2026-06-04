@@ -182,7 +182,6 @@ export function ReaderView() {
           side="left"
           open={layout.sidebarOpen}
           sizeClass="w-64"
-          className="bg-muted/30"
           label={t("reader.expandSidebar", "展开侧栏")}
         >
           <Sidebar bookId={bookId} />

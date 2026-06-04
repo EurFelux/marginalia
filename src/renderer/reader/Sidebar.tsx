@@ -13,7 +13,9 @@ export function Sidebar({ bookId }: { bookId: string }) {
   // tab label 仅在选中态显示（i18n 宽度适配）：trigger 标 group/tab，文字 span 用 group-data-[active] 显隐；
   // 未选中只剩图标，故每个 trigger 挂 aria-label 保可读名。
   return (
-    <div className="flex h-full flex-col">
+    // 背景放组件内部而非经 CollapsiblePane className 传入（镜像 AIPanel）：半透明 bg-muted/30
+    // 若传给 CollapsiblePane 会被 tailwind-merge 顶掉收起态抽屉的不透明 bg-background 底 → 浮层透明。
+    <div className="flex h-full flex-col bg-muted/30">
       <BookCard bookId={bookId} />
       <Tabs defaultValue="toc" className="min-h-0 flex-1 flex-col gap-0">
         <div className="shrink-0 border-b border-border p-1.5">

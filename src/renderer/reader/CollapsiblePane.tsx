@@ -34,7 +34,11 @@ interface CollapsiblePaneProps {
   sizeClass: string;
   /** 收起态边缘热区的 aria-label。 */
   label: string;
-  /** 追加到面板元素的类（两种模式都生效，如左栏 bg-muted/30）。 */
+  /**
+   * 追加到面板元素的类（两种模式都生效）。**勿传半透明背景**（如 bg-muted/30）——
+   * tailwind-merge 会用它顶掉收起态抽屉的不透明 bg-background 底，浮层将透出正文；
+   * 装饰性背景放 children 根元素（见 Sidebar / AIPanel）。
+   */
   className?: string;
   children: ReactNode;
 }
