@@ -57,7 +57,7 @@ body :is(code, pre) * {
 
 ## 字体资源加载
 
-新增依赖:`@fontsource/lxgw-wenkai`、`@fontsource/noto-serif-sc`、`@fontsource/noto-sans-sc`(各引 400 + 700 两个 weight;serif 档另补 Fraunces 的 italic CSS——正文 `<em>` 常见,可变包默认只含 normal style)。
+新增依赖:`lxgw-wenkai-webfont`、`@fontsource/noto-serif-sc`、`@fontsource/noto-sans-sc`(各引 regular/400 + bold/700 两个 weight;serif 档另补 Fraunces 的 italic CSS——正文 `<em>` 常见,可变包默认只含 normal style)。文楷不用 `@fontsource/lxgw-wenkai`:该包**只有 latin 子集、没有中文字形**(实装勘察发现),社区包 `lxgw-wenkai-webfont` 才有完整中文 unicode-range 切片(582 个 woff2)。
 
 新建 `src/renderer/reader/reader-fonts.ts` 作为字体档位单一源:
 

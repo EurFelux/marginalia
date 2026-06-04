@@ -6,7 +6,9 @@
 
 **Architecture:** `readerPrefs` 新增 `fontFamily` 枚举字段(`.default("default")` 保旧数据兼容,复用现有持久化流水线,零新 IPC);`prefsToCss()` 按档位输出 `font-family` 覆盖规则;@fontsource 切片 CSS 经 vite `?inline` 取字符串、只拼当前档进 `styleCss` 注入每个 section iframe;ReaderPrefs 浮窗加 2×2 字体选择按钮(按钮用自家字体渲染预览)。
 
-**Tech Stack:** `@fontsource/lxgw-wenkai`、`@fontsource/noto-serif-sc`、`@fontsource/noto-sans-sc`(切片 woff2)、vite `?inline`、Zod 4、zustand、i18next。
+**Tech Stack:** `lxgw-wenkai-webfont`、`@fontsource/noto-serif-sc`、`@fontsource/noto-sans-sc`(切片 woff2)、vite `?inline`、Zod 4、zustand、i18next。
+
+> **Task 1 执行修正(2026-06-04):** `@fontsource/lxgw-wenkai` 只有 latin 子集、无中文字形,已换 `lxgw-wenkai-webfont`(完整中文切片 582 个 woff2;`lxgwwenkai-regular.css`=400、`lxgwwenkai-bold.css`=700,font-family `'LXGW WenKai'`,url 相对 `./files/`)。Task 2/5/6 中 wenkai 的 import 路径已按此更正。
 
 **Spec:** `docs/superpowers/specs/2026-06-04-reader-font-family-design.md`
 
@@ -82,7 +84,7 @@ git commit -m "chore(deps): add cjk reading fonts (lxgw-wenkai, noto serif/sans 
 
 ```ts
 // @ts-expect-error spike: ?inline 声明在正式任务补
-import wenkai400 from "@fontsource/lxgw-wenkai/400.css?inline";
+import wenkai400 from "lxgw-wenkai-webfont/lxgwwenkai-regular.css?inline";
 ```
 
 把 `styleCss={...}` 的拼接改为(在 `prefsToCss(prefs)` 前面多拼两段):
@@ -428,8 +430,8 @@ declare module "*.css?inline" {
 import frauncesItalic from "@fontsource-variable/fraunces/wght-italic.css?inline";
 import frauncesWght from "@fontsource-variable/fraunces/wght.css?inline";
 import manropeWght from "@fontsource-variable/manrope/wght.css?inline";
-import wenkai400 from "@fontsource/lxgw-wenkai/400.css?inline";
-import wenkai700 from "@fontsource/lxgw-wenkai/700.css?inline";
+import wenkaiRegular from "lxgw-wenkai-webfont/lxgwwenkai-regular.css?inline";
+import wenkaiBold from "lxgw-wenkai-webfont/lxgwwenkai-bold.css?inline";
 import notoSansSc400 from "@fontsource/noto-sans-sc/400.css?inline";
 import notoSansSc700 from "@fontsource/noto-sans-sc/700.css?inline";
 import notoSerifSc400 from "@fontsource/noto-serif-sc/400.css?inline";
@@ -437,7 +439,7 @@ import notoSerifSc700 from "@fontsource/noto-serif-sc/700.css?inline";
 import type { ReaderFontFamily } from "@renderer/types";
 
 const FONT_FACE_CSS: Record<Exclude<ReaderFontFamily, "default">, string> = {
-  wenkai: [wenkai400, wenkai700].join("\n"),
+  wenkai: [wenkaiRegular, wenkaiBold].join("\n"),
   // 正文 <em> 常见,衬线档带上 Fraunces 的 italic 轴(中文无斜体,浏览器合成)
   serif: [frauncesWght, frauncesItalic, notoSerifSc400, notoSerifSc700].join("\n"),
   sans: [manropeWght, notoSansSc400, notoSansSc700].join("\n"),
@@ -503,7 +505,7 @@ git commit -m "feat(renderer): inject per-preset @font-face css into section ifr
 import 区追加(side-effect import 让**主文档**也有 @font-face,预览按钮才能渲染出真字体;400 足够):
 
 ```ts
-import "@fontsource/lxgw-wenkai/400.css";
+import "lxgw-wenkai-webfont/lxgwwenkai-regular.css";
 import "@fontsource/noto-sans-sc/400.css";
 import "@fontsource/noto-serif-sc/400.css";
 import type { ReaderFontFamily } from "@renderer/types";
