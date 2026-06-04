@@ -54,6 +54,17 @@ A bilingual interface (English / 简体中文) that follows your system language
 
 ## 📦 Installation
 
+### Homebrew (recommended)
+
+```bash
+brew tap eurfelux/tap
+brew install --cask marginalia
+```
+
+The cask clears the quarantine flag for you, so the app opens right away — no Gatekeeper hoops.
+
+### Manual download
+
 Grab the latest `.dmg` from [Releases](https://github.com/EurFelux/marginalia/releases), open it, and drag Marginalia into Applications.
 
 > [!IMPORTANT]
