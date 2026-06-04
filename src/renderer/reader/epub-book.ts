@@ -47,6 +47,12 @@ export async function createEpubBook(bytes: Uint8Array): Promise<EpubBook> {
   // epubjs 接受 ArrayBuffer；Uint8Array 取其底层 buffer。
   const book: Book = ePub(bytes.buffer as ArrayBuffer);
   await book.ready;
+  // ready 只等元数据解析，不等「全书资源 → blob URL 替换表」（resources.replacements()，
+  // 由 opened 门控；epubjs 自家 Rendition 也 gate 在 opened 上）。只等 ready 时，首屏 section
+  // 可能在替换表填充前 serialize——substitute 对空表静默跳过，img 留相对路径，在 srcDoc
+  // iframe 里永久裂图（仅滚远触发 unload 再滚回重 render 才自愈）。replacements() 对单资源
+  // 失败一律 catch 成 null，不会 reject，故此处不需要超时兜底。
+  await book.opened;
 
   const spine = book.spine;
   // spine 项数：运行时 epubjs Spine 有 `.length`（unpack 时由 items.length 赋值），
