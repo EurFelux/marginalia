@@ -8,6 +8,7 @@
 
 ### Patch Changes
 
+- Fix first launch showing a blank window and prompting for keychain access after every update (cookie-encryption fuse retired — the app keeps no cookies and no longer touches the keychain)
 - 53a7a98: Fix images sometimes failing to appear on first paint when opening a book
 - 53a7a98: Fix macOS Gatekeeper rejecting downloaded builds (ad-hoc code signing)
 - 9e2a97b: Fix the collapsed left sidebar's hover drawer having a transparent background (reader text showed through)

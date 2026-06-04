@@ -104,7 +104,11 @@ const config: ForgeConfig = {
     new FusesPlugin({
       version: FuseVersion.V1,
       [FuseV1Options.RunAsNode]: false,
-      [FuseV1Options.EnableCookieEncryption]: true,
+      // 必须关闭（模板默认 true 的残留）：开启时 Chromium 启动即初始化 Safe Storage（macOS 钥匙串），
+      // 而 ad-hoc 签名每次构建都变 → 钥匙串 ACL 不认 → 每个新版本首启弹密码授权，且授权阻塞窗口内
+      // 首次 loadFile 以 ERR_FAILED 白屏（重开即好）。本 app 无 cookie 加密需求（无登录态；API key
+      // 明文落库，钥匙串已整体退役，见 2026-06-04 plaintext spec）。
+      [FuseV1Options.EnableCookieEncryption]: false,
       [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
       [FuseV1Options.EnableNodeCliInspectArguments]: false,
       [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
