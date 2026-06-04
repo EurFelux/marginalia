@@ -2,11 +2,17 @@ import { z } from "zod";
 import { annotationStyle } from "@shared/annotations";
 import { uiLanguage } from "@shared/i18n/language";
 
-/** 阅读排版偏好（字号倍率 / 行距 / 栏宽 px）。@renderer/types 的 ReaderPrefs 由此推导，单一源。 */
+/** 正文字体档位:default=原书默认(零干预);其余映射到打包字体栈(见 renderer 的 font-stacks)。 */
+export const readerFontFamily = z.enum(["default", "wenkai", "serif", "sans"]);
+export type ReaderFontFamily = z.infer<typeof readerFontFamily>;
+
+/** 阅读排版偏好(字号倍率 / 行距 / 栏宽 px / 字体档)。@renderer/types 的 ReaderPrefs 由此推导，单一源。 */
 export const readerPrefsSchema = z.object({
   fontScale: z.number(),
   lineHeight: z.number(),
   maxWidth: z.number().int(),
+  // .default 保旧落盘 JSON(无此字段)parse 通过,不连带重置字号/行距/栏宽
+  fontFamily: readerFontFamily.default("default"),
 });
 export type ReaderPrefs = z.infer<typeof readerPrefsSchema>;
 

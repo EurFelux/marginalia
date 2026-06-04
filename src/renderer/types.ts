@@ -11,4 +11,4 @@ export interface SelectionInfo {
 }
 
 // ReaderPrefs / ReaderLayout 收口到 @shared/preferences 的 Zod schema（单一源，供 preferences 表持久化）。
-export type { ReaderLayout, ReaderPrefs } from "@shared/preferences";
+export type { ReaderFontFamily, ReaderLayout, ReaderPrefs } from "@shared/preferences";

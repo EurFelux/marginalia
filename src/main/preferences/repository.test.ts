@@ -15,13 +15,19 @@ function freshDb() {
 describe("preferences repository", () => {
   it("round-trips each known key", () => {
     const db = freshDb();
-    setPreference(db, "readerPrefs", { fontScale: 1.2, lineHeight: 2, maxWidth: 720 });
+    setPreference(db, "readerPrefs", {
+      fontScale: 1.2,
+      lineHeight: 2,
+      maxWidth: 720,
+      fontFamily: "default",
+    });
     setPreference(db, "lastHighlightStyle", "green");
     setPreference(db, "autoSummarize", true);
     expect(getPreference(db, "readerPrefs")).toEqual({
       fontScale: 1.2,
       lineHeight: 2,
       maxWidth: 720,
+      fontFamily: "default",
     });
     expect(getPreference(db, "lastHighlightStyle")).toBe("green");
     expect(getPreference(db, "autoSummarize")).toBe(true);
@@ -69,13 +75,18 @@ describe("preferences repository", () => {
   it("getAllPreferences returns every set & valid key, skipping corrupt/unknown", () => {
     const db = freshDb();
     setPreference(db, "autoSummarize", false);
-    setPreference(db, "readerPrefs", { fontScale: 1, lineHeight: 1.9, maxWidth: 640 });
+    setPreference(db, "readerPrefs", {
+      fontScale: 1,
+      lineHeight: 1.9,
+      maxWidth: 640,
+      fontFamily: "default",
+    });
     // 损坏的 lastHighlightStyle + 注册表外的陈旧 key 都应被跳过
     db.insert(preferences).values({ key: "lastHighlightStyle", value: 123, updatedAt: 1 }).run();
     db.insert(preferences).values({ key: "legacyKey", value: "x", updatedAt: 1 }).run();
     expect(getAllPreferences(db)).toEqual({
       autoSummarize: false,
-      readerPrefs: { fontScale: 1, lineHeight: 1.9, maxWidth: 640 },
+      readerPrefs: { fontScale: 1, lineHeight: 1.9, maxWidth: 640, fontFamily: "default" },
     });
   });
 

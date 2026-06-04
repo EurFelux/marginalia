@@ -22,7 +22,7 @@ interface PrefsActions {
 
 export const PREFS_INITIAL: PrefsState = {
   autoSummarize: false,
-  prefs: { fontScale: 1, lineHeight: 1.9, maxWidth: 640 },
+  prefs: { fontScale: 1, lineHeight: 1.9, maxWidth: 640, fontFamily: "default" },
   lastHighlightStyle: "yellow",
   layout: { sidebarOpen: true, panelOpen: false, headerOpen: true },
 };

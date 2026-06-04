@@ -79,6 +79,19 @@ describe("preferences schemas", () => {
       setPreferenceInput.safeParse({ key: "readerLayout", value: { sidebarOpen: true } }).success,
     ).toBe(false);
   });
+
+  it("readerPrefs 旧 JSON(无 fontFamily)parse 成功且默认 default", () => {
+    const parsed = readerPrefsSchema.parse({ fontScale: 1, lineHeight: 1.9, maxWidth: 640 });
+    expect(parsed.fontFamily).toBe("default");
+  });
+
+  it("fontFamily 接受四档枚举、拒绝未知值", () => {
+    const base = { fontScale: 1, lineHeight: 1.9, maxWidth: 640 };
+    for (const v of ["default", "wenkai", "serif", "sans"]) {
+      expect(readerPrefsSchema.safeParse({ ...base, fontFamily: v }).success).toBe(true);
+    }
+    expect(readerPrefsSchema.safeParse({ ...base, fontFamily: "comic-sans" }).success).toBe(false);
+  });
 });
 
 describe("language preference", () => {
