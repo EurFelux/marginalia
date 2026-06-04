@@ -33,6 +33,8 @@ marginalia 是应用型 repo(非 npm 库),只用 changesets 的「版本 bump + 
 
 `packages/ui-prototype` 不在 pnpm workspace(独立 lock),天然不受影响。
 
+**根包发现(实现时发现的必要补充)**:changesets 经 manypkg 只在 workspace `packages` 列表中找包,有 workspace 的 repo 里 private 根包默认不在其中,changeset 文件引用 `"marginalia"` 会报包不存在。修复 = `pnpm-workspace.yaml` 的 `packages` 加 `"."`(社区标准 workaround)。已实测副作用干净:pnpm 11 下 `pnpm -r` 仍只含两个子包、`--include-workspace-root` 行为不变(`test:all` 语义不变),`node-linker: hoisted` 预检不受影响,全量 test/typecheck 绿。
+
 ## 流程约定
 
 - **写作时机**:每个分支走 finishing 流程合并前,`pnpm changeset` 写一条**英文、用户向**描述;纯 docs/重构/CI 等用户不可见的分支**不写**。
