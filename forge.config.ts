@@ -7,6 +7,7 @@ import { MakerRpm } from "@electron-forge/maker-rpm";
 import { VitePlugin } from "@electron-forge/plugin-vite";
 import { AutoUnpackNativesPlugin } from "@electron-forge/plugin-auto-unpack-natives";
 import { FusesPlugin } from "@electron-forge/plugin-fuses";
+import { PublisherGithub } from "@electron-forge/publisher-github";
 import { FuseV1Options, FuseVersion } from "@electron/fuses";
 
 // better-sqlite3 是 native 模块、被 vite.main.config external（不能内联）；其余 prod 依赖的代码都被
@@ -43,6 +44,15 @@ const config: ForgeConfig = {
     new MakerZIP({}, ["darwin"]),
     new MakerRpm({}),
     new MakerDeb({}),
+  ],
+  publishers: [
+    // 发布到 GitHub Release：draft 先上传草稿（网页补 notes 后手动发布），0.x 阶段一律标 prerelease。
+    // token 经 GITHUB_TOKEN 注入（见 package.json 的 release script，从 gh keyring 现取不落盘）。
+    new PublisherGithub({
+      repository: { owner: "EurFelux", name: "marginalia" },
+      prerelease: true,
+      draft: true,
+    }),
   ],
   plugins: [
     new VitePlugin({

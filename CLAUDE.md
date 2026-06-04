@@ -15,7 +15,7 @@ Marginalia 是一个基于 Electron + React 的桌面 ePub AI 阅读器。主进
 pnpm start          # 启动 Electron 开发模式（会阻塞）
 pnpm package        # 打包
 pnpm make           # 制作分发包
-pnpm publish        # 发布
+pnpm release        # 发布到 GitHub Release（draft+prerelease；token 现取自 gh keyring。注意 pnpm publish 是 pnpm 内置命令＝发 npm，勿用）
 
 # 类型检查 / Lint / 格式化
 pnpm typecheck      # tsc --noEmit
