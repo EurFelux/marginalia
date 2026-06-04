@@ -55,6 +55,8 @@
 
 **Homebrew tap 分发已交付**（2026-06-04）：tap 仓库 `EurFelux/homebrew-lyrisland` 改名 **`homebrew-tap`** 通用化（GitHub 自动重定向旧 URL；本机旧 tap 名需 `brew untap --force`；Lyrisland 主仓库 README 的旧 tap 名待更新），新增 `Casks/marginalia.rb`——指向 GitHub Release dmg + sha256，`postflight` 跑 `xattr -cr` 清 quarantine（沿用 lyrisland 惯例），**brew 安装即开、零 Gatekeeper 弹窗**；`zap trash` 列 userData/缓存/偏好。`brew tap eurfelux/tap && brew install --cask marginalia` 已端到端验证（安装/重装/真启动）。**每次 release 后需 bump cask 的 version + sha256**（可后续用 GitHub Actions 自动化）。README Installation 以 brew 为推荐渠道。正规 Developer ID 签名 + 公证（$99/年）仍在 backlog。
 
+**v0.2.0 已发布**（2026-06-04）：changesets 首次走完全流程（`changeset version` 0.1.0→0.2.0 → `release` → `release:notes` → publish 打 tag → tap bump 0.2.0+sha256，brew 端到端验证）。发布途中冒烟揪出**发布阻断**：产物首启白屏（loadFile ERR_FAILED）+ 每个新版本首启弹钥匙串密码——根因 `EnableCookieEncryption` fuse（模板默认 true 残留）使 Chromium 启动即初始化 Safe Storage（钥匙串），ad-hoc 签名每次构建都变 → ACL 不认 → 弹授权，且授权阻塞窗口内首次 loadFile 必败（重开即好，故 v0.1.0 期间被「第一次开有点怪」掩盖）。修复=关 fuse（本 app 无 cookie/钥匙串需求，072c535）；冒烟断言从此**必须含「日志无 loadFile failed」**（首载断言）——进程存活 + .tables 全表不够。排查教训：file://asar 加载路径只有打包产物会走（dev 走 dev server、测试无头），相关回归只能靠打包冒烟暴露；A/B 对照实验会被「用户响应钥匙串弹窗的时机」污染。
+
 **下一目标候选**：RA4 收尾（**M-d 全书摘要**——RA4 已交付）、设置/产品 backlog（最大并发数 / 代理 / stepLimit / 独立摘要模型 / **自动命名会话** / onboarding 引导）、其余延后项（选区工具栏/ChipBar → Base UI 原语、自绘窗口 chrome、嵌套 TOC / 章内分页）。类型设计债清理 ✅、颜色模式 ✅、`preferences` ✅、RA5 ✅、RA1-full「精度/内存 pass」✅、IPC 契约注册表 #8 ✅、类 macOS 自绘滚动条 ✅、会话 tab ✅、**三向可收起布局 ✅** 均已完成。
 
 ---
