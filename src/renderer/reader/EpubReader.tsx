@@ -18,6 +18,7 @@ import { readerThemeCss } from "./reader-theme-css";
 import { sectionSelectToSelectionInfo } from "./epub-selection";
 import { applyAnnotations } from "./apply-annotations";
 import { ANNO_IFRAME_CSS } from "./highlight";
+import { fontFaceCss } from "./reader-fonts";
 import { useThemeStore } from "../store/theme-store";
 
 interface Props {
@@ -211,6 +212,8 @@ export function EpubReader({ bookId, chapters }: Props) {
         count={book.count}
         loadSection={book.loadSection}
         styleCss={
+          fontFaceCss(prefs.fontFamily) +
+          "\n" +
           prefsToCss(prefs) +
           "\n" +
           ANNO_IFRAME_CSS +
