@@ -52,6 +52,18 @@ Connect OpenAI, Anthropic, Google, or any **OpenAI-compatible endpoint** (self-h
 
 A bilingual interface (English / 简体中文) that follows your system language. Everything lives on your machine — no uploads, no account required.
 
+## 📦 Installation
+
+Grab the latest `.dmg` from [Releases](https://github.com/EurFelux/marginalia/releases), open it, and drag Marginalia into Applications.
+
+> [!IMPORTANT]
+> **macOS will warn that the app "cannot be verified"** on first launch — Marginalia is ad-hoc signed but not notarized by Apple (that requires a paid developer certificate). To open it anyway:
+>
+> 1. Double-click the app once (the warning appears) — then go to **System Settings → Privacy & Security**, scroll down, and click **Open Anyway**.
+> 2. Or, from a terminal: `xattr -d com.apple.quarantine /Applications/marginalia.app`
+>
+> The app is open source — you can always audit the code and build it yourself with `pnpm make`.
+
 ## 🪄 A glance at getting started
 
 1. **Drop in a book** — drag an ePub into the library and start reading.

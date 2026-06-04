@@ -1,4 +1,5 @@
 import type { ForgeConfig } from "@electron-forge/shared-types";
+import type { OsxSignOptions } from "@electron/packager";
 import { MakerSquirrel } from "@electron-forge/maker-squirrel";
 import { MakerZIP } from "@electron-forge/maker-zip";
 import { MakerDMG } from "@electron-forge/maker-dmg";
@@ -14,6 +15,23 @@ import { FuseV1Options, FuseVersion } from "@electron/fuses";
 // Vite bundle 进 .vite/，运行时只需 better-sqlite3 的实体包（require 链 → bindings → file-uri-to-path）。
 const KEEP_NODE_MODULES = ["better-sqlite3", "bindings", "file-uri-to-path"];
 
+// ad-hoc 重签名（零成本，无 Apple Developer 证书）：packager 改写 Info.plist/塞 asar 后，Electron
+// 出厂签名的 seal 已失效；不重签的话，带 quarantine 的下载产物会被 Gatekeeper 直接判「已损坏」
+// 且无放行入口。ad-hoc 重签让 seal 重新有效，Gatekeeper 文案变为「无法验证开发者」，用户可在
+// 系统设置 → 隐私与安全性 放行（正规分发需 Developer ID 签名 + 公证，留待后续）。
+// continueOnError 是 packager 运行时支持但输入类型漏收录的字段（dist/mac.js createSignOpts），
+// 故用交叉类型而非 any。
+const osxSign: OsxSignOptions & { continueOnError?: boolean } = {
+  identity: "-", // codesign 的 ad-hoc 身份
+  identityValidation: false, // "-" 不在 keychain 里，跳过查找（否则 findIdentities 报错）
+  preAutoEntitlements: false, // 该步骤从 identity 名提取 TeamID，ad-hoc 无 TeamID 会 throw
+  // osx-sign 默认开 hardened runtime（为公证准备），但其 library validation 要求库与主程序
+  // 同 Team ID——ad-hoc 签名没有 Team ID，dyld 拒载自家 Electron Framework（"different
+  // Team IDs"）启动即崩；ad-hoc 分发本就过不了公证，hardened 零收益，关掉。
+  optionsForFile: () => ({ hardenedRuntime: false }),
+  continueOnError: false, // packager 默认 true 会吞掉签名失败、静默产出坏产物
+};
+
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
@@ -22,6 +40,7 @@ const config: ForgeConfig = {
     icon: "./assets/icons/icon",
     // 迁移 SQL 不经 Vite 打包；复制整个迁移目录进 resources/，生产启动经 process.resourcesPath 读取（见 instance.ts）。
     extraResource: ["./src/main/db/migrations"],
+    osxSign,
     // Forge Vite plugin 默认令 ignore 排除「除 .vite/ 外一切」（含整个 node_modules），会丢掉被
     // external 的 better-sqlite3。它检测到 ignore 已是函数便不覆盖（见 plugin-vite resolveForgeConfig）。
     // 这里保留 .vite/ 与 native 运行时子树，其余 node_modules 文件一律忽略（其代码已 bundle 进 .vite，
