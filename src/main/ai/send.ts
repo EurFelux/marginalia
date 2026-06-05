@@ -153,6 +153,8 @@ export function runSend(
       });
       // 首轮完成 → 自动命名（spec §5）：title 仍 null 且本轮 complete 且有文本回复才触发；fire-and-forget
       // tool-only 轮（无文本回复）不触发命名——上下文不完整不起名
+      // namingInFlight 在本同步回调内置位，先于任何 IPC 往返——renderer 发送结束后的列表刷新必然观察到
+      // isNaming=true（轮询启动依赖此顺序）
       if (status === "complete") {
         const assistantText = textOfParts(responseMessage.parts);
         const row = db

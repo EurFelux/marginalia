@@ -43,6 +43,11 @@ describe("openConversation", () => {
     useChatStore.getState().openConversation("conv-1");
     expect(useChatStore.getState().openCommand?.nonce).toBe(2); // 同会话重开也递增 → 触发重载
   });
+  it("resets summaryChips to off when opening existing conversation", () => {
+    useChatStore.getState().setSummaryChipsPreset();
+    useChatStore.getState().openConversation("conv-1");
+    expect(useChatStore.getState().summaryChips).toEqual({ chapter: false, book: false });
+  });
 });
 
 describe("restoreConversation", () => {
@@ -58,6 +63,11 @@ describe("restoreConversation", () => {
     useChatStore.getState().restoreConversation("conv-restore");
     useChatStore.getState().restoreConversation("conv-restore");
     expect(useChatStore.getState().openCommand?.nonce).toBe(2);
+  });
+  it("resets summaryChips to off when restoring existing conversation", () => {
+    useChatStore.getState().setSummaryChipsPreset();
+    useChatStore.getState().restoreConversation("conv-restore");
+    expect(useChatStore.getState().summaryChips).toEqual({ chapter: false, book: false });
   });
 });
 

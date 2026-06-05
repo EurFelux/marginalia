@@ -48,12 +48,14 @@ export const useChatStore = create<ChatState & ChatActions>((set) => ({
     return set((s) => ({
       activeConversationId: id,
       openCommand: { conversationId: id, nonce: (s.openCommand?.nonce ?? 0) + 1 },
+      summaryChips: { chapter: false, book: false },
     }));
   },
   restoreConversation: (id) =>
     set((s) => ({
       activeConversationId: id,
       openCommand: { conversationId: id, nonce: (s.openCommand?.nonce ?? 0) + 1 },
+      summaryChips: { chapter: false, book: false },
     })),
   setSummaryChip: (kind, on) => set((s) => ({ summaryChips: { ...s.summaryChips, [kind]: on } })),
   setSummaryChipsPreset: () => set({ summaryChips: { chapter: true, book: true } }),
