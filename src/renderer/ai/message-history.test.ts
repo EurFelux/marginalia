@@ -47,6 +47,36 @@ describe("messageDtoToUIMessage", () => {
       },
     ]);
   });
+  it("hydrates chapter-summary chip with chip.chapterSummary labelKey and state required", () => {
+    const withChapterSummary: MessageDto = {
+      ...dto,
+      metadata: { contextChips: [{ id: "chapter-summary", content: "c", tokenCount: 1 }] },
+    };
+    expect(messageDtoToUIMessage(withChapterSummary).metadata?.contextChips).toEqual([
+      {
+        id: "chapter-summary",
+        labelKey: "chip.chapterSummary",
+        content: "c",
+        tokenCount: 1,
+        state: "required",
+      },
+    ]);
+  });
+  it("hydrates book-summary chip with chip.bookSummary labelKey and state required", () => {
+    const withBookSummary: MessageDto = {
+      ...dto,
+      metadata: { contextChips: [{ id: "book-summary", content: "b", tokenCount: 42 }] },
+    };
+    expect(messageDtoToUIMessage(withBookSummary).metadata?.contextChips).toEqual([
+      {
+        id: "book-summary",
+        labelKey: "chip.bookSummary",
+        content: "b",
+        tokenCount: 42,
+        state: "required",
+      },
+    ]);
+  });
   it("omits metadata when dto has none (assistant messages / chip-less sends)", () => {
     expect(messageDtoToUIMessage({ ...dto, metadata: null })).toEqual({
       id: "m1",

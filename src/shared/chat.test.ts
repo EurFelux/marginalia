@@ -44,6 +44,29 @@ describe("chat schemas", () => {
     expect(r.success).toBe(false);
   });
 
+  it("chipSchema accepts all three states", () => {
+    for (const state of ["required", "on", "off"] as const) {
+      expect(
+        chipSchema.safeParse({
+          id: "chapter-summary",
+          labelKey: "chip.chapterSummary",
+          content: "x",
+          tokenCount: 1,
+          state,
+        }).success,
+      ).toBe(true);
+    }
+  });
+
+  it("chipSchema rejects legacy boolean / unknown state values", () => {
+    for (const state of [true, "enabled", "ON"]) {
+      expect(
+        chipSchema.safeParse({ id: "selection", labelKey: "x", content: "y", tokenCount: 0, state })
+          .success,
+      ).toBe(false);
+    }
+  });
+
   it("buildChipsInput requires a non-empty selection and current paragraph", () => {
     expect(buildChipsInput.safeParse({ selection: "", paragraphCurrent: "p" }).success).toBe(false);
     expect(buildChipsInput.safeParse({ selection: "s", paragraphCurrent: "p" }).success).toBe(true);
