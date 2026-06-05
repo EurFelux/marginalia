@@ -1,11 +1,14 @@
 import { create } from "zustand";
 import type { AnnotationStyle } from "@shared/annotations";
+import type { SummaryModel } from "@shared/preferences";
 import type { ReaderLayout, ReaderPrefs } from "@renderer/types";
 import { persistPreference } from "@renderer/store/persist-preference";
 
 interface PrefsState {
   /** 开章时自动生成本章摘要（默认关——控成本；landing/onboarding 时引导用户开启）。 */
   autoSummarize: boolean;
+  /** 摘要模型（章节/全书摘要 + 会话自动命名）；null = 未配置（生成报错/命名跳过，无回退）。 */
+  summaryModel: SummaryModel | null;
   /** 阅读排版偏好（字号/行高/版心宽）。 */
   prefs: ReaderPrefs;
   /** 上次选用的高亮样式；选「高亮标记」时直接套用（Apple Books 式记忆）。 */
@@ -15,6 +18,7 @@ interface PrefsState {
 }
 interface PrefsActions {
   setAutoSummarize: (v: boolean) => void;
+  setSummaryModel: (v: SummaryModel) => void;
   updatePrefs: (patch: Partial<ReaderPrefs>) => void;
   setLastHighlightStyle: (style: AnnotationStyle) => void;
   updateLayout: (patch: Partial<ReaderLayout>) => void;
@@ -22,6 +26,7 @@ interface PrefsActions {
 
 export const PREFS_INITIAL: PrefsState = {
   autoSummarize: false,
+  summaryModel: null,
   prefs: { fontScale: 1, lineHeight: 1.9, maxWidth: 640, fontFamily: "default" },
   lastHighlightStyle: "yellow",
   layout: { sidebarOpen: true, panelOpen: false, headerOpen: true },
@@ -36,6 +41,10 @@ export const usePrefsStore = create<PrefsState & PrefsActions>()((set) => ({
   setAutoSummarize: (autoSummarize) => {
     persistPreference({ key: "autoSummarize", value: autoSummarize });
     set({ autoSummarize });
+  },
+  setSummaryModel: (summaryModel) => {
+    persistPreference({ key: "summaryModel", value: summaryModel });
+    set({ summaryModel });
   },
   updatePrefs: (patch) =>
     set((s) => {
