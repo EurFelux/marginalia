@@ -1,6 +1,6 @@
 // src/main/ai/send.test.ts
 import path from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MockLanguageModelV3, simulateReadableStream } from "ai/test";
 import { makeFixtureEpub } from "@marginalia/epub-parser";
 import { createDb, runMigrations } from "@main/db/client";
@@ -16,6 +16,7 @@ import { buildChips } from "@main/ai/chips";
 import type { ResolvedModel } from "@main/ai/assistant-model";
 import type { LoadBytes } from "@main/ai/tools";
 import { runSend, type SendDeps, type SendInput } from "@main/ai/send";
+import { __resetNamingRuntime } from "@main/chat/conversation-title";
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
 
@@ -167,6 +168,8 @@ describe("runSend conversation validation", () => {
 });
 
 describe("runSend", () => {
+  beforeEach(() => __resetNamingRuntime());
+
   it("returns an error and creates nothing when no model is configured", () => {
     const { db, book, deps } = setup({ ok: false, reason: "not configured" });
     const convo = createConversation(db, { bookId: book.id });
@@ -343,7 +346,6 @@ describe("runSend", () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     await r.finished;
-    await new Promise((res) => setTimeout(res, 50));
-    expect(getConversation(db, convo.id)?.title).toBe("既有名");
+    await vi.waitFor(() => expect(getConversation(db, convo.id)?.title).toBe("既有名"));
   });
 });

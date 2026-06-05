@@ -151,19 +151,21 @@ export function runSend(
           error: streamHadError ? errorInfo : undefined,
         },
       });
-      // 首轮完成 → 自动命名（spec §5）：title 仍 null 且本轮 complete 才触发；fire-and-forget
+      // 首轮完成 → 自动命名（spec §5）：title 仍 null 且本轮 complete 且有文本回复才触发；fire-and-forget
+      // tool-only 轮（无文本回复）不触发命名——上下文不完整不起名
       if (status === "complete") {
+        const assistantText = textOfParts(responseMessage.parts);
         const row = db
           .select({ title: conversations.title })
           .from(conversations)
           .where(eq(conversations.id, conversationId))
           .get();
-        if (row && row.title == null) {
+        if (assistantText && row && row.title == null) {
           void nameConversation(
             { db, resolveModel },
             conversationId,
             input.userText,
-            textOfParts(responseMessage.parts),
+            assistantText,
           );
         }
       }

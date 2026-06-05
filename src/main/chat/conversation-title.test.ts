@@ -94,4 +94,22 @@ describe("nameConversation", () => {
     );
     expect(getConversation(db, convo.id)?.title).toBe("手动名");
   });
+
+  it("clears isNaming and keeps title null when the model call throws", async () => {
+    const db = freshDb();
+    const convo = createConversation(db, { bookId: "book-1" });
+    const throwing = new MockLanguageModelV3({
+      doGenerate: async () => {
+        throw new Error("boom");
+      },
+    });
+    await nameConversation(
+      { db, resolveModel: () => ({ ok: true, model: throwing, modelId: "m" }) },
+      convo.id,
+      "u",
+      "a",
+    );
+    expect(getConversation(db, convo.id)?.title).toBeNull();
+    expect(isNamingConversation(convo.id)).toBe(false);
+  });
 });
