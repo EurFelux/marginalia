@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useChat } from "@ai-sdk/react";
 import { Plus, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -14,24 +14,19 @@ import { MessageList } from "@renderer/ai/MessageList";
 import { Composer } from "@renderer/ai/Composer";
 import { SummaryPill } from "@renderer/ai/SummaryPill";
 import { messagesToUI } from "@renderer/ai/message-history";
-import { qk } from "@renderer/query/keys";
+import { conversationsQuery } from "@renderer/query/conversation-queries";
 import type { Chip } from "@shared/chat";
 
 export function AIPanel() {
   const { t } = useTranslation();
-  const transport = useMemo(() => createIpcChatTransport(), []);
   const { messages, sendMessage, status, stop, setMessages, error } = useChat<ChatUIMessage>({
-    transport,
+    transport: createIpcChatTransport(),
   });
   const updateLayout = usePrefsStore((s) => s.updateLayout);
   const openCommand = useChatStore((s) => s.openCommand);
   const activeConversationId = useChatStore((s) => s.activeConversationId);
   const bookId = useNavigationStore((s) => s.currentBookId);
-  const convosQuery = useQuery({
-    queryKey: qk.conversations(bookId ?? ""),
-    queryFn: () => window.api.chat.conversations.listByBook({ bookId: bookId! }),
-    enabled: !!bookId,
-  });
+  const convosQuery = useQuery({ ...conversationsQuery(bookId ?? ""), enabled: !!bookId });
   const activeTitle = activeConversationId
     ? convosQuery.data?.find((c) => c.id === activeConversationId)?.title?.trim() ||
       t("reader.conversation.untitled", "未命名会话")
