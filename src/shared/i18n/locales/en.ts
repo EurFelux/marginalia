@@ -203,6 +203,8 @@ export default {
   "settings.reading.autoSummarize": "Auto-generate chapter summary on open",
   "settings.reading.autoSummarizeDesc":
     "Generates a summary of the current chapter in the background when a chapter is opened or switched. The summary is provided to the AI alongside your question once ready (incurs model calls). When off, you can generate it manually via the summary pill in the AI panel.",
+  "settings.summaryModel": "Summary Model",
+  "settings.summaryModel.desc": "Used for chapter/book summaries and conversation auto-naming",
   "settings.system": "System",
   "settings.title": "Settings",
   "terms.provider": "provider",

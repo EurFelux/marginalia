@@ -6,6 +6,7 @@ import type { ProviderDto } from "@shared/providers";
 import { qk } from "@renderer/query/keys";
 import { Button } from "@renderer/components/ui/button";
 import { AssistantModelPicker } from "./AssistantModelPicker";
+import { SummaryModelPicker } from "./SummaryModelPicker";
 import { ProviderCard } from "./ProviderCard";
 import { ProviderForm } from "./ProviderForm";
 
@@ -27,6 +28,7 @@ export function ModelsSettings() {
     <section className="space-y-6">
       <h2 className="font-serif text-lg">{t("settings.models", "模型")}</h2>
       <AssistantModelPicker />
+      <SummaryModelPicker />
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold">
