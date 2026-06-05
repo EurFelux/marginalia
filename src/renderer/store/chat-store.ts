@@ -12,6 +12,8 @@ interface ChatState {
    * 故发消息不会触发历史重载（避免覆盖刚流式出来的内容）。镜像 annotation-store.scrollCommand。
    */
   openCommand: { conversationId: string; nonce: number } | null;
+  /** 常驻摘要 toggle（spec §6）：true=on 随下条消息发送。 */
+  summaryChips: { chapter: boolean; book: boolean };
 }
 interface ChatActions {
   setActiveConversation: (id: string | null) => void;
@@ -21,6 +23,11 @@ interface ChatActions {
   openConversation: (id: string) => void;
   /** 开书恢复最近会话：同 openConversation 但不强制开面板（spec §7）。 */
   restoreConversation: (id: string) => void;
+  setSummaryChip: (kind: "chapter" | "book", on: boolean) => void;
+  /** 「将开启新会话」预亮（spec §6）：新对话按钮 / 开书无会话。 */
+  setSummaryChipsPreset: () => void;
+  /** 回落全 off。 */
+  resetSummaryChips: () => void;
 }
 
 export const CHAT_INITIAL: ChatState = {
@@ -28,6 +35,7 @@ export const CHAT_INITIAL: ChatState = {
   draftText: "",
   draftChips: [],
   openCommand: null,
+  summaryChips: { chapter: false, book: false },
 };
 
 export const useChatStore = create<ChatState & ChatActions>((set) => ({
@@ -47,4 +55,7 @@ export const useChatStore = create<ChatState & ChatActions>((set) => ({
       activeConversationId: id,
       openCommand: { conversationId: id, nonce: (s.openCommand?.nonce ?? 0) + 1 },
     })),
+  setSummaryChip: (kind, on) => set((s) => ({ summaryChips: { ...s.summaryChips, [kind]: on } })),
+  setSummaryChipsPreset: () => set({ summaryChips: { chapter: true, book: true } }),
+  resetSummaryChips: () => set({ summaryChips: { chapter: false, book: false } }),
 }));

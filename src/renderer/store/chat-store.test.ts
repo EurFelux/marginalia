@@ -60,3 +60,20 @@ describe("restoreConversation", () => {
     expect(useChatStore.getState().openCommand?.nonce).toBe(2);
   });
 });
+
+describe("summaryChips state machine", () => {
+  it("defaults to off, presets both on, resets to off", () => {
+    const s = useChatStore.getState();
+    expect(s.summaryChips).toEqual({ chapter: false, book: false });
+    s.setSummaryChipsPreset();
+    expect(useChatStore.getState().summaryChips).toEqual({ chapter: true, book: true });
+    useChatStore.getState().resetSummaryChips();
+    expect(useChatStore.getState().summaryChips).toEqual({ chapter: false, book: false });
+  });
+
+  it("toggles a single kind", () => {
+    useChatStore.getState().setSummaryChip("chapter", true);
+    expect(useChatStore.getState().summaryChips.chapter).toBe(true);
+    expect(useChatStore.getState().summaryChips.book).toBe(false);
+  });
+});

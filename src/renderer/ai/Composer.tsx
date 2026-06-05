@@ -1,12 +1,17 @@
 import { useEffect, useRef, type KeyboardEvent } from "react";
 import type { ChatStatus } from "ai";
+import { useQuery } from "@tanstack/react-query";
 import { ArrowUp, Square } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { Chip } from "@shared/chat";
 import { Button } from "@renderer/components/ui/button";
 import { useChatStore } from "@renderer/store/chat-store";
 import { usePrefsStore } from "@renderer/store/prefs-store";
+import { useNavigationStore } from "@renderer/store/navigation-store";
 import { ChipBar } from "@renderer/ai/ChipBar";
+import { SummaryChipToggles } from "@renderer/ai/SummaryChipToggles";
+import { materializeSummaryChips } from "@renderer/ai/summary-chips";
+import { bookSummaryQuery, chapterSummaryQuery } from "@renderer/query/summary-queries";
 
 interface Props {
   status: ChatStatus;
@@ -20,9 +25,18 @@ export function Composer({ status, onSend, onStop }: Props) {
   const draftChips = useChatStore((s) => s.draftChips);
   const setDraftText = useChatStore((s) => s.setDraftText);
   const setDraftChips = useChatStore((s) => s.setDraftChips);
+  const summaryChips = useChatStore((s) => s.summaryChips);
   const panelOpen = usePrefsStore((s) => s.layout.panelOpen);
+  const bookId = useNavigationStore((s) => s.currentBookId);
+  const chapterId = useNavigationStore((s) => s.currentChapterId);
   const ref = useRef<HTMLTextAreaElement | null>(null);
   const isStreaming = status === "streaming" || status === "submitted";
+
+  const chapterSummary = useQuery({
+    ...chapterSummaryQuery(bookId ?? "", chapterId ?? ""),
+    enabled: !!bookId && !!chapterId,
+  });
+  const bookSummary = useQuery({ ...bookSummaryQuery(bookId ?? ""), enabled: !!bookId });
 
   useEffect(() => {
     if (panelOpen) ref.current?.focus({ preventScroll: true });
@@ -31,9 +45,19 @@ export function Composer({ status, onSend, onStop }: Props) {
   const send = () => {
     const text = draftText.trim();
     if (!text || isStreaming) return;
-    onSend(text, draftChips);
+    const summaryExtras = materializeSummaryChips(
+      summaryChips,
+      chapterSummary.data,
+      bookSummary.data,
+    );
+    onSend(text, [...summaryExtras, ...draftChips]);
     setDraftText("");
     setDraftChips([]);
+    // 已随本条发送的摘要回落 off（一段对话只输入一次）；未 ready 被 materialize 跳过的保持 on
+    const sent = new Set(summaryExtras.map((c) => c.id));
+    const { setSummaryChip } = useChatStore.getState();
+    if (sent.has("chapter-summary")) setSummaryChip("chapter", false);
+    if (sent.has("book-summary")) setSummaryChip("book", false);
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -45,6 +69,7 @@ export function Composer({ status, onSend, onStop }: Props) {
 
   return (
     <div className="shrink-0 border-t border-border bg-card/40 p-3">
+      <SummaryChipToggles />
       {draftChips.length > 0 && (
         <div className="mb-2">
           <ChipBar chips={draftChips} />
