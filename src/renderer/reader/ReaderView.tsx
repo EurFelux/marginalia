@@ -25,6 +25,7 @@ import { SelectionToolbar } from "@renderer/reader/SelectionToolbar";
 import { HighlightStyleBar } from "@renderer/reader/HighlightStyleBar";
 import { NoteModal } from "@renderer/reader/NoteModal";
 import { AIPanel } from "@renderer/ai/AIPanel";
+import { SummaryPill } from "@renderer/ai/SummaryPill";
 import { useRestoreConversation } from "@renderer/ai/use-restore-conversation";
 
 export function ReaderView() {
@@ -124,6 +125,9 @@ export function ReaderView() {
                 <span className="truncate">{breadcrumb}</span>
               </div>
             )}
+            <div className="hidden shrink-0 sm:block">
+              <SummaryPill />
+            </div>
           </div>
           <div className="flex shrink-0 items-center gap-1">
             <ReaderPrefs />

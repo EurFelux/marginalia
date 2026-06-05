@@ -8,10 +8,9 @@ import { cn } from "@renderer/lib/utils";
 import { Button } from "@renderer/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@renderer/components/ui/popover";
 import { useNavigationStore } from "@renderer/store/navigation-store";
-import { usePrefsStore } from "@renderer/store/prefs-store";
 
 /**
- * AI 面板头部的本章摘要 pill（移植 UP1 SummaryPill）：显示摘要状态，点开弹卡看正文。
+ * 阅读器顶栏的本章摘要 pill（spec §3 自 AI 面板迁入）：显示摘要状态，点开弹卡看正文。
  * 摘要在主进程懒生成（pill 按钮手动 / 开章自动触发，pending→generating→ready）；
  * query 配置见 chapterSummaryQuery——派生状态必须绕开全局 staleTime=∞，非终态轮询刷新。
  */
@@ -19,7 +18,6 @@ export function SummaryPill() {
   const { t } = useTranslation();
   const bookId = useNavigationStore((s) => s.currentBookId);
   const chapterId = useNavigationStore((s) => s.currentChapterId);
-  const panelOpen = usePrefsStore((s) => s.layout.panelOpen);
   const qc = useQueryClient();
 
   const BADGE: Record<SummaryStatus, { label: string; cls: string }> = {
@@ -53,7 +51,7 @@ export function SummaryPill() {
 
   const summary = useQuery({
     ...chapterSummaryQuery(bookId ?? "", chapterId ?? ""),
-    enabled: panelOpen && bookId != null && chapterId != null,
+    enabled: bookId != null && chapterId != null,
   });
 
   // 手动点击总是 force：跳过 ready-skip 重新生成（镜像全书摘要按钮语义）；开章自动触发不走这里、不带 force。
@@ -97,7 +95,7 @@ export function SummaryPill() {
       >
         {badge.label}
       </PopoverTrigger>
-      <PopoverContent align="end" sideOffset={6} className="w-72 text-start">
+      <PopoverContent align="start" sideOffset={6} className="w-72 text-start">
         <div className="mb-1.5 flex items-center justify-between gap-2">
           <span className="truncate text-xs font-semibold">
             {t("ai.summary.heading", "本章摘要")}

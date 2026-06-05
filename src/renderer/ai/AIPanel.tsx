@@ -12,7 +12,6 @@ import { createIpcChatTransport } from "@renderer/ai/ipc-chat-transport";
 import type { ChatUIMessage } from "@renderer/ai/types";
 import { MessageList } from "@renderer/ai/MessageList";
 import { Composer } from "@renderer/ai/Composer";
-import { SummaryPill } from "@renderer/ai/SummaryPill";
 import { messagesToUI } from "@renderer/ai/message-history";
 import { conversationsQuery } from "@renderer/query/conversation-queries";
 import type { Chip } from "@shared/chat";
@@ -101,7 +100,6 @@ export function AIPanel() {
           )}
         </div>
         <div className="ms-auto flex shrink-0 items-center gap-1.5">
-          <SummaryPill />
           <Button
             variant="ghost"
             size="icon-sm"
