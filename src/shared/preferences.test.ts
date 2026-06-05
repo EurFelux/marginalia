@@ -26,6 +26,7 @@ describe("preferences schemas", () => {
       "lastHighlightStyle",
       "readerLayout",
       "readerPrefs",
+      "summaryModel",
     ]);
   });
 
@@ -77,6 +78,18 @@ describe("preferences schemas", () => {
     ).toBe(true);
     expect(
       setPreferenceInput.safeParse({ key: "readerLayout", value: { sidebarOpen: true } }).success,
+    ).toBe(false);
+    expect(
+      setPreferenceInput.safeParse({
+        key: "summaryModel",
+        value: { providerId: "p1", model: "m" },
+      }).success,
+    ).toBe(true);
+    expect(
+      setPreferenceInput.safeParse({
+        key: "summaryModel",
+        value: { providerId: "", model: "m" },
+      }).success,
     ).toBe(false);
   });
 

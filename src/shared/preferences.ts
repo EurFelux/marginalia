@@ -33,7 +33,7 @@ export const summaryModelSchema = z.object({
   providerId: z.string().min(1),
   model: z.string().min(1),
 });
-export type SummaryModelPref = z.infer<typeof summaryModelSchema>;
+export type SummaryModel = z.infer<typeof summaryModelSchema>;
 
 /**
  * 可持久化用户偏好的单一源：key → 值 Zod schema。

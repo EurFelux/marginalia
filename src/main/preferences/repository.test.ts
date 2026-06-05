@@ -101,6 +101,9 @@ describe("preferences repository", () => {
       providerId: "p1",
       model: "claude-haiku-4-5",
     });
+    expect(getAllPreferences(db)).toEqual({
+      summaryModel: { providerId: "p1", model: "claude-haiku-4-5" },
+    });
   });
 
   it("refreshes updatedAt on overwrite", () => {
