@@ -4,8 +4,9 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { createDb, runMigrations } from "@main/db/client";
 import { upsertProvider } from "@main/providers/repository";
 import { getDefaultAssistant, updateDefaultAssistant } from "@main/providers/assistant";
-import { resolveAssistantModel } from "@main/ai/assistant-model";
+import { resolveAssistantModel, resolveSummaryModel } from "@main/ai/assistant-model";
 import { initMainI18n } from "@main/i18n";
+import { setPreference } from "@main/preferences/repository";
 
 beforeAll(() => initMainI18n("en"));
 
@@ -66,5 +67,47 @@ describe("resolveAssistantModel", () => {
     updateDefaultAssistant(db, { providerId: provider.id, model: "gpt-4o-mini" });
     const r = resolveAssistantModel(db);
     expect(r).toMatchObject({ ok: false, reason: expect.stringContaining("API key") });
+  });
+});
+
+describe("resolveSummaryModel", () => {
+  it("resolves when the preference points at a provider with a key", () => {
+    const db = freshDb();
+    const provider = upsertProvider(db, {
+      type: "anthropic",
+      baseUrl: "https://api.anthropic.com/v1",
+      apiKey: "sk-test",
+    });
+    setPreference(db, "summaryModel", { providerId: provider.id, model: "claude-haiku-4-5" });
+    const r = resolveSummaryModel(db);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.modelId).toBe("claude-haiku-4-5");
+  });
+
+  it("fails when the preference is unset", () => {
+    const db = freshDb();
+    const r = resolveSummaryModel(db);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason.toLowerCase()).toContain("summary model");
+  });
+
+  it("fails when the referenced provider was deleted", () => {
+    const db = freshDb();
+    setPreference(db, "summaryModel", { providerId: "ghost", model: "m" });
+    const r = resolveSummaryModel(db);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason.toLowerCase()).toContain("provider");
+  });
+
+  it("fails when the provider has no API key", () => {
+    const db = freshDb();
+    const provider = upsertProvider(db, {
+      type: "anthropic",
+      baseUrl: "https://api.anthropic.com/v1",
+    });
+    setPreference(db, "summaryModel", { providerId: provider.id, model: "m" });
+    const r = resolveSummaryModel(db);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason.toLowerCase()).toContain("api key");
   });
 });

@@ -67,6 +67,7 @@ export default {
   "errors.providerHasNoApiKey": "$t(terms.provider) {{id}} has no API key",
   "errors.providerNotFound": "$t(terms.provider) {{id}} not found",
   "errors.requestFailed": "Request failed",
+  "errors.summaryModelNotConfigured": "Summary model is not configured",
   "library.deleteConfirm.body":
     "This permanently removes the book and all its annotations, notes, and conversations, plus the imported epub copy. This cannot be undone.",
   "library.deleteConfirm.cancel": "Cancel",
