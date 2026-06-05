@@ -1,5 +1,17 @@
 # marginalia
 
+## 0.3.0
+
+### Minor Changes
+
+- 5fa6417: The chapter summary pill moves to the reader top bar, and the composer gets a unified context pill row — hover any pill to preview its content, dashed borders mark missing summaries, and the selection context can be removed before sending.
+- 32af005: Conversations are no longer tied to chapters — keep one continuous conversation while reading across chapters. Summaries become user-controlled context chips, and conversations get AI-generated titles after the first reply.
+- a1eb1bb: Add an independent summary model setting. Chapter summaries, book summaries, and conversation auto-naming now use a separately configured model (Settings → Models → Summary model) instead of sharing the chat model, so you can route background tasks to a faster, cheaper model. The summary model must be configured explicitly — when unset, manual summary generation shows a clear error, and auto-naming is skipped. Also fixes reader layout persistence, which previously never survived restarts.
+
+### Patch Changes
+
+- 2887ba4: Toggling a summary chip now surfaces generation errors (e.g. "Summary model is not configured") as a toast instead of failing silently.
+
 ## 0.2.0
 
 ### Minor Changes
