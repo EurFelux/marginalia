@@ -17,7 +17,7 @@ const BRAND_KEY: Record<string, string> = {
 
 /**
  * 单个 provider 卡片。测试连接是**卡片自有**状态（本地 mutation + 就地显示），不共享测试结果状态——
- * 否则会和「对话模型」区的测试结果互相覆盖、显示串位（见 RA5 review）。无模型时禁用测试（避免空 model 触发后端校验错）。
+ * 否则会和「各 ModelPickerSection 区」的测试结果互相覆盖、显示串位（见 RA5 review）。无模型时禁用测试（避免空 model 触发后端校验错）。
  */
 export function ProviderCard({
   provider,

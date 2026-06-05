@@ -22,8 +22,8 @@ export function mergeModels(existing: string[], add: string[]): string[] {
   return out;
 }
 
-/** assistant 的 model 下拉选项：provider 的 models ∪ {当前已存 model（若不在列表）}。 */
-export function assistantModelOptions(providerModels: string[], current: string | null): string[] {
+/** model 下拉选项：provider 的 models ∪ {当前已存 model（若不在列表）}。 */
+export function providerModelOptions(providerModels: string[], current: string | null): string[] {
   if (current && !providerModels.includes(current)) return [...providerModels, current];
   return [...providerModels];
 }

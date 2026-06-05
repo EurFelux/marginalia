@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@renderer/components/ui/select";
-import { assistantModelOptions } from "./settings-logic";
+import { providerModelOptions } from "./settings-logic";
 
 export interface ModelPickerSectionProps {
   title: string;
@@ -46,7 +46,7 @@ export function ModelPickerSection({
   const [testResult, setTestResult] = useState<{ ok: boolean; message?: string } | null>(null);
 
   const selected = providers.data?.find((p) => p.id === providerId) ?? null;
-  const modelOptions = assistantModelOptions(selected?.models ?? [], model || null);
+  const modelOptions = providerModelOptions(selected?.models ?? [], model || null);
 
   const test = useMutation({
     mutationFn: () => window.api.settings.providers.test({ id: providerId, model }),
@@ -65,8 +65,7 @@ export function ModelPickerSection({
         <Select
           value={providerId || null}
           onValueChange={(id) => {
-            // 切 provider 同时清 model（旧 model 多半不属于新 provider）：显 placeholder 强制重选，
-            // 避免残留出非法 (provider, model) 对让测试/对话失败。换选后旧测试结果作废。
+            // 切 provider 同时由调用方清 model（旧 model 多半不属于新 provider）：显 placeholder 强制重选，避免残留非法 (provider, model) 对；换选后旧测试结果作废。
             if (id) {
               onProviderChange(id);
               setTestResult(null);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   mergeModels,
-  assistantModelOptions,
+  providerModelOptions,
   providerFormToUpsertInput,
 } from "@renderer/settings/settings-logic";
 
@@ -11,11 +11,11 @@ describe("mergeModels", () => {
   });
 });
 
-describe("assistantModelOptions", () => {
+describe("providerModelOptions", () => {
   it("includes current model even if not in the provider list", () => {
-    expect(assistantModelOptions(["a", "b"], "x")).toEqual(["a", "b", "x"]);
-    expect(assistantModelOptions(["a", "b"], "a")).toEqual(["a", "b"]);
-    expect(assistantModelOptions(["a"], null)).toEqual(["a"]);
+    expect(providerModelOptions(["a", "b"], "x")).toEqual(["a", "b", "x"]);
+    expect(providerModelOptions(["a", "b"], "a")).toEqual(["a", "b"]);
+    expect(providerModelOptions(["a"], null)).toEqual(["a"]);
   });
 });
 
