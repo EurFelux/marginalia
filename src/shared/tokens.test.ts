@@ -1,6 +1,6 @@
-// src/main/ai/tokens.test.ts
+// src/shared/tokens.test.ts
 import { describe, expect, it } from "vitest";
-import { estimateTokens } from "@main/ai/tokens";
+import { estimateTokens } from "@shared/tokens";
 
 describe("estimateTokens", () => {
   it("returns 0 for an empty string", () => {

@@ -1,5 +1,5 @@
 // src/main/ai/chips.ts
-import { estimateTokens } from "@main/ai/tokens";
+import { estimateTokens } from "@shared/tokens";
 import type { BuildChipsInput, Chip } from "@shared/chat";
 import type { MessageMetadata } from "@shared/types";
 

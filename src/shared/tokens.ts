@@ -1,8 +1,8 @@
-// src/main/ai/tokens.ts
+// src/shared/tokens.ts
 
 // 覆盖常见 CJK 区段：标点/符号(3000-303f)、扩展A(3400-4dbf)、统一汉字(4e00-9fff)、
 // 兼容汉字(f900-faff)、全角及半角形式(ff00-ffef)。命中即按 ~1 token 估算。
-const CJK = /[\u3000-\u303f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef]/;
+const CJK = /[　-〿㐀-䶿一-鿿豈-﫿＀-￯]/;
 
 /**
  * 粗略 token 估算（无 tokenizer 依赖，仅供 chip 信息展示）。
