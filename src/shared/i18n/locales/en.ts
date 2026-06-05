@@ -47,10 +47,8 @@ export default {
   "common.remove": "Remove",
   "common.save": "Save",
   "common.saving": "Saving…",
-  "errors.assistantNoApiKey": "$t(terms.provider) has no API key set",
   "errors.assistantNoModel": "assistant has no model configured",
   "errors.assistantNoProvider": "assistant has no $t(terms.provider) configured",
-  "errors.assistantProviderNotFound": "configured $t(terms.provider) not found",
   "errors.baseUrlRequiredCustom":
     "baseUrl is required for custom (non-builtin) $t(terms.provider)s",
   "errors.baseUrlRequiredForProvider": "baseUrl is required for this $t(terms.provider)",
@@ -59,6 +57,8 @@ export default {
   "errors.builtinTypeOutsideCompat":
     "Built-in $t(terms.provider) type can only switch within its compatible APIs",
   "errors.builtinUndeletable": "Built-in $t(terms.provider)s cannot be deleted",
+  "errors.configuredProviderNoApiKey": "$t(terms.provider) has no API key set",
+  "errors.configuredProviderNotFound": "configured $t(terms.provider) not found",
   "errors.conversationNotFound": "Conversation not found or belongs to another book",
   "errors.failedToBuildModel": "failed to build model",
   "errors.noApiKeyAvailable": "No API key available for this $t(terms.provider)",

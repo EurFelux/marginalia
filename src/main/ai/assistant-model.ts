@@ -22,10 +22,13 @@ export function resolveAssistantModel(db: DB): ResolvedModel {
   if (!provider)
     return {
       ok: false,
-      reason: t("errors.assistantProviderNotFound", "未找到所配置的$t(terms.provider)"),
+      reason: t("errors.configuredProviderNotFound", "未找到所配置的$t(terms.provider)"),
     };
   if (!provider.apiKey)
-    return { ok: false, reason: t("errors.assistantNoApiKey", "$t(terms.provider)未设置密钥") };
+    return {
+      ok: false,
+      reason: t("errors.configuredProviderNoApiKey", "$t(terms.provider)未设置密钥"),
+    };
 
   try {
     const model = resolveLanguageModel({
@@ -56,11 +59,14 @@ export function resolveSummaryModel(db: DB): ResolvedModel {
   if (!provider) {
     return {
       ok: false,
-      reason: t("errors.assistantProviderNotFound", "未找到所配置的$t(terms.provider)"),
+      reason: t("errors.configuredProviderNotFound", "未找到所配置的$t(terms.provider)"),
     };
   }
   if (!provider.apiKey) {
-    return { ok: false, reason: t("errors.assistantNoApiKey", "$t(terms.provider)未设置密钥") };
+    return {
+      ok: false,
+      reason: t("errors.configuredProviderNoApiKey", "$t(terms.provider)未设置密钥"),
+    };
   }
   try {
     const model = resolveLanguageModel({
