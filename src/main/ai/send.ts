@@ -25,7 +25,7 @@ export interface SendDeps {
   db: DB;
   loadBytes: LoadBytes;
   resolveModel: () => ResolvedModel;
-  /** 摘要模型解析器（auto naming 用；章节/全书摘要在 makeSummaryDeps 注入同一解析器）。 */
+  /** 摘要模型解析器（auto naming 用；章节/全书摘要在 makeSummaryDeps 注入同一解析器）。不回退聊天模型——未配置则 naming/摘要跳过。 */
   resolveSummaryModel: () => ResolvedModel;
   /** agent 多步上限（默认 5）。 */
   stepLimit?: number;

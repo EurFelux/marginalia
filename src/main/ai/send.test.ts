@@ -88,12 +88,10 @@ function tocThenTextModel(text: string) {
   });
 }
 
-const noSummaryModel: () => ResolvedModel = () => ({
-  ok: false as const,
-  reason: "summary model unset",
-});
-
-function setup(model: ResolvedModel) {
+function setup(
+  model: ResolvedModel,
+  summaryModel: ResolvedModel = { ok: false, reason: "summary model unset" },
+) {
   const db = createDb(":memory:");
   runMigrations(db, MIGRATIONS);
   const bytes = makeFixtureEpub();
@@ -103,7 +101,7 @@ function setup(model: ResolvedModel) {
     db,
     loadBytes,
     resolveModel: () => model,
-    resolveSummaryModel: noSummaryModel,
+    resolveSummaryModel: () => summaryModel,
   };
   return { db, book, deps };
 }
@@ -123,7 +121,12 @@ function makeDeps(db: ReturnType<typeof freshDb>): SendDeps {
   const bytes = makeFixtureEpub();
   const loadBytes: LoadBytes = async () => bytes;
   const model: ResolvedModel = { ok: true, model: textStreamModel("ok"), modelId: "mock" };
-  return { db, loadBytes, resolveModel: () => model, resolveSummaryModel: noSummaryModel };
+  return {
+    db,
+    loadBytes,
+    resolveModel: () => model,
+    resolveSummaryModel: () => ({ ok: false as const, reason: "summary model unset" }),
+  };
 }
 
 function input(bookId: string, conversationId: string, over: Partial<SendInput> = {}): SendInput {
@@ -321,26 +324,10 @@ describe("runSend", () => {
   });
 
   it("auto-names the conversation after the first completed turn", async () => {
-    const db = freshDb();
-    const book = seedBook(db);
-    const bytes = makeFixtureEpub();
-    const loadBytes: LoadBytes = async () => bytes;
-    const chatModel: ResolvedModel = {
-      ok: true,
-      model: textStreamModel("It means hello."),
-      modelId: "mock",
-    };
-    const summaryModel: ResolvedModel = {
-      ok: true,
-      model: namingOnlyModel("AI 标题"),
-      modelId: "summary-model",
-    };
-    const deps: SendDeps = {
-      db,
-      loadBytes,
-      resolveModel: () => chatModel,
-      resolveSummaryModel: () => summaryModel,
-    };
+    const { db, book, deps } = setup(
+      { ok: true, model: textStreamModel("It means hello."), modelId: "mock" },
+      { ok: true, model: namingOnlyModel("AI 标题"), modelId: "summary-model" },
+    );
     const convo = createConversation(db, { bookId: book.id });
     const r = runSend(deps, input(book.id, convo.id));
     expect(r.ok).toBe(true);
@@ -350,26 +337,10 @@ describe("runSend", () => {
   });
 
   it("does not rename a conversation that already has a title", async () => {
-    const db = freshDb();
-    const book = seedBook(db);
-    const bytes = makeFixtureEpub();
-    const loadBytes: LoadBytes = async () => bytes;
-    const chatModel: ResolvedModel = {
-      ok: true,
-      model: textStreamModel("answer"),
-      modelId: "mock",
-    };
-    const summaryModel: ResolvedModel = {
-      ok: true,
-      model: namingOnlyModel("AI 名"),
-      modelId: "summary-model",
-    };
-    const deps: SendDeps = {
-      db,
-      loadBytes,
-      resolveModel: () => chatModel,
-      resolveSummaryModel: () => summaryModel,
-    };
+    const { db, book, deps } = setup(
+      { ok: true, model: textStreamModel("answer"), modelId: "mock" },
+      { ok: true, model: namingOnlyModel("AI 名"), modelId: "summary-model" },
+    );
     const convo = createConversation(db, { bookId: book.id });
     setConversationTitle(db, convo.id, "既有名");
     const r = runSend(deps, input(book.id, convo.id));
@@ -380,27 +351,16 @@ describe("runSend", () => {
   });
 
   it("skips naming when the summary model is unconfigured; chat still completes", async () => {
-    const db = freshDb();
-    const book = seedBook(db);
-    const bytes = makeFixtureEpub();
-    const loadBytes: LoadBytes = async () => bytes;
-    const chatModel: ResolvedModel = {
-      ok: true,
-      model: textStreamModel("It means hello."),
-      modelId: "mock",
-    };
-    const deps: SendDeps = {
-      db,
-      loadBytes,
-      resolveModel: () => chatModel,
-      resolveSummaryModel: () => ({ ok: false, reason: "unset" }),
-    };
+    const { db, book, deps } = setup(
+      { ok: true, model: textStreamModel("It means hello."), modelId: "mock" },
+      { ok: false, reason: "unset" },
+    );
     const convo = createConversation(db, { bookId: book.id });
     const r = runSend(deps, input(book.id, convo.id));
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     await r.finished;
-    // Wait long enough for fire-and-forget naming to have settled (if it ran)
+    // 等 assistant 落库即可——naming 已因 ok:false 同步跳过，无异步尾部
     await vi.waitFor(() => {
       const msgs = listMessages(db, r.conversationId);
       const assistant = msgs.find((m) => m.role === "assistant");

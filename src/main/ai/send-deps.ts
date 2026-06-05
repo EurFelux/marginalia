@@ -15,8 +15,7 @@ export function makeSendDeps(): SendDeps {
   const db = getDb();
   const loadBytes = createLoadBytes(getBooksDir());
   const resolveModel = () => resolveAssistantModel(db);
-  const resolveSummaryModelFn = () => resolveSummaryModel(db);
-  return { db, loadBytes, resolveModel, resolveSummaryModel: resolveSummaryModelFn };
+  return { db, loadBytes, resolveModel, resolveSummaryModel: () => resolveSummaryModel(db) };
 }
 
 /** 章摘懒生成所需依赖（供 content:generate-chapter-summary handler 用）。
