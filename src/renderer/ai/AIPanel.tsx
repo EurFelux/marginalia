@@ -31,7 +31,7 @@ export function AIPanel() {
   const convosQuery = useQuery({
     queryKey: qk.conversations(bookId ?? ""),
     queryFn: () => window.api.chat.conversations.listByBook({ bookId: bookId! }),
-    enabled: bookId != null,
+    enabled: !!bookId,
   });
   const activeTitle = activeConversationId
     ? convosQuery.data?.find((c) => c.id === activeConversationId)?.title?.trim() ||

@@ -91,6 +91,16 @@ describe("createConversation reuses empty conversation", () => {
     const second = createConversation(db, { bookId: "book-1" });
     expect(second.id).not.toBe(first.id);
   });
+
+  it("does not reuse an empty conversation from another book", () => {
+    const db = freshDb();
+    seedBookWithChapters(db);
+    db.insert(books).values({ id: "book-2" }).run();
+    const otherBookEmpty = createConversation(db, { bookId: "book-2" });
+    const created = createConversation(db, { bookId: "book-1" });
+    expect(created.id).not.toBe(otherBookEmpty.id);
+    expect(created.bookId).toBe("book-1");
+  });
 });
 
 describe("setConversationTitle", () => {
