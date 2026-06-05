@@ -8,8 +8,7 @@ import { Button } from "@renderer/components/ui/button";
 import { useChatStore } from "@renderer/store/chat-store";
 import { usePrefsStore } from "@renderer/store/prefs-store";
 import { useNavigationStore } from "@renderer/store/navigation-store";
-import { ChipBar } from "@renderer/ai/ChipBar";
-import { SummaryChipToggles } from "@renderer/ai/SummaryChipToggles";
+import { ContextPillBar } from "@renderer/ai/ContextPillBar";
 import { materializeSummaryChips } from "@renderer/ai/summary-chips";
 import { bookSummaryQuery, chapterSummaryQuery } from "@renderer/query/summary-queries";
 
@@ -69,12 +68,7 @@ export function Composer({ status, onSend, onStop }: Props) {
 
   return (
     <div className="shrink-0 border-t border-border bg-card/40 p-3">
-      <SummaryChipToggles />
-      {draftChips.length > 0 && (
-        <div className="mb-2">
-          <ChipBar chips={draftChips} />
-        </div>
-      )}
+      <ContextPillBar />
       <div className="flex items-end gap-2 rounded-xl border border-border bg-background p-2 focus-within:ring-1 focus-within:ring-ring">
         <textarea
           ref={ref}
