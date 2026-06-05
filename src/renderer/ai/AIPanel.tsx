@@ -23,7 +23,6 @@ export function AIPanel() {
   const { messages, sendMessage, status, stop, setMessages, error } = useChat<ChatUIMessage>({
     transport,
   });
-  const setActiveConversation = useChatStore((s) => s.setActiveConversation);
   const updateLayout = usePrefsStore((s) => s.updateLayout);
   const openCommand = useChatStore((s) => s.openCommand);
   const activeConversationId = useChatStore((s) => s.activeConversationId);
@@ -73,14 +72,24 @@ export function AIPanel() {
     prevStatus.current = status;
   }, [status, qc]);
 
-  // active 置空（划词跨章进入无 active / 新对话 / 开书）→ 清面板；初始即空时为 no-op。
+  // active 置空（开书无会话 / 切书）→ 清面板；初始即空时为 no-op。
   useEffect(() => {
     if (activeConversationId === null) setMessages([]);
   }, [activeConversationId, setMessages]);
 
-  const newConversation = () => {
-    setMessages([]);
-    setActiveConversation(null);
+  const newConversation = async () => {
+    const bookId = useNavigationStore.getState().currentBookId;
+    if (!bookId) return;
+    try {
+      // 显式创建空会话（spec §2/§7）；防堆积由主进程兜底（复用既有空会话）
+      const convo = await window.api.chat.conversations.create({ bookId });
+      setMessages([]);
+      useChatStore.getState().setActiveConversation(convo.id);
+      useChatStore.getState().setSummaryChipsPreset();
+      void qc.invalidateQueries({ queryKey: ["conversations"] });
+    } catch (err) {
+      console.warn("[ai] create conversation failed:", err);
+    }
   };
 
   const handleSend = (text: string, chips: Chip[]) => {
@@ -101,7 +110,7 @@ export function AIPanel() {
           <Button
             variant="ghost"
             size="icon-sm"
-            onClick={newConversation}
+            onClick={() => void newConversation()}
             aria-label={t("ai.newConversation", "新对话")}
             className="text-muted-foreground"
           >

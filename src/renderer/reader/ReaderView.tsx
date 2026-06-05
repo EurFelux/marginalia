@@ -25,10 +25,12 @@ import { SelectionToolbar } from "@renderer/reader/SelectionToolbar";
 import { HighlightStyleBar } from "@renderer/reader/HighlightStyleBar";
 import { NoteModal } from "@renderer/reader/NoteModal";
 import { AIPanel } from "@renderer/ai/AIPanel";
+import { useRestoreConversation } from "@renderer/ai/use-restore-conversation";
 
 export function ReaderView() {
   const { t } = useTranslation();
   const bookId = useNavigationStore((s) => s.currentBookId);
+  useRestoreConversation(bookId);
   const chapterId = useNavigationStore((s) => s.currentChapterId);
   const backToLibrary = useNavigationStore((s) => s.backToLibrary);
   const openSettings = useSettingsStore((s) => s.setOpen);

@@ -8,6 +8,8 @@ import { qk } from "@renderer/query/keys";
 import { useChatStore } from "@renderer/store/chat-store";
 import { relativeTime } from "@renderer/lib/relative-time";
 
+type IntervalQuery = { state: { data?: ConversationDto[] } };
+
 export function ConversationsTab({ bookId }: { bookId: string }) {
   const { t, i18n } = useTranslation();
   const activeId = useChatStore((s) => s.activeConversationId);
@@ -15,6 +17,10 @@ export function ConversationsTab({ bookId }: { bookId: string }) {
   const convos = useQuery({
     queryKey: qk.conversations(bookId),
     queryFn: () => window.api.chat.conversations.listByBook({ bookId }),
+    // isNaming 是主进程后台推进的瞬态（spec §5/§8）：staleTime:0 + 命名期间短轮询，
+    // 终态（无 isNaming）即停——镜像 summary-queries 的非终态轮询取向。
+    staleTime: 0,
+    refetchInterval: (q: IntervalQuery) => (q.state.data?.some((c) => c.isNaming) ? 1200 : false),
   });
 
   if (convos.isPending)
@@ -55,7 +61,12 @@ export function ConversationsTab({ bookId }: { bookId: string }) {
             )}
           >
             <MessagesSquare className="size-4 shrink-0 text-muted-foreground" />
-            <span className="min-w-0 flex-1 truncate text-xs text-foreground">
+            <span
+              className={cn(
+                "min-w-0 flex-1 truncate text-xs text-foreground",
+                c.isNaming && "animate-pulse text-muted-foreground",
+              )}
+            >
               {primaryLabel(c)}
             </span>
             <span className="shrink-0 text-[10px] text-muted-foreground/70">
