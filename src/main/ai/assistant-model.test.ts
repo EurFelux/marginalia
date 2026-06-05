@@ -87,16 +87,14 @@ describe("resolveSummaryModel", () => {
   it("fails when the preference is unset", () => {
     const db = freshDb();
     const r = resolveSummaryModel(db);
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason.toLowerCase()).toContain("summary model");
+    expect(r).toMatchObject({ ok: false, reason: expect.stringContaining("Summary model") });
   });
 
-  it("fails when the referenced provider was deleted", () => {
+  it("fails when the preference points at a non-existent provider", () => {
     const db = freshDb();
     setPreference(db, "summaryModel", { providerId: "ghost", model: "m" });
     const r = resolveSummaryModel(db);
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason.toLowerCase()).toContain("provider");
+    expect(r).toMatchObject({ ok: false, reason: expect.stringContaining("not found") });
   });
 
   it("fails when the provider has no API key", () => {
@@ -107,7 +105,6 @@ describe("resolveSummaryModel", () => {
     });
     setPreference(db, "summaryModel", { providerId: provider.id, model: "m" });
     const r = resolveSummaryModel(db);
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason.toLowerCase()).toContain("api key");
+    expect(r).toMatchObject({ ok: false, reason: expect.stringContaining("API key") });
   });
 });
