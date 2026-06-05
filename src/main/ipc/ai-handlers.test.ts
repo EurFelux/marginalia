@@ -12,8 +12,6 @@ function okResult(chunks: unknown[], finished = Promise.resolve()): OkResult {
   return {
     ok: true,
     conversationId: "conv-1",
-    created: true,
-    switchedFromActive: false,
     stream: gen(),
     finished,
   };

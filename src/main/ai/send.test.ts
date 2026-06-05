@@ -2,12 +2,10 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { MockLanguageModelV3, simulateReadableStream } from "ai/test";
-import { eq } from "drizzle-orm";
 import { makeFixtureEpub } from "@marginalia/epub-parser";
 import { createDb, runMigrations } from "@main/db/client";
-import { chapters } from "@main/db/schema";
 import { importBook, resolveChapterByHref } from "@main/library/repository";
-import { listConversationsByBook } from "@main/chat/conversations";
+import { createConversation, listConversationsByBook } from "@main/chat/conversations";
 import { listMessages } from "@main/chat/messages";
 import { buildChips } from "@main/ai/chips";
 import type { ResolvedModel } from "@main/ai/assistant-model";
@@ -39,24 +37,6 @@ function textStreamModel(text: string) {
         ],
       }),
     }),
-  });
-}
-
-function capturingStreamModel(text: string, capture: { prompt?: string }) {
-  return new MockLanguageModelV3({
-    doStream: async (options) => {
-      capture.prompt = JSON.stringify(options.prompt);
-      return {
-        stream: simulateReadableStream({
-          chunks: [
-            { type: "text-start", id: "t1" },
-            { type: "text-delta", id: "t1", delta: text },
-            { type: "text-end", id: "t1" },
-            finishChunk("stop"),
-          ],
-        }),
-      };
-    },
   });
 }
 
@@ -101,23 +81,72 @@ function setup(model: ResolvedModel) {
   return { db, book, ch1, deps };
 }
 
-function input(bookId: string, chapterId: string, over: Partial<SendInput> = {}): SendInput {
+function freshDb() {
+  const db = createDb(":memory:");
+  runMigrations(db, MIGRATIONS);
+  return db;
+}
+
+function seedBook(db: ReturnType<typeof freshDb>) {
+  const bytes = makeFixtureEpub();
+  return importBook(db, { bytes });
+}
+
+function makeDeps(db: ReturnType<typeof freshDb>): SendDeps {
+  const bytes = makeFixtureEpub();
+  const loadBytes: LoadBytes = async () => bytes;
+  const model: ResolvedModel = { ok: true, model: textStreamModel("ok"), modelId: "mock" };
+  return { db, loadBytes, resolveModel: () => model };
+}
+
+function input(bookId: string, conversationId: string, over: Partial<SendInput> = {}): SendInput {
   return {
     bookId,
-    currentChapterId: chapterId,
-    activeConversationId: null,
+    conversationId,
     chips: buildChips({ selection: "the cat", paragraphCurrent: "the cat sat on the mat" }),
     userText: "what does this mean?",
     ...over,
   };
 }
 
+describe("runSend conversation validation", () => {
+  it("rejects unknown conversationId without writing anything", () => {
+    const db = freshDb();
+    seedBook(db);
+    const result = runSend(makeDeps(db), {
+      bookId: "book-1",
+      conversationId: "nope",
+      chips: [],
+      userText: "hi",
+    });
+    // 校验：runSend 拒绝未知会话，返回错误（i18n 在测试环境未初始化，不断言 reason 文案）
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects a conversation belonging to another book", () => {
+    const db = freshDb();
+    const book1 = seedBook(db);
+    const book2 = importBook(db, {
+      bytes: makeFixtureEpub({ identifier: "urn:uuid:other-book" }),
+    });
+    const other = createConversation(db, { bookId: book2.id, chapterId: null });
+    const result = runSend(makeDeps(db), {
+      bookId: book1.id,
+      conversationId: other.id,
+      chips: [],
+      userText: "hi",
+    });
+    expect(result.ok).toBe(false);
+  });
+});
+
 describe("runSend", () => {
   it("returns an error and creates nothing when no model is configured", () => {
     const { db, book, ch1, deps } = setup({ ok: false, reason: "not configured" });
-    const r = runSend(deps, input(book.id, ch1.id));
+    const convo = createConversation(db, { bookId: book.id, chapterId: ch1.id });
+    const r = runSend(deps, input(book.id, convo.id));
     expect(r.ok).toBe(false);
-    expect(listConversationsByBook(db, book.id)).toEqual([]);
+    expect(listConversationsByBook(db, book.id)).toHaveLength(1); // conversation still there, just no messages
   });
 
   it("persists the user message with a chip snapshot and the streamed assistant message", async () => {
@@ -126,7 +155,8 @@ describe("runSend", () => {
       model: textStreamModel("It means hello."),
       modelId: "mock",
     });
-    const r = runSend(deps, input(book.id, ch1.id));
+    const convo = createConversation(db, { bookId: book.id, chapterId: ch1.id });
+    const r = runSend(deps, input(book.id, convo.id));
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     await r.finished;
@@ -144,7 +174,6 @@ describe("runSend", () => {
     expect(assistantText).toContain("It means hello.");
     expect(msgs[1].status).toBe("complete");
     expect(msgs[1].metadata?.usage).toEqual({ inputTokens: 1, outputTokens: 1 });
-    expect(r.created).toBe(true);
   });
 
   it("runs the tool-calling agent loop and persists tool parts in the assistant message", async () => {
@@ -153,7 +182,8 @@ describe("runSend", () => {
       model: tocThenTextModel("Done."),
       modelId: "mock",
     });
-    const r = runSend(deps, input(book.id, ch1.id));
+    const convo = createConversation(db, { bookId: book.id, chapterId: ch1.id });
+    const r = runSend(deps, input(book.id, convo.id));
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     await r.finished;
@@ -172,7 +202,8 @@ describe("runSend", () => {
       },
     });
     const { db, book, ch1, deps } = setup({ ok: true, model: failModel, modelId: "mock" });
-    const r = runSend(deps, input(book.id, ch1.id));
+    const convo = createConversation(db, { bookId: book.id, chapterId: ch1.id });
+    const r = runSend(deps, input(book.id, convo.id));
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     await r.finished;
@@ -183,37 +214,6 @@ describe("runSend", () => {
     expect(assistant.metadata?.error?.message).toContain("stream boom");
   });
 
-  it("injects a ready chapter summary into the prompt", async () => {
-    const capture: { prompt?: string } = {};
-    const { db, book, ch1, deps } = setup({
-      ok: true,
-      model: capturingStreamModel("ok", capture),
-      modelId: "mock",
-    });
-    db.update(chapters)
-      .set({ summary: "CHAPTER-SUMMARY-XYZ" })
-      .where(eq(chapters.id, ch1.id))
-      .run();
-    const r = runSend(deps, input(book.id, ch1.id));
-    expect(r.ok).toBe(true);
-    if (!r.ok) return;
-    await r.finished;
-    expect(capture.prompt).toContain("CHAPTER-SUMMARY-XYZ"); // 摘要进了模型输入
-  });
-
-  it("returns an error without writing when the chapter belongs to a different book", () => {
-    const { db, book, deps } = setup({ ok: true, model: textStreamModel("x"), modelId: "mock" });
-    // 另一本书的章节：chapters.id 合法（FK 不报错）但不属于 book
-    const otherBook = importBook(db, {
-      bytes: makeFixtureEpub({ identifier: "urn:uuid:other-book" }),
-    });
-    const otherCh = resolveChapterByHref(db, otherBook.id, "OEBPS/ch1.xhtml")!;
-    const r = runSend(deps, input(book.id, otherCh.id));
-    expect(r.ok).toBe(false);
-    expect(listConversationsByBook(db, book.id)).toEqual([]);
-    expect(listConversationsByBook(db, otherBook.id)).toEqual([]);
-  });
-
   it("forwards a non-aborted signal without breaking the normal persist path", async () => {
     const controller = new AbortController();
     const { db, book, ch1, deps } = setup({
@@ -221,7 +221,8 @@ describe("runSend", () => {
       model: textStreamModel("hello"),
       modelId: "mock",
     });
-    const r = runSend(deps, input(book.id, ch1.id), { abortSignal: controller.signal });
+    const convo = createConversation(db, { bookId: book.id, chapterId: ch1.id });
+    const r = runSend(deps, input(book.id, convo.id), { abortSignal: controller.signal });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     await r.finished;
@@ -246,7 +247,8 @@ describe("runSend", () => {
       }),
     });
     const { db, book, ch1, deps } = setup({ ok: true, model: slowModel, modelId: "mock" });
-    const r = runSend(deps, input(book.id, ch1.id), { abortSignal: controller.signal });
+    const convo = createConversation(db, { bookId: book.id, chapterId: ch1.id });
+    const r = runSend(deps, input(book.id, convo.id), { abortSignal: controller.signal });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     controller.abort(); // runSend 同步返回后立即中止，分片仍在 50ms 延迟途中
@@ -261,9 +263,10 @@ describe("runSend", () => {
       model: textStreamModel("ok"),
       modelId: "mock",
     });
+    const convo = createConversation(db, { bookId: book.id, chapterId: ch1.id });
     const first = runSend(
       deps,
-      input(book.id, ch1.id, {
+      input(book.id, convo.id, {
         chips: buildChips({ selection: "s1", paragraphCurrent: "dup para" }),
         userText: "q1",
       }),
@@ -274,8 +277,7 @@ describe("runSend", () => {
 
     const second = runSend(
       deps,
-      input(book.id, ch1.id, {
-        activeConversationId: first.conversationId,
+      input(book.id, convo.id, {
         chips: buildChips({ selection: "s2", paragraphCurrent: "dup para" }),
         userText: "q2",
       }),
@@ -284,7 +286,7 @@ describe("runSend", () => {
     if (!second.ok) return;
     await second.finished;
 
-    const userMsgs = listMessages(db, first.conversationId).filter((m) => m.role === "user");
+    const userMsgs = listMessages(db, convo.id).filter((m) => m.role === "user");
     const lastUser = userMsgs[userMsgs.length - 1];
     expect(lastUser.metadata?.contextChips?.map((c) => c.id)).toEqual(["selection"]);
   });

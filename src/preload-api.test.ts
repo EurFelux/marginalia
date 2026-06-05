@@ -32,8 +32,8 @@ describe("preload api coverage", () => {
       .map((c) => c.channel),
   );
 
-  // 这两条是 main-only：有 handler、preload 故意不暴露（renderer 零引用）。
-  const KNOWN_MAIN_ONLY = new Set(["conversations:create", "conversations:get"]);
+  // 这一条是 main-only：有 handler、preload 故意不暴露（renderer 零引用）。
+  const KNOWN_MAIN_ONLY = new Set(["conversations:get"]);
 
   it("every bound channel is a real invoke contract", () => {
     for (const ch of bound) expect(invokeChannels.has(ch), ch).toBe(true);

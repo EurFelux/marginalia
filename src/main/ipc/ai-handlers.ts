@@ -47,12 +47,7 @@ export const aiBindings: Binding[] = [
     void pumpStream(event.sender, streamId, result, controller.signal).finally(() => {
       controllers.delete(streamId);
     });
-    return {
-      ok: true,
-      conversationId: result.conversationId,
-      created: result.created,
-      switchedFromActive: result.switchedFromActive,
-    };
+    return { ok: true, conversationId: result.conversationId };
   }),
 
   bind(C.aiAbort, ({ streamId }) => {

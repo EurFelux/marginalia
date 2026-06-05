@@ -6,17 +6,14 @@ import {
   type ModelMessage,
   type UIMessageChunk,
 } from "ai";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import type { DB } from "@main/db/client";
-import { chapters } from "@main/db/schema";
+import { conversations } from "@main/db/schema";
 import { getDefaultAssistant } from "@main/providers/assistant";
-import { getChapterSummaryView } from "@main/ai/summary";
 import { assemblePrompt } from "@main/ai/prompt";
 import { dedupeParagraph, toContextChips } from "@main/ai/chips";
 import { createReadingTools, type LoadBytes } from "@main/ai/tools";
 import type { ResolvedModel } from "@main/ai/assistant-model";
-import { routeConversation, setConversationTitle } from "@main/chat/conversations";
-import { deriveConversationTitle } from "@main/chat/conversation-title";
 import { appendMessage, getLastParagraphContent, listMessages } from "@main/chat/messages";
 import { t } from "@main/i18n";
 import { type SendInput } from "@shared/chat";
@@ -34,25 +31,11 @@ export type SendResult =
   | {
       ok: true;
       conversationId: string;
-      created: boolean;
-      switchedFromActive: boolean;
       /** UI message stream（chunk 为 UIMessageChunk）供 UI 轨 IPC 订阅推送。 */
       stream: AsyncIterable<UIMessageChunk>;
       finished: Promise<void>;
     }
   | { ok: false; reason: string };
-
-function getChapter(
-  db: DB,
-  bookId: string,
-  chapterId: string,
-): { title: string | null } | undefined {
-  return db
-    .select({ title: chapters.title })
-    .from(chapters)
-    .where(and(eq(chapters.bookId, bookId), eq(chapters.id, chapterId)))
-    .get();
-}
 
 /** 选区 → AI 发送编排（设计文档 §9）。 */
 export function runSend(
@@ -62,35 +45,29 @@ export function runSend(
 ): SendResult {
   const { db, loadBytes, resolveModel, stepLimit } = deps;
 
-  // 1. 先解析模型——未配置即返回错误，不路由/不落库（避免孤儿会话，设计文档 §16）
+  // 1. 先解析模型——未配置即返回错误，不落库
   const resolved = resolveModel();
   if (!resolved.ok) return { ok: false, reason: resolved.reason };
 
-  // 1b. 校验章节属于本书——在任何写入前拦截（§16 无孤儿）。否则步骤6 getChapterSummaryView 会在
-  //     已建会话 + 已落 user 消息之后裸抛（章节存在于别的书时 FK 不报错，但 book 作用域查询无行）。
-  const chapterRow = getChapter(db, input.bookId, input.currentChapterId);
-  if (!chapterRow) return { ok: false, reason: t("errors.chapterNotInBook", "本书中未找到该章节") };
-
-  // 2. 路由会话
-  const route = routeConversation(db, {
-    bookId: input.bookId,
-    currentChapterId: input.currentChapterId,
-    activeConversationId: input.activeConversationId,
-  });
-  const conversationId = route.conversationId;
-
-  // 首次创建会话时落「随便起」的标题（首条用户消息派生）；后续自动命名功能覆盖同字段。
-  if (route.created) {
-    setConversationTitle(db, conversationId, deriveConversationTitle(input.userText));
+  // 1b. 校验会话存在且属于本书（spec §5：只校验不分配，绝不默默新建）
+  const convo = db
+    .select({ bookId: conversations.bookId })
+    .from(conversations)
+    .where(eq(conversations.id, input.conversationId))
+    .get();
+  if (!convo || convo.bookId !== input.bookId) {
+    return { ok: false, reason: t("errors.conversationNotFound", "会话不存在或不属于本书") };
   }
+  const conversationId = input.conversationId;
 
-  // 3. 段落去重（对照本会话上一次插入的段落）
-  const deduped = dedupeParagraph(input.chips, getLastParagraphContent(db, conversationId));
+  // 2. 防御过滤 off chip（正常路径 renderer 已过滤）+ 段落去重
+  const activeChips = input.chips.filter((c) => c.state !== "off");
+  const deduped = dedupeParagraph(activeChips, getLastParagraphContent(db, conversationId));
 
-  // 4. 取历史（在落入本轮 user 消息之前）
+  // 3. 取历史（在落入本轮 user 消息之前）
   const history = listMessages(db, conversationId);
 
-  // 5. 落 user 消息（chips 快照入 metadata）
+  // 4. 落 user 消息（chips 快照入 metadata）
   appendMessage(db, {
     conversationId,
     role: "user",
@@ -98,18 +75,10 @@ export function runSend(
     metadata: { contextChips: toContextChips(deduped), model: resolved.modelId },
   });
 
-  // 6. 章节摘要：ready 则注入当前轮（生成由「开章自动/手动」触发，不再由发消息触发）
-  const summary = getChapterSummaryView(db, input.bookId, input.currentChapterId);
-  const chapter =
-    summary.status === "ready" && summary.summary
-      ? { title: chapterRow.title, summary: summary.summary }
-      : null;
-
-  // 7. 组装 prompt（system 来自默认 Assistant）
+  // 5. 组装 prompt（system 来自默认 Assistant；摘要不再隐式注入——随 chips 同构进入，spec §6）
   const assistant = getDefaultAssistant(db);
   const allMessages: ModelMessage[] = assemblePrompt({
     systemPrompt: assistant.systemPrompt,
-    chapter,
     history,
     current: { chips: deduped, userText: input.userText },
   });
@@ -125,7 +94,7 @@ export function runSend(
     messages = allMessages;
   }
 
-  // 8. streamText + tools + agent 循环
+  // 6. streamText + tools + agent 循环
   const tools = createReadingTools({ db, bookId: input.bookId, loadBytes });
   // 从 streamText 自身的 onFinish 旁路捕获跨步聚合用量（toUIMessageStream 的 onFinish 不带 usage）。
   let capturedUsage: LanguageModelUsage | undefined;
@@ -141,7 +110,7 @@ export function runSend(
     },
   });
 
-  // 9. 一轮终止时落 assistant 消息——出生即终态（complete|error|aborted），设计文档 §3 / DD-§3.1 / DD-§3.2。
+  // 7. 一轮终止时落 assistant 消息——出生即终态（complete|error|aborted），设计文档 §3 / DD-§3.1 / DD-§3.2。
   let resolveDone!: () => void;
   const finished = new Promise<void>((res) => {
     resolveDone = res;
@@ -207,8 +176,6 @@ export function runSend(
   return {
     ok: true,
     conversationId,
-    created: route.created,
-    switchedFromActive: route.switchedFromActive,
     stream: callerStream,
     finished,
   };

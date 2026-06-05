@@ -92,6 +92,7 @@ export function createApi(d: PreloadDeps) {
     chat: {
       conversations: {
         listByBook: inv(C.conversationsListByBook),
+        create: inv(C.conversationsCreate),
       },
       messages: {
         listByConversation: inv(C.messagesListByConversation),

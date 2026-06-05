@@ -179,7 +179,7 @@ export const C = {
   assistantGetDefault: def("assistant:get-default", "invoke", z.void(), out<AssistantDto>()),
   assistantUpdate: def("assistant:update", "invoke", updateAssistantInput, out<AssistantDto>()),
 
-  // chat（conversationsCreate / conversationsGet 为 main-only：有 handler、preload 不暴露）
+  // chat（conversationsGet 为 main-only：有 handler、preload 不暴露）
   conversationsListByBook: def(
     "conversations:list-by-book",
     "invoke",

@@ -87,12 +87,11 @@ describe("sendRequest", () => {
   const base = {
     streamId: "s1",
     bookId: "b1",
-    currentChapterId: "c1",
-    activeConversationId: null,
+    conversationId: "conv-1",
     chips: [],
     userText: "hi",
   };
-  it("accepts a valid request with empty chips and null conversation", () => {
+  it("accepts a valid request with empty chips and explicit conversationId", () => {
     expect(sendRequest.safeParse(base).success).toBe(true);
   });
   it("rejects empty userText", () => {
@@ -102,14 +101,15 @@ describe("sendRequest", () => {
     const { streamId: _omit, ...rest } = base;
     expect(sendRequest.safeParse(rest).success).toBe(false);
   });
+  it("rejects missing conversationId", () => {
+    const { conversationId: _omit, ...rest } = base;
+    expect(sendRequest.safeParse(rest).success).toBe(false);
+  });
 });
 
 describe("sendAck", () => {
   it("accepts ok:true variant", () => {
-    expect(
-      sendAck.safeParse({ ok: true, conversationId: "c", created: true, switchedFromActive: false })
-        .success,
-    ).toBe(true);
+    expect(sendAck.safeParse({ ok: true, conversationId: "c" }).success).toBe(true);
   });
   it("accepts ok:false variant", () => {
     expect(sendAck.safeParse({ ok: false, reason: "no key" }).success).toBe(true);

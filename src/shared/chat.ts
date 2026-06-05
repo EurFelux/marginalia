@@ -72,11 +72,10 @@ export interface MessageDto {
   createdAt: number;
 }
 
-/** runSend 的业务入参（不含传输层 streamId）。取代 send.ts 中手写的 SendInput interface。 */
+/** runSend 的业务入参（不含传输层 streamId）。conversationId 必传：send 只校验不分配（spec §5）。 */
 export const sendInputSchema = z.object({
   bookId: z.string().min(1),
-  currentChapterId: z.string().min(1),
-  activeConversationId: z.string().min(1).nullable(),
+  conversationId: z.string().min(1),
   chips: z.array(chipSchema),
   userText: z.string().min(1),
 });
@@ -88,12 +87,7 @@ export type SendRequest = z.infer<typeof sendRequest>;
 
 /** ai:send invoke 的同步 ack（增量走 ai:chunk 事件流，故不含 stream/finished）。 */
 export const sendAck = z.discriminatedUnion("ok", [
-  z.object({
-    ok: z.literal(true),
-    conversationId: z.string(),
-    created: z.boolean(),
-    switchedFromActive: z.boolean(),
-  }),
+  z.object({ ok: z.literal(true), conversationId: z.string() }),
   z.object({ ok: z.literal(false), reason: z.string() }),
 ]);
 export type SendAck = z.infer<typeof sendAck>;

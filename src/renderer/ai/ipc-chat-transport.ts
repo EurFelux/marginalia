@@ -50,21 +50,31 @@ function lastUserText(messages: ChatUIMessage[]): string {
  * - userText + chips 取自「刚发出的那条用户消息」（chips 在 metadata.contextChips），
  *   而非读 store.draftChips——避免与 Composer 发送后同步清空 draftChips 的竞态
  *   （仍满足 §4.1「userText + chips 同行」）。
- * - bookId / currentChapterId / activeConversationId 为稳定态，仍读 store。
+ * - bookId 读 store；conversationId 发送前懒建保证存在（spec §7）。
  * - 先订阅 ai:chunk 再 invoke ai:send（spec §4.4：订阅必早于推送，无竞态）。
  */
 export function createIpcChatTransport(): ChatTransport<ChatUIMessage> {
   return {
     async sendMessages({ messages, abortSignal }) {
-      const { currentBookId, currentChapterId } = useNavigationStore.getState();
-      const { activeConversationId } = useChatStore.getState();
-      if (!currentBookId || !currentChapterId) {
+      const { currentBookId } = useNavigationStore.getState();
+      if (!currentBookId) {
         const { default: i18n } = await import("@renderer/i18n");
-        throw new Error(i18n.t("ai.noChapterToSend", "没有正在阅读的章节，无法发送。"));
+        throw new Error(i18n.t("ai.noBookToSend", "没有正在阅读的书，无法发送。"));
+      }
+      // 发送前保证目标会话存在（spec §7）：无 active → 懒建（主进程防堆积兜底）
+      let conversationId = useChatStore.getState().activeConversationId;
+      if (!conversationId) {
+        const convo = await window.api.chat.conversations.create({
+          bookId: currentBookId,
+          chapterId: null, // 下一任务收窄 createConversationInput 后删本字段
+        });
+        useChatStore.getState().setActiveConversation(convo.id);
+        conversationId = convo.id;
       }
       const last = messages.at(-1);
       const userText = lastUserText(messages);
-      const chips = last?.metadata?.contextChips ?? [];
+      // off 的 chip 不发送（spec §6）；历史水合 chip 恒为 required，不受影响
+      const chips = (last?.metadata?.contextChips ?? []).filter((c) => c.state !== "off");
 
       const streamId = uuidv7();
       const stream = createEventStream(streamId, window.api.ai.onChunk);
@@ -73,8 +83,7 @@ export function createIpcChatTransport(): ChatTransport<ChatUIMessage> {
       const ack = await window.api.ai.send({
         streamId,
         bookId: currentBookId,
-        currentChapterId,
-        activeConversationId,
+        conversationId,
         chips,
         userText,
       });
@@ -82,8 +91,6 @@ export function createIpcChatTransport(): ChatTransport<ChatUIMessage> {
         void stream.cancel(); // 触发 cancel() → 退订，避免监听器泄漏
         throw new Error(ack.reason); // useChat 进 error 态
       }
-      // ack 回写（组件外）：记录会话 id 及其所属章（路由后的会话总是属于 currentChapterId 或同章/独立追加）
-      useChatStore.getState().setActiveConversation(ack.conversationId, currentChapterId);
       return stream;
     },
     // 单窗口竖切不做断线重连。
