@@ -1,11 +1,16 @@
 // src/main/ai/send.test.ts
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { MockLanguageModelV3, simulateReadableStream } from "ai/test";
 import { makeFixtureEpub } from "@marginalia/epub-parser";
 import { createDb, runMigrations } from "@main/db/client";
 import { importBook } from "@main/library/repository";
-import { createConversation, listConversationsByBook } from "@main/chat/conversations";
+import {
+  createConversation,
+  getConversation,
+  listConversationsByBook,
+  setConversationTitle,
+} from "@main/chat/conversations";
 import { listMessages } from "@main/chat/messages";
 import { buildChips } from "@main/ai/chips";
 import type { ResolvedModel } from "@main/ai/assistant-model";
@@ -36,6 +41,28 @@ function textStreamModel(text: string) {
           finishChunk("stop"),
         ],
       }),
+    }),
+  });
+}
+
+/** 同时支持 doStream（流式主回复）与 doGenerate（auto-naming 调用）的 mock */
+function textStreamModelWithNaming(streamText: string, namingTitle: string) {
+  return new MockLanguageModelV3({
+    doStream: async () => ({
+      stream: simulateReadableStream({
+        chunks: [
+          { type: "text-start", id: "t1" },
+          { type: "text-delta", id: "t1", delta: streamText },
+          { type: "text-end", id: "t1" },
+          finishChunk("stop"),
+        ],
+      }),
+    }),
+    doGenerate: async () => ({
+      finishReason: { unified: "stop" as const, raw: undefined },
+      usage: USAGE,
+      content: [{ type: "text" as const, text: namingTitle }],
+      warnings: [],
     }),
   });
 }
@@ -288,5 +315,35 @@ describe("runSend", () => {
     const userMsgs = listMessages(db, convo.id).filter((m) => m.role === "user");
     const lastUser = userMsgs[userMsgs.length - 1];
     expect(lastUser.metadata?.contextChips?.map((c) => c.id)).toEqual(["selection"]);
+  });
+
+  it("auto-names the conversation after the first completed turn", async () => {
+    const { db, book, deps } = setup({
+      ok: true,
+      model: textStreamModelWithNaming("It means hello.", "AI 标题"),
+      modelId: "mock",
+    });
+    const convo = createConversation(db, { bookId: book.id });
+    const r = runSend(deps, input(book.id, convo.id));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    await r.finished;
+    await vi.waitFor(() => expect(getConversation(db, convo.id)?.title).toBe("AI 标题"));
+  });
+
+  it("does not rename a conversation that already has a title", async () => {
+    const { db, book, deps } = setup({
+      ok: true,
+      model: textStreamModelWithNaming("answer", "AI 名"),
+      modelId: "mock",
+    });
+    const convo = createConversation(db, { bookId: book.id });
+    setConversationTitle(db, convo.id, "既有名");
+    const r = runSend(deps, input(book.id, convo.id));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    await r.finished;
+    await new Promise((res) => setTimeout(res, 50));
+    expect(getConversation(db, convo.id)?.title).toBe("既有名");
   });
 });

@@ -15,6 +15,8 @@ import { dedupeParagraph, toContextChips } from "@main/ai/chips";
 import { createReadingTools, type LoadBytes } from "@main/ai/tools";
 import type { ResolvedModel } from "@main/ai/assistant-model";
 import { appendMessage, getLastParagraphContent, listMessages } from "@main/chat/messages";
+import { nameConversation } from "@main/chat/conversation-title";
+import { textOfParts } from "@main/ai/prompt";
 import { t } from "@main/i18n";
 import { type SendInput } from "@shared/chat";
 export type { SendInput };
@@ -149,6 +151,22 @@ export function runSend(
           error: streamHadError ? errorInfo : undefined,
         },
       });
+      // 首轮完成 → 自动命名（spec §5）：title 仍 null 且本轮 complete 才触发；fire-and-forget
+      if (status === "complete") {
+        const row = db
+          .select({ title: conversations.title })
+          .from(conversations)
+          .where(eq(conversations.id, conversationId))
+          .get();
+        if (row && row.title == null) {
+          void nameConversation(
+            { db, resolveModel },
+            conversationId,
+            input.userText,
+            textOfParts(responseMessage.parts),
+          );
+        }
+      }
     },
   });
 
