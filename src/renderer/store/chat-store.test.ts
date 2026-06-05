@@ -31,8 +31,7 @@ describe("chat-store", () => {
       labelKey: "",
       content: "",
       tokenCount: 0,
-      required: false,
-      enabled: false,
+      state: "required",
     };
     useChatStore.getState().setDraftChips([chip]);
     expect(useChatStore.getState().draftText).toBe("hi");

@@ -8,6 +8,10 @@ export const chipLabel = (chip: Chip): string => {
       return i18n.t("ai.chip.selection", "选区");
     case "chip.paragraph":
       return i18n.t("ai.chip.paragraph", "段落上下文");
+    case "chip.chapterSummary":
+      return i18n.t("ai.chip.chapterSummary", "章节摘要");
+    case "chip.bookSummary":
+      return i18n.t("ai.chip.bookSummary", "全书摘要");
     default:
       return chip.labelKey;
   }

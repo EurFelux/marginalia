@@ -4,7 +4,7 @@ import type { TocNode } from "@marginalia/epub-parser";
 export type { TocNode };
 
 /** 上下文 chip 的 id 枚举（live Chip 与持久化 contextChips 共用，单一来源避免漂移） */
-export const chipIdSchema = z.enum(["selection", "paragraph"]);
+export const chipIdSchema = z.enum(["selection", "paragraph", "chapter-summary", "book-summary"]);
 
 /** 消息角色联合（主-渲染跨层共享，避免 ×4 重复声明） */
 export type MessageRole = "system" | "user" | "assistant";

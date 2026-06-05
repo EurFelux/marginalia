@@ -16,8 +16,7 @@ describe("buildChips", () => {
       id: "selection",
       labelKey: "chip.selection",
       content: "the cat sat",
-      required: true,
-      enabled: true,
+      state: "required",
     });
     expect(selection.tokenCount).toBeGreaterThan(0);
     // 段落 = before + current + after，用空行连接
@@ -66,7 +65,7 @@ describe("dedupeParagraph", () => {
 });
 
 describe("toContextChips", () => {
-  it("projects live chips to the persisted snapshot shape (drops labelKey/required/enabled)", () => {
+  it("projects live chips to the persisted snapshot shape (drops labelKey/state)", () => {
     const chips = buildChips({ selection: "sel", paragraphCurrent: "para" });
     expect(toContextChips(chips)).toEqual([
       { id: "selection", content: "sel", tokenCount: chips[0].tokenCount },

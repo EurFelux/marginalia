@@ -10,9 +10,11 @@ export const chipSchema = z.object({
   labelKey: z.string(),
   content: z.string(),
   tokenCount: z.number().int().nonnegative(),
-  // TODO(MA5): required/enabled 当前无读取方；UI toggle 落地时收敛为闭合联合（参见 ProviderDto 三态 follow-up）
-  required: z.boolean(),
-  enabled: z.boolean(),
+  /**
+   * 三态闭合联合（spec §4）：required=必备随发不可关（选区/段落）；
+   * on/off=用户 toggle（摘要 chips）。off 的 chip 发送前由 renderer 过滤。
+   */
+  state: z.enum(["required", "on", "off"]),
 });
 export type Chip = z.infer<typeof chipSchema>;
 

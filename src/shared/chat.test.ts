@@ -17,8 +17,7 @@ describe("chat schemas", () => {
       labelKey: "chip.selection",
       content: "hello",
       tokenCount: 2,
-      required: true,
-      enabled: true,
+      state: "required" as const,
     };
     expect(chipSchema.parse(chip)).toEqual(chip);
   });
@@ -29,8 +28,7 @@ describe("chat schemas", () => {
       labelKey: "x",
       content: "y",
       tokenCount: 0,
-      required: true,
-      enabled: true,
+      state: "required",
     });
     expect(r.success).toBe(false);
   });
@@ -41,8 +39,7 @@ describe("chat schemas", () => {
       labelKey: "x",
       content: "y",
       tokenCount: -1,
-      required: true,
-      enabled: true,
+      state: "required",
     });
     expect(r.success).toBe(false);
   });

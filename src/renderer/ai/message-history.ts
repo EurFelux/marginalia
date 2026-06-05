@@ -3,18 +3,20 @@ import type { ChatUIMessage } from "@renderer/ai/types";
 
 type ChipSnapshot = NonNullable<NonNullable<MessageDto["metadata"]>["contextChips"]>[number];
 
-/** 快照 id → labelKey（与主进程 buildChips 的取值一一对应）。 */
+/** 快照 id → labelKey（与主进程 buildChips / renderer 摘要 chip 物化的取值一一对应）。 */
 const LABEL_KEY: Record<ChipSnapshot["id"], string> = {
   selection: "chip.selection",
   paragraph: "chip.paragraph",
+  "chapter-summary": "chip.chapterSummary",
+  "book-summary": "chip.bookSummary",
 };
 
 /**
  * 持久化快照 {id,content,tokenCount} → live Chip：labelKey 由 id 反推；
- * 能落库的 chip 必然实际发送过，故 required/enabled 视为 true（与 buildChips 一致，当前也无读取方）。
+ * 能落库的 chip 必然实际发送过，历史不可交互，一律水合为 required。
  */
 function hydrateChip(snapshot: ChipSnapshot): Chip {
-  return { ...snapshot, labelKey: LABEL_KEY[snapshot.id], required: true, enabled: true };
+  return { ...snapshot, labelKey: LABEL_KEY[snapshot.id], state: "required" };
 }
 
 /**

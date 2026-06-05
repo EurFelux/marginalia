@@ -26,8 +26,7 @@ describe("messageDtoToUIMessage", () => {
             labelKey: "chip.selection",
             content: "x",
             tokenCount: 1,
-            required: true,
-            enabled: true,
+            state: "required",
           },
         ],
       },
@@ -44,8 +43,7 @@ describe("messageDtoToUIMessage", () => {
         labelKey: "chip.paragraph",
         content: "p",
         tokenCount: 2,
-        required: true,
-        enabled: true,
+        state: "required",
       },
     ]);
   });

@@ -13,8 +13,7 @@ export function buildChips(input: BuildChipsInput): Chip[] {
     labelKey: "chip.selection",
     content: selection,
     tokenCount: estimateTokens(selection),
-    required: true,
-    enabled: true,
+    state: "required",
   });
 
   const paragraph = [input.paragraphBefore, input.paragraphCurrent, input.paragraphAfter]
@@ -27,8 +26,7 @@ export function buildChips(input: BuildChipsInput): Chip[] {
       labelKey: "chip.paragraph",
       content: paragraph,
       tokenCount: estimateTokens(paragraph),
-      required: true,
-      enabled: true,
+      state: "required",
     });
   }
 

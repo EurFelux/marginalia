@@ -46,7 +46,9 @@ export function ChipBar({ chips }: { chips: Chip[] }) {
             <span className="text-[10px] tabular-nums text-muted-foreground">
               ≈{chip.tokenCount} {t("ai.tokUnit", "tok")}
             </span>
-            {chip.required && <Lock className="ms-auto size-3 shrink-0 text-muted-foreground/70" />}
+            {chip.state === "required" && (
+              <Lock className="ms-auto size-3 shrink-0 text-muted-foreground/70" />
+            )}
           </div>
           <div className="truncate text-[11px] text-muted-foreground">{chip.content}</div>
         </div>
@@ -95,7 +97,7 @@ function ChipPopover({
             {t("ai.chip.willSend", "将发送")} · {label}
           </div>
           <p className="whitespace-pre-wrap text-muted-foreground">{chip.content}</p>
-          {chip.required && (
+          {chip.state === "required" && (
             <div className="mt-2 text-[11px] text-muted-foreground/70">
               {t("ai.chip.requiredContext", "必备上下文，随消息一并发送。")}
             </div>

@@ -10,8 +10,7 @@ function userChips(selection: string, paragraph?: string): Chip[] {
       labelKey: "chip.selection",
       content: selection,
       tokenCount: 1,
-      required: true,
-      enabled: true,
+      state: "required",
     },
   ];
   if (paragraph) {
@@ -20,8 +19,7 @@ function userChips(selection: string, paragraph?: string): Chip[] {
       labelKey: "chip.paragraph",
       content: paragraph,
       tokenCount: 1,
-      required: true,
-      enabled: true,
+      state: "required",
     });
   }
   return chips;
