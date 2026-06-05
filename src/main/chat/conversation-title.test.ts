@@ -49,6 +49,11 @@ describe("sanitizeTitle", () => {
     expect(sanitizeTitle("好".repeat(50))).toBe("好".repeat(40) + "…");
     expect(sanitizeTitle("  \n ")).toBe("");
   });
+
+  it("strips curly/smart quotes (U+201C/D and U+2018/9)", () => {
+    expect(sanitizeTitle("“AI 标题”")).toBe("AI 标题");
+    expect(sanitizeTitle("‘quoted’")).toBe("quoted");
+  });
 });
 
 describe("nameConversation", () => {

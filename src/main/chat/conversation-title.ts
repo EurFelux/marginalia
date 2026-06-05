@@ -7,6 +7,14 @@ import type { ResolvedModel } from "@main/ai/assistant-model";
 
 const MAX_TITLE_LEN = 40;
 
+// 用 \u 转义写死，防格式化器再次吞字符：
+//   U+0022 " ASCII 直双引号   U+0027 ' ASCII 直单引号
+//   U+201C " 左弯双引号       U+201D " 右弯双引号
+//   U+2018 ' 左弯单引号       U+2019 ' 右弯单引号
+//   U+300C 「 左单书名号       U+300D 」 右单书名号
+//   U+300E 『 左双书名号       U+300F 』 右双书名号
+const QUOTE_EDGES = /^["'“”‘’「」『』]+|["'“”‘’「」『』]+$/g;
+
 const NAMING_SYSTEM =
   "你是会话命名助手。根据给出的一轮对话，产出一个能概括话题的简短标题。" +
   "要求：使用与对话内容相同的语言；不超过 15 个字/词；只输出标题本身，不要引号、句号或任何解释。";
@@ -36,7 +44,7 @@ export function sanitizeTitle(raw: string): string {
       .split("\n")
       .map((l) => l.trim())
       .find((l) => l.length > 0) ?? "";
-  const unquoted = firstLine.replace(/^["'""''「」『』]+|["'""''「」『』]+$/g, "");
+  const unquoted = firstLine.replace(QUOTE_EDGES, "");
   const collapsed = unquoted.replace(/\s+/g, " ").trim();
   return [...collapsed].length <= MAX_TITLE_LEN // oxlint-disable-line no-misused-spread
     ? collapsed
