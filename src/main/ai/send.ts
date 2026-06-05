@@ -25,6 +25,8 @@ export interface SendDeps {
   db: DB;
   loadBytes: LoadBytes;
   resolveModel: () => ResolvedModel;
+  /** 摘要模型解析器（auto naming 用；章节/全书摘要在 makeSummaryDeps 注入同一解析器）。 */
+  resolveSummaryModel: () => ResolvedModel;
   /** agent 多步上限（默认 5）。 */
   stepLimit?: number;
 }
@@ -45,7 +47,7 @@ export function runSend(
   input: SendInput,
   opts?: { abortSignal?: AbortSignal },
 ): SendResult {
-  const { db, loadBytes, resolveModel, stepLimit } = deps;
+  const { db, loadBytes, resolveModel, resolveSummaryModel, stepLimit } = deps;
 
   // 1. 先解析模型——未配置即返回错误，不落库
   const resolved = resolveModel();
@@ -164,7 +166,7 @@ export function runSend(
           .get();
         if (assistantText && row && row.title == null) {
           void nameConversation(
-            { db, resolveModel },
+            { db, resolveModel: resolveSummaryModel },
             conversationId,
             input.userText,
             assistantText,
