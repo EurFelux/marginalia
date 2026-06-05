@@ -3,7 +3,7 @@ import { estimateTokens } from "@shared/tokens";
 import type { BuildChipsInput, Chip } from "@shared/chat";
 import type { MessageMetadata } from "@shared/types";
 
-/** 由 renderer 提取的原始文本构造 selection / paragraph chip（不含会话上下文；去重见 dedupeParagraph）。 */
+/** 由 renderer 提取的原始文本构造 selection / paragraph chip（构建为 on：随消息发送、UI 可整体删除；"required" 仅历史水合产出）。 */
 export function buildChips(input: BuildChipsInput): Chip[] {
   const chips: Chip[] = [];
 
@@ -13,7 +13,7 @@ export function buildChips(input: BuildChipsInput): Chip[] {
     labelKey: "chip.selection",
     content: selection,
     tokenCount: estimateTokens(selection),
-    state: "required",
+    state: "on",
   });
 
   const paragraph = [input.paragraphBefore, input.paragraphCurrent, input.paragraphAfter]
@@ -26,7 +26,7 @@ export function buildChips(input: BuildChipsInput): Chip[] {
       labelKey: "chip.paragraph",
       content: paragraph,
       tokenCount: estimateTokens(paragraph),
-      state: "required",
+      state: "on",
     });
   }
 

@@ -16,7 +16,7 @@ describe("buildChips", () => {
       id: "selection",
       labelKey: "chip.selection",
       content: "the cat sat",
-      state: "required",
+      state: "on",
     });
     expect(selection.tokenCount).toBeGreaterThan(0);
     // 段落 = before + current + after，用空行连接
