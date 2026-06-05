@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { MockLanguageModelV3, simulateReadableStream } from "ai/test";
 import { makeFixtureEpub } from "@marginalia/epub-parser";
 import { createDb, runMigrations } from "@main/db/client";
-import { importBook, resolveChapterByHref } from "@main/library/repository";
+import { importBook } from "@main/library/repository";
 import { createConversation, listConversationsByBook } from "@main/chat/conversations";
 import { listMessages } from "@main/chat/messages";
 import { buildChips } from "@main/ai/chips";
@@ -75,10 +75,9 @@ function setup(model: ResolvedModel) {
   runMigrations(db, MIGRATIONS);
   const bytes = makeFixtureEpub();
   const book = importBook(db, { bytes });
-  const ch1 = resolveChapterByHref(db, book.id, "OEBPS/ch1.xhtml")!;
   const loadBytes: LoadBytes = async () => bytes;
   const deps: SendDeps = { db, loadBytes, resolveModel: () => model };
-  return { db, book, ch1, deps };
+  return { db, book, deps };
 }
 
 function freshDb() {
@@ -129,7 +128,7 @@ describe("runSend conversation validation", () => {
     const book2 = importBook(db, {
       bytes: makeFixtureEpub({ identifier: "urn:uuid:other-book" }),
     });
-    const other = createConversation(db, { bookId: book2.id, chapterId: null });
+    const other = createConversation(db, { bookId: book2.id });
     const result = runSend(makeDeps(db), {
       bookId: book1.id,
       conversationId: other.id,
@@ -142,20 +141,20 @@ describe("runSend conversation validation", () => {
 
 describe("runSend", () => {
   it("returns an error and creates nothing when no model is configured", () => {
-    const { db, book, ch1, deps } = setup({ ok: false, reason: "not configured" });
-    const convo = createConversation(db, { bookId: book.id, chapterId: ch1.id });
+    const { db, book, deps } = setup({ ok: false, reason: "not configured" });
+    const convo = createConversation(db, { bookId: book.id });
     const r = runSend(deps, input(book.id, convo.id));
     expect(r.ok).toBe(false);
     expect(listConversationsByBook(db, book.id)).toHaveLength(1); // conversation still there, just no messages
   });
 
   it("persists the user message with a chip snapshot and the streamed assistant message", async () => {
-    const { db, book, ch1, deps } = setup({
+    const { db, book, deps } = setup({
       ok: true,
       model: textStreamModel("It means hello."),
       modelId: "mock",
     });
-    const convo = createConversation(db, { bookId: book.id, chapterId: ch1.id });
+    const convo = createConversation(db, { bookId: book.id });
     const r = runSend(deps, input(book.id, convo.id));
     expect(r.ok).toBe(true);
     if (!r.ok) return;
@@ -177,12 +176,12 @@ describe("runSend", () => {
   });
 
   it("runs the tool-calling agent loop and persists tool parts in the assistant message", async () => {
-    const { db, book, ch1, deps } = setup({
+    const { db, book, deps } = setup({
       ok: true,
       model: tocThenTextModel("Done."),
       modelId: "mock",
     });
-    const convo = createConversation(db, { bookId: book.id, chapterId: ch1.id });
+    const convo = createConversation(db, { bookId: book.id });
     const r = runSend(deps, input(book.id, convo.id));
     expect(r.ok).toBe(true);
     if (!r.ok) return;
@@ -201,8 +200,8 @@ describe("runSend", () => {
         throw new Error("stream boom");
       },
     });
-    const { db, book, ch1, deps } = setup({ ok: true, model: failModel, modelId: "mock" });
-    const convo = createConversation(db, { bookId: book.id, chapterId: ch1.id });
+    const { db, book, deps } = setup({ ok: true, model: failModel, modelId: "mock" });
+    const convo = createConversation(db, { bookId: book.id });
     const r = runSend(deps, input(book.id, convo.id));
     expect(r.ok).toBe(true);
     if (!r.ok) return;
@@ -216,12 +215,12 @@ describe("runSend", () => {
 
   it("forwards a non-aborted signal without breaking the normal persist path", async () => {
     const controller = new AbortController();
-    const { db, book, ch1, deps } = setup({
+    const { db, book, deps } = setup({
       ok: true,
       model: textStreamModel("hello"),
       modelId: "mock",
     });
-    const convo = createConversation(db, { bookId: book.id, chapterId: ch1.id });
+    const convo = createConversation(db, { bookId: book.id });
     const r = runSend(deps, input(book.id, convo.id), { abortSignal: controller.signal });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
@@ -246,8 +245,8 @@ describe("runSend", () => {
         }),
       }),
     });
-    const { db, book, ch1, deps } = setup({ ok: true, model: slowModel, modelId: "mock" });
-    const convo = createConversation(db, { bookId: book.id, chapterId: ch1.id });
+    const { db, book, deps } = setup({ ok: true, model: slowModel, modelId: "mock" });
+    const convo = createConversation(db, { bookId: book.id });
     const r = runSend(deps, input(book.id, convo.id), { abortSignal: controller.signal });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
@@ -258,12 +257,12 @@ describe("runSend", () => {
   });
 
   it("omits the paragraph chip from the snapshot when it duplicates the conversation's last", async () => {
-    const { db, book, ch1, deps } = setup({
+    const { db, book, deps } = setup({
       ok: true,
       model: textStreamModel("ok"),
       modelId: "mock",
     });
-    const convo = createConversation(db, { bookId: book.id, chapterId: ch1.id });
+    const convo = createConversation(db, { bookId: book.id });
     const first = runSend(
       deps,
       input(book.id, convo.id, {

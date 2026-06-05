@@ -13,16 +13,10 @@ describe("chat-store", () => {
     useChatStore.getState().setActiveConversation("conv1");
     expect(useChatStore.getState().activeConversationId).toBe("conv1");
   });
-  it("setActiveConversation(id, chapterId) stores both", () => {
-    useChatStore.getState().setActiveConversation("c1", "ch1");
-    expect(useChatStore.getState().activeConversationId).toBe("c1");
-    expect(useChatStore.getState().activeConversationChapterId).toBe("ch1");
-  });
-  it("setActiveConversation(null) resets chapter to null", () => {
-    useChatStore.getState().setActiveConversation("c1", "ch1");
+  it("setActiveConversation(null) resets to null", () => {
+    useChatStore.getState().setActiveConversation("c1");
     useChatStore.getState().setActiveConversation(null);
     expect(useChatStore.getState().activeConversationId).toBeNull();
-    expect(useChatStore.getState().activeConversationChapterId).toBeNull();
   });
   it("setDraftText / setDraftChips update drafts", () => {
     useChatStore.getState().setDraftText("hi");
@@ -40,21 +34,29 @@ describe("chat-store", () => {
 });
 
 describe("openConversation", () => {
-  it("sets active + chapter + opens panel + bumps openCommand nonce", () => {
-    useChatStore.getState().openConversation("conv-1", "ch-1");
+  it("sets active + opens panel + bumps openCommand nonce", () => {
+    useChatStore.getState().openConversation("conv-1");
     const s1 = useChatStore.getState();
     expect(s1.activeConversationId).toBe("conv-1");
-    expect(s1.activeConversationChapterId).toBe("ch-1");
     expect(usePrefsStore.getState().layout.panelOpen).toBe(true);
     expect(s1.openCommand).toEqual({ conversationId: "conv-1", nonce: 1 });
-    useChatStore.getState().openConversation("conv-1", "ch-1");
+    useChatStore.getState().openConversation("conv-1");
     expect(useChatStore.getState().openCommand?.nonce).toBe(2); // 同会话重开也递增 → 触发重载
   });
-  it("openConversation with null chapterId (independent) sets chapter to null", () => {
-    useChatStore.getState().openConversation("conv-indep", null);
+});
+
+describe("restoreConversation", () => {
+  it("sets active + bumps openCommand nonce + does NOT open panel", () => {
+    useChatStore.getState().restoreConversation("conv-restore");
     const s = useChatStore.getState();
-    expect(s.activeConversationId).toBe("conv-indep");
-    expect(s.activeConversationChapterId).toBeNull();
-    expect(usePrefsStore.getState().layout.panelOpen).toBe(true);
+    expect(s.activeConversationId).toBe("conv-restore");
+    expect(s.openCommand).toEqual({ conversationId: "conv-restore", nonce: 1 });
+    // 不强制开面板（与 openConversation 的区别）
+    expect(usePrefsStore.getState().layout.panelOpen).toBe(false);
+  });
+  it("bumps nonce on repeated restoreConversation", () => {
+    useChatStore.getState().restoreConversation("conv-restore");
+    useChatStore.getState().restoreConversation("conv-restore");
+    expect(useChatStore.getState().openCommand?.nonce).toBe(2);
   });
 });

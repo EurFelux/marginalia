@@ -66,7 +66,6 @@ export function createIpcChatTransport(): ChatTransport<ChatUIMessage> {
       if (!conversationId) {
         const convo = await window.api.chat.conversations.create({
           bookId: currentBookId,
-          chapterId: null, // 下一任务收窄 createConversationInput 后删本字段
         });
         useChatStore.getState().setActiveConversation(convo.id);
         conversationId = convo.id;

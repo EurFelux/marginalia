@@ -2,7 +2,6 @@ import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { MessagesSquare } from "lucide-react";
 import type { ConversationDto } from "@shared/chat";
-import type { ChapterRefDto } from "@shared/library";
 import { cn } from "@renderer/lib/utils";
 import { ScrollArea } from "@renderer/components/ui/scroll-area";
 import { qk } from "@renderer/query/keys";
@@ -16,10 +15,6 @@ export function ConversationsTab({ bookId }: { bookId: string }) {
   const convos = useQuery({
     queryKey: qk.conversations(bookId),
     queryFn: () => window.api.chat.conversations.listByBook({ bookId }),
-  });
-  const chapters = useQuery({
-    queryKey: qk.chapters(bookId),
-    queryFn: () => window.api.content.chapters({ bookId }),
   });
 
   if (convos.isPending)
@@ -42,18 +37,8 @@ export function ConversationsTab({ bookId }: { bookId: string }) {
       </p>
     );
 
-  const chapterLabel = (c: ConversationDto): string => {
-    if (c.kind === "independent") return t("reader.conversation.independent", "独立会话");
-    const ch = (chapters.data ?? []).find((x: ChapterRefDto) => x.id === c.chapterId);
-    return ch?.title ?? t("reader.conversation.independent", "独立会话");
-  };
-  // 主标签：title 优先；title 空时退章节标题（章节会话）/未命名（独立会话）。
   const primaryLabel = (c: ConversationDto): string =>
-    c.title?.trim()
-      ? c.title
-      : c.kind === "chapter"
-        ? chapterLabel(c)
-        : t("reader.conversation.untitled", "未命名会话");
+    c.title?.trim() ? c.title : t("reader.conversation.untitled", "未命名会话");
   const now = Date.now();
 
   return (
@@ -63,7 +48,7 @@ export function ConversationsTab({ bookId }: { bookId: string }) {
           <button
             key={c.id}
             type="button"
-            onClick={() => openConversation(c.id, c.kind === "chapter" ? c.chapterId : null)}
+            onClick={() => openConversation(c.id)}
             className={cn(
               "flex w-full items-center gap-2 rounded-lg border border-transparent p-2 text-start",
               c.id === activeId ? "bg-accent" : "hover:bg-muted",
@@ -73,7 +58,6 @@ export function ConversationsTab({ bookId }: { bookId: string }) {
             <span className="min-w-0 flex-1 truncate text-xs text-foreground">
               {primaryLabel(c)}
             </span>
-            <span className="shrink-0 text-[10px] text-muted-foreground/70">{chapterLabel(c)}</span>
             <span className="shrink-0 text-[10px] text-muted-foreground/70">
               {relativeTime(c.updatedAt, now, i18n.language)}
             </span>

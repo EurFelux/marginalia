@@ -72,9 +72,9 @@ describe("chat schemas", () => {
     expect(buildChipsInput.safeParse({ selection: "s", paragraphCurrent: "p" }).success).toBe(true);
   });
 
-  it("createConversationInput allows a null chapterId (independent conversation)", () => {
-    expect(createConversationInput.safeParse({ bookId: "b", chapterId: null }).success).toBe(true);
-    expect(createConversationInput.safeParse({ bookId: "", chapterId: null }).success).toBe(false);
+  it("createConversationInput requires a non-empty bookId", () => {
+    expect(createConversationInput.safeParse({ bookId: "b" }).success).toBe(true);
+    expect(createConversationInput.safeParse({ bookId: "" }).success).toBe(false);
   });
 
   it("messagesByConversationInput requires a non-empty conversationId", () => {

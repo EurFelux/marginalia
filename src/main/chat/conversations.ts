@@ -1,32 +1,44 @@
 // src/main/chat/conversations.ts
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import type { DB } from "@main/db/client";
-import { conversations } from "@main/db/schema";
+import { conversations, messages } from "@main/db/schema";
 import { getDefaultAssistant } from "@main/providers/assistant";
+import { isNamingConversation } from "@main/chat/conversation-title";
 import type { ConversationDto, CreateConversationInput } from "@shared/chat";
 
 type ConversationRow = typeof conversations.$inferSelect;
 
 function toDto(row: ConversationRow): ConversationDto {
-  const base = {
+  return {
     id: row.id,
     bookId: row.bookId,
     assistantId: row.assistantId,
     title: row.title ?? null,
+    isNaming: isNamingConversation(row.id),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
-  return row.chapterId === null
-    ? { ...base, kind: "independent", chapterId: null }
-    : { ...base, kind: "chapter", chapterId: row.chapterId };
 }
 
-/** 创建会话（chapterId 传 null = 独立会话）；assistantId 取默认 Assistant（按需惰性播种）。 */
+/**
+ * 创建会话；assistantId 取默认 Assistant（按需惰性播种）。
+ * 防堆积（spec §5）：该书已存在零消息会话 → 返回最新的那个而不新建。
+ */
 export function createConversation(db: DB, input: CreateConversationInput): ConversationDto {
+  const empty = db
+    .select({ row: conversations })
+    .from(conversations)
+    .leftJoin(messages, eq(messages.conversationId, conversations.id))
+    .where(and(eq(conversations.bookId, input.bookId), isNull(messages.id)))
+    .orderBy(desc(conversations.updatedAt))
+    .limit(1)
+    .get();
+  if (empty) return toDto(empty.row);
+
   const assistant = getDefaultAssistant(db);
   const row = db
     .insert(conversations)
-    .values({ bookId: input.bookId, chapterId: input.chapterId, assistantId: assistant.id })
+    .values({ bookId: input.bookId, assistantId: assistant.id })
     .returning()
     .get();
   return toDto(row);
@@ -37,7 +49,7 @@ export function getConversation(db: DB, id: string): ConversationDto | null {
   return row ? toDto(row) : null;
 }
 
-/** 设置会话标题（首建会话落「随便起」标题 / 未来自动命名覆盖）。 */
+/** 设置会话标题（auto naming 写回；未来手动命名复用）。 */
 export function setConversationTitle(db: DB, id: string, title: string): void {
   db.update(conversations).set({ title }).where(eq(conversations.id, id)).run();
 }
@@ -51,51 +63,4 @@ export function listConversationsByBook(db: DB, bookId: string): ConversationDto
     .orderBy(desc(conversations.updatedAt))
     .all()
     .map(toDto);
-}
-
-export interface RouteParams {
-  bookId: string;
-  currentChapterId: string;
-  activeConversationId: string | null;
-}
-
-export interface RouteDecision {
-  conversationId: string;
-  created: boolean;
-  switchedFromActive: boolean;
-}
-
-/**
- * send 时会话路由。有副作用（可能创建会话），故只由 ai.send 内部在确定发送时调用，不接 IPC。
- * 仅当存在「活的」同书 active 会话、且其为独立或绑定当前章时才追加；
- * 其余情况（不同章 / 陈旧 / 无 active）一律建新——「回来继续本章会话」由会话 tab 显式重开取代，
- * 故弃 find-or-create：会话只在 send 时创建，「新对话」后提问真·新会话。
- */
-export function routeConversation(db: DB, params: RouteParams): RouteDecision {
-  // 仅当存在「活的」同书 active 会话、且其为独立或绑定当前章时才追加；
-  // 其余情况（不同章 / 陈旧 / 无 active）一律建新——「回来继续本章会话」由会话 tab 显式重开取代，
-  // 故弃 find-or-create：会话只在 send 时创建，「新对话」后提问真·新会话。
-  if (params.activeConversationId) {
-    const active = db
-      .select()
-      .from(conversations)
-      .where(eq(conversations.id, params.activeConversationId))
-      .get();
-    if (active && active.bookId === params.bookId) {
-      if (active.chapterId === null || active.chapterId === params.currentChapterId) {
-        return { conversationId: active.id, created: false, switchedFromActive: false };
-      }
-      // 不同章：离开 active 建新（防御兜底——正常路径渲染层已在划词时清 active）
-      const created = createConversation(db, {
-        bookId: params.bookId,
-        chapterId: params.currentChapterId,
-      });
-      return { conversationId: created.id, created: true, switchedFromActive: true };
-    }
-  }
-  const created = createConversation(db, {
-    bookId: params.bookId,
-    chapterId: params.currentChapterId,
-  });
-  return { conversationId: created.id, created: true, switchedFromActive: false };
 }

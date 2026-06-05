@@ -84,7 +84,6 @@ describe("library repository", () => {
   it("ON DELETE CASCADE removes all book-owned dependents", () => {
     const db = freshDb();
     const book = importBook(db, { bytes: makeFixtureEpub() });
-    const ch1 = resolveChapterByHref(db, book.id, "OEBPS/ch1.xhtml")!;
     const assistantId = db.insert(assistants).values({ name: "A" }).returning().get().id;
     db.insert(progress).values({ bookId: book.id, cfi: "epubcfi(/6/2)" }).run();
     db.insert(annotations)
@@ -92,7 +91,7 @@ describe("library repository", () => {
       .run();
     const conv = db
       .insert(conversations)
-      .values({ bookId: book.id, chapterId: ch1.id, assistantId })
+      .values({ bookId: book.id, assistantId })
       .returning()
       .get();
     db.insert(messages).values({ conversationId: conv.id, role: "user", parts: [], seq: 0 }).run();

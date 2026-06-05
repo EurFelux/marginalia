@@ -120,7 +120,6 @@ export const conversations = sqliteTable(
     bookId: text("book_id")
       .notNull()
       .references(() => books.id, { onDelete: "cascade" }),
-    chapterId: text("chapter_id").references(() => chapters.id, { onDelete: "cascade" }), // NULL = 独立会话
     assistantId: text("assistant_id")
       .notNull()
       .references(() => assistants.id),

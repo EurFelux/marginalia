@@ -27,10 +27,9 @@ export const buildChipsInput = z.object({
 });
 export type BuildChipsInput = z.infer<typeof buildChipsInput>;
 
-/** conversations:create 入参——chapterId 传 null 表示显式「独立会话」 */
+/** conversations:create 入参。 */
 export const createConversationInput = z.object({
   bookId: z.string().min(1),
-  chapterId: z.string().min(1).nullable(),
 });
 export type CreateConversationInput = z.infer<typeof createConversationInput>;
 
@@ -42,24 +41,17 @@ export type ConversationIdInput = z.infer<typeof conversationIdInput>;
 export const messagesByConversationInput = z.object({ conversationId: z.string().min(1) });
 export type MessagesByConversationInput = z.infer<typeof messagesByConversationInput>;
 
-interface ConversationBase {
+/** 会话视图。bookId/assistantId 恒非空（列已 NOT NULL）；isNaming 为主进程内存瞬态合成（spec §5）。 */
+export interface ConversationDto {
   id: string;
   bookId: string;
   assistantId: string;
   title: string | null;
+  /** auto naming 进行中（下一任务接线真状态前恒 false）。 */
+  isNaming: boolean;
   createdAt: number;
   updatedAt: number;
 }
-
-/**
- * 会话视图，按 chapterId 存在性判别（非法组合不可表示）：
- *  - `chapter`：绑定具体章节（chapterId 非空）。
- *  - `independent`：独立会话（chapterId 为 null）。
- * bookId/assistantId 恒非空（列已 NOT NULL）。
- */
-export type ConversationDto =
-  | (ConversationBase & { kind: "chapter"; chapterId: string })
-  | (ConversationBase & { kind: "independent"; chapterId: null });
 
 export interface MessageDto {
   id: string;

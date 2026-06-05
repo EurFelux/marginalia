@@ -28,7 +28,7 @@ function seedConversation(db: ReturnType<typeof freshDb>): string {
   db.insert(books).values({ id: "book-1" }).run();
   const row = db
     .insert(conversations)
-    .values({ bookId: "book-1", chapterId: null, assistantId: seedAssistant(db) })
+    .values({ bookId: "book-1", assistantId: seedAssistant(db) })
     .returning()
     .get();
   return row.id;
@@ -92,16 +92,8 @@ describe("appendMessage / listMessages", () => {
     const db = freshDb();
     db.insert(books).values({ id: "book-1" }).run();
     const assistantId = seedAssistant(db);
-    const a = db
-      .insert(conversations)
-      .values({ bookId: "book-1", chapterId: null, assistantId })
-      .returning()
-      .get();
-    const b = db
-      .insert(conversations)
-      .values({ bookId: "book-1", chapterId: null, assistantId })
-      .returning()
-      .get();
+    const a = db.insert(conversations).values({ bookId: "book-1", assistantId }).returning().get();
+    const b = db.insert(conversations).values({ bookId: "book-1", assistantId }).returning().get();
     appendMessage(db, {
       conversationId: a.id,
       role: "user",

@@ -1,3 +1,9 @@
+/** auto naming 进行中查询（下一任务接真状态；先恒 false 占位接通编译）。 */
+const namingInFlight = new Set<string>();
+export function isNamingConversation(id: string): boolean {
+  return namingInFlight.has(id);
+}
+
 const MAX_TITLE_LEN = 40;
 
 /**
