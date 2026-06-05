@@ -15,17 +15,18 @@
 
 ## 2. 决策摘要
 
-| 决策点              | 结论                                                                                      |
-| ------------------- | ----------------------------------------------------------------------------------------- |
-| 新会话创建时机      | **纯手动**——同书内永续当前活跃会话，仅「新对话」按钮新建（ChatGPT 模式）                  |
-| `chapterId` 列去留  | **彻底删除**（表重建迁移），`ConversationDto` 判别联合随之消失（清掉 MA4 遗留债）         |
-| 会话列表 item       | **单行**：标题 + 相对时间，删章节名副标签                                                 |
-| 跨重启连续性        | **恢复最近会话**——打开书时该书 `updatedAt` 最新的会话自动成为活跃会话                     |
-| 「新对话」按钮      | **显式创建空会话**（落库一条 `title: null` 记录），空会话合法                             |
-| `routeConversation` | **彻底删除**——send 必传 `conversationId`，只校验不分配                                    |
-| 新增 UI 入口        | 不加。复用 AIPanel header 既有「+」按钮，仅改其行为                                       |
-| 摘要注入方式        | **chip 化**——章节/全书摘要改为 ChipBar 常驻 toggle chip，用户显式控制，主进程不再隐式注入 |
-| 摘要 chip 默认态    | 默认 **off**；「将开启新会话」状态预设 **on**；发送成功后回落 off（一段对话只输入一次）   |
+| 决策点              | 结论                                                                                                                                         |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| 新会话创建时机      | **纯手动**——同书内永续当前活跃会话，仅「新对话」按钮新建（ChatGPT 模式）                                                                     |
+| `chapterId` 列去留  | **彻底删除**（表重建迁移），`ConversationDto` 判别联合随之消失（清掉 MA4 遗留债）                                                            |
+| 会话列表 item       | **单行**：标题 + 相对时间，删章节名副标签                                                                                                    |
+| 跨重启连续性        | **恢复最近会话**——打开书时该书 `updatedAt` 最新的会话自动成为活跃会话                                                                        |
+| 「新对话」按钮      | **显式创建空会话**（落库一条 `title: null` 记录），空会话合法                                                                                |
+| `routeConversation` | **彻底删除**——send 必传 `conversationId`，只校验不分配                                                                                       |
+| 新增 UI 入口        | 不加。复用 AIPanel header 既有「+」按钮，仅改其行为                                                                                          |
+| 摘要注入方式        | **chip 化**——章节/全书摘要改为 ChipBar 常驻 toggle chip，用户显式控制，主进程不再隐式注入                                                    |
+| 摘要 chip 默认态    | 默认 **off**；「将开启新会话」状态预设 **on**；发送成功后回落 off（一段对话只输入一次）                                                      |
+| 会话标题            | **废除 userText 截断 derive**，改为 **auto naming**——首轮完整对话后 AI 异步起名（落 ROADMAP backlog「自动命名会话」）；null 期间走 i18n 占位 |
 
 ## 3. 数据模型与迁移
 
@@ -56,13 +57,20 @@
 ### `ai.send`（`src/main/ai/send.ts`）
 
 - 只**校验**不分配：`conversationId` 对应会话必须存在且 `bookId` 匹配，否则抛带通道名的可读错误（透传给 renderer，不默默新建）。
-- 标题派生时机：从「route 新建时」改为「**首条消息落库时，若会话 `title` 仍为 null 则 `deriveConversationTitle`**」——按钮建的空会话在收到第一条消息时拿到标题。
 - **摘要隐式注入删除**：`getChapterSummaryView` 调用、`prompt.ts` 的 `chapter: { title, summary }` 特殊参数及对应组装分支整体删除——摘要随 chips 统一链路进入消息（§6），prompt 组装的输入只剩「system + 历史（各带自己的 chips）+ 当前轮 chips + 正文」，上下文来源完全同构，无隐藏注入通道。
 - 其余链路不变：段落去重、chips 快照入 `metadata.contextChips`。
 
 ### `createConversation` 防堆积
 
 若该书已存在**零消息**会话，直接返回最新的那个而不新建——连点 N 次「新对话」不会堆 N 个「未命名会话」。
+
+### 会话自动命名（取代 derive）
+
+- `deriveConversationTitle`（首条 userText 截断起名）**废除**——它本是 auto naming 就位前的占位实现；`setConversationTitle` 写入路径保留，即为 auto naming 的接口。
+- **触发**：一轮 send 完成、assistant 消息以 `complete` 落库后，若会话 `title` 仍为 null → 异步触发命名（fire-and-forget，不阻塞流结束）。规则天然覆盖边角：首轮 assistant error/aborted 不触发，下一轮 complete 后用该轮上下文重试；写回后 title 非 null，不再触发。
+- **上下文与模型**：取触发轮的 user + assistant 两条消息；复用会话 assistant 的已解析模型做一次非流式短调用；产出简短标题（语言跟随对话内容），写回 `setConversationTitle`。
+- **失败处理**：模型未配置/调用失败 → title 保持 null（UI 走 i18n 占位），错误落日志不打扰用户——与自动摘要触发侧的静默取向一致，绝不编造标题。
+- **UI 感知**：会话列表对「有消息但 title=null」的会话短轮询直到写回（复用 summary-queries 的非终态轮询工厂模式，缓存命中不启轮询的坑已知），具体形态实现计划定。
 
 ## 6. 摘要上下文 chip 化
 
@@ -122,7 +130,8 @@ SummaryPill（与侧栏书卡）仍是摘要的**查看/生成**入口，职责�
 
 ## 8. 会话列表 UI（`ConversationsTab`）
 
-- item 改**单行**：标题（fallback「未命名会话」）+ 相对时间；章节名副标签删除。
+- item 改**单行**：标题 + 相对时间；章节名副标签删除。
+- title 为 null 时显示 i18n 占位 `reader.conversation.untitled`（key 已存在，zh「未命名会话」/ en "Untitled conversation"）；「title 空退章节标题」分支删除。
 - 「独立会话」标签随判别联合一起消失，所有会话一视同仁。
 
 ## 9. 测试与验证
@@ -130,7 +139,8 @@ SummaryPill（与侧栏书卡）仍是摘要的**查看/生成**入口，职责�
 ### 主进程
 
 - 删 `routeConversation` 测试。
-- 新增：`createConversation` 复用空会话（防堆积）；send 拒绝不存在/跨书 `conversationId`；首条消息落库补 derive title；空会话第一条消息后标题生效。
+- 新增：`createConversation` 复用空会话（防堆积）；send 拒绝不存在/跨书 `conversationId`。
+- auto naming：title null + assistant `complete` 落库 → 触发；error/aborted 轮不触发；命名失败 title 保持 null；title 非 null 不再触发。
 - chips：三态收敛后构建/快照投影/段落去重测试更新；prompt 组装测试删「章节摘要注入当前轮」分支，确认摘要以 chip 形态与其他 chips 同构组装。
 
 ### 迁移
@@ -150,7 +160,8 @@ SummaryPill（与侧栏书卡）仍是摘要的**查看/生成**入口，职责�
 | schema   | `src/main/db/schema.ts` + 新迁移                                 | 删 `chapter_id` 列（表重建）                                      |
 | 共享契约 | `src/shared/types.ts`、`src/shared/chat.ts`、`src/shared/ipc.ts` | DTO 去判别联合；create/send 入参变更；chip id 四元；chip 三态收敛 |
 | 主进程   | `src/main/chat/conversations.ts`                                 | 删 `routeConversation`；create 防堆积                             |
-| 主进程   | `src/main/ai/send.ts`                                            | 校验代替路由；标题派生时机调整；删摘要隐式注入                    |
+| 主进程   | `src/main/ai/send.ts`                                            | 校验代替路由；删摘要隐式注入；接 auto naming 触发                 |
+| 主进程   | `src/main/chat/conversation-title.ts`                            | 删 `deriveConversationTitle`，改造为 auto naming 模块             |
 | 主进程   | `src/main/ai/prompt.ts`                                          | 删 `chapter` 特殊参数及组装分支                                   |
 | 主进程   | `src/main/ai/chips.ts`                                           | 三态收敛；摘要 chip 构建/token 估算                               |
 | renderer | `store/chat-store.ts`                                            | 删 `activeConversationChapterId`；摘要 chip 状态机                |
