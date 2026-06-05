@@ -109,6 +109,47 @@ describe("assemblePrompt", () => {
     expect(out[out.length - 1].content).toContain("## 全书概要\n这本书讲了 Y");
   });
 
+  it("renders all four sections in fixed order: book-summary → chapter-summary → paragraph → selection → userText", () => {
+    const chips: Chip[] = [
+      {
+        id: "book-summary",
+        labelKey: "chip.bookSummary",
+        content: "B",
+        tokenCount: 1,
+        state: "on",
+      },
+      {
+        id: "chapter-summary",
+        labelKey: "chip.chapterSummary",
+        content: "C",
+        tokenCount: 1,
+        state: "on",
+      },
+      {
+        id: "paragraph",
+        labelKey: "chip.paragraph",
+        content: "P",
+        tokenCount: 1,
+        state: "required",
+      },
+      {
+        id: "selection",
+        labelKey: "chip.selection",
+        content: "S",
+        tokenCount: 1,
+        state: "required",
+      },
+    ];
+    const out = assemblePrompt({
+      systemPrompt: null,
+      history: [],
+      current: { chips, userText: "Q" },
+    });
+    expect(out[out.length - 1].content).toBe(
+      `## 全书概要\nB\n\n## 本章概要\nC\n\n## 周围上下文\nP\n\n## 选中文本\nS\n\nQ`,
+    );
+  });
+
   it("re-expands each historical user turn from its own metadata chips (isomorphic with current turn)", () => {
     const history: PromptHistoryMessage[] = [
       {

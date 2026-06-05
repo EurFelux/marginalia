@@ -198,4 +198,51 @@ describe("createIpcChatTransport sendMessages", () => {
       }),
     ).rejects.toThrow();
   });
+
+  it("rejects with ack reason and unsubscribes onChunk when ack returns ok:false", async () => {
+    // 构造一个带退订记录的 onChunk（不依赖 makeApi 内的 setTimeout finish——ok:false 走 cancel 路径，不需 finish）
+    let unsubCalled = false;
+    const onChunk = (_streamId: string, _cb: (ev: AiStreamEvent) => void) => {
+      return () => {
+        unsubCalled = true;
+      };
+    };
+
+    const api = {
+      ai: {
+        send: vi.fn(async () => ({ ok: false as const, reason: "model not configured" })),
+        abort: vi.fn(),
+        onChunk,
+      },
+      chat: {
+        conversations: {
+          create: vi.fn(async () => ({
+            id: "new-conv-id",
+            bookId: "book-1",
+            chapterId: null,
+            kind: "independent",
+            assistantId: "a1",
+            title: null,
+            createdAt: 0,
+            updatedAt: 0,
+          })),
+        },
+      },
+    };
+    vi.stubGlobal("window", { api });
+
+    const transport = createIpcChatTransport();
+    await expect(
+      transport.sendMessages({
+        messages: [makeMessage("hello")],
+        abortSignal: undefined,
+        trigger: "submit-message" as const,
+        chatId: "chat-1",
+        messageId: undefined,
+      }),
+    ).rejects.toThrow("model not configured");
+
+    // stream.cancel() 触发 ReadableStream cancel → 调用 unsub
+    expect(unsubCalled).toBe(true);
+  });
 });
