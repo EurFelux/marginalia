@@ -94,6 +94,15 @@ describe("preferences repository", () => {
     expect(getAllPreferences(freshDb())).toEqual({});
   });
 
+  it("roundtrips the summaryModel preference", () => {
+    const db = freshDb();
+    setPreference(db, "summaryModel", { providerId: "p1", model: "claude-haiku-4-5" });
+    expect(getPreference(db, "summaryModel")).toEqual({
+      providerId: "p1",
+      model: "claude-haiku-4-5",
+    });
+  });
+
   it("refreshes updatedAt on overwrite", () => {
     const db = freshDb();
     setPreference(db, "autoSummarize", true);

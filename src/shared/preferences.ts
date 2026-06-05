@@ -28,6 +28,13 @@ export const readerLayoutSchema = z.object({
 });
 export type ReaderLayout = z.infer<typeof readerLayoutSchema>;
 
+/** 摘要模型（章节/全书摘要 + 会话自动命名）：显式 (provider, model) 对；未存 = 未配置（报错态，无回退）。 */
+export const summaryModelSchema = z.object({
+  providerId: z.string().min(1),
+  model: z.string().min(1),
+});
+export type SummaryModelPref = z.infer<typeof summaryModelSchema>;
+
 /**
  * 可持久化用户偏好的单一源：key → 值 Zod schema。
  * 新增偏好＝在此注册一个 key + schema；DB / 服务 / IPC / 类型全部据此推导。
@@ -39,6 +46,7 @@ export const PREFERENCE_SCHEMAS = {
   colorMode,
   language: uiLanguage,
   readerLayout: readerLayoutSchema,
+  summaryModel: summaryModelSchema,
 } as const;
 
 export type PreferenceKey = keyof typeof PREFERENCE_SCHEMAS;
@@ -63,5 +71,6 @@ export const setPreferenceInput = z.discriminatedUnion("key", [
   z.object({ key: z.literal("colorMode"), value: colorMode }),
   z.object({ key: z.literal("language"), value: uiLanguage }),
   z.object({ key: z.literal("readerLayout"), value: readerLayoutSchema }),
+  z.object({ key: z.literal("summaryModel"), value: summaryModelSchema }),
 ]);
 export type SetPreferenceInput = z.infer<typeof setPreferenceInput>;
