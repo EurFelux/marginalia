@@ -11,8 +11,9 @@ export const chipSchema = z.object({
   content: z.string(),
   tokenCount: z.number().int().nonnegative(),
   /**
-   * 三态闭合联合（spec §4）：required=必备随发不可关（选区/段落）；
-   * on/off=用户 toggle（摘要 chips）。off 的 chip 发送前由 renderer 过滤。
+   * 三态闭合联合：required=历史水合产出（落库即已发送、不可交互）；
+   * on/off=live 态（摘要 toggle 开关；选区/段落构建为 on、UI 可整体删除）。
+   * off 的 chip 发送前由 renderer 过滤。
    */
   state: z.enum(["required", "on", "off"]),
 });
