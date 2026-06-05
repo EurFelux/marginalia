@@ -15,7 +15,9 @@ export function SummaryModelPicker() {
   const [draftProvider, setDraftProvider] = useState<string | null>(null);
 
   const providerId = draftProvider ?? stored?.providerId ?? "";
-  const model = draftProvider != null ? "" : (stored?.model ?? "");
+  // 切回已存 provider 时恢复已存 model；切到别家才显空 placeholder
+  const model =
+    draftProvider != null && draftProvider !== stored?.providerId ? "" : (stored?.model ?? "");
 
   return (
     <ModelPickerSection
