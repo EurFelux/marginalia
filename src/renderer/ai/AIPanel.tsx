@@ -79,21 +79,6 @@ export function AIPanel() {
   };
 
   const handleSend = (text: string, chips: Chip[]) => {
-    // 防御：跨章自由输入（未经划词路径）→ 只清面板起新，**不**在此 null 化 active——
-    // 否则「active===null → 清面板」effect 会在 React 提交后触发，把 sendMessage 刚加入的
-    // 用户消息一并擦掉（ack 异步设新 id 晚于 effect）。路由交给主进程防御分支
-    // （active 不同章 → 建新），ack 回写即纠正 active 与所属章。
-    const { currentChapterId } = useNavigationStore.getState();
-    const { activeConversationId: activeId, activeConversationChapterId: activeChapter } =
-      useChatStore.getState();
-    if (
-      activeId &&
-      activeChapter !== null &&
-      currentChapterId &&
-      activeChapter !== currentChapterId
-    ) {
-      setMessages([]);
-    }
     void sendMessage({ text, metadata: { contextChips: chips } });
   };
 
