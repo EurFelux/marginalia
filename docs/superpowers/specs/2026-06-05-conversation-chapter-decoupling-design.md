@@ -42,7 +42,7 @@
 
 ## 4. 共享契约（`src/shared/chat.ts`、`src/shared/ipc.ts`）
 
-- `ConversationDto`：判别联合（`kind: "chapter" | "independent"`）还原为**普通 interface**——`id`、`bookId`、`assistantId`、`title`、`createdAt`、`updatedAt`。`kind` 与 `chapterId` 字段删除。
+- `ConversationDto`：判别联合（`kind: "chapter" | "independent"`）还原为**普通 interface**——`id`、`bookId`、`assistantId`、`title`、`isNaming`（命名中瞬态标志，§5）、`createdAt`、`updatedAt`。`kind` 与 `chapterId` 字段删除。
 - `createConversationInput`：收窄为 `{ bookId: string }`。
 - `ai.send` 入参（`SendInput`）：`activeConversationId?`（可选）改为 **`conversationId: string`（必传）**，Zod schema 同步收紧。`currentChapterId` **删除**——它原本仅服务「路由 + 摘要隐式注入」，路由已删、摘要 chip 化（§6）后无任何读取方；「章节」概念至此完全退出对话子系统。
 - `chipIdSchema`（`src/shared/types.ts`）：扩为四元 `["selection", "paragraph", "chapter-summary", "book-summary"]`——live Chip 与持久化快照共用单一来源，自动覆盖两侧。
@@ -70,7 +70,8 @@
 - **触发**：一轮 send 完成、assistant 消息以 `complete` 落库后，若会话 `title` 仍为 null → 异步触发命名（fire-and-forget，不阻塞流结束）。规则天然覆盖边角：首轮 assistant error/aborted 不触发，下一轮 complete 后用该轮上下文重试；写回后 title 非 null，不再触发。
 - **上下文与模型**：取触发轮的 user + assistant 两条消息；复用会话 assistant 的已解析模型做一次非流式短调用；产出简短标题（语言跟随对话内容），写回 `setConversationTitle`。
 - **失败处理**：模型未配置/调用失败 → title 保持 null（UI 走 i18n 占位），错误落日志不打扰用户——与自动摘要触发侧的静默取向一致，绝不编造标题。
-- **UI 感知**：会话列表对「有消息但 title=null」的会话短轮询直到写回（复用 summary-queries 的非终态轮询工厂模式，缓存命中不启轮询的坑已知），具体形态实现计划定。
+- **命名中状态（瞬态）**：主进程以进程内存（`Map<conversationId, …>`）记录正在命名的会话，命名 promise settle（成功/失败）即清除，**不落库**；`ConversationDto` 合成只读标志 `isNaming: boolean`。重启后 Map 自然为空——命名失败遗留的 null title 会话不会被误标为命名中。
+- **UI 感知**：会话列表对「存在 `isNaming` 的 item」短轮询直到写回/清除（复用 summary-queries 的非终态轮询工厂模式，缓存命中不启轮询的坑已知），具体形态实现计划定。
 
 ## 6. 摘要上下文 chip 化
 
@@ -132,6 +133,7 @@ SummaryPill（与侧栏书卡）仍是摘要的**查看/生成**入口，职责�
 
 - item 改**单行**：标题 + 相对时间；章节名副标签删除。
 - title 为 null 时显示 i18n 占位 `reader.conversation.untitled`（key 已存在，zh「未命名会话」/ en "Untitled conversation"）；「title 空退章节标题」分支删除。
+- **命名中动画**：item 的 `isNaming` 为 true 时，标题占位文本应用脉冲闪烁样式（Tailwind `animate-pulse`，具体样式实现时调）；写回后随轮询刷新换真标题、动画停止；命名失败 `isNaming` 清除，回落静态占位。
 - 「独立会话」标签随判别联合一起消失，所有会话一视同仁。
 
 ## 9. 测试与验证
@@ -141,6 +143,7 @@ SummaryPill（与侧栏书卡）仍是摘要的**查看/生成**入口，职责�
 - 删 `routeConversation` 测试。
 - 新增：`createConversation` 复用空会话（防堆积）；send 拒绝不存在/跨书 `conversationId`。
 - auto naming：title null + assistant `complete` 落库 → 触发；error/aborted 轮不触发；命名失败 title 保持 null；title 非 null 不再触发。
+- `isNaming` 生命周期：触发时置位、settle（成功/失败）即清除；列表 DTO 正确合成该标志。
 - chips：三态收敛后构建/快照投影/段落去重测试更新；prompt 组装测试删「章节摘要注入当前轮」分支，确认摘要以 chip 形态与其他 chips 同构组装。
 
 ### 迁移
