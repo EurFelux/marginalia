@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { BookOpen, FileText, Loader2, TextSelect, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import type { SummaryStatus } from "@shared/library";
 import { cn } from "@renderer/lib/utils";
 import { ScrollArea } from "@renderer/components/ui/scroll-area";
@@ -123,18 +124,25 @@ export function ContextPillBar() {
 
   const selCtx = selectionContextOf(draftChips);
 
+  // 手动点亮触发的生成失败要透传真实原因（如「未配置摘要模型」）——与 SummaryPill 显式生成同款 toast；
+  // 开章自动触发的静默路径在 ReaderView，不经此处。
+  const surfaceGenerateError = (e: unknown) =>
+    toast.error(
+      t("ai.summary.generateFailed", "生成摘要失败：{{error}}", { error: (e as Error).message }),
+    );
+
   const toggle = (kind: "chapter" | "book", status: SummaryStatus | undefined, on: boolean) => {
     if (!on && (status === "pending" || status === "unavailable")) {
       if (kind === "chapter" && chapterId) {
         void window.api.content
           .generateChapterSummary({ bookId, chapterId })
           .then(() => qc.invalidateQueries({ queryKey: qk.chapterSummary(bookId, chapterId) }))
-          .catch(() => undefined);
+          .catch(surfaceGenerateError);
       } else if (kind === "book") {
         void window.api.content
           .generateBookSummary({ bookId })
           .then(() => qc.invalidateQueries({ queryKey: qk.bookSummary(bookId) }))
-          .catch(() => undefined);
+          .catch(surfaceGenerateError);
       }
     }
     setSummaryChip(kind, !on);
