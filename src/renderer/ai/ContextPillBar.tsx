@@ -44,16 +44,24 @@ function ContextPill(props: {
           />
         }
       >
-        <button
-          type="button"
-          onClick={props.onClick}
-          aria-pressed={props.ariaPressed}
-          className="flex items-center gap-1"
-        >
-          {props.icon}
-          {props.label}
-          {props.trailing}
-        </button>
+        {props.onClick ? (
+          <button
+            type="button"
+            onClick={props.onClick}
+            aria-pressed={props.ariaPressed}
+            className="flex items-center gap-1"
+          >
+            {props.icon}
+            {props.label}
+            {props.trailing}
+          </button>
+        ) : (
+          <span className="flex items-center gap-1">
+            {props.icon}
+            {props.label}
+            {props.trailing}
+          </span>
+        )}
         {props.onRemove && (
           <button
             type="button"
@@ -71,13 +79,8 @@ function ContextPill(props: {
 }
 
 /** 摘要 hover 内容：ready 显正文（限高滚动），其余显状态占位（spec §5）。 */
-function SummaryHover({
-  view,
-  t,
-}: {
-  view: SummaryView | undefined;
-  t: (k: string, d: string) => string;
-}) {
+function SummaryHover({ view }: { view: SummaryView | undefined }) {
+  const { t } = useTranslation();
   const status = view?.status ?? "pending";
   if (status === "ready" && view?.summary) {
     return (
@@ -159,7 +162,7 @@ export function ContextPillBar() {
         missing={status === "pending" || status === "unavailable"}
         onClick={() => toggle(kind, status, on)}
         ariaPressed={on}
-        hover={<SummaryHover view={view} t={t} />}
+        hover={<SummaryHover view={view} />}
       />
     );
   };
