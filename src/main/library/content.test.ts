@@ -140,5 +140,7 @@ describe("content (pdf)", () => {
     const db = freshDb();
     const pdf = await importBook(db, { bytes: await makeTextPdf({ outline: false }) });
     expect(() => assertTextLayer(db, pdf.id)).not.toThrow();
+    const epub = await importBook(db, { bytes: makeFixtureEpub() });
+    expect(() => assertTextLayer(db, epub.id)).not.toThrow();
   });
 });
