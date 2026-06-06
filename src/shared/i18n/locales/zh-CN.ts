@@ -61,7 +61,7 @@ export default {
   "errors.noApiKeyAvailable": "该$t(terms.provider)无可用密钥",
   "errors.noApiKeyConfigured": "未配置密钥",
   "errors.noApiKeySet": "该$t(terms.provider)未配置密钥",
-  "errors.noTextLayer": "扫描版 PDF 没有文本层，无法提取文本生成摘要",
+  "errors.noTextLayer": "扫描版 PDF 没有文本层，无法提取文本",
   "errors.providerHasNoApiKey": "$t(terms.provider) {{id}} 未配置密钥",
   "errors.providerNotFound": "未找到$t(terms.provider) {{id}}",
   "errors.requestFailed": "请求失败",
