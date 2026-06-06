@@ -41,6 +41,8 @@ export function PdfReader({ bookId, chapters }: Props) {
   const currentChapterId = useNavigationStore((s) => s.currentChapterId);
   const setCurrentChapter = useNavigationStore((s) => s.setCurrentChapter);
   const virtuosoRef = useRef<VirtuosoHandle | null>(null);
+  // Virtuoso 滚动容器（rangeChanged 里从 scrollTop 推视口顶部页用）。
+  const scrollerRef = useRef<HTMLElement | null>(null);
   // 防循环：记录最近一次「由滚动得出的章 id」；跳章 effect 只在目标 ≠ 它时滚动（对齐 EpubReader）。
   const topChapterIdRef = useRef<string | null>(null);
 
@@ -201,13 +203,27 @@ export function PdfReader({ bookId, chapters }: Props) {
     >
       <Virtuoso
         ref={virtuosoRef}
+        scrollerRef={(el) => {
+          scrollerRef.current = el instanceof HTMLElement ? el : null;
+        }}
         className="no-scrollbar h-full"
         totalCount={book.pageCount}
         defaultItemHeight={pageH + 16}
         increaseViewportBy={{ top: pageH, bottom: pageH }}
         initialTopMostItemIndex={{ index: initialPage, align: "start" }}
         rangeChanged={(range) => {
-          const page = range.startIndex + 1;
+          // rangeChanged 报告的是渲染范围——startIndex 含 increaseViewportBy 的 overscan
+          // 预渲染页（CDP 实测视口顶页 125 时 startIndex 报 123），直接用会把当前章/进度
+          // 偏到视口上方一页。从 scrollTop 推视口顶部页：每项高 pageH+16 均匀（v1 全书
+          // 同尺寸前提）；+8px 把页间缝隙的归属切在缝隙中点，同时吸收跨页累计的亚像素误差。
+          const scrollTop = scrollerRef.current?.scrollTop;
+          const page =
+            scrollTop != null
+              ? Math.min(
+                  book.pageCount,
+                  Math.max(1, Math.floor((scrollTop + 8) / (pageH + 16)) + 1),
+                )
+              : range.startIndex + 1;
           // 当前章回写（含首发：开书恢复进度后侧栏即高亮正确章）。
           const chId = chapterIdAtPage(chapters, page);
           if (chId) {
