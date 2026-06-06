@@ -1,12 +1,13 @@
 import * as pdfjsLib from "pdfjs-dist";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
-// vite worker 入口：打包为独立 worker chunk，经 workerPort 接给 pdfjs
-// oxlint-disable-next-line import/default -- Vite ?worker 虚拟模块，oxlint 无法解析默认导出
-import PdfWorker from "pdfjs-dist/build/pdf.worker.mjs?worker";
+// vite `?url` 资产引用：dev 给源模块 URL、build 输出 asset——pdfjs 按 workerSrc 每文档
+// 自建 module worker，无共享状态。不用 `?worker` + GlobalWorkerOptions.workerPort：
+// 共享 port 的 PDFWorker wrapper 在文档销毁/重建间存在竞态（CDP 冒烟实测
+// getDocument 永久挂起、零报错），workerSrc 路径同环境实测正常。
+// oxlint-disable-next-line import/default -- Vite ?url 虚拟模块，oxlint 无法解析默认导出
+import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.mjs?url";
 
-if (!pdfjsLib.GlobalWorkerOptions.workerPort) {
-  pdfjsLib.GlobalWorkerOptions.workerPort = new PdfWorker();
-}
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 export interface PdfBook {
   pageCount: number;
@@ -27,16 +28,7 @@ export interface PdfBook {
   destroy: () => void;
 }
 
-/**
- * 上一本书的销毁进度。PDFWorker 对「销毁中」的共享 port 直接抛
- * "the worker is being destroyed"（pdfjs 源码要求 await destroy()-calls），
- * 而 PdfBook.destroy 是同步接口（React cleanup 不能 await）——
- * 故在下一次 createPdfBook 入口处串行等待上一本销毁完成。
- */
-let lastDestroy: Promise<unknown> = Promise.resolve();
-
 export async function createPdfBook(bytes: Uint8Array): Promise<PdfBook> {
-  await lastDestroy;
   // pdfjs 会 transfer 传入 buffer——传副本，避免 react-query 缓存的 bytes 被 neuter。
   const loadingTask = pdfjsLib.getDocument({ data: bytes.slice() });
   let doc: PDFDocumentProxy;
@@ -93,11 +85,9 @@ export async function createPdfBook(bytes: Uint8Array): Promise<PdfBook> {
     },
 
     destroy: () => {
-      // PDFDocumentProxy 无直接 destroy()；cleanup + loadingTask.destroy() 释放 worker 端文档资源。
-      // 实证（pdfjs v6 源码）：port 模式下 PDFWorker.#webWorker 恒为 null，destroy 不会
-      // 终止共享 OS worker，只移除 wrapper——下次 getDocument 同 port 正常重建。
-      // destroy 的完成 promise 存入 lastDestroy，由下一次 createPdfBook 串行等待（见上）。
-      lastDestroy = doc.loadingTask.destroy().catch(() => {});
+      // PDFDocumentProxy 无直接 destroy()；loadingTask.destroy() 释放 worker 端文档资源
+      // 并终止该文档自有的 worker 线程（workerSrc 模式每文档一个 worker，无共享态）。
+      void doc.loadingTask.destroy().catch(() => {});
     },
   };
 }

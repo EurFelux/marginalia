@@ -97,6 +97,7 @@ export default {
   "reader.bookSummary.generate": "生成",
   "reader.bookSummary.generateFailed": "生成全书摘要失败：{{error}}",
   "reader.bookSummary.generatingLabel": "生成中…",
+  "reader.bookSummary.noTextLayer": "扫描版 PDF 没有文本层，无法生成摘要",
   "reader.bookSummary.panelTitle": "全书摘要",
   "reader.bookSummary.placeholderGenerating": "全书摘要正在生成…（喂入整本书，可能需要些时间）",
   "reader.bookSummary.placeholderPending":

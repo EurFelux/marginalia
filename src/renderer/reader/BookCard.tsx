@@ -48,6 +48,8 @@ export function BookCard({ bookId }: { bookId: string }) {
   const status = summary.data?.status ?? "pending";
   const badgeCls = BADGE_CLS[status];
   const text = summary.data?.summary ?? null; // ready=全文；generating=累积 partial（流式）
+  // 扫描版门控（spec §8 UI 层）：无文本层无从生成摘要；主进程 assertTextLayer 兜底正确性。
+  const noTextLayer = book.data?.hasTextLayer === false;
 
   const BADGE_LABEL: Record<SummaryStatus, string> = {
     pending: t("reader.bookSummary.statusPending", "全书摘要待生成"),
@@ -115,7 +117,12 @@ export function BookCard({ bookId }: { bookId: string }) {
                 size="xs"
                 variant={status === "ready" ? "outline" : "default"}
                 onClick={() => generate.mutate()}
-                disabled={generate.isPending}
+                disabled={generate.isPending || noTextLayer}
+                title={
+                  noTextLayer
+                    ? t("reader.bookSummary.noTextLayer", "扫描版 PDF 没有文本层，无法生成摘要")
+                    : undefined
+                }
                 className="shrink-0"
               >
                 {generate.isPending ? "…" : genLabel}
@@ -129,7 +136,9 @@ export function BookCard({ bookId }: { bookId: string }) {
                 <Streamdown>{text}</Streamdown>
               ) : (
                 <p className="whitespace-pre-wrap text-xs text-muted-foreground">
-                  {PLACEHOLDER[status]}
+                  {noTextLayer
+                    ? t("reader.bookSummary.noTextLayer", "扫描版 PDF 没有文本层，无法生成摘要")
+                    : PLACEHOLDER[status]}
                 </p>
               )}
             </div>

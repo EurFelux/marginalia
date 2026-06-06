@@ -105,6 +105,8 @@ export default {
   "reader.bookSummary.generate": "Generate",
   "reader.bookSummary.generateFailed": "Failed to generate book summary: {{error}}",
   "reader.bookSummary.generatingLabel": "Generating…",
+  "reader.bookSummary.noTextLayer":
+    "This scanned PDF has no text layer, so a summary cannot be generated",
   "reader.bookSummary.panelTitle": "Full-book summary",
   "reader.bookSummary.placeholderGenerating":
     "Full-book summary is generating… (feeding the entire book to the model — this may take a moment)",
