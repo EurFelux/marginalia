@@ -29,7 +29,7 @@ describe("annotation-store", () => {
     const n1 = useAnnotationStore.getState().scrollCommand?.nonce;
     useAnnotationStore.getState().requestScroll("cfi-b");
     const cmd = useAnnotationStore.getState().scrollCommand;
-    expect(cmd?.cfi).toBe("cfi-b");
+    expect(cmd?.locator).toBe("cfi-b");
     expect(cmd?.nonce).toBe((n1 ?? 0) + 1);
   });
 });

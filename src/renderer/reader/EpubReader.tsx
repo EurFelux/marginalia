@@ -54,7 +54,7 @@ export function EpubReader({ bookId, chapters }: Props) {
     staleTime: Infinity,
   });
 
-  // 恢复位置：进度 CFI → spine index（开书时取一次）。
+  // 恢复位置：进度 locator（ePub 下为 CFI 串）→ spine index（开书时取一次）。
   const progress = useQuery({
     queryKey: qk.progress(bookId),
     queryFn: () => window.api.progress.get({ bookId }),
@@ -172,7 +172,7 @@ export function EpubReader({ bookId, chapters }: Props) {
   // 侧栏列表点击 → 滚到该标注所在 section（best-effort：稍后把 mark 滚入视口）。
   useEffect(() => {
     if (!book || !scrollCommand) return;
-    const idx = book.indexOfCfi(scrollCommand.cfi);
+    const idx = book.indexOfCfi(scrollCommand.locator);
     if (idx >= 0) vRef.current?.scrollToIndex(idx);
   }, [book, scrollCommand]);
 

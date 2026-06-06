@@ -20,8 +20,8 @@ interface AnnotationState {
   selection: SelectionInfo | null;
   styleBar: StyleBarState | null;
   noteModal: NoteModalState | null;
-  /** 命令信号（非状态）：nonce 递增触发 EpubReader 滚动到该 CFI。 */
-  scrollCommand: { cfi: string; nonce: number } | null;
+  /** 命令信号（非状态）：nonce 递增触发 reader 滚动到该 locator（ePub 下为 CFI 串）。 */
+  scrollCommand: { locator: string; nonce: number } | null;
 }
 interface AnnotationActions {
   setSelection: (selection: SelectionInfo | null) => void;
@@ -29,7 +29,7 @@ interface AnnotationActions {
   closeStyleBar: () => void;
   openNoteModal: (s: NoteModalState) => void;
   closeNoteModal: () => void;
-  requestScroll: (cfi: string) => void;
+  requestScroll: (locator: string) => void;
 }
 
 export const ANNOTATION_INITIAL: AnnotationState = {
@@ -46,6 +46,6 @@ export const useAnnotationStore = create<AnnotationState & AnnotationActions>((s
   closeStyleBar: () => set({ styleBar: null }),
   openNoteModal: (noteModal) => set({ noteModal }),
   closeNoteModal: () => set({ noteModal: null }),
-  requestScroll: (cfi) =>
-    set((s) => ({ scrollCommand: { cfi, nonce: (s.scrollCommand?.nonce ?? 0) + 1 } })),
+  requestScroll: (locator) =>
+    set((s) => ({ scrollCommand: { locator, nonce: (s.scrollCommand?.nonce ?? 0) + 1 } })),
 }));
