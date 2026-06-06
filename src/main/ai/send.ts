@@ -10,9 +10,11 @@ import { eq } from "drizzle-orm";
 import type { DB } from "@main/db/client";
 import { conversations } from "@main/db/schema";
 import { getDefaultAssistant } from "@main/providers/assistant";
-import { assemblePrompt } from "@main/ai/prompt";
+import { assemblePrompt, pdfSystemNote } from "@main/ai/prompt";
 import { dedupeParagraph, toContextChips } from "@main/ai/chips";
 import { createReadingTools, type LoadBytes } from "@main/ai/tools";
+import { supportsImageToolResults } from "@main/ai/model-factory";
+import { getBook } from "@main/library/repository";
 import type { ResolvedModel } from "@main/ai/assistant-model";
 import { appendMessage, getLastParagraphContent, listMessages } from "@main/chat/messages";
 import { nameConversation } from "@main/chat/conversation-title";
@@ -81,8 +83,20 @@ export function runSend(
 
   // 5. 组装 prompt（system 来自默认 Assistant；摘要不再隐式注入——随 chips 同构进入，spec §6）
   const assistant = getDefaultAssistant(db);
+  const book = getBook(db, input.bookId);
+  const imageToolResults = supportsImageToolResults(resolved.providerType);
+  // PDF 书附加页粒度工具提示（spec §7）；epub 完全不变。
+  let systemPromptText = assistant.systemPrompt;
+  if (book?.format === "pdf") {
+    const note = pdfSystemNote({
+      pageCount: book.pageCount,
+      hasTextLayer: Boolean(book.hasTextLayer),
+      imageMode: imageToolResults,
+    });
+    systemPromptText = systemPromptText ? `${systemPromptText}\n\n${note}` : note;
+  }
   const allMessages: ModelMessage[] = assemblePrompt({
-    systemPrompt: assistant.systemPrompt,
+    systemPrompt: systemPromptText,
     history,
     current: { chips: deduped, userText: input.userText },
   });
@@ -99,7 +113,7 @@ export function runSend(
   }
 
   // 6. streamText + tools + agent 循环
-  const tools = createReadingTools({ db, bookId: input.bookId, loadBytes });
+  const tools = createReadingTools({ db, bookId: input.bookId, loadBytes, imageToolResults });
   // 从 streamText 自身的 onFinish 旁路捕获跨步聚合用量（toUIMessageStream 的 onFinish 不带 usage）。
   let capturedUsage: LanguageModelUsage | undefined;
   const result = streamText({

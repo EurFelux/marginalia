@@ -3,6 +3,7 @@ import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MockLanguageModelV3, simulateReadableStream } from "ai/test";
 import { makeFixtureEpub } from "@marginalia/epub-parser";
+import { makeTextPdf } from "@marginalia/pdf-parser/fixture";
 import { createDb, runMigrations } from "@main/db/client";
 import { importBook } from "@main/library/repository";
 import {
@@ -368,5 +369,76 @@ describe("runSend", () => {
     });
     // Title stays null — naming was skipped because summary model is unset
     expect(getConversation(db, convo.id)?.title).toBeNull();
+  });
+});
+
+function systemCapturingModel(captured: { system?: string }) {
+  return new MockLanguageModelV3({
+    doStream: async ({ prompt }) => {
+      const sys = prompt.find((m) => m.role === "system");
+      captured.system = sys && typeof sys.content === "string" ? sys.content : undefined;
+      return {
+        stream: simulateReadableStream({
+          chunks: [
+            { type: "text-start", id: "t1" },
+            { type: "text-delta", id: "t1", delta: "ok" },
+            { type: "text-end", id: "t1" },
+            finishChunk("stop"),
+          ],
+        }),
+      };
+    },
+  });
+}
+
+describe("pdf system prompt injection", () => {
+  it("appends a pdf note (with image hint for capable providers) for pdf books", async () => {
+    const captured: { system?: string } = {};
+    const db = createDb(":memory:");
+    runMigrations(db, MIGRATIONS);
+    const bytes = await makeTextPdf({ outline: true, title: "P" });
+    const book = await importBook(db, { bytes });
+    const deps: SendDeps = {
+      db,
+      loadBytes: async () => bytes,
+      resolveModel: () => ({
+        ok: true,
+        model: systemCapturingModel(captured),
+        modelId: "m",
+        providerType: "anthropic",
+      }),
+      resolveSummaryModel: () => ({ ok: false, reason: "unset" }),
+    };
+    const convo = createConversation(db, { bookId: book.id });
+    const r = runSend(deps, {
+      bookId: book.id,
+      conversationId: convo.id,
+      userText: "hi",
+      chips: [],
+    });
+    if (!r.ok) throw new Error(r.reason);
+    await r.finished;
+    expect(captured.system).toContain("is a PDF");
+    expect(captured.system).toContain("3 pages");
+    expect(captured.system).toContain('mode "image"');
+  });
+
+  it("does not mention PDF for epub books", async () => {
+    const captured: { system?: string } = {};
+    const { db, book, deps } = await setup({
+      ok: true,
+      model: systemCapturingModel(captured),
+      modelId: "m",
+    });
+    const convo = createConversation(db, { bookId: book.id });
+    const r = runSend(deps, {
+      bookId: book.id,
+      conversationId: convo.id,
+      userText: "hi",
+      chips: [],
+    });
+    if (!r.ok) throw new Error(r.reason);
+    await r.finished;
+    expect(captured.system).not.toContain("is a PDF");
   });
 });

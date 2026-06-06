@@ -43,6 +43,31 @@ function renderUserTurn(chips: ChipLike, userText: string): string {
   return context ? `${context}\n\n${userText}` : userText;
 }
 
+/** PDF 会话的 system prompt 附注（spec §7）：让模型知道页粒度工具的存在与扫描版的现实。 */
+export function pdfSystemNote(p: {
+  pageCount: number | null;
+  hasTextLayer: boolean;
+  imageMode: boolean;
+}): string {
+  const pages = p.pageCount != null ? ` with ${p.pageCount} pages` : "";
+  const lines = [`The current book is a PDF${pages}.`];
+  if (p.hasTextLayer) {
+    lines.push(
+      "Chapter text contains [p.N] page-boundary markers; use the readPage tool to read a specific page by number.",
+    );
+  } else {
+    lines.push(
+      "This PDF is scanned and has no text layer, so chapter text extraction is unavailable.",
+    );
+  }
+  if (p.imageMode) {
+    lines.push(
+      'readPage mode "image" renders a page visually — use it for figures, tables, or scanned pages.',
+    );
+  }
+  return lines.join(" ");
+}
+
 /** 组装分层上下文为 ModelMessage[]（设计文档 §10）。纯函数，无模型调用。 */
 export function assemblePrompt(params: AssemblePromptParams): ModelMessage[] {
   const out: ModelMessage[] = [];

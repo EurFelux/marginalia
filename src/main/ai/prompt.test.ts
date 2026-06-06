@@ -1,6 +1,6 @@
 // src/main/ai/prompt.test.ts
 import { describe, expect, it } from "vitest";
-import { assemblePrompt, type PromptHistoryMessage } from "@main/ai/prompt";
+import { assemblePrompt, pdfSystemNote, type PromptHistoryMessage } from "@main/ai/prompt";
 import type { Chip } from "@shared/chat";
 
 function userChips(selection: string, paragraph?: string): Chip[] {
@@ -184,5 +184,25 @@ describe("assemblePrompt", () => {
     expect(out[2]).toEqual({ role: "assistant", content: "earlier answer" });
     // 当前轮
     expect(out[3].content).toBe("## 选中文本\nnew sel\n\nfollow up");
+  });
+});
+
+describe("pdfSystemNote", () => {
+  it("mentions page count and readPage for text-layer pdfs", () => {
+    const s = pdfSystemNote({ pageCount: 270, hasTextLayer: true, imageMode: false });
+    expect(s).toContain("PDF");
+    expect(s).toContain("270 pages");
+    expect(s).toContain("readPage");
+    expect(s).toContain("[p.N]");
+    expect(s).not.toContain('"image"');
+  });
+  it("advertises image mode when gated on", () => {
+    const s = pdfSystemNote({ pageCount: 10, hasTextLayer: true, imageMode: true });
+    expect(s).toContain('mode "image"');
+  });
+  it("tells the truth about scanned pdfs", () => {
+    const s = pdfSystemNote({ pageCount: null, hasTextLayer: false, imageMode: true });
+    expect(s).toContain("scanned");
+    expect(s).not.toContain("[p.N]");
   });
 });

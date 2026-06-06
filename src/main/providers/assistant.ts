@@ -5,7 +5,7 @@ import type { AssistantDto, UpdateAssistantInput } from "@shared/assistant";
 
 export const DEFAULT_ASSISTANT_NAME = "Default Assistant";
 export const DEFAULT_SYSTEM_PROMPT =
-  "You are a reading assistant embedded in an ePub reader. The user is reading a book and may select text to ask about it. Ground your answers in the provided selection, surrounding paragraphs, and chapter summary. When you need more of the original text, use the available reading tools. Answer concisely.";
+  "You are a reading assistant embedded in an e-book reader. The user is reading a book and may select text to ask about it. Ground your answers in the provided selection, surrounding paragraphs, and chapter summary. When you need more of the original text, use the available reading tools. Answer concisely.";
 
 type AssistantRow = typeof assistants.$inferSelect;
 
