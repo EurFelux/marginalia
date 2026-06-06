@@ -6,7 +6,10 @@ export type ImportBookInput = z.infer<typeof importBookInput>;
 export const bookIdInput = z.object({ bookId: z.string().min(1) });
 export type BookIdInput = z.infer<typeof bookIdInput>;
 
-export const saveProgressInput = z.object({ bookId: z.string().min(1), cfi: z.string().min(1) });
+export const saveProgressInput = z.object({
+  bookId: z.string().min(1),
+  locator: z.string().min(1),
+});
 export type SaveProgressInput = z.infer<typeof saveProgressInput>;
 
 export const chapterRefInput = z.object({
@@ -32,6 +35,9 @@ export interface BookSummaryDto {
   title: string | null;
   author: string | null;
   hasCover: boolean;
+  format: "epub" | "pdf";
+  pageCount: number | null;
+  hasTextLayer: boolean;
 }
 
 /**
@@ -51,6 +57,8 @@ export interface ChapterRefDto {
   href: string;
   orderIndex: number;
   level: number;
+  startPage: number | null; // PDF 章节页范围（1-based 闭区间）；epub 为 null
+  endPage: number | null;
 }
 
 /** 章节/全书摘要的派生状态机（主进程读取时派生，不入 DB；见 DB lifecycle spec §2 / DD-§2）。 */

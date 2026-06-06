@@ -24,7 +24,7 @@ const base = {
   style: "yellow" as const,
   note: "",
   selectedText: "hello world",
-  cfiRange: "epubcfi(/6/4!/4/2,/1:0,/1:5)",
+  locatorRange: "epubcfi(/6/4!/4/2,/1:0,/1:5)",
 };
 
 describe("annotations repository", () => {

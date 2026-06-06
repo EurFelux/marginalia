@@ -72,7 +72,7 @@ export function NoteModal() {
         style: lastStyle,
         note: text,
         selectedText: anchor.selectedText,
-        cfiRange: anchor.cfiRange,
+        locatorRange: anchor.locatorRange,
       });
       setSelection(null);
     } else {

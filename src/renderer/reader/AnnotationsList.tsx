@@ -60,9 +60,9 @@ export function AnnotationsList({ bookId }: { bookId: string }) {
   // 阅读序排序（compare 不可用时回退 spinePos）。
   const sorted = [...list].sort((a, b) => {
     try {
-      return cfiCompare.compare(a.cfiRange, b.cfiRange);
+      return cfiCompare.compare(a.locatorRange, b.locatorRange);
     } catch {
-      return spineOf(a.cfiRange) - spineOf(b.cfiRange);
+      return spineOf(a.locatorRange) - spineOf(b.locatorRange);
     }
   });
   const chapterTitle = (cfi: string): string | null => {
@@ -78,8 +78,8 @@ export function AnnotationsList({ bookId }: { bookId: string }) {
           <AnnoItem
             key={a.id}
             a={a}
-            chapter={chapterTitle(a.cfiRange)}
-            onGoto={() => requestScroll(a.cfiRange)}
+            chapter={chapterTitle(a.locatorRange)}
+            onGoto={() => requestScroll(a.locatorRange)}
             onDelete={() => deleteM.mutate({ id: a.id })}
           />
         ))}

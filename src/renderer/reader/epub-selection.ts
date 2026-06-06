@@ -43,7 +43,7 @@ function siblingBlockText(el: Element, dir: "previous" | "next"): string | null 
 }
 
 /**
- * 把包的 onSelect 事件转成 SelectionInfo（AI 契约老形状 + cfiRange）。
+ * 把包的 onSelect 事件转成 SelectionInfo（AI 契约老形状 + locatorRange）。
  * 块级取段：当前段 = 选区**起点**的最近块级祖先文本；前/后段 = 其相邻块级兄弟。
  * 跨块选区（起点、终点在不同块）时不做精确切分——`paragraphCurrent` 仍取起点块，
  * 终点块自然落入 `paragraphAfter`；这是 best-effort 语义，足够给 AI 上下文。
@@ -51,7 +51,7 @@ function siblingBlockText(el: Element, dir: "previous" | "next"): string | null 
  */
 export function sectionSelectToSelectionInfo(
   e: SectionSelectEvent,
-  cfiRange: string | null,
+  locatorRange: string | null,
 ): SelectionInfo {
   const block = blockAncestor(e.range.startContainer);
   const paragraphCurrent = (block?.textContent ?? e.text).trim();
@@ -63,6 +63,6 @@ export function sectionSelectToSelectionInfo(
     paragraphCurrent: paragraphCurrent.length > 0 ? paragraphCurrent : e.text,
     paragraphAfter,
     rect: e.rect, // 包已平移为 viewport 坐标（ViewportRect 与 SelectionInfo.rect 同形）
-    cfiRange,
+    locatorRange,
   };
 }

@@ -10,7 +10,7 @@ export interface AnnotationDto {
   style: AnnotationStyle;
   note: string;
   selectedText: string;
-  cfiRange: string;
+  locatorRange: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -20,7 +20,7 @@ export const createAnnotationInput = z.object({
   style: annotationStyle,
   note: z.string(),
   selectedText: z.string().min(1),
-  cfiRange: z.string().min(1),
+  locatorRange: z.string().min(1),
 });
 export type CreateAnnotationInput = z.infer<typeof createAnnotationInput>;
 

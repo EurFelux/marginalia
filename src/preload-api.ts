@@ -35,10 +35,10 @@ export function createApi(d: PreloadDeps) {
 
     library: {
       import: inv(C.libraryImport),
-      pickEpub: inv(C.libraryPickEpub),
+      pickBook: inv(C.libraryPickBook),
       list: inv(C.libraryList),
       get: inv(C.libraryGet),
-      readEpubBytes: inv(C.libraryReadEpubBytes),
+      readBookBytes: inv(C.libraryReadBookBytes),
       delete: inv(C.libraryDelete),
       /** 由拖入的 File 取磁盘路径（Electron 41 已移除 File.path，须经 webUtils）。同步、纯渲染端、非 IPC。 */
       pathForFile: (file: File) => d.getPathForFile(file),

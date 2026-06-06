@@ -33,7 +33,7 @@ export function SelectionToolbar() {
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.annotations(bookId ?? "") }),
   });
   // 二级工具栏（样式栏）/ 笔记 modal 打开时，主工具栏让位消失（Apple Books 式取代，
-  // 而非叠层）。选区仍保留在 store 里，供样式栏/modal 读取 cfiRange/selectedText。
+  // 而非叠层）。选区仍保留在 store 里，供样式栏/modal 读取 locatorRange/selectedText。
   if (styleBar || noteModal) return null;
   if (!selection || !selection.rect) return null;
 
@@ -45,14 +45,14 @@ export function SelectionToolbar() {
   // 选「高亮标记」：立即用上次的样式建高亮（Apple Books 式，无需先选色），再打开该条的样式栏供改色；
   // 滚动 / 点别处则关栏、高亮保留。
   const applyHighlight = () => {
-    if (!bookId || !selection.cfiRange || !selection.selectionText) return;
+    if (!bookId || !selection.locatorRange || !selection.selectionText) return;
     createM.mutate(
       {
         bookId,
         style: lastStyle,
         note: "",
         selectedText: selection.selectionText,
-        cfiRange: selection.cfiRange,
+        locatorRange: selection.locatorRange,
       },
       {
         onSuccess: (anno) =>
@@ -62,12 +62,12 @@ export function SelectionToolbar() {
     setSelection(null);
   };
 
-  // 选「添加笔记」：把选区锚点（cfiRange/selectedText）快照进 modal，使 save 不依赖易失的 selection。
+  // 选「添加笔记」：把选区锚点（locatorRange/selectedText）快照进 modal，使 save 不依赖易失的 selection。
   const addNote = () => {
-    if (!selection.cfiRange || !selection.selectionText) return;
+    if (!selection.locatorRange || !selection.selectionText) return;
     openNoteModal({
       target: { type: "create" },
-      anchor: { cfiRange: selection.cfiRange, selectedText: selection.selectionText },
+      anchor: { locatorRange: selection.locatorRange, selectedText: selection.selectionText },
     });
   };
 

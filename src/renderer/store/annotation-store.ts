@@ -9,11 +9,11 @@ export interface StyleBarState {
 export interface NoteModalState {
   target: AnnoTarget;
   /**
-   * create 模式的选区快照（cfiRange/selectedText）；edit 模式不需要（读标注）。
+   * create 模式的选区快照（locatorRange/selectedText）；edit 模式不需要（读标注）。
    * 快照避免 save 时依赖易失的 `selection`——笔记过长时 textarea 内部滚动会被
    * EpubReader 的捕获阶段 scroll 监听清掉选区，若 save 仍读 selection 会静默丢笔记。
    */
-  anchor?: { cfiRange: string; selectedText: string };
+  anchor?: { locatorRange: string; selectedText: string };
 }
 
 interface AnnotationState {

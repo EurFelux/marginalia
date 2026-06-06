@@ -74,6 +74,8 @@ export function listChapters(db: DB, bookId: string): ChapterRefDto[] {
             href: ch.href,
             orderIndex: ch.orderIndex ?? 0,
             level,
+            startPage: ch.startPage ?? null,
+            endPage: ch.endPage ?? null,
           });
         }
       }
@@ -90,6 +92,8 @@ export function listChapters(db: DB, bookId: string): ChapterRefDto[] {
       title: chapters.title,
       href: chapters.href,
       orderIndex: chapters.orderIndex,
+      startPage: chapters.startPage,
+      endPage: chapters.endPage,
     })
     .from(chapters)
     .where(eq(chapters.bookId, bookId))
@@ -101,5 +105,7 @@ export function listChapters(db: DB, bookId: string): ChapterRefDto[] {
       href: c.href,
       orderIndex: c.orderIndex ?? 0,
       level: 0,
+      startPage: c.startPage ?? null,
+      endPage: c.endPage ?? null,
     }));
 }

@@ -49,8 +49,8 @@ export function EpubReader({ bookId, chapters }: Props) {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const bytes = useQuery({
-    queryKey: qk.epubBytes(bookId),
-    queryFn: () => window.api.library.readEpubBytes({ bookId }),
+    queryKey: qk.bookBytes(bookId),
+    queryFn: () => window.api.library.readBookBytes({ bookId }),
     staleTime: Infinity,
   });
 
@@ -104,11 +104,11 @@ export function EpubReader({ bookId, chapters }: Props) {
     if (idx >= 0) vRef.current?.scrollToIndex(idx);
   }, [book, currentChapterId, chapters]);
 
-  // 恢复初始位置：进度 CFI → index（仅在 book+progress 就绪时算一次初值）。
+  // 恢复初始位置：进度 locator → index（仅在 book+progress 就绪时算一次初值）。
   const initialIndex =
-    book && progress.data?.cfi != null
+    book && progress.data?.locator != null
       ? (() => {
-          const i = book.indexOfCfi(progress.data.cfi);
+          const i = book.indexOfCfi(progress.data.locator);
           return i >= 0 ? i : 0;
         })()
       : 0;
@@ -133,10 +133,10 @@ export function EpubReader({ bookId, chapters }: Props) {
     if (cfi) {
       if (saveTimer.current) clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(() => {
-        void window.api.progress.save({ bookId, cfi });
+        void window.api.progress.save({ bookId, locator: cfi });
         // 同步写入查询缓存：progress 查询 staleTime=Infinity，不写缓存的话重开书会读到首开时
         // 的旧值（通常是 null）→ initialIndex 永远 0 → 回到开头。
-        qc.setQueryData(qk.progress(bookId), { cfi });
+        qc.setQueryData(qk.progress(bookId), { locator: cfi });
       }, SAVE_DEBOUNCE_MS);
     }
   };

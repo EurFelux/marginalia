@@ -50,7 +50,7 @@ function wrapRange(range: Range, doc: Document, className: string, annoId: strin
 
 /**
  * 把属于第 index 个 section 的标注渲染为高亮 mark。先清旧 mark（幂等），
- * 再按 `book.indexOfCfi(cfiRange)===index` 过滤、`book.rangeFromCfi` 取 Range 后包裹。
+ * 再按 `book.indexOfCfi(locatorRange)===index` 过滤、`book.rangeFromCfi` 取 Range 后包裹。
  * toRange 失败（CFI 失效）跳过该条（best-effort），它仍在侧栏列表（快照展示）。
  */
 export function applyAnnotations(
@@ -61,8 +61,8 @@ export function applyAnnotations(
 ): void {
   clearAnnoMarks(doc);
   for (const a of annotations) {
-    if (book.indexOfCfi(a.cfiRange) !== index) continue;
-    const range = book.rangeFromCfi(a.cfiRange, doc);
+    if (book.indexOfCfi(a.locatorRange) !== index) continue;
+    const range = book.rangeFromCfi(a.locatorRange, doc);
     if (!range) continue;
     const noted = a.note.trim().length > 0 ? " anno-noted" : "";
     wrapRange(range, doc, `anno anno-${a.style}${noted}`, a.id);

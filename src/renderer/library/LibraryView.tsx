@@ -107,7 +107,7 @@ export function LibraryView() {
 
   // 按钮导入：原生对话框取单个路径 → 同一批量通道。
   const onPick = async () => {
-    const filePath = await window.api.library.pickEpub();
+    const filePath = await window.api.library.pickBook();
     if (!filePath) return;
     void runImport([{ filePath, name: fileNameOf(filePath) }], []);
   };

@@ -22,11 +22,17 @@ const toDto = (b: {
   title: string | null;
   author: string | null;
   hasCover: boolean;
+  format: "epub" | "pdf";
+  pageCount: number | null;
+  hasTextLayer: boolean;
 }): BookSummaryDto => ({
   id: b.id,
   title: b.title,
   author: b.author,
   hasCover: Boolean(b.hasCover),
+  format: b.format,
+  pageCount: b.pageCount,
+  hasTextLayer: Boolean(b.hasTextLayer),
 });
 
 export const libraryBindings: Binding[] = [
@@ -40,11 +46,11 @@ export const libraryBindings: Binding[] = [
     return toDto({ ...book, hasCover: book.cover != null && book.cover.length > 0 });
   }),
 
-  bind(C.libraryPickEpub, async () => {
+  bind(C.libraryPickBook, async () => {
     const win = BrowserWindow.getFocusedWindow();
     const opts = {
       properties: ["openFile" as const],
-      filters: [{ name: "EPUB", extensions: ["epub"] }],
+      filters: [{ name: "Books", extensions: ["epub", "pdf"] }],
     };
     const r = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts);
     return r.canceled || r.filePaths.length === 0 ? null : r.filePaths[0];
@@ -57,20 +63,20 @@ export const libraryBindings: Binding[] = [
     return b ? toDto({ ...b, hasCover: b.cover != null && b.cover.length > 0 }) : null;
   }),
 
-  bind(C.libraryReadEpubBytes, (input) => readEpubFile(getBooksDir(), input.bookId)),
+  bind(C.libraryReadBookBytes, (input) => readEpubFile(getBooksDir(), input.bookId)),
 
   bind(C.libraryDelete, (input) => deleteBook(getDb(), getBooksDir(), input.bookId)),
 
   bind(C.progressGet, (input) => {
     const p = getProgress(getDb(), input.bookId);
-    return p ? { cfi: p.locator } : null; // TODO(T6): rename IPC field cfi→locator
+    return p ? { locator: p.locator } : null;
   }),
 
   bind(C.progressSave, (input) => {
     const db = getDb();
     if (!getBook(db, input.bookId))
       throw new Error(`progress:save — book ${input.bookId} not found`);
-    saveProgress(db, input.bookId, input.cfi); // TODO(T6): rename IPC field cfi→locator
+    saveProgress(db, input.bookId, input.locator);
   }),
 
   bind(C.contentToc, (input) => {

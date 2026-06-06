@@ -64,6 +64,9 @@ export function listBooks(db: DB) {
       title: books.title,
       author: books.author,
       hasCover: sql<boolean>`${books.cover} is not null and length(${books.cover}) > 0`,
+      format: books.format,
+      pageCount: books.pageCount,
+      hasTextLayer: books.hasTextLayer,
     })
     .from(books)
     .all();
