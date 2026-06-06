@@ -33,6 +33,10 @@ export async function readChapterText(
     .get();
   if (!ch) throw new Error(`content: chapter ${chapterId} not found in book ${bookId}`);
   if (book.format === "pdf") {
+    // 扫描版防御（spec §8）：绝不静默返回空文本——模型/调用方必须收到真实原因。
+    if (!book.hasTextLayer) {
+      throw new Error(t("errors.noTextLayer", "扫描版 PDF 没有文本层，无法提取文本"));
+    }
     return extractPdfText(bytes, {
       startPage: ch.startPage ?? 1,
       endPage: ch.endPage ?? book.pageCount ?? 1,
@@ -57,6 +61,10 @@ export async function readBookText(
   const book = getBook(db, bookId);
   if (!book) throw new Error(`content: book ${bookId} not found`);
   if (book.format === "pdf") {
+    // 扫描版防御（spec §8）：绝不静默返回空文本——模型/调用方必须收到真实原因。
+    if (!book.hasTextLayer) {
+      throw new Error(t("errors.noTextLayer", "扫描版 PDF 没有文本层，无法提取文本"));
+    }
     const slice = await extractPdfText(bytes, {
       startPage: 1,
       endPage: book.pageCount ?? 1,
@@ -83,7 +91,7 @@ export function assertTextLayer(db: DB, bookId: string): void {
   // 渲染层收不到任何 reject，摘要永远卡 pending。
   if (!book) throw new Error(`content: book ${bookId} not found`);
   if (!book.hasTextLayer) {
-    throw new Error(t("errors.noTextLayer", "扫描版 PDF 没有文本层，无法提取文本生成摘要"));
+    throw new Error(t("errors.noTextLayer", "扫描版 PDF 没有文本层，无法提取文本"));
   }
 }
 

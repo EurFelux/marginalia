@@ -64,8 +64,7 @@ export default {
   "errors.noApiKeyAvailable": "No API key available for this $t(terms.provider)",
   "errors.noApiKeyConfigured": "No API key configured",
   "errors.noApiKeySet": "No API key set for this $t(terms.provider)",
-  "errors.noTextLayer":
-    "This scanned PDF has no text layer, so no text can be extracted for summaries",
+  "errors.noTextLayer": "This scanned PDF has no text layer, so its text cannot be extracted",
   "errors.providerHasNoApiKey": "$t(terms.provider) {{id}} has no API key",
   "errors.providerNotFound": "$t(terms.provider) {{id}} not found",
   "errors.requestFailed": "Request failed",

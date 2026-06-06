@@ -1,5 +1,6 @@
 import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
 import { createDb, runMigrations } from "@main/db/client";
 import { chapters } from "@main/db/schema";
 import { importBook, resolveChapterByHref } from "@main/library/repository";
@@ -142,5 +143,26 @@ describe("content (pdf)", () => {
     expect(() => assertTextLayer(db, pdf.id)).not.toThrow();
     const epub = await importBook(db, { bytes: makeFixtureEpub() });
     expect(() => assertTextLayer(db, epub.id)).not.toThrow();
+  });
+});
+
+describe("scanned pdf guard (no text layer)", () => {
+  it("readChapterText rejects instead of silently returning empty text", async () => {
+    const db = freshDb();
+    const bytes = await makeScannedPdf();
+    const book = await importBook(db, { bytes });
+    const ch = db.select().from(chapters).where(eq(chapters.bookId, book.id)).get()!;
+    await expect(readChapterText(db, bytes, book.id, ch.id, {})).rejects.toThrow(
+      /text layer|文本层/,
+    );
+  });
+
+  it("readBookText rejects the same way", async () => {
+    const db = freshDb();
+    const bytes = await makeScannedPdf();
+    const book = await importBook(db, { bytes });
+    await expect(readBookText(db, bytes, book.id, { maxChars: 100 })).rejects.toThrow(
+      /text layer|文本层/,
+    );
   });
 });
