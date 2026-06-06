@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Virtuoso } from "react-virtuoso";
 import { Minus, Plus } from "lucide-react";
 import { Button } from "@renderer/components/ui/button";
+import { cn } from "@renderer/lib/utils";
 import { useThemeStore } from "@renderer/store/theme-store";
 import { qk } from "../query/keys";
 import { createPdfBook, type PdfBook } from "./pdf-book";
@@ -180,7 +181,7 @@ export function PdfReader({ bookId }: Props) {
   );
 }
 
-/** 单页：挂载即渲染（Virtuoso 只挂可视项）；卸载/参数变化取消未完成渲染（pdf-book 契约要求）。 */
+/** 单页：canvas + textLayer 叠层；卸载/参数变化取消未完成渲染（pdf-book 契约要求）。 */
 function PdfPage(props: {
   book: PdfBook;
   index: number;
@@ -190,13 +191,14 @@ function PdfPage(props: {
 }) {
   const { book, index, cssWidth, cssHeight, invert } = props;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const textLayerRef = useRef<HTMLDivElement | null>(null);
   const [renderError, setRenderError] = useState(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     setRenderError(false);
-    const task = book.renderPage(index, canvas, cssWidth);
+    const task = book.renderPage(index, canvas, cssWidth, textLayerRef.current ?? undefined);
     task.done.catch(() => setRenderError(true)); // done 可能 reject（pdf-book 契约）
     return () => task.cancel();
   }, [book, index, cssWidth]);
@@ -212,11 +214,15 @@ function PdfPage(props: {
           ⚠ p.{index + 1}
         </div>
       ) : (
-        <canvas
-          ref={canvasRef}
-          className={invert ? "shadow-sm [filter:invert(1)_hue-rotate(180deg)]" : "shadow-sm"}
-          style={{ width: cssWidth, height: cssHeight }}
-        />
+        <div className="relative shadow-sm" style={{ width: cssWidth, height: cssHeight }}>
+          <canvas
+            ref={canvasRef}
+            className={cn("h-full w-full", invert && "[filter:invert(1)_hue-rotate(180deg)]")}
+          />
+          {/* data-page：选区处理据此识别页号（1-based）。invert 滤镜只作用于 canvas，
+              textLayer 的 ::selection 高亮在暗色下保持可见。 */}
+          <div ref={textLayerRef} data-page={index + 1} className="textLayer" />
+        </div>
       )}
     </div>
   );

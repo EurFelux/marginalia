@@ -362,6 +362,37 @@ a {
   background: color-mix(in oklab, var(--header-bg) 84%, transparent 16%);
 }
 
+/* pdfjs textLayer（v6）：透明 span 绝对定位叠在页面 canvas 上，仅承载原生文本选区。
+   --total-scale-factor 由 pdf-book renderPage 按页设置；--scale-round-* 是 pdfjs
+   round() 表达式要求的量化步长（官方默认 1px）。 */
+.textLayer {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  text-align: initial;
+  line-height: 1;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  caret-color: CanvasText;
+  --scale-round-x: 1px;
+  --scale-round-y: 1px;
+}
+.textLayer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+}
+.textLayer span.markedContent {
+  top: 0;
+  height: 0;
+}
+.textLayer ::selection {
+  background: rgb(59 130 246 / 0.35);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
