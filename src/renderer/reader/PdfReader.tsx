@@ -12,7 +12,8 @@ import { useNavigationStore } from "@renderer/store/navigation-store";
 import type { ChapterRefDto } from "@shared/library";
 import { qk } from "../query/keys";
 import { createPdfBook, type PdfBook } from "./pdf-book";
-import { makePdfLocator, parsePdfLocator } from "./pdf-locator";
+import { makePdfLocator, parsePdfLocator, parsePdfLocatorRange } from "./pdf-locator";
+import { pdfAnnosByPage } from "./pdf-annotations";
 import { buildPdfSelectionInfo, flatOffsetOf } from "./pdf-selection";
 import { chapterIdAtPage } from "./pdf-chapter-at-page";
 import { OVERLAY_FILL } from "./highlight";
@@ -64,6 +65,14 @@ export function PdfReader({ bookId, chapters }: Props) {
     queryFn: () => window.api.progress.get({ bookId }),
     staleTime: Infinity,
   });
+
+  // 标注：对齐 EpubReader 的 query 配置；建/改/删后 invalidate 自动重画。
+  const annotations = useQuery({
+    queryKey: qk.annotations(bookId),
+    queryFn: () => window.api.annotations.listByBook({ bookId }),
+    staleTime: Infinity,
+  });
+  const scrollCommand = useAnnotationStore((s) => s.scrollCommand);
 
   // 容器宽度（适宽缩放的输入）：ResizeObserver 跟踪。
   useEffect(() => {
@@ -117,6 +126,14 @@ export function PdfReader({ bookId, chapters }: Props) {
     if (ch?.startPage == null) return;
     virtuosoRef.current?.scrollToIndex({ index: ch.startPage - 1, align: "start" });
   }, [book, currentChapterId, chapters]);
+
+  // 侧栏标注列表点击 → 滚到标注所在页（对齐 EpubReader 的 scrollCommand 消费；
+  // 非 pdf locator 解析为 null → no-op，与 ePub locator 互不串台）。
+  useEffect(() => {
+    if (!book || !scrollCommand) return;
+    const r = parsePdfLocatorRange(scrollCommand.locator);
+    if (r) virtuosoRef.current?.scrollToIndex({ index: r.page - 1, align: "start" });
+  }, [book, scrollCommand]);
 
   // 选区：textLayer 原生 DOM selection（同文档，无 iframe 桥）→ 页内偏移 + 字符窗口上下文。
   const onMouseUp = () => {
@@ -192,6 +209,9 @@ export function PdfReader({ bookId, chapters }: Props) {
   const pageW = Math.max(200, (containerW - PAGE_GUTTER) * ZOOM_STEPS[zoomIdx]!);
   const pageH = pageW * (book.baseSize.height / book.baseSize.width);
 
+  // 标注按页分组（每渲染重算；可见页 × 条数级，开销可忽略——React Compiler 亦会缓存）。
+  const annosByPage = pdfAnnosByPage(annotations.data ?? []);
+
   const initialPage = (() => {
     const loc = progress.data?.locator ? parsePdfLocator(progress.data.locator) : null;
     if (!loc) return 0;
@@ -250,7 +270,7 @@ export function PdfReader({ bookId, chapters }: Props) {
             cssWidth={pageW}
             cssHeight={pageH}
             invert={resolvedTheme === "dark"}
-            annos={[]}
+            annos={annosByPage.get(index + 1) ?? []}
           />
         )}
       />
