@@ -50,6 +50,15 @@ describe("db client", () => {
     ).toThrow();
   });
 
+  it("rejects an invalid book format via CHECK constraint", () => {
+    const db = createDb(":memory:");
+    runMigrations(db, MIGRATIONS);
+    expect(() =>
+      // @ts-expect-error intentionally violating the type-level enum to test the SQL CHECK
+      db.insert(books).values({ id: "b-fmt", format: "word" }).run(),
+    ).toThrow();
+  });
+
   it("rejects a chapter referencing a non-existent book (FK)", () => {
     const db = createDb(":memory:");
     runMigrations(db, MIGRATIONS);
