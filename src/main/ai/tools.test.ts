@@ -3,6 +3,7 @@ import path from "node:path";
 import { z } from "zod";
 import { describe, expect, it } from "vitest";
 import { makeFixtureEpub, type ChapterTextSlice } from "@marginalia/epub-parser";
+import { makeScannedPdf, makeTextPdf } from "@marginalia/pdf-parser/fixture";
 import { createDb, runMigrations } from "@main/db/client";
 import { importBook, resolveChapterByHref } from "@main/library/repository";
 import { createReadingTools, resolveChapterRef, type LoadBytes } from "@main/ai/tools";
@@ -93,6 +94,93 @@ describe("createReadingTools", () => {
     const { tools } = await setup();
     const schema = tools.readChapterText.inputSchema as z.ZodType<unknown>;
     expect(schema.safeParse({ chapterId: "" }).success).toBe(false);
+  });
+});
+
+async function setupPdf(o: { scanned?: boolean; imageToolResults?: boolean } = {}) {
+  const db = createDb(":memory:");
+  runMigrations(db, MIGRATIONS);
+  const bytes = o.scanned
+    ? await makeScannedPdf()
+    : await makeTextPdf({ outline: true, title: "Px" });
+  const book = await importBook(db, { bytes });
+  const loadBytes: LoadBytes = async () => bytes;
+  const tools = createReadingTools({
+    db,
+    bookId: book.id,
+    loadBytes,
+    imageToolResults: o.imageToolResults,
+  });
+  return { db, book, tools };
+}
+
+describe("readPage tool (pdf)", () => {
+  it("is absent for epub books", async () => {
+    const { tools } = await setup(); // 既有 epub setup
+    expect("readPage" in tools).toBe(false);
+  });
+
+  it("is present for pdf books", async () => {
+    const { tools } = await setupPdf();
+    expect("readPage" in tools).toBe(true);
+  });
+
+  it("mode text returns the page text with its page marker", async () => {
+    const { tools } = await setupPdf();
+    if (!("readPage" in tools)) throw new Error("readPage missing");
+    const out = (await tools.readPage.execute!({ page: 2, mode: "text" }, opts)) as {
+      kind: string;
+      page: number;
+      text: string;
+    };
+    expect(out.kind).toBe("text");
+    expect(out.text).toContain("[p.2]");
+    expect(out.text).toContain("body text of page 2");
+  });
+
+  it("mode image returns base64 png and toModelOutput emits a file-data content part", async () => {
+    const { tools } = await setupPdf({ imageToolResults: true });
+    if (!("readPage" in tools)) throw new Error("readPage missing");
+    const out = (await tools.readPage.execute!({ page: 1, mode: "image" }, opts)) as {
+      kind: string;
+      data: string;
+    };
+    expect(out.kind).toBe("image");
+    const buf = Buffer.from(out.data, "base64");
+    expect([...buf.subarray(0, 4)]).toEqual([0x89, 0x50, 0x4e, 0x47]); // PNG 魔数
+    const modelOut = await tools.readPage.toModelOutput!({
+      toolCallId: "t",
+      input: { page: 1, mode: "image" },
+      output: out,
+    } as never);
+    expect(modelOut).toEqual({
+      type: "content",
+      value: [{ type: "file-data", mediaType: "image/png", data: out.data }],
+    });
+  });
+
+  it("gates mode image out of the schema when provider lacks image tool results", async () => {
+    const { tools } = await setupPdf({ imageToolResults: false });
+    if (!("readPage" in tools)) throw new Error("readPage missing");
+    const schema = tools.readPage.inputSchema as z.ZodTypeAny;
+    expect(schema.safeParse({ page: 1, mode: "image" }).success).toBe(false);
+    expect(schema.safeParse({ page: 1, mode: "text" }).success).toBe(true);
+  });
+
+  it("mode text rejects for scanned pdfs with an actionable error", async () => {
+    const { tools } = await setupPdf({ scanned: true, imageToolResults: true });
+    if (!("readPage" in tools)) throw new Error("readPage missing");
+    await expect(tools.readPage.execute!({ page: 1, mode: "text" }, opts)).rejects.toThrow(
+      /scanned|text layer/,
+    );
+  });
+
+  it("rejects out-of-range pages", async () => {
+    const { tools } = await setupPdf();
+    if (!("readPage" in tools)) throw new Error("readPage missing");
+    await expect(tools.readPage.execute!({ page: 99, mode: "text" }, opts)).rejects.toThrow(
+      /out of range/,
+    );
   });
 });
 
