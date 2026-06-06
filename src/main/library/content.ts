@@ -55,7 +55,8 @@ export async function readBookText(
   opts: { maxChars: number },
 ): Promise<{ text: string; truncated: boolean }> {
   const book = getBook(db, bookId);
-  if (book?.format === "pdf") {
+  if (!book) throw new Error(`content: book ${bookId} not found`);
+  if (book.format === "pdf") {
     const slice = await extractPdfText(bytes, {
       startPage: 1,
       endPage: book.pageCount ?? 1,
@@ -78,7 +79,10 @@ export async function readBookText(
  */
 export function assertTextLayer(db: DB, bookId: string): void {
   const book = getBook(db, bookId);
-  if (book && !book.hasTextLayer) {
+  // 缺书也要抛：静默通过会让后续 fire-and-forget ensure* 把 not-found 吞进 console.warn，
+  // 渲染层收不到任何 reject，摘要永远卡 pending。
+  if (!book) throw new Error(`content: book ${bookId} not found`);
+  if (!book.hasTextLayer) {
     throw new Error(t("errors.noTextLayer", "扫描版 PDF 没有文本层，无法提取文本生成摘要"));
   }
 }
