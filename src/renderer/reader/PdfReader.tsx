@@ -52,6 +52,7 @@ export function PdfReader({ bookId, chapters }: Props) {
   const topChapterIdRef = useRef<string | null>(null);
 
   const setSelection = useAnnotationStore((s) => s.setSelection);
+  const closeStyleBar = useAnnotationStore((s) => s.closeStyleBar);
 
   const bytes = useQuery({
     queryKey: qk.bookBytes(bookId),
@@ -168,15 +169,23 @@ export function PdfReader({ bookId, chapters }: Props) {
       }),
     );
   };
-  const onMouseDown = () => setSelection(null);
+  // 正文 mousedown：关样式栏并清选区（对齐 EpubReader 的 onContentMouseDown——
+  // P3 引入 styleBar 后若不关，残留的栏会让 SelectionToolbar 永久让位）。
+  const onMouseDown = () => {
+    closeStyleBar();
+    setSelection(null);
+  };
 
-  // 滚动即放弃（对齐 EpubReader）：工具栏锚定视口坐标，滚动后位置失真。
+  // 滚动即放弃（对齐 EpubReader）：工具栏/样式栏锚定视口坐标，滚动后位置失真。
   // 捕获阶段监听 document——scroll 不冒泡，但能捕获到 Virtuoso 滚动容器的滚动。
   useEffect(() => {
-    const onScroll = () => setSelection(null);
+    const onScroll = () => {
+      closeStyleBar();
+      setSelection(null);
+    };
     document.addEventListener("scroll", onScroll, true);
     return () => document.removeEventListener("scroll", onScroll, true);
-  }, [setSelection]);
+  }, [closeStyleBar, setSelection]);
 
   const saveAt = (page: number) => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
