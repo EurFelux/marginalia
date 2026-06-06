@@ -10,6 +10,9 @@ import { ScrollArea } from "@renderer/components/ui/scroll-area";
 import { qk } from "@renderer/query/keys";
 import { useAnnotationStore } from "@renderer/store/annotation-store";
 import { STYLE_STRIPE } from "./highlight";
+import { chapterIdAtPage } from "./pdf-chapter-at-page";
+import { parsePdfLocatorRange } from "./pdf-locator";
+import { pdfOrderKey } from "./pdf-annotations";
 
 const cfiCompare = new EpubCFI();
 function spineOf(cfi: string): number {
@@ -57,16 +60,27 @@ export function AnnotationsList({ bookId }: { bookId: string }) {
       </p>
     );
 
-  // 阅读序排序（compare 不可用时回退 spinePos）。
+  // 阅读序排序：PDF 标注按页+页内偏移；ePub 走 CFI compare（不可比时回退 spinePos）。
+  // 同一本书不会混两种 locator，两键同时非 null 即 PDF 书。
   const sorted = [...list].sort((a, b) => {
+    const ka = pdfOrderKey(a.locatorRange);
+    const kb = pdfOrderKey(b.locatorRange);
+    if (ka != null && kb != null) return ka - kb;
     try {
       return cfiCompare.compare(a.locatorRange, b.locatorRange);
     } catch {
       return spineOf(a.locatorRange) - spineOf(b.locatorRange);
     }
   });
-  const chapterTitle = (cfi: string): string | null => {
-    const sp = spineOf(cfi);
+  const chapterTitle = (locator: string): string | null => {
+    const pdfRange = parsePdfLocatorRange(locator);
+    if (pdfRange) {
+      // PDF：页 → 所属章标题 + 页号；无章（首章前）退页号。
+      const chId = chapterIdAtPage(chapters.data ?? [], pdfRange.page);
+      const title = (chapters.data ?? []).find((c: ChapterRefDto) => c.id === chId)?.title;
+      return title ? `${title} · p.${pdfRange.page}` : `p.${pdfRange.page}`;
+    }
+    const sp = spineOf(locator);
     const ch = (chapters.data ?? []).find((c: ChapterRefDto) => c.orderIndex === sp);
     return ch?.title ?? null;
   };

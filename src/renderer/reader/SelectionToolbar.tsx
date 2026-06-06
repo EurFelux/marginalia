@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { BookOpen, FileText, Highlighter, Languages, Sparkles, StickyNote } from "lucide-react";
 import { cn } from "@renderer/lib/utils";
 import { Button } from "@renderer/components/ui/button";
@@ -28,15 +28,6 @@ export function SelectionToolbar() {
   const lastStyle = usePrefsStore((s) => s.lastHighlightStyle);
   const { startAiAction } = useAiActions();
   const qc = useQueryClient();
-  // 与 ReaderView 同 key（qk.book）——React Query 去重，零额外 IPC。
-  const book = useQuery({
-    queryKey: qk.book(bookId ?? ""),
-    queryFn: () => window.api.library.get({ bookId: bookId! }),
-    enabled: bookId != null,
-  });
-  // P2：PDF 选区仅接问 AI；高亮/笔记的绘制与持久化是 P3（spec §9）——
-  // 入口先藏，免得写入无人能看见的标注。P3 接通绘制后移除此门控。
-  const annotatable = book.data?.format !== "pdf";
   const createM = useMutation({
     mutationFn: window.api.annotations.create,
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.annotations(bookId ?? "") }),
@@ -86,21 +77,17 @@ export function SelectionToolbar() {
       style={{ position: "fixed", left, top, transform: "translate(-50%, -100%)", zIndex: 50 }}
       className="flex w-max items-center gap-0.5 whitespace-nowrap rounded-xl border border-border bg-popover/95 p-1 shadow-lg backdrop-blur"
     >
-      {annotatable && (
-        <>
-          <ToolBtn
-            onClick={applyHighlight}
-            icon={<Highlighter className="size-3.5" />}
-            label={t("reader.selection.highlight", "高亮标记")}
-          />
-          <ToolBtn
-            onClick={addNote}
-            icon={<StickyNote className="size-3.5" />}
-            label={t("reader.selection.addNote", "添加笔记")}
-          />
-          <span className="mx-0.5 h-5 w-px bg-border" />
-        </>
-      )}
+      <ToolBtn
+        onClick={applyHighlight}
+        icon={<Highlighter className="size-3.5" />}
+        label={t("reader.selection.highlight", "高亮标记")}
+      />
+      <ToolBtn
+        onClick={addNote}
+        icon={<StickyNote className="size-3.5" />}
+        label={t("reader.selection.addNote", "添加笔记")}
+      />
+      <span className="mx-0.5 h-5 w-px bg-border" />
       <ToolBtn
         primary
         onClick={() => void startAiAction(null)}
