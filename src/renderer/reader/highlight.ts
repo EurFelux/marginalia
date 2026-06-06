@@ -23,6 +23,20 @@ export const STYLE_STRIPE: Record<AnnotationStyle, string> = {
 };
 
 /**
+ * PDF 高亮 overlay 矩形样式（主文档 Tailwind 生效；半透明色块叠在 canvas 上、
+ * textLayer 之下）。underline 不填充、画底边线。暗色下 canvas 反色但 overlay
+ * 不反（在 canvas 元素之外），45% 透明度两种模式均可读。
+ */
+export const OVERLAY_FILL: Record<AnnotationStyle, string> = {
+  yellow: "bg-yellow-300/45",
+  green: "bg-green-300/45",
+  blue: "bg-sky-300/45",
+  pink: "bg-pink-300/45",
+  purple: "bg-purple-300/45",
+  underline: "border-b-2 border-foreground/60",
+};
+
+/**
  * 注入每个 section iframe 的高亮 CSS（iframe 是 sandboxed srcdoc，主应用 Tailwind 不生效，
  * 故用具体 CSS）。`.anno` 可点击；5 色背景填充；underline 走 text-decoration；
  * `.anno-noted` 叠虚线下划表示有笔记。

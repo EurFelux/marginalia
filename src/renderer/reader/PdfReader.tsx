@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
@@ -14,6 +15,9 @@ import { createPdfBook, type PdfBook } from "./pdf-book";
 import { makePdfLocator, parsePdfLocator } from "./pdf-locator";
 import { buildPdfSelectionInfo, flatOffsetOf } from "./pdf-selection";
 import { chapterIdAtPage } from "./pdf-chapter-at-page";
+import { OVERLAY_FILL } from "./highlight";
+import type { PdfPageAnno } from "./pdf-annotations";
+import { usePdfHighlights } from "./use-pdf-highlights";
 
 interface Props {
   bookId: string;
@@ -246,6 +250,7 @@ export function PdfReader({ bookId, chapters }: Props) {
             cssWidth={pageW}
             cssHeight={pageH}
             invert={resolvedTheme === "dark"}
+            annos={[]}
           />
         )}
       />
@@ -276,27 +281,61 @@ export function PdfReader({ bookId, chapters }: Props) {
   );
 }
 
-/** 单页：canvas + textLayer 叠层；卸载/参数变化取消未完成渲染（pdf-book 契约要求）。 */
+/** 单页：canvas + 高亮 overlay + textLayer 三层叠放；卸载/参数变化取消未完成渲染。 */
 function PdfPage(props: {
   book: PdfBook;
   index: number;
   cssWidth: number;
   cssHeight: number;
   invert: boolean;
+  annos: PdfPageAnno[];
 }) {
-  const { book, index, cssWidth, cssHeight, invert } = props;
+  const { book, index, cssWidth, cssHeight, invert, annos } = props;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const textLayerRef = useRef<HTMLDivElement | null>(null);
   const [renderError, setRenderError] = useState(false);
+  // renderPage done = canvas+textLayer 两路都 settle → 偏移可以安全还原成 Range。
+  const [textReady, setTextReady] = useState(false);
+  const openStyleBar = useAnnotationStore((s) => s.openStyleBar);
+  const highlights = usePdfHighlights(annos, textLayerRef.current, textReady);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     setRenderError(false);
+    setTextReady(false);
     const task = book.renderPage(index, canvas, cssWidth, textLayerRef.current ?? undefined);
-    task.done.catch(() => setRenderError(true)); // done 可能 reject（pdf-book 契约）
+    task.done.then(() => setTextReady(true)).catch(() => setRenderError(true));
     return () => task.cancel();
   }, [book, index, cssWidth]);
+
+  // 点击命中高亮 → 编辑样式栏（对齐 ePub onHighlightClick）。视觉矩形 pointer-events-none
+  // 不挡划词；命中测试走容器 click——选区未塌缩 = 拖选结尾，不当点击。
+  const onClick = (e: ReactMouseEvent) => {
+    if (!(window.getSelection()?.isCollapsed ?? true)) return;
+    const layer = textLayerRef.current;
+    if (!layer || highlights.length === 0) return;
+    const base = layer.getBoundingClientRect();
+    const x = e.clientX - base.x;
+    const y = e.clientY - base.y;
+    const hit = highlights.find(
+      (h) =>
+        x >= h.rect.left &&
+        x <= h.rect.left + h.rect.width &&
+        y >= h.rect.top &&
+        y <= h.rect.top + h.rect.height,
+    );
+    if (!hit) return;
+    openStyleBar({
+      rect: {
+        x: hit.rect.left + base.x,
+        y: hit.rect.top + base.y,
+        width: hit.rect.width,
+        height: hit.rect.height,
+      },
+      target: { type: "edit", annotationId: hit.annoId },
+    });
+  };
 
   return (
     <div className="flex justify-center py-2">
@@ -309,13 +348,32 @@ function PdfPage(props: {
           ⚠ p.{index + 1}
         </div>
       ) : (
-        <div className="relative shadow-sm" style={{ width: cssWidth, height: cssHeight }}>
+        <div
+          className="relative shadow-sm"
+          style={{ width: cssWidth, height: cssHeight }}
+          onClick={onClick}
+        >
           <canvas
             ref={canvasRef}
             className={cn("h-full w-full", invert && "[filter:invert(1)_hue-rotate(180deg)]")}
           />
-          {/* data-page：选区处理据此识别页号（1-based）。invert 滤镜只作用于 canvas，
-              textLayer 的 ::selection 高亮在暗色下保持可见。 */}
+          {/* 高亮 overlay：canvas 之上、textLayer 之下；纯视觉不接事件（不挡原生划词）。 */}
+          <div className="pointer-events-none absolute inset-0">
+            {highlights.map((h, i) => (
+              <div
+                key={`${h.annoId}-${i}`}
+                className={cn("absolute", OVERLAY_FILL[h.style])}
+                // 运行时计算的矩形几何
+                style={{
+                  left: h.rect.left,
+                  top: h.rect.top,
+                  width: h.rect.width,
+                  height: h.rect.height,
+                }}
+              />
+            ))}
+          </div>
+          {/* data-page：选区处理据此识别页号（1-based）。invert 滤镜只作用于 canvas。 */}
           <div ref={textLayerRef} data-page={index + 1} className="textLayer" />
         </div>
       )}
