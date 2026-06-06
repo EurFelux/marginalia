@@ -304,9 +304,21 @@ function PdfPage(props: {
     if (!canvas) return;
     setRenderError(false);
     setTextReady(false);
+    // stale 守卫：cancel 时 done 也 resolve（pdf-book 契约）——effect 重跑后旧 task 的
+    // then 绝不能再碰 state，否则会在新渲染完成前把 textReady 抢先置 true 且永不纠正。
+    let stale = false;
     const task = book.renderPage(index, canvas, cssWidth, textLayerRef.current ?? undefined);
-    task.done.then(() => setTextReady(true)).catch(() => setRenderError(true));
-    return () => task.cancel();
+    task.done
+      .then(() => {
+        if (!stale) setTextReady(true);
+      })
+      .catch(() => {
+        if (!stale) setRenderError(true);
+      });
+    return () => {
+      stale = true;
+      task.cancel();
+    };
   }, [book, index, cssWidth]);
 
   // 点击命中高亮 → 编辑样式栏（对齐 ePub onHighlightClick）。视觉矩形 pointer-events-none
@@ -359,9 +371,9 @@ function PdfPage(props: {
           />
           {/* 高亮 overlay：canvas 之上、textLayer 之下；纯视觉不接事件（不挡原生划词）。 */}
           <div className="pointer-events-none absolute inset-0">
-            {highlights.map((h, i) => (
+            {highlights.map((h) => (
               <div
-                key={`${h.annoId}-${i}`}
+                key={`${h.annoId}-${Math.round(h.rect.left)}-${Math.round(h.rect.top)}`}
                 className={cn("absolute", OVERLAY_FILL[h.style])}
                 // 运行时计算的矩形几何
                 style={{
