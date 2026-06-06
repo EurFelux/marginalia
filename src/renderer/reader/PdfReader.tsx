@@ -6,9 +6,11 @@ import { Minus, Plus } from "lucide-react";
 import { Button } from "@renderer/components/ui/button";
 import { cn } from "@renderer/lib/utils";
 import { useThemeStore } from "@renderer/store/theme-store";
+import { useAnnotationStore } from "@renderer/store/annotation-store";
 import { qk } from "../query/keys";
 import { createPdfBook, type PdfBook } from "./pdf-book";
 import { makePdfLocator, parsePdfLocator } from "./pdf-locator";
+import { buildPdfSelectionInfo, flatOffsetOf } from "./pdf-selection";
 
 interface Props {
   bookId: string;
@@ -32,6 +34,8 @@ export function PdfReader({ bookId }: Props) {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Virtuoso 挂载即触发一次 rangeChanged（含进度恢复时）——首发不是用户滚动，跳过免得无谓写库。
   const sawInitialRange = useRef(false);
+
+  const setSelection = useAnnotationStore((s) => s.setSelection);
 
   const bytes = useQuery({
     queryKey: qk.bookBytes(bookId),
@@ -89,6 +93,49 @@ export function PdfReader({ bookId }: Props) {
     };
   }, []);
 
+  // 选区：textLayer 原生 DOM selection（同文档，无 iframe 桥）→ 页内偏移 + 字符窗口上下文。
+  const onMouseUp = () => {
+    const sel = document.getSelection();
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    const startEl =
+      range.startContainer instanceof Element
+        ? range.startContainer
+        : range.startContainer.parentElement;
+    const layer = startEl?.closest<HTMLElement>(".textLayer");
+    if (!layer || !containerRef.current?.contains(layer)) return;
+    const page = Number(layer.dataset.page);
+    if (!Number.isInteger(page) || page < 1) return;
+    const start = flatOffsetOf(layer, range.startContainer, range.startOffset);
+    const endEl =
+      range.endContainer instanceof Element ? range.endContainer : range.endContainer.parentElement;
+    // 跨页选区：终点不在同一 textLayer → 偏移记不了（locatorRange null），仍可问 AI。
+    const end =
+      endEl?.closest(".textLayer") === layer
+        ? flatOffsetOf(layer, range.endContainer, range.endOffset)
+        : null;
+    const r = range.getBoundingClientRect();
+    setSelection(
+      buildPdfSelectionInfo({
+        page,
+        pageStr: layer.textContent ?? "",
+        start,
+        end,
+        selectionText: sel.toString(),
+        rect: { x: r.x, y: r.y, width: r.width, height: r.height },
+      }),
+    );
+  };
+  const onMouseDown = () => setSelection(null);
+
+  // 滚动即放弃（对齐 EpubReader）：工具栏锚定视口坐标，滚动后位置失真。
+  // 捕获阶段监听 document——scroll 不冒泡，但能捕获到 Virtuoso 滚动容器的滚动。
+  useEffect(() => {
+    const onScroll = () => setSelection(null);
+    document.addEventListener("scroll", onScroll, true);
+    return () => document.removeEventListener("scroll", onScroll, true);
+  }, [setSelection]);
+
   const saveAt = (page: number) => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
@@ -127,7 +174,12 @@ export function PdfReader({ bookId }: Props) {
   })();
 
   return (
-    <div ref={containerRef} className="relative h-full">
+    <div
+      ref={containerRef}
+      className="relative h-full"
+      onMouseUp={onMouseUp}
+      onMouseDown={onMouseDown}
+    >
       <Virtuoso
         className="no-scrollbar h-full"
         totalCount={book.pageCount}
