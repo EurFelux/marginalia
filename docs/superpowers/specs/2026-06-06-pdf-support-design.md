@@ -12,17 +12,17 @@ ePub 与 PDF 的根本分野是 **reflowable（流式）vs fixed-layout（固定
 
 ## 2. 决策摘要
 
-| 决策点        | 结论                                                                                                                                  |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| 总体方案      | **双引擎并立**：epubjs 与 pdfjs-dist 各管各的渲染；不造统一 `BookAdapter` 抽象（CFI 方法对 PDF 无意义，泛化只得一堆 null 实现）       |
-| 定位          | **Locator 黑盒原则**：`progress`/`annotations` 定位串存储层不解释；ePub 继续存裸 CFI（既有数据零迁移转换），PDF 存 `pdf:` 前缀 + JSON |
-| 「章节」映射  | 有 outline → 每个 outline 项一章（压扁，记页范围）；**无 outline → 整本退化单章**；AI 工具 `getToc`/`readChapterText` 契约不变        |
-| AI 工具       | **按 `book.format` 分发工具集**：PDF 额外暴露 `readPage(page, mode: "text" \| "image")`；image 形式供视觉模型直接读页面图像           |
-| 扫描版        | 能看（canvas 渲染免费）；选区/标注/摘要禁用（无文本层）；**聊天问答经 `readPage(image)` 对视觉模型解锁**                              |
-| 主进程 canvas | 引入 `@napi-rs/canvas`（NAPI = ABI 稳定，**无需 electron-rebuild**）做页面渲染：readPage image 形式 + 导入时封面缩略图                |
-| 缩放          | v1 = 适宽默认 + 缩放档位（100%/125%/150% 等）；Ctrl+滚轮平滑缩放进 backlog                                                            |
-| pdfjs 双端    | 主进程用 `pdfjs-dist/legacy/build/pdf.mjs`（Node 环境，官方支持路径）；渲染层用标准 build + vite worker                               |
-| 列重命名      | `progress.cfi` → `locator`、`annotations.cfiRange` → `locatorRange`（SQLite `RENAME COLUMN`，非表重建，绕开 FK 迁移坑）               |
+| 决策点        | 结论                                                                                                                                                                      |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 总体方案      | **双引擎并立**：epubjs 与 pdfjs-dist 各管各的渲染；不造统一 `BookAdapter` 抽象（CFI 方法对 PDF 无意义，泛化只得一堆 null 实现）                                           |
+| 定位          | **Locator 黑盒原则**：`progress`/`annotations` 定位串存储层不解释；ePub 继续存裸 CFI（既有数据零迁移转换），PDF 存 `pdf:` 前缀 + JSON                                     |
+| 「章节」映射  | 有 outline → 每个 outline 项一章（压扁，记页范围）；**无 outline → 整本退化单章（标题取书名，避免 `title: null` 困惑模型）**；AI 工具 `getToc`/`readChapterText` 契约不变 |
+| AI 工具       | **按 `book.format` 分发工具集**：PDF 额外暴露 `readPage(page, mode: "text" \| "image")`；image 形式供视觉模型直接读页面图像                                               |
+| 扫描版        | 能看（canvas 渲染免费）；选区/标注/摘要禁用（无文本层）；**聊天问答经 `readPage(image)` 对视觉模型解锁**                                                                  |
+| 主进程 canvas | 引入 `@napi-rs/canvas`（NAPI = ABI 稳定，**无需 electron-rebuild**）做页面渲染：readPage image 形式 + 导入时封面缩略图                                                    |
+| 缩放          | v1 = 适宽默认 + 缩放档位（100%/125%/150% 等）；Ctrl+滚轮平滑缩放进 backlog                                                                                                |
+| pdfjs 双端    | 主进程用 `pdfjs-dist/legacy/build/pdf.mjs`（Node 环境，官方支持路径）；渲染层用标准 build + vite worker                                                                   |
+| 列重命名      | `progress.cfi` → `locator`、`annotations.cfiRange` → `locatorRange`（SQLite `RENAME COLUMN`，非表重建，绕开 FK 迁移坑）                                                   |
 
 ## 3. 总体架构
 
@@ -77,6 +77,8 @@ parsePdf(bytes): Promise<ParsedPdf>
 
 extractPdfText(bytes, { startPage, endPage, offset?, maxChars? }): Promise<ChapterTextSlice>
 // 页范围 getTextContent 拼接 → 字符偏移分页；输出形状与 ePub 的 extractChapterText 一致
+// 页间插入轻量页边界标记（如 "\n\n[p.13]\n\n"）——模型可在章节文本中引用页码，
+// 并据此跳转 readPage(n) 精读（粗读定位 → 精读看图的工作流闭环）
 
 renderPageImage(bytes, page, { scale? }): Promise<Uint8Array>
 // @napi-rs/canvas + pdfjs render → PNG；供 readPage(image) 与封面缩略图
@@ -85,6 +87,7 @@ renderPageImage(bytes, page, { scale? }): Promise<Uint8Array>
 - **outline → 页号**：outline 项 `dest` 经 `getDestination()` + `getPageIndex()` 异步解析为起始页；`endPage` = 下一项起始页 − 1（最后一项到 pageCount）。嵌套 outline 压扁（与现有 `content.chapters` 扁平现状一致；嵌套 TOC 渲染本就在 backlog）。
 - **扫描版检测**：采样前 ~8 页 `getTextContent`，平均每页字符数低于阈值（~50，实现期校准）→ `hasTextLayer=false`。
 - **连锁改动**：`parseEpub` 同步而 pdfjs 全异步 → `importBook` 签名变 async（IPC handler 本来就 await，波及面小）。
+- **偏移空间注记（防实现期混淆）**：「页内偏移」（annotations locator 的 `start/end`，渲染层 textLayer 产生，不含任何标记）与「章内偏移」（`readChapterText`/`extractPdfText` 的 `offset`，含页边界标记）是**两个独立坐标空间**——各自自洽、互不转换，不存在跨空间换算需求。
 
 ### 5.2 既有模块改动
 
@@ -134,6 +137,8 @@ buildTools(book):
 - **`readPage(page, "image")`**：`renderPageImage` 渲染 PNG → tool result 图像内容。视觉模型直接「看」排版/图表/公式。
 - **provider 能力门控**：tool result 带图像是 provider 差异区（Anthropic 原生支持；OpenAI Chat Completions 的 tool 消息只收纯文本）。image 形式按「模型支持视觉 + provider 支持图像 tool result」决定是否在工具 schema 中声明；不支持时只声明 text 形式，避免模型调用后失败。能力判定的具体机制（已知映射表 / provider 配置）在实现计划阶段定。
 - 摘要链路（章节/全书）继续走 `readChapterText` 纯文本喂入，不走 image（整本喂图 token 爆炸）。
+- **system prompt 注入**：PDF 会话的系统提示附加一行「本书为 PDF，共 N 页；可用 readPage 按页读取，image 形式可查看图表/排版」——否则模型未必意识到页粒度工具的存在价值。
+- **既有工具兼容性（已审查）**：`getToc`/`getChapterSummary`/`readChapterText` 的描述与输入输出形状均格式中立（无 spine/CFI 等 ePub 专属概念外漏），PDF 下无需分叉版本；`resolveChapterRef` 的 id/href 双解析对 PDF 合成 href（`pdf-ch:<i>`）同样成立。
 
 ## 8. 扫描版（`hasTextLayer=false`）门控矩阵
 
