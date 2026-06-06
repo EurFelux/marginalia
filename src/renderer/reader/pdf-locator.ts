@@ -29,3 +29,33 @@ export function parsePdfLocator(s: string): PdfProgressLocator | null {
     return null;
   }
 }
+
+/**
+ * PDF 标注 locatorRange（spec §4）：页内文本流字符偏移（[start, end) 闭开区间）。
+ * 坐标空间 = textLayer DOM 文本流（getTextContent items 顺序，不含 EOL 合成换行），
+ * 与渲染层选区/（P3）高亮绘制同一空间；与主进程「章内偏移」互不转换。
+ */
+export interface PdfRangeLocator {
+  page: number; // 1-based
+  start: number;
+  end: number;
+}
+
+export function makePdfLocatorRange(r: PdfRangeLocator): string {
+  return `pdf:${JSON.stringify({ page: r.page, start: r.start, end: r.end })}`;
+}
+
+export function parsePdfLocatorRange(s: string): PdfRangeLocator | null {
+  if (!s.startsWith("pdf:")) return null;
+  try {
+    const v: unknown = JSON.parse(s.slice(4));
+    if (typeof v !== "object" || v === null) return null;
+    const { page, start, end } = v as { page?: unknown; start?: unknown; end?: unknown };
+    if (typeof page !== "number" || !Number.isInteger(page) || page < 1) return null;
+    if (typeof start !== "number" || !Number.isInteger(start) || start < 0) return null;
+    if (typeof end !== "number" || !Number.isInteger(end) || end < start) return null;
+    return { page, start, end };
+  } catch {
+    return null;
+  }
+}

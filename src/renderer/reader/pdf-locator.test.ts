@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { makePdfLocator, parsePdfLocator } from "./pdf-locator";
+import {
+  makePdfLocator,
+  parsePdfLocator,
+  makePdfLocatorRange,
+  parsePdfLocatorRange,
+} from "./pdf-locator";
 
 describe("pdf locator", () => {
   it("round-trips page + scrollRatio", () => {
@@ -16,5 +21,23 @@ describe("pdf locator", () => {
     expect(parsePdfLocator("epubcfi(/6/4!/4/2)")).toBeNull();
     expect(parsePdfLocator("pdf:not-json")).toBeNull();
     expect(parsePdfLocator('pdf:{"page":0}')).toBeNull(); // page 必须 >= 1
+  });
+});
+
+describe("pdf range locator", () => {
+  it("round-trips", () => {
+    const s = makePdfLocatorRange({ page: 12, start: 480, end: 527 });
+    expect(s).toBe('pdf:{"page":12,"start":480,"end":527}');
+    expect(parsePdfLocatorRange(s)).toEqual({ page: 12, start: 480, end: 527 });
+  });
+  it("rejects non-pdf prefixes and malformed json", () => {
+    expect(parsePdfLocatorRange("epubcfi(/6/4!/4)")).toBeNull();
+    expect(parsePdfLocatorRange("pdf:{nope")).toBeNull();
+  });
+  it("rejects invalid shapes", () => {
+    expect(parsePdfLocatorRange('pdf:{"page":0,"start":0,"end":1}')).toBeNull();
+    expect(parsePdfLocatorRange('pdf:{"page":1,"start":-1,"end":1}')).toBeNull();
+    expect(parsePdfLocatorRange('pdf:{"page":1,"start":5,"end":4}')).toBeNull();
+    expect(parsePdfLocatorRange('pdf:{"page":1,"scrollRatio":0.5}')).toBeNull(); // 进度形状不是 range
   });
 });
