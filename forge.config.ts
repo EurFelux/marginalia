@@ -62,7 +62,12 @@ const config: ForgeConfig = {
       if (file.startsWith("/.vite")) return false;
       if (file === "/node_modules") return false;
       return !KEEP_NODE_MODULES.some(
-        (pkg) => file === `/node_modules/${pkg}` || file.startsWith(`/node_modules/${pkg}/`),
+        (pkg) =>
+          file === `/node_modules/${pkg}` ||
+          file.startsWith(`/node_modules/${pkg}/`) ||
+          // packager 自顶向下遍历：scope 目录（如 /node_modules/@napi-rs）是白名单项的
+          // 祖先，不放行则整个子树被剪枝、子包永远轮不到匹配（@napi-rs/canvas 实测中招）。
+          `/node_modules/${pkg}`.startsWith(`${file}/`),
       );
     },
   },
