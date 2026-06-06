@@ -17,7 +17,7 @@ function toDto(row: AnnotationRow): AnnotationDto {
     style: row.style as AnnotationStyle,
     note: row.note,
     selectedText: row.selectedText,
-    cfiRange: row.cfiRange,
+    cfiRange: row.locatorRange, // TODO(T6): rename IPC field cfiRange→locatorRange
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -45,7 +45,7 @@ export function createAnnotation(db: DB, input: CreateAnnotationInput): Annotati
       style: input.style,
       note: input.note,
       selectedText: input.selectedText,
-      cfiRange: input.cfiRange,
+      locatorRange: input.cfiRange, // TODO(T6): rename IPC field cfiRange→locatorRange
     })
     .returning()
     .get();

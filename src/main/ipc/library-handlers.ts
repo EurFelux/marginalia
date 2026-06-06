@@ -63,14 +63,14 @@ export const libraryBindings: Binding[] = [
 
   bind(C.progressGet, (input) => {
     const p = getProgress(getDb(), input.bookId);
-    return p ? { cfi: p.cfi } : null;
+    return p ? { cfi: p.locator } : null; // TODO(T6): rename IPC field cfi→locator
   }),
 
   bind(C.progressSave, (input) => {
     const db = getDb();
     if (!getBook(db, input.bookId))
       throw new Error(`progress:save — book ${input.bookId} not found`);
-    saveProgress(db, input.bookId, input.cfi);
+    saveProgress(db, input.bookId, input.cfi); // TODO(T6): rename IPC field cfi→locator
   }),
 
   bind(C.contentToc, (input) => {

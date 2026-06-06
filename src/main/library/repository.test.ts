@@ -46,6 +46,12 @@ describe("library repository", () => {
     expect(ch1?.id).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
     );
+
+    // schema 默认值：epub 导入 format='epub'、hasTextLayer=true、pageCount=null
+    const row = db.select().from(books).where(eq(books.id, book.id)).get()!;
+    expect(row.format).toBe("epub");
+    expect(row.hasTextLayer).toBe(true);
+    expect(row.pageCount).toBeNull();
   });
 
   it("falls back to a content-hash id when the epub has no identifier", () => {
@@ -85,9 +91,9 @@ describe("library repository", () => {
     const db = freshDb();
     const book = importBook(db, { bytes: makeFixtureEpub() });
     const assistantId = db.insert(assistants).values({ name: "A" }).returning().get().id;
-    db.insert(progress).values({ bookId: book.id, cfi: "epubcfi(/6/2)" }).run();
+    db.insert(progress).values({ bookId: book.id, locator: "epubcfi(/6/2)" }).run();
     db.insert(annotations)
-      .values({ bookId: book.id, style: "yellow", selectedText: "x", cfiRange: "r" })
+      .values({ bookId: book.id, style: "yellow", selectedText: "x", locatorRange: "r" })
       .run();
     const conv = db
       .insert(conversations)

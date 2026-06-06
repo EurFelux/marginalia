@@ -8,9 +8,9 @@ export function getProgress(db: DB, bookId: string): ProgressRow | undefined {
   return db.select().from(progress).where(eq(progress.bookId, bookId)).get();
 }
 
-export function saveProgress(db: DB, bookId: string, cfi: string): void {
+export function saveProgress(db: DB, bookId: string, locator: string): void {
   db.insert(progress)
-    .values({ bookId, cfi, updatedAt: Date.now() })
-    .onConflictDoUpdate({ target: progress.bookId, set: { cfi, updatedAt: Date.now() } })
+    .values({ bookId, locator, updatedAt: Date.now() })
+    .onConflictDoUpdate({ target: progress.bookId, set: { locator, updatedAt: Date.now() } })
     .run();
 }

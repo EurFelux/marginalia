@@ -49,19 +49,30 @@ export const assistants = sqliteTable("assistants", {
   createdAt: nowMs(),
 });
 
-export const books = sqliteTable("books", {
-  id: text("id").primaryKey(), // ePub 自然键，由导入流程提供（标识符缺失时回退文件哈希）
-  title: text("title"),
-  author: text("author"),
-  cover: blob("cover", { mode: "buffer" }),
-  toc: text("toc", { mode: "json" }).$type<TocNode[]>(),
-  // 全书摘要正文：唯一持久化的事实。状态（pending/generating/ready/unavailable）是运行时派生，
-  // 不入 DB——summary!=null=ready，内存 inFlight=generating，内存 failed=unavailable，否则 pending。
-  summary: text("summary"),
-  addedAt: integer("added_at")
-    .notNull()
-    .$defaultFn(() => Date.now()),
-});
+export const books = sqliteTable(
+  "books",
+  {
+    id: text("id").primaryKey(), // ePub 自然键，由导入流程提供（标识符缺失时回退文件哈希）
+    title: text("title"),
+    author: text("author"),
+    cover: blob("cover", { mode: "buffer" }),
+    toc: text("toc", { mode: "json" }).$type<TocNode[]>(),
+    // 全书摘要正文：唯一持久化的事实。状态（pending/generating/ready/unavailable）是运行时派生，
+    // 不入 DB——summary!=null=ready，内存 inFlight=generating，内存 failed=unavailable，否则 pending。
+    summary: text("summary"),
+    // 文档格式判别：双引擎分发的依据（spec 2026-06-06-pdf-support §4）。
+    format: text("format", { enum: ["epub", "pdf"] })
+      .notNull()
+      .default("epub"),
+    pageCount: integer("page_count"), // PDF 专用；epub 为 null
+    // 扫描版检测结果（导入时落库）；epub 恒 true。false ⇒ AI/标注功能门控。
+    hasTextLayer: integer("has_text_layer", { mode: "boolean" }).notNull().default(true),
+    addedAt: integer("added_at")
+      .notNull()
+      .$defaultFn(() => Date.now()),
+  },
+  (t) => [check("books_format_check", sql`${t.format} in ('epub','pdf')`)],
+);
 
 export const chapters = sqliteTable(
   "chapters",
@@ -73,6 +84,8 @@ export const chapters = sqliteTable(
     title: text("title"),
     orderIndex: integer("order_index"),
     href: text("href").notNull(), // spine 项 href（书内唯一定位）
+    startPage: integer("start_page"), // PDF 章节页范围（1-based 闭区间）；epub 为 null
+    endPage: integer("end_page"),
     summary: text("summary"),
   },
   (t) => [unique().on(t.bookId, t.href), index("chapters_book_id_idx").on(t.bookId)],
@@ -82,7 +95,7 @@ export const progress = sqliteTable("progress", {
   bookId: text("book_id")
     .primaryKey()
     .references(() => books.id, { onDelete: "cascade" }),
-  cfi: text("cfi").notNull(),
+  locator: text("locator").notNull(),
   updatedAt: integer("updated_at")
     .notNull()
     .$defaultFn(() => Date.now()),
@@ -98,7 +111,7 @@ export const annotations = sqliteTable(
     style: text("style").notNull(), // yellow|green|blue|pink|purple|underline
     note: text("note").notNull().default(""),
     selectedText: text("selected_text").notNull(),
-    cfiRange: text("cfi_range").notNull(),
+    locatorRange: text("locator_range").notNull(),
     createdAt: nowMs(),
     updatedAt: integer("updated_at")
       .notNull()

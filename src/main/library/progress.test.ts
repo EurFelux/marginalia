@@ -18,11 +18,11 @@ describe("progress repository", () => {
     const { db, book } = setup();
     expect(getProgress(db, book.id)).toBeUndefined();
   });
-  it("upserts cfi", () => {
+  it("upserts locator", () => {
     const { db, book } = setup();
     saveProgress(db, book.id, "epubcfi(/6/2!/4/1:0)");
-    expect(getProgress(db, book.id)?.cfi).toBe("epubcfi(/6/2!/4/1:0)");
+    expect(getProgress(db, book.id)?.locator).toBe("epubcfi(/6/2!/4/1:0)");
     saveProgress(db, book.id, "epubcfi(/6/4!/4/1:0)");
-    expect(getProgress(db, book.id)?.cfi).toBe("epubcfi(/6/4!/4/1:0)");
+    expect(getProgress(db, book.id)?.locator).toBe("epubcfi(/6/4!/4/1:0)");
   });
 });

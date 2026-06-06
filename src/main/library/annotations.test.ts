@@ -81,7 +81,12 @@ describe("annotations repository", () => {
     expect(() =>
       db
         .insert(annotations)
-        .values({ bookId: "book-1", style: "rainbow", selectedText: "x", cfiRange: "epubcfi(/1)" })
+        .values({
+          bookId: "book-1",
+          style: "rainbow",
+          selectedText: "x",
+          locatorRange: "epubcfi(/1)",
+        })
         .run(),
     ).toThrow();
   });
