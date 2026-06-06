@@ -8,7 +8,7 @@ import { ScrollArea } from "@renderer/components/ui/scroll-area";
 import { qk } from "@renderer/query/keys";
 import { useNavigationStore } from "@renderer/store/navigation-store";
 import { useSettingsStore } from "@renderer/store/settings-store";
-import { fileNameOf, pickEpubFiles } from "./epub-drop";
+import { fileNameOf, pickBookFiles } from "./book-drop";
 import { useEpubDrop } from "./use-epub-drop";
 import { DropOverlay } from "./DropOverlay";
 import { BookCover } from "./BookCover";
@@ -81,7 +81,7 @@ export function LibraryView() {
         ignored,
       );
       toast.warning(
-        t("library.ignored", "已忽略 {{count}} 个非 ePub：{{names}}", {
+        t("library.ignored", "已忽略 {{count}} 个不支持的文件：{{names}}", {
           count: ignored.length,
           names,
         }),
@@ -95,10 +95,10 @@ export function LibraryView() {
     }
   };
 
-  // 拖拽落点：过滤 epub → 取路径 → 批量导入；忽略项进 toast。
+  // 拖拽落点：过滤受支持书籍格式 → 取路径 → 批量导入；忽略项进 toast。
   const onFiles = (files: File[]) => {
-    const { epubs, ignored } = pickEpubFiles(files);
-    const items = epubs.map((f) => ({ filePath: window.api.library.pathForFile(f), name: f.name }));
+    const { books, ignored } = pickBookFiles(files);
+    const items = books.map((f) => ({ filePath: window.api.library.pathForFile(f), name: f.name }));
     void runImport(
       items,
       ignored.map((f) => f.name),
@@ -126,7 +126,7 @@ export function LibraryView() {
             <FolderOpen />
             {importBooks.isPending
               ? t("library.importPending", "导入中…")
-              : t("library.import", "导入 ePub")}
+              : t("library.import", "导入书籍")}
           </Button>
           <Button
             variant="ghost"
@@ -152,7 +152,10 @@ export function LibraryView() {
             <div className="mt-20 text-center text-muted-foreground">
               <BookOpen className="mx-auto mb-3 size-10 opacity-40" />
               <p className="text-sm">
-                {t("library.empty", "书库为空，点右上角「导入 ePub」或把 .epub 拖进窗口开始。")}
+                {t(
+                  "library.empty",
+                  "书库为空，点右上角「导入书籍」或把 .epub / .pdf 拖进窗口开始。",
+                )}
               </p>
             </div>
           )}

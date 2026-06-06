@@ -1,5 +1,5 @@
 import { useRef, useState, type DragEvent } from "react";
-import { isFilesDrag } from "./epub-drop";
+import { isFilesDrag } from "./book-drop";
 
 export interface EpubDropHandlers {
   onDragEnter: (e: DragEvent<HTMLDivElement>) => void;

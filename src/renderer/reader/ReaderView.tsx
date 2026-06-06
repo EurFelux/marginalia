@@ -20,6 +20,7 @@ import { usePrefsStore } from "@renderer/store/prefs-store";
 import { CollapsiblePane } from "@renderer/reader/CollapsiblePane";
 import { Sidebar } from "@renderer/reader/Sidebar";
 import { EpubReader } from "@renderer/reader/EpubReader";
+import { PdfReader } from "@renderer/reader/PdfReader";
 import { ReaderPrefs } from "@renderer/reader/ReaderPrefs";
 import { SelectionToolbar } from "@renderer/reader/SelectionToolbar";
 import { HighlightStyleBar } from "@renderer/reader/HighlightStyleBar";
@@ -59,6 +60,7 @@ export function ReaderView() {
   // 主进程 ensureChapterSummary 仅从 pending 起，故对已就绪章重复触发是廉价 no-op。
   useEffect(() => {
     if (!autoSummarize || bookId == null || chapterId == null) return;
+    if (book.data?.hasTextLayer === false) return;
     const t = setTimeout(() => {
       void window.api.content
         .generateChapterSummary({ bookId, chapterId })
@@ -66,7 +68,7 @@ export function ReaderView() {
         .catch(() => {});
     }, 800);
     return () => clearTimeout(t);
-  }, [autoSummarize, bookId, chapterId, qc]);
+  }, [autoSummarize, bookId, chapterId, qc, book.data?.hasTextLayer]);
 
   if (!bookId) return null;
 
@@ -125,12 +127,14 @@ export function ReaderView() {
                 <span className="truncate">{breadcrumb}</span>
               </div>
             )}
-            <div className="hidden shrink-0 sm:block">
-              <SummaryPill />
-            </div>
+            {book.data?.hasTextLayer !== false && (
+              <div className="hidden shrink-0 sm:block">
+                <SummaryPill />
+              </div>
+            )}
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            <ReaderPrefs />
+            {book.data?.format !== "pdf" && <ReaderPrefs />}
             <Tooltip>
               <TooltipTrigger
                 render={
@@ -193,9 +197,13 @@ export function ReaderView() {
           <Sidebar bookId={bookId} />
         </CollapsiblePane>
         <main className="min-w-0 flex-1">
-          {/* 无条件渲染：EpubReader 自管载入/错误态，并据 CFI 进度恢复初始位置（不门控在 chapterId 上，
-              否则需先有当前章才渲染，与「开书即按进度连续渲染」相悖）。 */}
-          <EpubReader bookId={bookId} chapters={chapters.data ?? []} />
+          {/* 按格式分发：book 查询就绪前不渲染（避免 PDF 书闪挂 EpubReader）。
+              EpubReader 自管载入/错误态，并据 CFI 进度恢复初始位置。 */}
+          {book.isPending ? null : book.data?.format === "pdf" ? (
+            <PdfReader bookId={bookId} />
+          ) : (
+            <EpubReader bookId={bookId} chapters={chapters.data ?? []} />
+          )}
         </main>
         <CollapsiblePane
           side="right"
