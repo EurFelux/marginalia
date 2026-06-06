@@ -62,6 +62,14 @@
 
 > 全量分解与依赖 DAG 见 [`renderer-track-decomposition`](plans/2026-06-01-marginalia-renderer-track-decomposition.md)。
 
+### PDF 轨（spec `2026-06-06-pdf-support-design.md`）
+
+| 单元   | 名称                                                  | 状态 | 备注                                                                                                                                                                                                           |
+| ------ | ----------------------------------------------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PDF-P1 | 解析包 + 导入 + 渲染 + 进度 + 扫描版检测              | ✅   | pdf-parser 包（parsePdf/extractPdfText/renderPageImage）、魔数分发导入（封面缩略图）、PdfReader（virtuoso+适宽/档位缩放+暗色反色）、pdf locator 进度、扫描版门控（UI+主进程双层）；CDP 真启动 + 打包产物双冒烟 |
+| PDF-P2 | textLayer 选区 → 问 AI + readPage 工具 + TOC 跳页接线 | 🔴   | spec §7（readPage text/image + provider 能力门控 + system prompt 注入）                                                                                                                                        |
+| PDF-P3 | 标注（页内偏移 locator + 矩形 overlay 高亮）          | 🔴   | spec §4/§6                                                                                                                                                                                                     |
+
 ---
 
 ## Backlog（待办，按主题）
@@ -137,6 +145,7 @@
 | **ChipBar 迁 Base UI PreviewCard**：ChipBar 已随 pill 迭代整体退役——`components/ui/hover-card.tsx`（PreviewCard 包装）+ `ContextPillBar` 取代，自绘 hover 卡片消失。                                                                                                              | ✅             | 上下文 pill 迭代（2026-06-05）                    |
 | **更广 Tooltip 应用 + Card 化 composite**：Tooltip 现仅阅读页顶栏 2 按钮，可推广到其余图标按钮；书卡/章节项/标注项/消息气泡等 composite 仍手搓 Tailwind，可按需抽成 shadcn `Card`。                                                                                               | 🔴             | shadcn 重构延后（按需）                           |
 | **shadcn tabs 的 data-orientation 适配**：shadcn tabs 用 `data-horizontal`/`data-vertical`，Base UI `Tabs.Root` 发 `data-orientation`，属性名错配致方向类惰性。现 Sidebar 显式 `flex-col` + TabsList `h-8` 兜底（仅水平 tabs）；若再用 tabs 或加竖向，补 `@custom-variant` 映射。 | 🔴             | shadcn 重构发现                                   |
+| **PDF-P1 延后项**：文档句柄缓存（每次提取重开 getDocument）、Ctrl+滚轮平滑缩放、暗色按书关闭、scrollRatio 页内精确恢复（现页级）、TOC 跳页接线（P2）、pdfjs-dist asar 体积裁剪（cmaps/多构建变体全量进包，asar 15M→87M）                                                          | 🔴             | PDF-P1（2026-06-07）                              |
 
 | **chapters.summaryStatus 改派生态**：去 `summary_status` 列+CHECK（表重建迁移）、状态读时派生（内存 `inFlightChapters`/`failedChapters` 集 + `getChapterSummaryView`，镜像全书摘要）、删 `resetStuckSummaries`。契约 `{status,summary}` 不变 → IPC/renderer 零改动。 | ✅ | #9 P1（spec §2 / plan `…-p1-…`） |
 
