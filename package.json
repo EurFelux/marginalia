@@ -45,6 +45,7 @@
     "@fontsource/noto-serif-sc": "^5.2.9",
     "@lobehub/icons": "^5.10.0",
     "@marginalia/epub-parser": "workspace:*",
+    "@marginalia/pdf-parser": "workspace:*",
     "@marginalia/virtual-docs": "workspace:*",
     "@napi-rs/canvas": "^1.0.0",
     "@tanstack/react-query": "^5.100.14",

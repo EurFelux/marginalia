@@ -2,7 +2,7 @@ import path from "node:path";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { createDb, runMigrations } from "@main/db/client";
 import {
   annotations,
@@ -22,6 +22,7 @@ import {
 } from "@main/library/repository";
 import { storedBookPath } from "@main/library/book-files";
 import { makeFixtureEpub } from "@marginalia/epub-parser";
+import { makeScannedPdf, makeTextPdf } from "@marginalia/pdf-parser";
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
 const freshDb = () => {
@@ -31,9 +32,9 @@ const freshDb = () => {
 };
 
 describe("library repository", () => {
-  it("imports a book and persists metadata + ordered chapters (pending)", () => {
+  it("imports a book and persists metadata + ordered chapters (pending)", async () => {
     const db = freshDb();
-    const book = importBook(db, { bytes: makeFixtureEpub() });
+    const book = await importBook(db, { bytes: makeFixtureEpub() });
     expect(book.id).toBe("urn:uuid:fixture-001");
     expect(book.title).toBe("Fixture Book");
     expect(listBooks(db)).toHaveLength(1);
@@ -54,25 +55,25 @@ describe("library repository", () => {
     expect(row.pageCount).toBeNull();
   });
 
-  it("falls back to a content-hash id when the epub has no identifier", () => {
+  it("falls back to a content-hash id when the epub has no identifier", async () => {
     const db = freshDb();
-    const book = importBook(db, {
+    const book = await importBook(db, {
       bytes: makeFixtureEpub({ identifier: null }),
     });
     expect(book.id).toMatch(/^[0-9a-f]{64}$/);
     expect(getBook(db, book.id)).toBeDefined();
   });
 
-  it("idempotent import: re-importing the same epub does not create duplicate books or change chapter ids", () => {
+  it("idempotent import: re-importing the same epub does not create duplicate books or change chapter ids", async () => {
     const db = freshDb();
     const bytes = makeFixtureEpub();
 
-    const book1 = importBook(db, { bytes });
+    const book1 = await importBook(db, { bytes });
     const ch1AfterFirst = resolveChapterByHref(db, book1.id, "OEBPS/ch1.xhtml");
     const ch1Id = ch1AfterFirst?.id;
 
     // Second import of the same bytes
-    const book2 = importBook(db, { bytes });
+    const book2 = await importBook(db, { bytes });
 
     expect(listBooks(db)).toHaveLength(1);
     const ch1AfterSecond = resolveChapterByHref(db, book2.id, "OEBPS/ch1.xhtml");
@@ -81,15 +82,15 @@ describe("library repository", () => {
     expect(db.select().from(chapters).all()).toHaveLength(2);
   });
 
-  it("resolveChapterByHref returns undefined for a missing href", () => {
+  it("resolveChapterByHref returns undefined for a missing href", async () => {
     const db = freshDb();
-    const book = importBook(db, { bytes: makeFixtureEpub() });
+    const book = await importBook(db, { bytes: makeFixtureEpub() });
     expect(resolveChapterByHref(db, book.id, "OEBPS/nonexistent.xhtml")).toBeUndefined();
   });
 
-  it("ON DELETE CASCADE removes all book-owned dependents", () => {
+  it("ON DELETE CASCADE removes all book-owned dependents", async () => {
     const db = freshDb();
-    const book = importBook(db, { bytes: makeFixtureEpub() });
+    const book = await importBook(db, { bytes: makeFixtureEpub() });
     const assistantId = db.insert(assistants).values({ name: "A" }).returning().get().id;
     db.insert(progress).values({ bookId: book.id, locator: "epubcfi(/6/2)" }).run();
     db.insert(annotations)
@@ -118,7 +119,7 @@ describe("library repository", () => {
     const db = freshDb();
     const booksDir = await mkdtemp(path.join(tmpdir(), "marginalia-del-"));
     try {
-      const book = importBook(db, { bytes: makeFixtureEpub() });
+      const book = await importBook(db, { bytes: makeFixtureEpub() });
       await writeFile(storedBookPath(booksDir, book.id, book.format), new Uint8Array([1]));
 
       await deleteBook(db, booksDir, book.id);
@@ -137,7 +138,7 @@ describe("library repository", () => {
     const db = freshDb();
     const booksDir = await mkdtemp(path.join(tmpdir(), "marginalia-del-"));
     try {
-      const book = importBook(db, { bytes: makeFixtureEpub() }); // 未写文件
+      const book = await importBook(db, { bytes: makeFixtureEpub() }); // 未写文件
       await expect(deleteBook(db, booksDir, book.id)).resolves.toBeUndefined();
       expect(listBooks(db)).toHaveLength(0);
     } finally {
@@ -156,9 +157,9 @@ describe("library repository", () => {
     }
   });
 
-  it("listBooks derives hasCover and does not load the cover blob", () => {
+  it("listBooks derives hasCover and does not load the cover blob", async () => {
     const db = freshDb();
-    importBook(db, { bytes: makeFixtureEpub() }); // fixture 带封面
+    await importBook(db, { bytes: makeFixtureEpub() }); // fixture 带封面
     db.insert(books).values({ id: "no-cover", cover: null }).run();
 
     const items = listBooks(db);
@@ -178,5 +179,63 @@ describe("library repository", () => {
       .run();
     const item = listBooks(db).find((b) => b.id === "empty-cover")!;
     expect(Boolean(item.hasCover)).toBe(false);
+  });
+});
+
+describe("importBook (pdf)", () => {
+  it("imports a pdf with outline: format/pageCount/chapters with page ranges", async () => {
+    const db = freshDb();
+    const bytes = await makeTextPdf({ outline: true, title: "Fixture Book", author: "Tester" });
+    const book = await importBook(db, { bytes });
+    expect(book.format).toBe("pdf");
+    expect(book.title).toBe("Fixture Book");
+    expect(book.pageCount).toBe(3);
+    expect(book.hasTextLayer).toBe(true);
+    expect(book.cover).not.toBeNull(); // 首页缩略图
+
+    const chs = db
+      .select()
+      .from(chapters)
+      .where(eq(chapters.bookId, book.id))
+      .orderBy(asc(chapters.orderIndex))
+      .all();
+    expect(chs).toHaveLength(2);
+    expect(chs[0]).toMatchObject({ href: "pdf-ch:0", startPage: 1, endPage: 2 });
+    expect(chs[1]).toMatchObject({ href: "pdf-ch:1", startPage: 3, endPage: 3 });
+  });
+
+  it("falls back to single chapter titled by book title when no outline", async () => {
+    const db = freshDb();
+    const bytes = await makeTextPdf({ outline: false, title: "Untitled Things" });
+    const book = await importBook(db, { bytes });
+    const chs = db.select().from(chapters).where(eq(chapters.bookId, book.id)).all();
+    expect(chs).toHaveLength(1);
+    expect(chs[0]).toMatchObject({
+      href: "pdf-ch:0",
+      title: "Untitled Things",
+      startPage: 1,
+      endPage: 3,
+    });
+  });
+
+  it("detects scanned pdf and stores hasTextLayer=false", async () => {
+    const db = freshDb();
+    const book = await importBook(db, { bytes: await makeScannedPdf() });
+    expect(book.hasTextLayer).toBe(false);
+  });
+
+  it("is idempotent for the same pdf bytes", async () => {
+    const db = freshDb();
+    const bytes = await makeTextPdf({ outline: false });
+    const a = await importBook(db, { bytes });
+    const b = await importBook(db, { bytes });
+    expect(b.id).toBe(a.id);
+  });
+
+  it("rejects unknown formats with an honest error", async () => {
+    const db = freshDb();
+    await expect(importBook(db, { bytes: new TextEncoder().encode("hello") })).rejects.toThrow(
+      /not a supported book format/i,
+    );
   });
 });

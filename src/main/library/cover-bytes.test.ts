@@ -26,9 +26,9 @@ describe("sniffImageType", () => {
 });
 
 describe("coverResponseFor", () => {
-  it("returns bytes + content-type for a book that has a cover", () => {
+  it("returns bytes + content-type for a book that has a cover", async () => {
     const db = freshDb();
-    const book = importBook(db, { bytes: makeFixtureEpub() });
+    const book = await importBook(db, { bytes: makeFixtureEpub() });
     const r = coverResponseFor(db, book.id);
     expect(r).not.toBeNull();
     expect(r!.bytes.byteLength).toBeGreaterThan(0);

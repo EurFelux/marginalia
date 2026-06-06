@@ -6,20 +6,20 @@ import { getProgress, saveProgress } from "@main/library/progress";
 import { makeFixtureEpub } from "@marginalia/epub-parser";
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
-const setup = () => {
+const setup = async () => {
   const db = createDb(":memory:");
   runMigrations(db, MIGRATIONS);
-  const book = importBook(db, { bytes: makeFixtureEpub() });
+  const book = await importBook(db, { bytes: makeFixtureEpub() });
   return { db, book };
 };
 
 describe("progress repository", () => {
-  it("returns undefined when nothing saved", () => {
-    const { db, book } = setup();
+  it("returns undefined when nothing saved", async () => {
+    const { db, book } = await setup();
     expect(getProgress(db, book.id)).toBeUndefined();
   });
-  it("upserts locator", () => {
-    const { db, book } = setup();
+  it("upserts locator", async () => {
+    const { db, book } = await setup();
     saveProgress(db, book.id, "epubcfi(/6/2!/4/1:0)");
     expect(getProgress(db, book.id)?.locator).toBe("epubcfi(/6/2!/4/1:0)");
     saveProgress(db, book.id, "epubcfi(/6/4!/4/1:0)");

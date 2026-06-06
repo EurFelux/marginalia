@@ -47,6 +47,9 @@ importers:
       '@marginalia/epub-parser':
         specifier: workspace:*
         version: link:packages/epub-parser
+      '@marginalia/pdf-parser':
+        specifier: workspace:*
+        version: link:packages/pdf-parser
       '@marginalia/virtual-docs':
         specifier: workspace:*
         version: link:packages/virtual-docs

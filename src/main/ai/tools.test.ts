@@ -9,11 +9,11 @@ import { createReadingTools, resolveChapterRef, type LoadBytes } from "@main/ai/
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
 
-function setup() {
+async function setup() {
   const db = createDb(":memory:");
   runMigrations(db, MIGRATIONS);
   const bytes = makeFixtureEpub();
-  const book = importBook(db, { bytes });
+  const book = await importBook(db, { bytes });
   const loadBytes: LoadBytes = async () => bytes;
   const tools = createReadingTools({ db, bookId: book.id, loadBytes });
   const ch1 = resolveChapterByHref(db, book.id, "OEBPS/ch1.xhtml")!;
@@ -26,7 +26,7 @@ const opts = { toolCallId: "test", messages: [] } as never;
 
 describe("createReadingTools", () => {
   it("getToc returns chapters with ids and titles the read tools accept", async () => {
-    const { tools } = setup();
+    const { tools } = await setup();
     const toc = (await tools.getToc.execute!({}, opts)) as Array<{
       id: string;
       title: string | null;
@@ -38,7 +38,7 @@ describe("createReadingTools", () => {
   });
 
   it("readChapterText loads bytes via the port and returns verbatim text", async () => {
-    const { tools, ch1 } = setup();
+    const { tools, ch1 } = await setup();
     const slice = (await tools.readChapterText.execute!(
       { chapterId: ch1.id },
       opts,
@@ -48,7 +48,7 @@ describe("createReadingTools", () => {
   });
 
   it("readChapterText accepts an href (as getToc returns) for chapterId", async () => {
-    const { tools } = setup();
+    const { tools } = await setup();
     const slice = (await tools.readChapterText.execute!(
       { chapterId: "OEBPS/ch1.xhtml" },
       opts,
@@ -57,7 +57,7 @@ describe("createReadingTools", () => {
   });
 
   it("readChapterText forwards offset/maxChars for pagination", async () => {
-    const { tools, ch1 } = setup();
+    const { tools, ch1 } = await setup();
     const slice = (await tools.readChapterText.execute!(
       { chapterId: ch1.id, offset: 0, maxChars: 5 },
       opts,
@@ -68,7 +68,7 @@ describe("createReadingTools", () => {
   });
 
   it("getChapterSummary returns the cached summary state", async () => {
-    const { tools, ch1 } = setup();
+    const { tools, ch1 } = await setup();
     expect(await tools.getChapterSummary.execute!({ chapterId: ch1.id }, opts)).toEqual({
       status: "pending",
       summary: null,
@@ -76,35 +76,35 @@ describe("createReadingTools", () => {
   });
 
   it("readChapterText rejects on an unknown chapterId (error propagates to the agent loop)", async () => {
-    const { tools } = setup();
+    const { tools } = await setup();
     await expect(tools.readChapterText.execute!({ chapterId: "nope" }, opts)).rejects.toThrow(
       "not found",
     );
   });
 
   it("getChapterSummary rejects on an unknown chapterId", async () => {
-    const { tools } = setup();
+    const { tools } = await setup();
     await expect(tools.getChapterSummary.execute!({ chapterId: "nope" }, opts)).rejects.toThrow(
       "not found",
     );
   });
 
-  it("readChapterText inputSchema rejects an empty chapterId", () => {
-    const { tools } = setup();
+  it("readChapterText inputSchema rejects an empty chapterId", async () => {
+    const { tools } = await setup();
     const schema = tools.readChapterText.inputSchema as z.ZodType<unknown>;
     expect(schema.safeParse({ chapterId: "" }).success).toBe(false);
   });
 });
 
 describe("resolveChapterRef", () => {
-  it("returns a valid id unchanged and resolves an href to that id", () => {
-    const { db, book, ch1 } = setup();
+  it("returns a valid id unchanged and resolves an href to that id", async () => {
+    const { db, book, ch1 } = await setup();
     expect(resolveChapterRef(db, book.id, ch1.id)).toBe(ch1.id);
     expect(resolveChapterRef(db, book.id, "OEBPS/ch1.xhtml")).toBe(ch1.id);
   });
 
-  it("throws for a ref that is neither a known id nor href", () => {
-    const { db, book } = setup();
+  it("throws for a ref that is neither a known id nor href", async () => {
+    const { db, book } = await setup();
     expect(() => resolveChapterRef(db, book.id, "night_3")).toThrow(/not found/);
   });
 });

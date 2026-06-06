@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 import { parseEpub, type TocNode } from "@marginalia/epub-parser";
+import { parsePdf, renderPageImage } from "@marginalia/pdf-parser";
 import type { DB } from "@main/db/client";
 import { books, chapters } from "@main/db/schema";
 import { deleteBookFile } from "@main/library/book-files";
@@ -19,9 +20,31 @@ function tocLabelByHref(toc: TocNode[], acc = new Map<string, string>()): Map<st
   return acc;
 }
 
-export function importBook(db: DB, input: ImportInput): BookRow {
-  const parsed = parseEpub(input.bytes);
-  const id = parsed.uid ?? createHash("sha256").update(input.bytes).digest("hex");
+/** 魔数嗅探（不信文件后缀）：%PDF- → pdf；PK（zip 头）→ epub；其余诚实报错。 */
+export function detectFormat(bytes: Uint8Array): "epub" | "pdf" {
+  if (
+    bytes[0] === 0x25 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x44 &&
+    bytes[3] === 0x46 &&
+    bytes[4] === 0x2d
+  ) {
+    return "pdf";
+  }
+  if (bytes[0] === 0x50 && bytes[1] === 0x4b) return "epub";
+  throw new Error("not a supported book format (expected ePub or PDF)");
+}
+
+export async function importBook(db: DB, input: ImportInput): Promise<BookRow> {
+  return detectFormat(input.bytes) === "pdf"
+    ? importPdfBook(db, input.bytes)
+    : importEpubBook(db, input.bytes);
+}
+
+/** 原 importBook 函数体原样改名为 importEpubBook（保持同步实现；async 包装由 importBook 承担）。 */
+function importEpubBook(db: DB, bytes: Uint8Array): BookRow {
+  const parsed = parseEpub(bytes);
+  const id = parsed.uid ?? createHash("sha256").update(bytes).digest("hex");
 
   // 幂等：已在库则直接返回，不写入 books/chapters（零 DB churn）。注：parseEpub 在幂等检查前已执行（id 派生需要它）。
   // "显式刷新/重新导入"留后续里程碑（按 (book_id, href) 稳定 upsert 保 chapter id）。
@@ -53,6 +76,53 @@ export function importBook(db: DB, input: ImportInput): BookRow {
 
     const row = tx.select().from(books).where(eq(books.id, id)).get();
     if (!row) throw new Error("importBook: book row missing after insert");
+    return row;
+  });
+}
+
+async function importPdfBook(db: DB, bytes: Uint8Array): Promise<BookRow> {
+  const parsed = await parsePdf(bytes);
+  const id = createHash("sha256").update(bytes).digest("hex"); // PDF 无自然键，统一文件哈希
+
+  const existing = db.select().from(books).where(eq(books.id, id)).get();
+  if (existing) return existing;
+
+  // 封面 = 首页缩略图；渲染失败不阻塞导入（书库走兜底 tile）。
+  const cover = await renderPageImage(bytes, 1, { targetWidth: 600 }).catch((err: unknown) => {
+    console.warn("[library] pdf cover render failed:", err);
+    return null;
+  });
+
+  return db.transaction((tx) => {
+    tx.insert(books)
+      .values({
+        id,
+        title: parsed.title ?? null,
+        author: parsed.author ?? null,
+        cover: cover ? Buffer.from(cover) : null,
+        toc: parsed.toc,
+        format: "pdf",
+        pageCount: parsed.pageCount,
+        hasTextLayer: parsed.hasTextLayer,
+      })
+      .run();
+
+    parsed.chapterRanges.forEach((range, index) => {
+      tx.insert(chapters)
+        .values({
+          bookId: id,
+          href: `pdf-ch:${index}`,
+          orderIndex: index,
+          // 有 outline：toc 同序号的 label；单章退化：取书名（spec §2——避免 title:null 困惑模型）
+          title: parsed.toc[index]?.label ?? parsed.title ?? null,
+          startPage: range.startPage,
+          endPage: range.endPage,
+        })
+        .run();
+    });
+
+    const row = tx.select().from(books).where(eq(books.id, id)).get();
+    if (!row) throw new Error("importPdfBook: book row missing after insert");
     return row;
   });
 }

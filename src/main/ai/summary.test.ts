@@ -64,11 +64,11 @@ function streamModel(text: string) {
   });
 }
 
-function setup(model: ResolvedModel) {
+async function setup(model: ResolvedModel) {
   const db = createDb(":memory:");
   runMigrations(db, MIGRATIONS);
   const bytes = makeFixtureEpub();
-  const book = importBook(db, { bytes });
+  const book = await importBook(db, { bytes });
   const ch1 = resolveChapterByHref(db, book.id, "OEBPS/ch1.xhtml")!;
   const loadBytes: LoadBytes = async () => bytes;
   const deps: SummaryDeps = { db, loadBytes, resolveModel: () => model };
@@ -79,8 +79,8 @@ describe("ensureChapterSummary / getChapterSummaryView (derived status)", () => 
   // chapter.id 由 fixture 确定、跨用例相同 → 清进程内运行时集保证隔离。
   beforeEach(() => __resetChapterSummaryRuntime());
 
-  it("derives pending for a fresh chapter with no summary", () => {
-    const { db, book, ch1, deps: _deps } = setup({ ok: false, reason: "x" });
+  it("derives pending for a fresh chapter with no summary", async () => {
+    const { db, book, ch1, deps: _deps } = await setup({ ok: false, reason: "x" });
     void _deps;
     expect(getChapterSummaryView(db, book.id, ch1.id)).toEqual({
       status: "pending",
@@ -88,13 +88,13 @@ describe("ensureChapterSummary / getChapterSummaryView (derived status)", () => 
     });
   });
 
-  it("throws for an unknown chapterId", () => {
-    const { db, book } = setup({ ok: false, reason: "x" });
+  it("throws for an unknown chapterId", async () => {
+    const { db, book } = await setup({ ok: false, reason: "x" });
     expect(() => getChapterSummaryView(db, book.id, "nonexistent-id")).toThrow(/not found/);
   });
 
   it("generates and stores the summary, deriving ready", async () => {
-    const { db, book, ch1, deps } = setup({
+    const { db, book, ch1, deps } = await setup({
       ok: true,
       model: genModel("A concise summary."),
       modelId: "mock",
@@ -107,7 +107,11 @@ describe("ensureChapterSummary / getChapterSummaryView (derived status)", () => 
   });
 
   it("is a no-op when the summary already exists", async () => {
-    const { db, book, ch1, deps } = setup({ ok: true, model: genModel("new"), modelId: "mock" });
+    const { db, book, ch1, deps } = await setup({
+      ok: true,
+      model: genModel("new"),
+      modelId: "mock",
+    });
     db.update(chapters).set({ summary: "cached" }).where(eq(chapters.id, ch1.id)).run();
     await ensureChapterSummary(deps, book.id, ch1.id);
     expect(getChapterSummaryView(db, book.id, ch1.id).summary).toBe("cached"); // unchanged
@@ -119,13 +123,13 @@ describe("ensureChapterSummary / getChapterSummaryView (derived status)", () => 
         throw new Error("model exploded");
       },
     });
-    const { db, book, ch1, deps } = setup({ ok: true, model: failModel, modelId: "mock" });
+    const { db, book, ch1, deps } = await setup({ ok: true, model: failModel, modelId: "mock" });
     await ensureChapterSummary(deps, book.id, ch1.id);
     expect(getChapterSummaryView(db, book.id, ch1.id).status).toBe("unavailable");
   });
 
   it("stays pending when no model is configured", async () => {
-    const { db, book, ch1, deps } = setup({ ok: false, reason: "not configured" });
+    const { db, book, ch1, deps } = await setup({ ok: false, reason: "not configured" });
     await ensureChapterSummary(deps, book.id, ch1.id);
     expect(getChapterSummaryView(db, book.id, ch1.id).status).toBe("pending");
   });
@@ -136,7 +140,7 @@ describe("ensureChapterSummary / getChapterSummaryView (derived status)", () => 
         throw new Error("boom");
       },
     });
-    const { db, book, ch1, deps } = setup({ ok: true, model: failModel, modelId: "mock" });
+    const { db, book, ch1, deps } = await setup({ ok: true, model: failModel, modelId: "mock" });
     await ensureChapterSummary(deps, book.id, ch1.id);
     expect(getChapterSummaryView(db, book.id, ch1.id).status).toBe("unavailable");
     __resetChapterSummaryRuntime(); // 模拟重启：进程内集清空
@@ -146,7 +150,7 @@ describe("ensureChapterSummary / getChapterSummaryView (derived status)", () => 
   });
 
   it("does not store an empty generation; derives unavailable (retryable)", async () => {
-    const { db, book, ch1, deps } = setup({ ok: true, model: genModel(""), modelId: "mock" });
+    const { db, book, ch1, deps } = await setup({ ok: true, model: genModel(""), modelId: "mock" });
     await ensureChapterSummary(deps, book.id, ch1.id);
     const row = db
       .select({ summary: chapters.summary })
@@ -158,7 +162,7 @@ describe("ensureChapterSummary / getChapterSummaryView (derived status)", () => 
   });
 
   it("treats whitespace-only generation as empty (not stored)", async () => {
-    const { db, book, ch1, deps } = setup({
+    const { db, book, ch1, deps } = await setup({
       ok: true,
       model: genModel("  \n\t "),
       modelId: "mock",
@@ -170,8 +174,8 @@ describe("ensureChapterSummary / getChapterSummaryView (derived status)", () => 
     });
   });
 
-  it("derives pending for a stored empty summary (self-heals legacy bad rows on read)", () => {
-    const { db, book, ch1 } = setup({ ok: false, reason: "x" });
+  it("derives pending for a stored empty summary (self-heals legacy bad rows on read)", async () => {
+    const { db, book, ch1 } = await setup({ ok: false, reason: "x" });
     db.update(chapters).set({ summary: "" }).where(eq(chapters.id, ch1.id)).run();
     expect(getChapterSummaryView(db, book.id, ch1.id)).toEqual({
       status: "pending",
@@ -180,7 +184,11 @@ describe("ensureChapterSummary / getChapterSummaryView (derived status)", () => 
   });
 
   it("regenerates over a stored empty summary instead of skipping", async () => {
-    const { db, book, ch1, deps } = setup({ ok: true, model: genModel("fresh"), modelId: "mock" });
+    const { db, book, ch1, deps } = await setup({
+      ok: true,
+      model: genModel("fresh"),
+      modelId: "mock",
+    });
     db.update(chapters).set({ summary: "" }).where(eq(chapters.id, ch1.id)).run();
     await ensureChapterSummary(deps, book.id, ch1.id);
     expect(getChapterSummaryView(db, book.id, ch1.id)).toEqual({
@@ -190,7 +198,11 @@ describe("ensureChapterSummary / getChapterSummaryView (derived status)", () => 
   });
 
   it("force=true regenerates over an existing summary", async () => {
-    const { db, book, ch1, deps } = setup({ ok: true, model: genModel("fresh"), modelId: "mock" });
+    const { db, book, ch1, deps } = await setup({
+      ok: true,
+      model: genModel("fresh"),
+      modelId: "mock",
+    });
     db.update(chapters).set({ summary: "cached" }).where(eq(chapters.id, ch1.id)).run();
     await ensureChapterSummary(deps, book.id, ch1.id, true);
     expect(getChapterSummaryView(db, book.id, ch1.id).summary).toBe("fresh");
@@ -201,13 +213,13 @@ describe("ensureBookSummary / getBookSummaryView (derived status)", () => {
   // book.id 由 fixture 确定、跨用例相同 → 清进程内运行时集保证隔离。
   beforeEach(() => __resetBookSummaryRuntime());
 
-  it("derives pending for a fresh book with no summary", () => {
-    const { db, book } = setup({ ok: false, reason: "x" });
+  it("derives pending for a fresh book with no summary", async () => {
+    const { db, book } = await setup({ ok: false, reason: "x" });
     expect(getBookSummaryView(db, book.id)).toEqual({ status: "pending", summary: null });
   });
 
   it("streams and stores the whole-book summary, deriving ready", async () => {
-    const { db, book, deps } = setup({
+    const { db, book, deps } = await setup({
       ok: true,
       model: streamModel("Whole-book summary."),
       modelId: "mock",
@@ -220,14 +232,22 @@ describe("ensureBookSummary / getBookSummaryView (derived status)", () => {
   });
 
   it("is a no-op when the book summary already exists (force=false)", async () => {
-    const { db, book, deps } = setup({ ok: true, model: streamModel("new"), modelId: "mock" });
+    const { db, book, deps } = await setup({
+      ok: true,
+      model: streamModel("new"),
+      modelId: "mock",
+    });
     db.update(books).set({ summary: "cached" }).where(eq(books.id, book.id)).run();
     await ensureBookSummary(deps, book.id);
     expect(getBookSummaryView(db, book.id).summary).toBe("cached");
   });
 
   it("force=true regenerates over an existing summary", async () => {
-    const { db, book, deps } = setup({ ok: true, model: streamModel("fresh"), modelId: "mock" });
+    const { db, book, deps } = await setup({
+      ok: true,
+      model: streamModel("fresh"),
+      modelId: "mock",
+    });
     db.update(books).set({ summary: "old" }).where(eq(books.id, book.id)).run();
     await ensureBookSummary(deps, book.id, true);
     expect(getBookSummaryView(db, book.id).summary).toBe("fresh");
@@ -239,13 +259,13 @@ describe("ensureBookSummary / getBookSummaryView (derived status)", () => {
         throw new Error("stream boom");
       },
     });
-    const { db, book, deps } = setup({ ok: true, model: failModel, modelId: "mock" });
+    const { db, book, deps } = await setup({ ok: true, model: failModel, modelId: "mock" });
     await ensureBookSummary(deps, book.id);
     expect(getBookSummaryView(db, book.id).status).toBe("unavailable");
   });
 
   it("stays pending (no write) when no model is configured", async () => {
-    const { db, book, deps } = setup({ ok: false, reason: "not configured" });
+    const { db, book, deps } = await setup({ ok: false, reason: "not configured" });
     await ensureBookSummary(deps, book.id);
     expect(getBookSummaryView(db, book.id)).toEqual({ status: "pending", summary: null });
   });
@@ -256,7 +276,7 @@ describe("ensureBookSummary / getBookSummaryView (derived status)", () => {
         throw new Error("boom");
       },
     });
-    const { db, book, deps } = setup({ ok: true, model: failModel, modelId: "mock" });
+    const { db, book, deps } = await setup({ ok: true, model: failModel, modelId: "mock" });
     await ensureBookSummary(deps, book.id);
     expect(getBookSummaryView(db, book.id).status).toBe("unavailable");
     __resetBookSummaryRuntime(); // 模拟重启：进程内集清空
@@ -266,7 +286,7 @@ describe("ensureBookSummary / getBookSummaryView (derived status)", () => {
   });
 
   it("does not store an empty stream output (forced regen keeps old summary, derives ready)", async () => {
-    const { db, book, deps } = setup({ ok: true, model: streamModel(""), modelId: "mock" });
+    const { db, book, deps } = await setup({ ok: true, model: streamModel(""), modelId: "mock" });
     db.update(books).set({ summary: "old" }).where(eq(books.id, book.id)).run();
     await ensureBookSummary(deps, book.id, true);
     // 空产出不覆盖旧摘要；旧摘要仍有效 → 派生 ready（与 stream error 保留旧摘要的语义一致）
@@ -274,13 +294,13 @@ describe("ensureBookSummary / getBookSummaryView (derived status)", () => {
   });
 
   it("does not store an empty stream output; derives unavailable when no old summary exists", async () => {
-    const { db, book, deps } = setup({ ok: true, model: streamModel(""), modelId: "mock" });
+    const { db, book, deps } = await setup({ ok: true, model: streamModel(""), modelId: "mock" });
     await ensureBookSummary(deps, book.id);
     expect(getBookSummaryView(db, book.id)).toEqual({ status: "unavailable", summary: null });
   });
 
-  it("derives pending for a stored empty book summary (self-heals legacy bad rows on read)", () => {
-    const { db, book } = setup({ ok: false, reason: "x" });
+  it("derives pending for a stored empty book summary (self-heals legacy bad rows on read)", async () => {
+    const { db, book } = await setup({ ok: false, reason: "x" });
     db.update(books).set({ summary: "" }).where(eq(books.id, book.id)).run();
     expect(getBookSummaryView(db, book.id)).toEqual({ status: "pending", summary: null });
   });
@@ -295,8 +315,8 @@ describe("assertSummaryModelReady", () => {
     );
   });
 
-  it("is a no-op when the model resolves", () => {
-    const { deps } = setup({ ok: true, model: genModel("s"), modelId: "mock" });
+  it("is a no-op when the model resolves", async () => {
+    const { deps } = await setup({ ok: true, model: genModel("s"), modelId: "mock" });
     expect(() => assertSummaryModelReady(deps.resolveModel)).not.toThrow();
   });
 });

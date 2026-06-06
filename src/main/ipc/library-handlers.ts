@@ -38,10 +38,10 @@ const toDto = (b: {
 export const libraryBindings: Binding[] = [
   bind(C.libraryImport, async (input) => {
     const buf = await readFile(input.filePath).catch((err: NodeJS.ErrnoException) => {
-      throw new Error(`Cannot read epub file at "${input.filePath}": ${err.code ?? err.message}`);
+      throw new Error(`Cannot read book file at "${input.filePath}": ${err.code ?? err.message}`);
     });
     const bytes = new Uint8Array(buf);
-    const book = importBook(getDb(), { bytes });
+    const book = await importBook(getDb(), { bytes });
     await writeBookFile(getBooksDir(), book.id, book.format, bytes); // 复制进 app 自有位置（relink/重导即覆盖）
     return toDto({ ...book, hasCover: book.cover != null && book.cover.length > 0 });
   }),

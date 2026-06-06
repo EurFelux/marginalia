@@ -88,14 +88,14 @@ function tocThenTextModel(text: string) {
   });
 }
 
-function setup(
+async function setup(
   model: ResolvedModel,
   summaryModel: ResolvedModel = { ok: false, reason: "summary model unset" },
 ) {
   const db = createDb(":memory:");
   runMigrations(db, MIGRATIONS);
   const bytes = makeFixtureEpub();
-  const book = importBook(db, { bytes });
+  const book = await importBook(db, { bytes });
   const loadBytes: LoadBytes = async () => bytes;
   const deps: SendDeps = {
     db,
@@ -112,7 +112,7 @@ function freshDb() {
   return db;
 }
 
-function seedBook(db: ReturnType<typeof freshDb>) {
+async function seedBook(db: ReturnType<typeof freshDb>) {
   const bytes = makeFixtureEpub();
   return importBook(db, { bytes });
 }
@@ -140,9 +140,9 @@ function input(bookId: string, conversationId: string, over: Partial<SendInput> 
 }
 
 describe("runSend conversation validation", () => {
-  it("rejects unknown conversationId without writing anything", () => {
+  it("rejects unknown conversationId without writing anything", async () => {
     const db = freshDb();
-    seedBook(db);
+    await seedBook(db);
     const result = runSend(makeDeps(db), {
       bookId: "book-1",
       conversationId: "nope",
@@ -153,10 +153,10 @@ describe("runSend conversation validation", () => {
     expect(result.ok).toBe(false);
   });
 
-  it("rejects a conversation belonging to another book", () => {
+  it("rejects a conversation belonging to another book", async () => {
     const db = freshDb();
-    const book1 = seedBook(db);
-    const book2 = importBook(db, {
+    const book1 = await seedBook(db);
+    const book2 = await importBook(db, {
       bytes: makeFixtureEpub({ identifier: "urn:uuid:other-book" }),
     });
     const other = createConversation(db, { bookId: book2.id });
@@ -173,8 +173,8 @@ describe("runSend conversation validation", () => {
 describe("runSend", () => {
   beforeEach(() => __resetNamingRuntime());
 
-  it("returns an error and creates nothing when no model is configured", () => {
-    const { db, book, deps } = setup({ ok: false, reason: "not configured" });
+  it("returns an error and creates nothing when no model is configured", async () => {
+    const { db, book, deps } = await setup({ ok: false, reason: "not configured" });
     const convo = createConversation(db, { bookId: book.id });
     const r = runSend(deps, input(book.id, convo.id));
     expect(r.ok).toBe(false);
@@ -182,7 +182,7 @@ describe("runSend", () => {
   });
 
   it("persists the user message with a chip snapshot and the streamed assistant message", async () => {
-    const { db, book, deps } = setup({
+    const { db, book, deps } = await setup({
       ok: true,
       model: textStreamModel("It means hello."),
       modelId: "mock",
@@ -209,7 +209,7 @@ describe("runSend", () => {
   });
 
   it("runs the tool-calling agent loop and persists tool parts in the assistant message", async () => {
-    const { db, book, deps } = setup({
+    const { db, book, deps } = await setup({
       ok: true,
       model: tocThenTextModel("Done."),
       modelId: "mock",
@@ -233,7 +233,7 @@ describe("runSend", () => {
         throw new Error("stream boom");
       },
     });
-    const { db, book, deps } = setup({ ok: true, model: failModel, modelId: "mock" });
+    const { db, book, deps } = await setup({ ok: true, model: failModel, modelId: "mock" });
     const convo = createConversation(db, { bookId: book.id });
     const r = runSend(deps, input(book.id, convo.id));
     expect(r.ok).toBe(true);
@@ -248,7 +248,7 @@ describe("runSend", () => {
 
   it("forwards a non-aborted signal without breaking the normal persist path", async () => {
     const controller = new AbortController();
-    const { db, book, deps } = setup({
+    const { db, book, deps } = await setup({
       ok: true,
       model: textStreamModel("hello"),
       modelId: "mock",
@@ -278,7 +278,7 @@ describe("runSend", () => {
         }),
       }),
     });
-    const { db, book, deps } = setup({ ok: true, model: slowModel, modelId: "mock" });
+    const { db, book, deps } = await setup({ ok: true, model: slowModel, modelId: "mock" });
     const convo = createConversation(db, { bookId: book.id });
     const r = runSend(deps, input(book.id, convo.id), { abortSignal: controller.signal });
     expect(r.ok).toBe(true);
@@ -290,7 +290,7 @@ describe("runSend", () => {
   });
 
   it("omits the paragraph chip from the snapshot when it duplicates the conversation's last", async () => {
-    const { db, book, deps } = setup({
+    const { db, book, deps } = await setup({
       ok: true,
       model: textStreamModel("ok"),
       modelId: "mock",
@@ -324,7 +324,7 @@ describe("runSend", () => {
   });
 
   it("auto-names the conversation after the first completed turn", async () => {
-    const { db, book, deps } = setup(
+    const { db, book, deps } = await setup(
       { ok: true, model: textStreamModel("It means hello."), modelId: "mock" },
       { ok: true, model: namingOnlyModel("AI 标题"), modelId: "summary-model" },
     );
@@ -337,7 +337,7 @@ describe("runSend", () => {
   });
 
   it("does not rename a conversation that already has a title", async () => {
-    const { db, book, deps } = setup(
+    const { db, book, deps } = await setup(
       { ok: true, model: textStreamModel("answer"), modelId: "mock" },
       { ok: true, model: namingOnlyModel("AI 名"), modelId: "summary-model" },
     );
@@ -351,7 +351,7 @@ describe("runSend", () => {
   });
 
   it("skips naming when the summary model is unconfigured; chat still completes", async () => {
-    const { db, book, deps } = setup(
+    const { db, book, deps } = await setup(
       { ok: true, model: textStreamModel("It means hello."), modelId: "mock" },
       { ok: false, reason: "unset" },
     );
