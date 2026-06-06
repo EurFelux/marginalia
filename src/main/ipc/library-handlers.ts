@@ -128,7 +128,7 @@ export const libraryBindings: Binding[] = [
     const book = getBook(db, input.bookId);
     if (!book) throw new Error(`content: book ${input.bookId} not found`);
     // readEpubFile 缺失即抛 EpubFileMissingError（message 已含 bookId），其他 OS 错误原样透传——
-    // 不再包一层「可能缺失/重新导入」的笼统文案（对非缺失错误属编造），与 readEpubBytes handler 一致。
+    // 不再包一层「可能缺失/重新导入」的笼统文案（对非缺失错误属编造），与 readBookBytes handler 一致。
     const bytes = await readEpubFile(getBooksDir(), input.bookId);
     return readChapterText(db, bytes, input.bookId, input.chapterId, {
       offset: input.offset,
