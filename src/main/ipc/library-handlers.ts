@@ -1,3 +1,4 @@
+import path from "node:path";
 import { readFile } from "node:fs/promises";
 import { BrowserWindow, dialog } from "electron";
 import { C } from "@shared/ipc";
@@ -41,7 +42,7 @@ export const libraryBindings: Binding[] = [
       throw new Error(`Cannot read book file at "${input.filePath}": ${err.code ?? err.message}`);
     });
     const bytes = new Uint8Array(buf);
-    const book = await importBook(getDb(), { bytes });
+    const book = await importBook(getDb(), { bytes, fileName: path.basename(input.filePath) });
     await writeBookFile(getBooksDir(), book.id, book.format, bytes); // 复制进 app 自有位置（relink/重导即覆盖）
     return toDto({ ...book, hasCover: book.cover != null && book.cover.length > 0 });
   }),

@@ -8,6 +8,8 @@ import { deleteBookFile } from "@main/library/book-files";
 
 export interface ImportInput {
   bytes: Uint8Array;
+  /** 原始文件名（不含路径）。PDF 元数据缺 Title 时回退为书名（去扩展名）。 */
+  fileName?: string;
 }
 export type BookRow = typeof books.$inferSelect;
 export type ChapterRow = typeof chapters.$inferSelect;
@@ -37,7 +39,7 @@ export function detectFormat(bytes: Uint8Array): "epub" | "pdf" {
 
 export async function importBook(db: DB, input: ImportInput): Promise<BookRow> {
   return detectFormat(input.bytes) === "pdf"
-    ? importPdfBook(db, input.bytes)
+    ? importPdfBook(db, input.bytes, input.fileName)
     : importEpubBook(db, input.bytes);
 }
 
@@ -80,7 +82,7 @@ function importEpubBook(db: DB, bytes: Uint8Array): BookRow {
   });
 }
 
-async function importPdfBook(db: DB, bytes: Uint8Array): Promise<BookRow> {
+async function importPdfBook(db: DB, bytes: Uint8Array, fileName?: string): Promise<BookRow> {
   const parsed = await parsePdf(bytes);
   const id = createHash("sha256").update(bytes).digest("hex"); // PDF 无自然键，统一文件哈希
 
@@ -93,11 +95,15 @@ async function importPdfBook(db: DB, bytes: Uint8Array): Promise<BookRow> {
     return null;
   });
 
+  // PDF 元数据缺 Title 时回退文件名（去扩展名）；trim 后为空串视同缺失。
+  const fallbackTitle = fileName?.replace(/\.[^.]+$/, "").trim() || undefined;
+  const title = parsed.title ?? fallbackTitle ?? null;
+
   return db.transaction((tx) => {
     tx.insert(books)
       .values({
         id,
-        title: parsed.title ?? null,
+        title,
         author: parsed.author ?? null,
         cover: cover ? Buffer.from(cover) : null,
         toc: parsed.toc,
@@ -114,7 +120,7 @@ async function importPdfBook(db: DB, bytes: Uint8Array): Promise<BookRow> {
           href: `pdf-ch:${index}`,
           orderIndex: index,
           // 有 outline：toc 同序号的 label；单章退化：取书名（spec §2——避免 title:null 困惑模型）
-          title: parsed.toc[index]?.label ?? parsed.title ?? null,
+          title: parsed.toc[index]?.label ?? title,
           startPage: range.startPage,
           endPage: range.endPage,
         })

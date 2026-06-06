@@ -255,4 +255,21 @@ describe("importBook (pdf)", () => {
     expect(book.cover).toBeNull();
     expect(listBooks(db)).toHaveLength(1); // 导入不被封面失败阻塞
   });
+
+  it("falls back to the file name (sans extension) when pdf metadata has no title", async () => {
+    const db = freshDb();
+    const bytes = await makeTextPdf({ outline: false }); // 不带 title 选项 → 元数据无 Title
+    const book = await importBook(db, { bytes, fileName: "深入浅出统计学.pdf" });
+    expect(book.title).toBe("深入浅出统计学");
+    // 单章退化的章节 title 兜底也应用同一回退值
+    const chs = db.select().from(chapters).where(eq(chapters.bookId, book.id)).all();
+    expect(chs[0]!.title).toBe("深入浅出统计学");
+  });
+
+  it("metadata title wins over the file name", async () => {
+    const db = freshDb();
+    const bytes = await makeTextPdf({ outline: false, title: "Real Title" });
+    const book = await importBook(db, { bytes, fileName: "whatever.pdf" });
+    expect(book.title).toBe("Real Title");
+  });
 });
