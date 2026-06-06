@@ -11,7 +11,14 @@ const TEXT_LAYER_SAMPLE_PAGES = 8;
  * 故一律传副本；isEvalSupported:false 关掉字体代码 eval（沙箱友好）。
  */
 export async function openPdf(bytes: Uint8Array): Promise<PDFDocumentProxy> {
-  return getDocument({ data: bytes.slice() }).promise;
+  const task = getDocument({ data: bytes.slice() });
+  try {
+    return await task.promise;
+  } catch (err) {
+    // promise reject 时 task（含 worker）不会自清——必须显式 destroy，否则 worker 泄漏。
+    await task.destroy();
+    throw err;
+  }
 }
 
 /** 单页纯文本：items.str 拼接，hasEOL 处换行。 */
@@ -48,7 +55,8 @@ async function flattenOutline(doc: PDFDocumentProxy): Promise<FlatOutlineEntry[]
       if (ref != null) {
         try {
           const pageIndex = await doc.getPageIndex(ref);
-          if (item.title) flat.push({ title: item.title, pageIndex });
+          const title = item.title?.trim();
+          if (title) flat.push({ title, pageIndex });
         } catch {
           // dest 指向不存在的页（畸形书）：跳过该条目，不让整书导入失败。
         }
@@ -85,8 +93,9 @@ export async function parsePdf(bytes: Uint8Array): Promise<ParsedPdf> {
       toc = flat.map((e, i) => ({ label: e.title, href: `pdf-ch:${i}` }));
       chapterRanges = flat.map((e, i) => ({
         startPage: e.pageIndex + 1,
-        // endPage = 下一章起始页 − 1（= 0-based 下一章起点的 1-based 值 − 1 = flat[i+1].pageIndex）；
-        // 末章到 pageCount；同页起章时至少含本章起始页（Math.max 兜底）。
+        // endPage = 下一章起始页 − 1（= flat[i+1].pageIndex 的 1-based 前一页）；末章到 pageCount。
+        // 同页起章（两个 outline 项指向同一页）时 Math.max 保证本章至少含起始页——
+        // 刻意允许与下一章重叠一页，空章节对摘要/阅读毫无意义。
         endPage:
           i + 1 < flat.length ? Math.max(e.pageIndex + 1, flat[i + 1]!.pageIndex) : pageCount,
       }));

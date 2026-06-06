@@ -1,4 +1,4 @@
-import { PDFDocument, PDFHexString, PDFName, StandardFonts } from "pdf-lib";
+import { PDFDocument, PDFHexString, PDFName, PDFObject, StandardFonts } from "pdf-lib";
 
 /** 每页正文模板：page N 的文本（fixture 断言用，足够长以通过文本层检测阈值）。 */
 export function fixturePageText(page: number): string {
@@ -11,6 +11,10 @@ interface TextPdfOptions {
   title?: string;
   author?: string;
   pages?: number; // 默认 3
+  /** 测试用：第二个 outline 条目的 Dest 指向未注册的 ref（坏 dest，应被解析端跳过）。 */
+  brokenDest?: boolean;
+  /** 测试用：两个 outline 条目都指向第 1 页（同页起章）。 */
+  samePageChapters?: boolean;
 }
 
 /**
@@ -34,18 +38,20 @@ export async function makeTextPdf(opts: TextPdfOptions): Promise<Uint8Array> {
     const pageRefs = doc.getPages().map((p) => p.ref);
     const entries = [
       { title: "Chapter One", pageIndex: 0 },
-      { title: "Chapter Two", pageIndex: 2 },
+      { title: "Chapter Two", pageIndex: opts.samePageChapters ? 0 : 2 },
     ];
     const outlinesRef = ctx.nextRef();
     const itemRefs = entries.map(() => ctx.nextRef());
     entries.forEach((e, i) => {
-      const item: Record<string, unknown> = {
+      const destTarget = opts.brokenDest && i === 1 ? ctx.nextRef() : pageRefs[e.pageIndex]!;
+      const dest = ctx.obj([destTarget, PDFName.of("XYZ"), null, null, null]);
+      const item: Record<string, PDFObject> = {
         Title: PDFHexString.fromText(e.title),
         Parent: outlinesRef,
-        Dest: [pageRefs[e.pageIndex]!, PDFName.of("XYZ"), null, null, null],
+        Dest: dest,
       };
-      if (i > 0) item.Prev = itemRefs[i - 1];
-      if (i < entries.length - 1) item.Next = itemRefs[i + 1];
+      if (i > 0) item.Prev = itemRefs[i - 1]!;
+      if (i < entries.length - 1) item.Next = itemRefs[i + 1]!;
       ctx.assign(itemRefs[i]!, ctx.obj(item));
     });
     ctx.assign(

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { makeScannedPdf, makeTextPdf } from "./fixture";
-import { parsePdf } from "./parse";
+import { openPdf, pageText, parsePdf } from "./parse";
 
 describe("parsePdf", () => {
   it("reads metadata, pageCount and detects text layer", async () => {
@@ -37,5 +37,40 @@ describe("parsePdf", () => {
     const bytes = await makeScannedPdf();
     const parsed = await parsePdf(bytes);
     expect(parsed.hasTextLayer).toBe(false);
+  });
+
+  it("returns undefined title/author when metadata absent", async () => {
+    const parsed = await parsePdf(await makeTextPdf({ outline: false }));
+    expect(parsed.title).toBeUndefined();
+    expect(parsed.author).toBeUndefined();
+  });
+
+  it("pageText extracts a single page's text", async () => {
+    const doc = await openPdf(await makeTextPdf({ outline: false }));
+    try {
+      const text = await pageText(doc, 2);
+      expect(text).toContain("body text of page 2");
+      expect(text).not.toContain("page 1");
+    } finally {
+      await doc.cleanup();
+      await doc.loadingTask.destroy();
+    }
+  });
+
+  it("skips outline entries whose dest is broken", async () => {
+    const bytes = await makeTextPdf({ outline: true, brokenDest: true });
+    const parsed = await parsePdf(bytes);
+    // 坏 dest 条目被跳过，只剩好的那条
+    expect(parsed.toc).toEqual([{ label: "Chapter One", href: "pdf-ch:0" }]);
+    expect(parsed.chapterRanges).toEqual([{ startPage: 1, endPage: 3 }]);
+  });
+
+  it("keeps at least the start page for same-page adjacent chapters (deliberate one-page overlap)", async () => {
+    const bytes = await makeTextPdf({ outline: true, samePageChapters: true });
+    const parsed = await parsePdf(bytes);
+    expect(parsed.chapterRanges).toEqual([
+      { startPage: 1, endPage: 1 },
+      { startPage: 1, endPage: 3 },
+    ]);
   });
 });
