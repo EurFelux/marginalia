@@ -61,7 +61,7 @@ export function createReadingTools(deps: ReadingToolsDeps) {
       execute: async ({ chapterId, offset, maxChars }) => {
         const id = resolveChapterRef(db, bookId, chapterId);
         const bytes = await loadBytes(bookId);
-        return readChapterText(db, bytes, bookId, id, { offset, maxChars });
+        return await readChapterText(db, bytes, bookId, id, { offset, maxChars });
       },
     }),
   };

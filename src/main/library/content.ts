@@ -1,10 +1,12 @@
 import { and, asc, eq } from "drizzle-orm";
 import { extractBookText, extractChapterText, type ReadOptions } from "@marginalia/epub-parser";
+import { extractPdfText } from "@marginalia/pdf-parser";
 import type { DB } from "@main/db/client";
 import { books, chapters } from "@main/db/schema";
-import { resolveChapterByHref } from "@main/library/repository";
+import { getBook, resolveChapterByHref } from "@main/library/repository";
 import { tocNodeSchema, type TocNode } from "@shared/types";
 import type { ChapterRefDto, ChapterTextSlice } from "@shared/library";
+import { t } from "@main/i18n";
 
 export function getToc(db: DB, bookId: string): TocNode[] {
   const row = db.select({ toc: books.toc }).from(books).where(eq(books.id, bookId)).get();
@@ -15,19 +17,29 @@ export function getToc(db: DB, bookId: string): TocNode[] {
   return (row?.toc ?? []).filter((n) => tocNodeSchema.safeParse(n).success);
 }
 
-export function readChapterText(
+export async function readChapterText(
   db: DB,
   bytes: Uint8Array,
   bookId: string,
   chapterId: string,
   opts: ReadOptions,
-): ChapterTextSlice {
+): Promise<ChapterTextSlice> {
+  const book = getBook(db, bookId);
+  if (!book) throw new Error(`content: book ${bookId} not found`);
   const ch = db
-    .select({ href: chapters.href })
+    .select({ href: chapters.href, startPage: chapters.startPage, endPage: chapters.endPage })
     .from(chapters)
     .where(and(eq(chapters.bookId, bookId), eq(chapters.id, chapterId)))
     .get();
   if (!ch) throw new Error(`content: chapter ${chapterId} not found in book ${bookId}`);
+  if (book.format === "pdf") {
+    return extractPdfText(bytes, {
+      startPage: ch.startPage ?? 1,
+      endPage: ch.endPage ?? book.pageCount ?? 1,
+      offset: opts.offset,
+      maxChars: opts.maxChars,
+    });
+  }
   return extractChapterText(bytes, ch.href, opts);
 }
 
@@ -36,12 +48,21 @@ export function readChapterText(
  * 供全书摘要一次性喂模型（用户决策「直接喂整本书」）。委托 `extractBookText`——**只解压一次**
  * （逐章 extractChapterText 会每次全解压 epub，N 章 = N 次、同步阻塞主进程，导致重新生成时 app 卡死）。
  */
-export function readBookText(
+export async function readBookText(
   db: DB,
   bytes: Uint8Array,
   bookId: string,
   opts: { maxChars: number },
-): { text: string; truncated: boolean } {
+): Promise<{ text: string; truncated: boolean }> {
+  const book = getBook(db, bookId);
+  if (book?.format === "pdf") {
+    const slice = await extractPdfText(bytes, {
+      startPage: 1,
+      endPage: book.pageCount ?? 1,
+      maxChars: opts.maxChars,
+    });
+    return { text: slice.text, truncated: slice.hasMore };
+  }
   const hrefs = db
     .select({ href: chapters.href })
     .from(chapters)
@@ -50,6 +71,16 @@ export function readBookText(
     .all()
     .map((r) => r.href);
   return extractBookText(bytes, hrefs, opts);
+}
+
+/**
+ * 扫描版门控（spec §8 主进程防御层）：无文本层的书绝不静默生成空摘要。
+ */
+export function assertTextLayer(db: DB, bookId: string): void {
+  const book = getBook(db, bookId);
+  if (book && !book.hasTextLayer) {
+    throw new Error(t("errors.noTextLayer", "扫描版 PDF 没有文本层，无法提取文本生成摘要"));
+  }
 }
 
 /**

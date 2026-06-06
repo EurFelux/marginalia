@@ -100,7 +100,7 @@ export async function ensureChapterSummary(
     inFlightChapters.add(chapterId); // 同步前缀：使 generate handler 即时派生 generating
     claimed = true;
     const bytes = await loadBytes(bookId);
-    const slice = readChapterText(db, bytes, bookId, chapterId, {
+    const slice = await readChapterText(db, bytes, bookId, chapterId, {
       maxChars: SUMMARY_INPUT_MAX_CHARS,
     });
     const { text } = await generateText({
@@ -190,7 +190,9 @@ export async function ensureBookSummary(
     inFlightBooks.add(bookId); // 同步前缀：使 generate handler 即时派生出 generating
     claimed = true;
     const bytes = await loadBytes(bookId);
-    const { text } = readBookText(db, bytes, bookId, { maxChars: BOOK_SUMMARY_INPUT_MAX_CHARS });
+    const { text } = await readBookText(db, bytes, bookId, {
+      maxChars: BOOK_SUMMARY_INPUT_MAX_CHARS,
+    });
     // streamText 遇错发 error chunk 并正常关流（textStream 不 throw），故用 onError 标志兜——否则会把半截落库。
     let hadError = false;
     const result = streamText({

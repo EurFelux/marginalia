@@ -6,7 +6,7 @@ import { getBooksDir, getDb } from "@main/db/instance";
 import { deleteBook, getBook, importBook, listBooks } from "@main/library/repository";
 import { readBookFile, writeBookFile } from "@main/library/book-files";
 import { getProgress, saveProgress } from "@main/library/progress";
-import { getToc, listChapters, readChapterText } from "@main/library/content";
+import { assertTextLayer, getToc, listChapters, readChapterText } from "@main/library/content";
 import {
   assertSummaryModelReady,
   ensureBookSummary,
@@ -107,6 +107,7 @@ export const libraryBindings: Binding[] = [
     const db = getDb();
     const deps = makeSummaryDeps();
     assertSummaryModelReady(deps.resolveModel);
+    assertTextLayer(db, input.bookId);
     void ensureChapterSummary(deps, input.bookId, input.chapterId, input.force ?? false).catch(
       (err) => console.warn("[content] generate chapter summary failed:", err),
     );
@@ -120,6 +121,7 @@ export const libraryBindings: Binding[] = [
     const db = getDb();
     const deps = makeSummaryDeps();
     assertSummaryModelReady(deps.resolveModel); // 模型未配置 → reject 带 reason（书卡 toast 透传）
+    assertTextLayer(db, input.bookId);
     // force=true：书卡「生成/重新生成」总是（重）生成，覆盖旧摘要。
     void ensureBookSummary(deps, input.bookId, true).catch((err) =>
       console.warn("[content] generate book summary failed:", err),
@@ -134,7 +136,7 @@ export const libraryBindings: Binding[] = [
     // readBookFile 缺失即抛 BookFileMissingError（message 已含 bookId），其他 OS 错误原样透传——
     // 不再包一层「可能缺失/重新导入」的笼统文案（对非缺失错误属编造），与 readBookBytes handler 一致。
     const bytes = await readBookFile(getBooksDir(), input.bookId, book.format);
-    return readChapterText(db, bytes, input.bookId, input.chapterId, {
+    return await readChapterText(db, bytes, input.bookId, input.chapterId, {
       offset: input.offset,
       maxChars: input.maxChars,
     });
