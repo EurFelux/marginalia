@@ -127,14 +127,15 @@ export function ReaderView() {
                 <span className="truncate">{breadcrumb}</span>
               </div>
             )}
-            {book.data?.hasTextLayer !== false && (
+            {/* !isPending：book 未就绪时不渲染，避免扫描版开书的「先现后隐」布局抖动 */}
+            {!book.isPending && book.data?.hasTextLayer !== false && (
               <div className="hidden shrink-0 sm:block">
                 <SummaryPill />
               </div>
             )}
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            {book.data?.format !== "pdf" && <ReaderPrefs />}
+            {!book.isPending && book.data?.format !== "pdf" && <ReaderPrefs />}
             <Tooltip>
               <TooltipTrigger
                 render={

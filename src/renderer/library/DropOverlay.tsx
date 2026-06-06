@@ -31,10 +31,10 @@ export function DropOverlay({
         <p className="text-xl font-medium">
           {active
             ? t("library.dropActive", "松手即导入")
-            : t("library.dropHint", "拖放 ePub 到此导入")}
+            : t("library.dropHint", "拖放 ePub / PDF 到此导入")}
         </p>
         <p className="text-sm opacity-70">
-          {t("library.dropSubhint", "支持一次拖入多本，非 ePub 会被忽略")}
+          {t("library.dropSubhint", "支持一次拖入多本，不支持的文件会被忽略")}
         </p>
       </div>
     </div>

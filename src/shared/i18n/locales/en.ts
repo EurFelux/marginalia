@@ -78,8 +78,8 @@ export default {
   "library.deleted": "Deleted “{{title}}”",
   "library.deleteFailed": "{{title}} failed to delete: {{error}}",
   "library.dropActive": "Release to import",
-  "library.dropHint": "Drop ePub here to import",
-  "library.dropSubhint": "Drop multiple at once; non-ePub files are ignored",
+  "library.dropHint": "Drop ePub / PDF here to import",
+  "library.dropSubhint": "Drop multiple at once; unsupported files are ignored",
   "library.duplicate_one": "{{count}} book already in library",
   "library.duplicate_other": "{{count}} books already in library",
   "library.empty":
