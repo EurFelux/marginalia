@@ -1,9 +1,19 @@
+import path from "node:path";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { createDb, runMigrations } from "@main/db/client";
 import { createLoadBytes } from "@main/ai/send-deps";
-import { storedEpubPath } from "@main/library/book-files";
+import { importBook } from "@main/library/repository";
+import { storedBookPath } from "@main/library/book-files";
+import { makeFixtureEpub } from "@marginalia/epub-parser";
+
+const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
+const freshDb = () => {
+  const db = createDb(":memory:");
+  runMigrations(db, MIGRATIONS);
+  return db;
+};
 
 describe("createLoadBytes", () => {
   let dir: string;
@@ -14,20 +24,30 @@ describe("createLoadBytes", () => {
     await rm(dir, { recursive: true, force: true });
   });
 
-  it("reads bytes for a book whose epub file exists", async () => {
-    const bookId = "known-book";
+  it("reads bytes for a book whose file exists", async () => {
+    const db = freshDb();
+    const book = importBook(db, { bytes: makeFixtureEpub() });
     const expectedBytes = new Uint8Array([1, 2, 3]);
-    await writeFile(storedEpubPath(dir, bookId), expectedBytes);
+    await writeFile(storedBookPath(dir, book.id, book.format), expectedBytes);
 
-    const loadBytes = createLoadBytes(dir);
-    const bytes = await loadBytes(bookId);
+    const loadBytes = createLoadBytes(dir, db);
+    const bytes = await loadBytes(book.id);
     expect(bytes).toBeInstanceOf(Uint8Array);
     expect(Array.from(bytes)).toEqual([1, 2, 3]);
   });
 
-  it("throws EpubFileMissingError for a book whose epub file is absent", async () => {
-    const loadBytes = createLoadBytes(dir);
-    const { EpubFileMissingError } = await import("@main/library/book-files");
-    await expect(loadBytes("missing")).rejects.toBeInstanceOf(EpubFileMissingError);
+  it("throws BookFileMissingError for a book whose file is absent", async () => {
+    const db = freshDb();
+    const book = importBook(db, { bytes: makeFixtureEpub() });
+    // 书行存在但文件未写入
+    const loadBytes = createLoadBytes(dir, db);
+    const { BookFileMissingError } = await import("@main/library/book-files");
+    await expect(loadBytes(book.id)).rejects.toBeInstanceOf(BookFileMissingError);
+  });
+
+  it("throws when the book does not exist in DB", () => {
+    const db = freshDb();
+    const loadBytes = createLoadBytes(dir, db);
+    expect(() => loadBytes("nonexistent-id")).toThrow("not found");
   });
 });

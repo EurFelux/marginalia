@@ -20,7 +20,7 @@ import {
   listBooks,
   resolveChapterByHref,
 } from "@main/library/repository";
-import { storedEpubPath } from "@main/library/book-files";
+import { storedBookPath } from "@main/library/book-files";
 import { makeFixtureEpub } from "@marginalia/epub-parser";
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
@@ -119,13 +119,13 @@ describe("library repository", () => {
     const booksDir = await mkdtemp(path.join(tmpdir(), "marginalia-del-"));
     try {
       const book = importBook(db, { bytes: makeFixtureEpub() });
-      await writeFile(storedEpubPath(booksDir, book.id), new Uint8Array([1]));
+      await writeFile(storedBookPath(booksDir, book.id, book.format), new Uint8Array([1]));
 
       await deleteBook(db, booksDir, book.id);
 
       expect(listBooks(db)).toHaveLength(0);
       expect(db.select().from(chapters).all()).toHaveLength(0); // 级联
-      await expect(readFile(storedEpubPath(booksDir, book.id))).rejects.toMatchObject({
+      await expect(readFile(storedBookPath(booksDir, book.id, book.format))).rejects.toMatchObject({
         code: "ENOENT",
       }); // 文件已删
     } finally {

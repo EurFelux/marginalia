@@ -3,7 +3,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { parseEpub, type TocNode } from "@marginalia/epub-parser";
 import type { DB } from "@main/db/client";
 import { books, chapters } from "@main/db/schema";
-import { deleteEpubFile } from "@main/library/book-files";
+import { deleteBookFile } from "@main/library/book-files";
 
 export interface ImportInput {
   bytes: Uint8Array;
@@ -88,6 +88,7 @@ export function resolveChapterByHref(db: DB, bookId: string, href: string): Chap
  * 幂等：删不存在的书是 no-op（DELETE 命中 0 行 + unlink 吞 ENOENT），不抛——契合删书 UI 的重复点击 / 乐观删除竞态。
  */
 export async function deleteBook(db: DB, booksDir: string, bookId: string): Promise<void> {
+  const book = getBook(db, bookId); // 删行前取 format（行删后取不到）
   db.delete(books).where(eq(books.id, bookId)).run();
-  await deleteEpubFile(booksDir, bookId);
+  if (book) await deleteBookFile(booksDir, bookId, book.format);
 }

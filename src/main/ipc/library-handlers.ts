@@ -4,7 +4,7 @@ import { C } from "@shared/ipc";
 import type { BookSummaryDto } from "@shared/library";
 import { getBooksDir, getDb } from "@main/db/instance";
 import { deleteBook, getBook, importBook, listBooks } from "@main/library/repository";
-import { readEpubFile, writeEpubFile } from "@main/library/book-files";
+import { readBookFile, writeBookFile } from "@main/library/book-files";
 import { getProgress, saveProgress } from "@main/library/progress";
 import { getToc, listChapters, readChapterText } from "@main/library/content";
 import {
@@ -42,7 +42,7 @@ export const libraryBindings: Binding[] = [
     });
     const bytes = new Uint8Array(buf);
     const book = importBook(getDb(), { bytes });
-    await writeEpubFile(getBooksDir(), book.id, bytes); // 复制进 app 自有位置（relink/重导即覆盖）
+    await writeBookFile(getBooksDir(), book.id, book.format, bytes); // 复制进 app 自有位置（relink/重导即覆盖）
     return toDto({ ...book, hasCover: book.cover != null && book.cover.length > 0 });
   }),
 
@@ -63,7 +63,11 @@ export const libraryBindings: Binding[] = [
     return b ? toDto({ ...b, hasCover: b.cover != null && b.cover.length > 0 }) : null;
   }),
 
-  bind(C.libraryReadBookBytes, (input) => readEpubFile(getBooksDir(), input.bookId)),
+  bind(C.libraryReadBookBytes, async (input) => {
+    const book = getBook(getDb(), input.bookId);
+    if (!book) throw new Error(`library: book ${input.bookId} not found`);
+    return readBookFile(getBooksDir(), input.bookId, book.format);
+  }),
 
   bind(C.libraryDelete, (input) => deleteBook(getDb(), getBooksDir(), input.bookId)),
 
@@ -127,9 +131,9 @@ export const libraryBindings: Binding[] = [
     const db = getDb();
     const book = getBook(db, input.bookId);
     if (!book) throw new Error(`content: book ${input.bookId} not found`);
-    // readEpubFile 缺失即抛 EpubFileMissingError（message 已含 bookId），其他 OS 错误原样透传——
+    // readBookFile 缺失即抛 BookFileMissingError（message 已含 bookId），其他 OS 错误原样透传——
     // 不再包一层「可能缺失/重新导入」的笼统文案（对非缺失错误属编造），与 readBookBytes handler 一致。
-    const bytes = await readEpubFile(getBooksDir(), input.bookId);
+    const bytes = await readBookFile(getBooksDir(), input.bookId, book.format);
     return readChapterText(db, bytes, input.bookId, input.chapterId, {
       offset: input.offset,
       maxChars: input.maxChars,
