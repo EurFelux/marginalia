@@ -89,7 +89,10 @@ describe("resolveSummaryModel", () => {
     setPreference(db, "summaryModel", { providerId: provider.id, model: "claude-haiku-4-5" });
     const r = resolveSummaryModel(db);
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.modelId).toBe("claude-haiku-4-5");
+    if (r.ok) {
+      expect(r.modelId).toBe("claude-haiku-4-5");
+      expect(r.providerType).toBe("anthropic");
+    }
   });
 
   it("fails when the preference is unset", () => {
