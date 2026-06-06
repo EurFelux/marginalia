@@ -114,7 +114,7 @@ renderPageImage(bytes, page, { scale? }): Promise<Uint8Array>
 
 `ReaderView` 按 `book.format` 分发 → 新 `PdfReader.tsx` + `pdf-book.ts` 适配层：
 
-- **虚拟化**：不复用 VirtualDocs（iframe-HTML 专用），用已有依赖 **react-virtuoso** 虚拟化页列表。每页 = `canvas`（pdfjs render）+ textLayer div 叠加。`getViewport` 给出精确页高 → 高度天生稳定（无需 ePub 那套测高缓存）。
+- **虚拟化**：不复用 VirtualDocs（iframe-HTML 专用），新增依赖 **react-virtuoso** 虚拟化页列表（主 app 此前未用它；ui-prototype 有使用经验与坑记录）。每页 = `canvas`（pdfjs render）+ textLayer div 叠加。`getViewport` 给出精确页高 → 高度天生稳定（无需 ePub 那套测高缓存）。
 - **worker**：pdfjs-dist 标准 build + vite worker 入口（`GlobalWorkerOptions`）。
 - **缩放**：适宽默认（容器宽度驱动 viewport scale）+ 顶栏缩放档位；档位切换触发可视页重渲。
 - **选区 → AI**：textLayer 原生 DOM selection（无 iframe 桥，同文档直接 `getSelection()`）→ 映射页内字符偏移 + 选中文本。textLayer 的 span 流就是按 `getTextContent` items 构建的，与 §4 存储偏移天然同一坐标空间。`SelectionInfo` 形状不变（AI 契约零改动）；PDF 无段落 DOM，`paragraphBefore/Current/After` 用选区前后 N 字符窗口替代。
