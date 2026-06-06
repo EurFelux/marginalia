@@ -75,7 +75,7 @@ function importEpubBook(db: DB, bytes: Uint8Array): BookRow {
     });
 
     const row = tx.select().from(books).where(eq(books.id, id)).get();
-    if (!row) throw new Error("importBook: book row missing after insert");
+    if (!row) throw new Error("importEpubBook: book row missing after insert");
     return row;
   });
 }

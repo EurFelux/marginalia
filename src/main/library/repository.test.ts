@@ -1,7 +1,7 @@
 import path from "node:path";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { asc, eq } from "drizzle-orm";
 import { createDb, runMigrations } from "@main/db/client";
 import {
@@ -22,7 +22,13 @@ import {
 } from "@main/library/repository";
 import { storedBookPath } from "@main/library/book-files";
 import { makeFixtureEpub } from "@marginalia/epub-parser";
-import { makeScannedPdf, makeTextPdf } from "@marginalia/pdf-parser";
+import { makeScannedPdf, makeTextPdf, renderPageImage } from "@marginalia/pdf-parser";
+
+// 部分替换：renderPageImage 包成 vi.fn（默认透传真实实现），供封面 fail-open 用例单次注入失败。
+vi.mock("@marginalia/pdf-parser", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@marginalia/pdf-parser")>();
+  return { ...actual, renderPageImage: vi.fn(actual.renderPageImage) };
+});
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
 const freshDb = () => {
@@ -237,5 +243,15 @@ describe("importBook (pdf)", () => {
     await expect(importBook(db, { bytes: new TextEncoder().encode("hello") })).rejects.toThrow(
       /not a supported book format/i,
     );
+  });
+
+  it("succeeds with cover=null when cover render fails (fail-open)", async () => {
+    const db = freshDb();
+    vi.mocked(renderPageImage).mockRejectedValueOnce(new Error("render failed"));
+    const book = await importBook(db, {
+      bytes: await makeTextPdf({ outline: false, title: "Cover Fail" }),
+    });
+    expect(book.cover).toBeNull();
+    expect(listBooks(db)).toHaveLength(1); // 导入不被封面失败阻塞
   });
 });
