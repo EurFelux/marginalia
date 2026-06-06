@@ -20,4 +20,15 @@ describe("renderPageImage", () => {
     const width = (png[16]! << 24) | (png[17]! << 16) | (png[18]! << 8) | png[19]!;
     expect(width).toBe(200);
   });
+
+  it("rejects non-positive scale/targetWidth instead of producing degenerate images", async () => {
+    const bytes = await makeTextPdf({ outline: false });
+    await expect(renderPageImage(bytes, 1, { scale: 0 })).rejects.toThrow(RangeError);
+    await expect(renderPageImage(bytes, 1, { targetWidth: 0 })).rejects.toThrow(RangeError);
+  });
+
+  it("rejects out-of-range page numbers", async () => {
+    const bytes = await makeTextPdf({ outline: false });
+    await expect(renderPageImage(bytes, 99)).rejects.toThrow();
+  });
 });
