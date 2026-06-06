@@ -7,8 +7,7 @@ const TEXT_LAYER_MIN_AVG_CHARS = 50;
 const TEXT_LAYER_SAMPLE_PAGES = 8;
 
 /**
- * 打开 PDF 文档。pdfjs 会 transfer 传入 buffer（之后原数组不可用），
- * 故一律传副本；isEvalSupported:false 关掉字体代码 eval（沙箱友好）。
+ * 打开 PDF 文档。pdfjs 会 transfer 传入 buffer（之后原数组不可用），故一律传副本。
  */
 export async function openPdf(bytes: Uint8Array): Promise<PDFDocumentProxy> {
   const task = getDocument({ data: bytes.slice() });
