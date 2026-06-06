@@ -30,6 +30,18 @@ export function setModelFetch(fetchImpl: typeof globalThis.fetch | undefined): v
   injectedFetch = fetchImpl;
 }
 
+/**
+ * provider 是否支持图像 tool result（file-data content part；spec §7 门控）。
+ * openai-chat-completions 的 tool 消息只收纯文本（@ai-sdk/openai-compatible 不处理 file-data）；
+ * 其余三家 SDK 均转换 file-data → 各自原生图像格式（对各包 dist 实证）。
+ * undefined（测试 mock 未注入 providerType）按不支持处理——保守但 honest。
+ * 刻意不做「模型是否视觉」启发式白名单：白名单必漏新视觉模型而静默剥夺能力（对齐
+ * provider-models.ts「未知一律保留」原则）；误调 image 的失败以真实错误流回，模型自会改用 text。
+ */
+export function supportsImageToolResults(type?: AiProviderApiType): boolean {
+  return type === "anthropic" || type === "google-generate-content" || type === "openai-responses";
+}
+
 /** 把 (provider 配置 + 模型名) 解析为 AI SDK 语言模型。MA3 测连接与 MA4 对话共用此工厂。 */
 export function resolveLanguageModel(p: ResolveModelParams): ChatModel {
   const withBase = (base: string | null) => (base ? { baseURL: base } : {});

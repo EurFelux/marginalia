@@ -5,9 +5,10 @@ import { loadProvider } from "@main/providers/repository";
 import { resolveLanguageModel, type ChatModel } from "@main/ai/model-factory";
 import { t } from "@main/i18n";
 import { getPreference } from "@main/preferences/repository";
+import type { AiProviderApiType } from "@shared/providers";
 
 export type ResolvedModel =
-  | { ok: true; model: ChatModel; modelId: string }
+  | { ok: true; model: ChatModel; modelId: string; providerType?: AiProviderApiType }
   | { ok: false; reason: string };
 
 /** 把默认 Assistant 解析为可调用模型；任一前置缺失返回结构化错误（供发送前友好拦截）。 */
@@ -37,7 +38,7 @@ export function resolveAssistantModel(db: DB): ResolvedModel {
       apiKey: provider.apiKey,
       model: assistant.model,
     });
-    return { ok: true, model, modelId: assistant.model };
+    return { ok: true, model, modelId: assistant.model, providerType: provider.type };
   } catch (err) {
     return {
       ok: false,
@@ -75,7 +76,7 @@ export function resolveSummaryModel(db: DB): ResolvedModel {
       apiKey: provider.apiKey,
       model: pref.model,
     });
-    return { ok: true, model, modelId: pref.model };
+    return { ok: true, model, modelId: pref.model, providerType: provider.type };
   } catch (err) {
     return {
       ok: false,

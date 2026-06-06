@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveLanguageModel } from "@main/ai/model-factory";
+import { resolveLanguageModel, supportsImageToolResults } from "@main/ai/model-factory";
 
 describe("resolveLanguageModel", () => {
   it("builds an openai model carrying the given model id", () => {
@@ -47,5 +47,17 @@ describe("resolveLanguageModel", () => {
         model: "x",
       }),
     ).toThrow(/baseUrl/i);
+  });
+});
+
+describe("supportsImageToolResults", () => {
+  it("allows providers whose SDK converts file-data tool results", () => {
+    expect(supportsImageToolResults("anthropic")).toBe(true);
+    expect(supportsImageToolResults("google-generate-content")).toBe(true);
+    expect(supportsImageToolResults("openai-responses")).toBe(true);
+  });
+  it("denies openai-chat-completions (text-only tool messages) and undefined", () => {
+    expect(supportsImageToolResults("openai-chat-completions")).toBe(false);
+    expect(supportsImageToolResults(undefined)).toBe(false);
   });
 });

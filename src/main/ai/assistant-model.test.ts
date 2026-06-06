@@ -39,6 +39,14 @@ describe("resolveAssistantModel", () => {
     }
   });
 
+  it("exposes providerType on successful resolution", () => {
+    const db = freshDb();
+    configure(db);
+    const resolved = resolveAssistantModel(db);
+    expect(resolved.ok).toBe(true);
+    expect(resolved.ok && resolved.providerType).toBe("openai-responses");
+  });
+
   it("fails when the assistant has no provider configured", () => {
     const db = freshDb();
     getDefaultAssistant(db); // seed default assistant (no provider/model)
