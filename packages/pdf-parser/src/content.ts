@@ -31,8 +31,11 @@ export async function extractPdfText(
       if (text) parts.push(text);
     }
     const full = parts.join("\n\n");
-    const text = full.slice(offset, offset + maxChars);
-    const nextOffset = offset + text.length;
+    // clamp 越界 offset：nextOffset 永远 ≤ full.length，调用方持久化续传安全
+    //（不 clamp 时越界 offset 会被原样回传，形成永远空切片的静默循环）。
+    const start = Math.min(offset, full.length);
+    const text = full.slice(start, start + maxChars);
+    const nextOffset = start + text.length;
     return { text, hasMore: nextOffset < full.length, nextOffset };
   } finally {
     await doc.cleanup();

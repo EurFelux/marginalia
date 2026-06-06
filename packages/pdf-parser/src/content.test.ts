@@ -31,4 +31,18 @@ describe("extractPdfText", () => {
     const whole = await extractPdfText(bytes, { startPage: 1, endPage: 3, maxChars: 100_000 });
     expect(first.text + rest.text).toBe(whole.text);
   });
+
+  it("clamps out-of-range offset so nextOffset stays resumable", async () => {
+    const bytes = await makeTextPdf({ outline: false });
+    const whole = await extractPdfText(bytes, { startPage: 1, endPage: 3, maxChars: 100_000 });
+    const past = await extractPdfText(bytes, {
+      startPage: 1,
+      endPage: 3,
+      offset: whole.text.length + 999,
+    });
+    expect(past.text).toBe("");
+    expect(past.hasMore).toBe(false);
+    // 越界 offset 不被原样回传——归位到文本末尾
+    expect(past.nextOffset).toBe(whole.text.length);
+  });
 });
