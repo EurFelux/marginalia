@@ -1,19 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Virtuoso } from "react-virtuoso";
+import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { Minus, Plus } from "lucide-react";
 import { Button } from "@renderer/components/ui/button";
 import { cn } from "@renderer/lib/utils";
 import { useThemeStore } from "@renderer/store/theme-store";
 import { useAnnotationStore } from "@renderer/store/annotation-store";
+import { useNavigationStore } from "@renderer/store/navigation-store";
+import type { ChapterRefDto } from "@shared/library";
 import { qk } from "../query/keys";
 import { createPdfBook, type PdfBook } from "./pdf-book";
 import { makePdfLocator, parsePdfLocator } from "./pdf-locator";
 import { buildPdfSelectionInfo, flatOffsetOf } from "./pdf-selection";
+import { chapterIdAtPage } from "./pdf-chapter-at-page";
 
 interface Props {
   bookId: string;
+  chapters: ChapterRefDto[];
 }
 
 const SAVE_DEBOUNCE_MS = 1000; // 对齐 EpubReader
@@ -22,7 +26,7 @@ const ZOOM_STEPS = [0.75, 1, 1.25, 1.5, 2] as const;
 /** 页列表左右留白（px）。 */
 const PAGE_GUTTER = 48;
 
-export function PdfReader({ bookId }: Props) {
+export function PdfReader({ bookId, chapters }: Props) {
   const { t } = useTranslation();
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
   const qc = useQueryClient();
@@ -34,6 +38,11 @@ export function PdfReader({ bookId }: Props) {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Virtuoso 挂载即触发一次 rangeChanged（含进度恢复时）——首发不是用户滚动，跳过免得无谓写库。
   const sawInitialRange = useRef(false);
+  const currentChapterId = useNavigationStore((s) => s.currentChapterId);
+  const setCurrentChapter = useNavigationStore((s) => s.setCurrentChapter);
+  const virtuosoRef = useRef<VirtuosoHandle | null>(null);
+  // 防循环：记录最近一次「由滚动得出的章 id」；跳章 effect 只在目标 ≠ 它时滚动（对齐 EpubReader）。
+  const topChapterIdRef = useRef<string | null>(null);
 
   const setSelection = useAnnotationStore((s) => s.setSelection);
 
@@ -81,8 +90,9 @@ export function PdfReader({ bookId }: Props) {
       alive = false;
       created?.destroy();
       setBook(null);
-      // 换书/重解析时丢弃挂起的进度保存，避免把上一本的状态带到下一本。
+      // 换书/重解析时丢弃挂起的进度保存与滚动章快照，避免把上一本的状态带到下一本。
       if (saveTimer.current) clearTimeout(saveTimer.current);
+      topChapterIdRef.current = null;
     };
   }, [bytes.data]);
 
@@ -92,6 +102,15 @@ export function PdfReader({ bookId }: Props) {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
   }, []);
+
+  // 跳章：currentChapterId 变化（ChapterList 点击）→ 滚到章起始页。
+  useEffect(() => {
+    if (!book || currentChapterId == null) return;
+    if (currentChapterId === topChapterIdRef.current) return; // 由滚动引起的同步，不回滚
+    const ch = chapters.find((c) => c.id === currentChapterId);
+    if (ch?.startPage == null) return;
+    virtuosoRef.current?.scrollToIndex({ index: ch.startPage - 1, align: "start" });
+  }, [book, currentChapterId, chapters]);
 
   // 选区：textLayer 原生 DOM selection（同文档，无 iframe 桥）→ 页内偏移 + 字符窗口上下文。
   const onMouseUp = () => {
@@ -181,17 +200,25 @@ export function PdfReader({ bookId }: Props) {
       onMouseDown={onMouseDown}
     >
       <Virtuoso
+        ref={virtuosoRef}
         className="no-scrollbar h-full"
         totalCount={book.pageCount}
         defaultItemHeight={pageH + 16}
         increaseViewportBy={{ top: pageH, bottom: pageH }}
         initialTopMostItemIndex={{ index: initialPage, align: "start" }}
         rangeChanged={(range) => {
+          const page = range.startIndex + 1;
+          // 当前章回写（含首发：开书恢复进度后侧栏即高亮正确章）。
+          const chId = chapterIdAtPage(chapters, page);
+          if (chId) {
+            topChapterIdRef.current = chId;
+            if (chId !== currentChapterId) setCurrentChapter(chId);
+          }
           if (!sawInitialRange.current) {
             sawInitialRange.current = true;
-            return;
+            return; // 首发非用户滚动，不写进度
           }
-          saveAt(range.startIndex + 1);
+          saveAt(page);
         }}
         // 缩放换档时 key 变化 → 可视页整体重挂（拿到新 canvas，满足 pdf-book 同 canvas 约束）。
         // v1 接受全量重挂；离屏页经 cssWidth dep 自然重渲。

@@ -201,7 +201,7 @@ export function ReaderView() {
           {/* 按格式分发：book 查询就绪前不渲染（避免 PDF 书闪挂 EpubReader）。
               EpubReader 自管载入/错误态，并据 CFI 进度恢复初始位置。 */}
           {book.isPending ? null : book.data?.format === "pdf" ? (
-            <PdfReader bookId={bookId} />
+            <PdfReader bookId={bookId} chapters={chapters.data ?? []} />
           ) : (
             <EpubReader bookId={bookId} chapters={chapters.data ?? []} />
           )}
