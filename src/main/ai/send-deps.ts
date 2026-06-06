@@ -9,7 +9,9 @@ import type { SendDeps } from "@main/ai/send";
 
 /** (bookId) => 该书 app 自有副本字节；缺失抛 BookFileMissingError。注入 db/booksDir 以便单测。 */
 export function createLoadBytes(booksDir: string, db: DB): LoadBytes {
-  return (bookId: string) => {
+  // async 闭包：让「book 不存在」的同步 throw 也统一成 rejected promise——
+  // 非 async 时 .catch()/Promise.allSettled 消费方接不住同步异常。
+  return async (bookId: string) => {
     const book = getBook(db, bookId);
     if (!book) throw new Error(`send-deps: book ${bookId} not found`);
     return readBookFile(booksDir, bookId, book.format);

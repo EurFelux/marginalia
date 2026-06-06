@@ -85,7 +85,7 @@ export function resolveChapterByHref(db: DB, bookId: string, href: string): Chap
 /**
  * 删书：先删 DB 行（真相源；依赖行靠 FK ON DELETE CASCADE 自动清，P3a），再 best-effort 删自有副本文件。
  * 顺序不可反——指向已删文件的 DB 行 = 打不开的鬼书，比无主文件（可 GC）更糟（DD-§1.3）。
- * 幂等：删不存在的书是 no-op（DELETE 命中 0 行 + unlink 吞 ENOENT），不抛——契合删书 UI 的重复点击 / 乐观删除竞态。
+ * 幂等：删不存在的书是 no-op（DELETE 命中 0 行；行不存在读不到 format 则直接跳过 unlink），不抛——契合删书 UI 的重复点击 / 乐观删除竞态。
  */
 export async function deleteBook(db: DB, booksDir: string, bookId: string): Promise<void> {
   const book = getBook(db, bookId); // 删行前取 format（行删后取不到）

@@ -16,6 +16,8 @@ export class BookFileMissingError extends Error {
  * app 自有书籍副本的**派生**路径：`booksDir/<sha256(bookId)>.<format>`。
  * 不入库（位置由 bookId+format 确定性派生）。编码函数须**永久稳定**——
  * 改了旧文件即失联；epub 派生与历史 storedEpubPath 逐字节一致。
+ * format 是派生键的一部分：若未来允许就地修改 books.format，须先删旧格式文件再写新，
+ * 否则旧后缀文件成孤儿（当前 importBook 幂等不改 format，无此问题）。
  */
 export function storedBookPath(booksDir: string, bookId: string, format: BookFormat): string {
   const name = createHash("sha256").update(bookId).digest("hex");

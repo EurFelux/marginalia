@@ -45,9 +45,10 @@ describe("createLoadBytes", () => {
     await expect(loadBytes(book.id)).rejects.toBeInstanceOf(BookFileMissingError);
   });
 
-  it("throws when the book does not exist in DB", () => {
+  it("rejects when the book does not exist in DB", async () => {
     const db = freshDb();
     const loadBytes = createLoadBytes(dir, db);
-    expect(() => loadBytes("nonexistent-id")).toThrow("not found");
+    // async 闭包统一错误通道：同步 throw 也必须以 rejected promise 形式暴露
+    await expect(loadBytes("nonexistent-id")).rejects.toThrow("not found");
   });
 });
