@@ -12,7 +12,7 @@ import {
 } from "@main/library/content";
 import { initMainI18n } from "@main/i18n";
 import { makeFixtureEpub } from "@marginalia/epub-parser";
-import { makeScannedPdf, makeTextPdf } from "@marginalia/pdf-parser";
+import { makeScannedPdf, makeTextPdf } from "@marginalia/pdf-parser/fixture";
 
 beforeAll(() => initMainI18n("zh-CN"));
 

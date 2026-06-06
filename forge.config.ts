@@ -13,7 +13,18 @@ import { FuseV1Options, FuseVersion } from "@electron/fuses";
 
 // better-sqlite3 是 native 模块、被 vite.main.config external（不能内联）；其余 prod 依赖的代码都被
 // Vite bundle 进 .vite/，运行时只需 better-sqlite3 的实体包（require 链 → bindings → file-uri-to-path）。
-const KEEP_NODE_MODULES = ["better-sqlite3", "bindings", "file-uri-to-path"];
+// pdf 支持：pdfjs-dist（主进程 legacy 解析）与 @napi-rs/canvas（NAPI 原生件）同被 external，
+// 须随产物分发。@napi-rs 平台二进制是与主包平级的独立包（@napi-rs/canvas-<platform>-<arch>），
+// startsWith 匹配带尾斜杠不命中它们，故逐个列出（当前仅打 macOS 包）。
+const KEEP_NODE_MODULES = [
+  "better-sqlite3",
+  "bindings",
+  "file-uri-to-path",
+  "pdfjs-dist",
+  "@napi-rs/canvas",
+  "@napi-rs/canvas-darwin-arm64",
+  "@napi-rs/canvas-darwin-x64",
+];
 
 // ad-hoc 重签名（零成本，无 Apple Developer 证书）：packager 改写 Info.plist/塞 asar 后，Electron
 // 出厂签名的 seal 已失效；不重签的话，带 quarantine 的下载产物会被 Gatekeeper 直接判「已损坏」

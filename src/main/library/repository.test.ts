@@ -22,7 +22,8 @@ import {
 } from "@main/library/repository";
 import { storedBookPath } from "@main/library/book-files";
 import { makeFixtureEpub } from "@marginalia/epub-parser";
-import { makeScannedPdf, makeTextPdf, renderPageImage } from "@marginalia/pdf-parser";
+import { renderPageImage } from "@marginalia/pdf-parser";
+import { makeScannedPdf, makeTextPdf } from "@marginalia/pdf-parser/fixture";
 
 // 部分替换：renderPageImage 包成 vi.fn（默认透传真实实现），供封面 fail-open 用例单次注入失败。
 vi.mock("@marginalia/pdf-parser", async (importOriginal) => {
