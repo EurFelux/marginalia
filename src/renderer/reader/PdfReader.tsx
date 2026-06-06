@@ -29,6 +29,8 @@ export function PdfReader({ bookId }: Props) {
   const [containerW, setContainerW] = useState(0);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Virtuoso 挂载即触发一次 rangeChanged（含进度恢复时）——首发不是用户滚动，跳过免得无谓写库。
+  const sawInitialRange = useRef(false);
 
   const bytes = useQuery({
     queryKey: qk.bookBytes(bookId),
@@ -131,10 +133,18 @@ export function PdfReader({ bookId }: Props) {
         defaultItemHeight={pageH + 16}
         increaseViewportBy={{ top: pageH, bottom: pageH }}
         initialTopMostItemIndex={{ index: initialPage, align: "start" }}
-        rangeChanged={(range) => saveAt(range.startIndex + 1)}
+        rangeChanged={(range) => {
+          if (!sawInitialRange.current) {
+            sawInitialRange.current = true;
+            return;
+          }
+          saveAt(range.startIndex + 1);
+        }}
+        // 缩放换档时 key 变化 → 可视页整体重挂（拿到新 canvas，满足 pdf-book 同 canvas 约束）。
+        // v1 接受全量重挂；离屏页经 cssWidth dep 自然重渲。
+        computeItemKey={(index) => `${index}-${Math.round(pageW)}`}
         itemContent={(index) => (
           <PdfPage
-            key={`${index}-${Math.round(pageW)}`}
             book={book}
             index={index}
             cssWidth={pageW}
