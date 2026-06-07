@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { appService, initAppService, type AppServiceEnv } from "./app-service";
+import * as barrel from "./index";
 
 function makeEnv(overrides: Partial<AppServiceEnv> = {}): AppServiceEnv {
   return {
@@ -36,5 +37,11 @@ describe("app-service", () => {
     initAppService(makeEnv({ openFolder }));
     await appService.env.openFolder("/some/dir");
     expect(openFolder).toHaveBeenCalledWith("/some/dir");
+  });
+});
+
+describe("app barrel", () => {
+  it("exposes only appService (encapsulation does not leak)", () => {
+    expect(Object.keys(barrel).sort()).toEqual(["appService"]);
   });
 });
