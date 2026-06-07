@@ -7,6 +7,7 @@ import { chatBindings } from "@main/ipc/chat-handlers";
 import { annotationsBindings } from "@main/ipc/annotations-handlers";
 import { preferencesBindings } from "@main/ipc/preferences-handlers";
 import { aiBindings } from "@main/ipc/ai-handlers";
+import { logBindings } from "@main/ipc/log-handlers";
 
 const allBindings = [
   ...appBindings,
@@ -16,6 +17,7 @@ const allBindings = [
   ...annotationsBindings,
   ...preferencesBindings,
   ...aiBindings,
+  ...logBindings,
 ];
 
 describe("ipc bindings coverage", () => {

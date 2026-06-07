@@ -12,6 +12,7 @@ import { registerLibraryHandlers } from "@main/ipc/library-handlers";
 import { registerSettingsHandlers } from "@main/ipc/settings-handlers";
 import { registerChatHandlers } from "@main/ipc/chat-handlers";
 import { registerAiHandlers } from "@main/ipc/ai-handlers";
+import { registerLogHandlers } from "@main/ipc/log-handlers";
 import { registerAnnotationHandlers } from "@main/ipc/annotations-handlers";
 import { registerPreferenceHandlers } from "@main/ipc/preferences-handlers";
 import { registerCoverProtocol, registerCoverProtocolScheme } from "@main/library/cover-protocol";
@@ -121,6 +122,7 @@ app.on("ready", () => {
   registerAnnotationHandlers();
   registerPreferenceHandlers();
   registerAiHandlers();
+  registerLogHandlers();
   createWindow();
 });
 
