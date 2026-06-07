@@ -70,7 +70,7 @@ export default {
   "errors.requestFailed": "Request failed",
   "errors.summaryModelNotConfigured": "Summary model is not configured",
   "library.deleteConfirm.body":
-    "This permanently removes the book and all its annotations, notes, and conversations, plus the imported epub copy. This cannot be undone.",
+    "This permanently removes the book and all its annotations, notes, and conversations, plus the imported book file. This cannot be undone.",
   "library.deleteConfirm.cancel": "Cancel",
   "library.deleteConfirm.confirm": "Delete",
   "library.deleteConfirm.title": "Delete “{{title}}”?",

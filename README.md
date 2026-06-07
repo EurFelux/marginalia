@@ -6,7 +6,7 @@
 
 **Talk to AI in the margins.**
 
-A desktop ePub reader that understands the book you're reading.
+A desktop AI reader for ePub and PDF books.
 
 English · [简体中文](README.zh-CN.md)
 
@@ -16,7 +16,7 @@ English · [简体中文](README.zh-CN.md)
 
 ## What is Marginalia
 
-Marginalia puts AI right in the margins of your reading. Hit a sentence you want to dig into, **select it**, and an assistant joins you in the side panel — already holding the context of the book. Explain an allusion, translate a passage, summarize the thread, or just ask. No breaking your flow, no copy-pasting into another window.
+Marginalia puts AI right in the margins of your reading. Open an ePub or PDF, hit a sentence you want to dig into, **select it**, and an assistant joins you in the side panel — already holding the context of the book. Explain an allusion, translate a passage, summarize the thread, or just ask. No breaking your flow, no copy-pasting into another window.
 
 It's local-first, bring-your-own-key, and tied to no single model provider — your books and notes stay quietly on your own machine.
 
@@ -24,7 +24,7 @@ It's local-first, bring-your-own-key, and tied to no single model provider — y
 
 ### 🪄 Ask by selecting — the core
 
-Select any text and a floating toolbar appears: **Explain / Translate / Summarize** in one click, or hit "Ask AI" for an open question. Answers **stream** into the side panel, so you can read and ask in the same breath.
+Select text in an ePub or text-layer PDF and a floating toolbar appears: **Explain / Translate / Summarize** in one click, or hit "Ask AI" for an open question. Answers **stream** into the side panel, so you can read and ask in the same breath.
 
 ### 🧩 Transparent context
 
@@ -36,11 +36,11 @@ Five highlight colors plus underline, with sticky notes on any passage. Every an
 
 ### 📖 Immersive reading
 
-Real, continuously-scrolling typography that remembers and restores your place. Tune font size, line height, and page width; switch between dark / light / system themes anytime.
+Real, continuously-scrolling reading that remembers and restores your place. ePub gets tuneable typography; PDF gets fit-to-width rendering, zoom controls, clickable links, and text-layer selection when the document provides text. Switch between dark / light / system themes anytime.
 
 ### 🗂️ Cover-wall library
 
-An Apple Books-style cover wall to spot your books at a glance. **Drag an ePub into the window** to import it; books without a cover get a tasteful generated tile.
+An Apple Books-style cover wall to spot your books at a glance. **Drag an ePub or PDF into the window** to import it; books without a cover get a tasteful generated tile.
 
 ![The library — an Apple Books-style cover wall](assets/library.jpg)
 
@@ -77,7 +77,7 @@ Grab the latest `.dmg` from [Releases](https://github.com/EurFelux/marginalia/re
 
 ## 🪄 A glance at getting started
 
-1. **Drop in a book** — drag an ePub into the library and start reading.
+1. **Drop in a book** — drag an ePub or PDF into the library and start reading.
 2. **Select text, hit "Ask AI"** — the side panel picks up the passage's context automatically.
 3. **Watch the answer stream in** — read, annotate, follow up, and summarize, all in one window.
 

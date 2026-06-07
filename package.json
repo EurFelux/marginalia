@@ -2,7 +2,7 @@
   "name": "marginalia",
   "version": "0.3.0",
   "private": true,
-  "description": "Desktop ePub AI reader — select a passage and chat with a context-aware assistant in the margins.",
+  "description": "Desktop ePub and PDF AI reader — select a passage and chat with a context-aware assistant in the margins.",
   "keywords": [],
   "license": "GPL-3.0-or-later",
   "author": {

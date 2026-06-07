@@ -1,8 +1,8 @@
-# ePub AI Reader — Project Spec
+# Marginalia AI Reader — Project Spec
 
 ## Overview
 
-A cross-platform desktop ePub reader built with Electron + React, featuring a continuous scroll reading experience and deep AI integration. The core differentiator is a selection-triggered AI workflow: users highlight text, choose an AI action from a toolbar, and interact with a context-aware assistant in a side panel. The AI can also operate on user-authorized external directories via sandboxed file tools.
+A cross-platform desktop reader for ePub and PDF books, built with Electron + React, featuring a continuous reading experience and deep AI integration. The core differentiator is a selection-triggered AI workflow: users highlight text, choose an AI action from a toolbar, and interact with a context-aware assistant in a side panel. For PDFs with a text layer, Marginalia supports text selection, clickable links, page-aware reading tools, and annotations; scanned PDFs degrade gracefully when text extraction is unavailable.
 
 ---
 
@@ -14,6 +14,7 @@ A cross-platform desktop ePub reader built with Electron + React, featuring a co
 | UI Framework    | React + TypeScript           | Ecosystem maturity, broad community examples                              |
 | Styling         | Tailwind CSS                 | Utility-first, fast iteration                                             |
 | ePub Rendering  | epub.js (`flow: "scrolled"`) | Best-in-class scrolled ePub support                                       |
+| PDF Rendering   | pdfjs-dist                   | Mature PDF rendering, text layer, annotations, links, and page extraction |
 | Database        | better-sqlite3               | Sync API, single-file DB, no ORM needed for this scale                    |
 | AI SDK          | Vercel AI SDK                | Multi-provider support, streaming, native tool call support               |
 | Build / Package | electron-builder             | Cross-platform packaging                                                  |
@@ -64,7 +65,7 @@ Generation runs in a background queue and does not block the reading experience.
 ```sql
 -- Books
 CREATE TABLE books (
-  id TEXT PRIMARY KEY,           -- ePub unique identifier
+  id TEXT PRIMARY KEY,           -- ePub identifier or file-derived id
   path TEXT NOT NULL,
   title TEXT,
   author TEXT,
@@ -143,8 +144,8 @@ CREATE TABLE authorized_dirs (
 ┌─────────────────────────────────────────────────────────┐
 │  Sidebar          │  Reader                │  AI Panel  │
 │  ─────────────    │  ──────────────────    │  ────────  │
-│  Book library     │  epub.js scrolled      │  Assistant │
-│  TOC (current     │  render                │  selector  │
+│  Book library     │  ePub / PDF reader     │  Assistant │
+│  TOC (current     │  surface               │  selector  │
 │  book)            │                        │            │
 │  Conversations    │  [Selection toolbar    │  Message   │
 │                   │   appears on select]   │  history   │
@@ -163,15 +164,15 @@ The AI Panel can be collapsed. When collapsed, the selection toolbar still appea
 
 ### Book Import Flow
 
-1. User opens ePub file via file dialog
-2. App parses metadata and TOC from OPF/NCX (synchronous, fast)
+1. User opens or drops an ePub / PDF file
+2. App detects format, parses metadata and TOC/outline when available
 3. Book appears in library immediately
 4. If auto-generate is enabled: background queue starts generating global summary, then chapter summaries in spine order
 5. Status indicators visible in library and AI panel chips
 
 ### Selection → AI Flow
 
-1. User selects text in epub.js rendition
+1. User selects text in the ePub reader or a text-layer PDF page
 2. Floating toolbar appears near selection with actions: **Copy**, **AI Ask**, **Highlight** (future), **...more**
 3. User clicks **AI Ask**
 4. AI Panel opens (if collapsed)
@@ -262,17 +263,27 @@ Context is ordered macro → micro. Disabled or unavailable chips are omitted en
 - **Assistants**: Create, edit, delete Assistants
 - **Context Generation**: Default behavior on book import (auto-generate / ask / never)
 - **Authorized Directories**: List of directories the AI can read/write, with add/remove controls
-- **Reader**: Font size, line height, max content width (injected as CSS overrides into epub.js)
+- **Reader**: ePub typography settings and PDF zoom / rendering preferences
 
 ---
 
-## epub.js Integration Notes
+## Reader Integration Notes
+
+### ePub
 
 - Use `flow: "scrolled"` and `spread: "none"`
 - Serve ePub assets via a custom `WKURLSchemeHandler` equivalent — in Electron, use a custom protocol registered with `protocol.registerFileProtocol` or serve from a local Express instance to avoid CSP issues
 - Hook `rendition.on("selected", ...)` for selection events; extract surrounding paragraphs by walking the DOM from the selection anchor
 - Save/restore reading position using `rendition.on("relocated", ...)` and `rendition.display(cfi)`
 - Chapter id for context lookup: derive from the current CFI or from `rendition.currentLocation().start.href`
+
+### PDF
+
+- Render pages with pdfjs-dist and a text layer when available
+- Save/restore progress using a page-based locator
+- Use page text offsets for selection context and annotations
+- Expose `readPage` to AI tools so the model can read the user's current page directly
+- Treat scanned PDFs as readable visually but unavailable for text-based AI workflows unless OCR is added later
 
 ---
 
@@ -282,7 +293,7 @@ Context is ordered macro → micro. Disabled or unavailable chips are omitted en
 
 - Multi-device sync
 - DRM support
-- PDF support
+- OCR for scanned PDFs
 - Mobile / web versions
 - Export to specific apps (Obsidian, Notion, etc.) — the file tools cover this generically
 - Offline AI (local models)
@@ -295,13 +306,14 @@ Context is ordered macro → micro. Disabled or unavailable chips are omitted en
 src/
 ├── main/                   # Electron main process
 │   ├── db/                 # better-sqlite3 setup, migrations, query functions
-│   ├── epub/               # EpubSkill: parse, extract, summary generation
+│   ├── epub/               # ePub parse, extract, summary generation
+│   ├── pdf/                # PDF parse, page extraction, rendering helpers
 │   ├── ai/                 # Tool definitions, prompt assembly
 │   ├── files/              # Sandboxed file tools, authorization checks
 │   └── ipc/                # IPC handlers bridging main ↔ renderer
 ├── renderer/               # React app
 │   ├── components/
-│   │   ├── Reader/         # epub.js wrapper, selection toolbar
+│   │   ├── Reader/         # ePub/PDF reader surfaces, selection toolbar
 │   │   ├── AIPanel/        # Conversation UI, input bar, chips
 │   │   ├── Library/        # Book grid, import flow
 │   │   ├── Sidebar/        # TOC, conversation list

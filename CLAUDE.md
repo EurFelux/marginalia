@@ -4,7 +4,7 @@ This file provides guidance to coding agents working in this repository. It is s
 
 ## 项目简介
 
-Marginalia 是一个基于 Electron + React 的桌面 ePub AI 阅读器。主进程里程碑 **MA1–MA5** 与 UI 原型 **UP1** 已完成；**最小可用竖切**（导入 → 读 → 选 → 问 → 真模型流式回复）已实现并合并，渲染层 `src/renderer/` 已建（替换原 Forge 模板桩）。
+Marginalia 是一个基于 Electron + React 的桌面 AI 阅读器，当前支持 ePub 与 PDF。主进程里程碑 **MA1–MA5** 与 UI 原型 **UP1** 已完成；**最小可用竖切**（导入 → 读 → 选 → 问 → 真模型流式回复）已实现并合并，渲染层 `src/renderer/` 已建（替换原 Forge 模板桩）。
 
 > **进度真相源 = [`docs/superpowers/ROADMAP.md`](docs/superpowers/ROADMAP.md)**：里程碑状态、当前焦点、待办 backlog 都看那里（别在本文件里维护会过时的状态散文）。**每次合并分支时顺手更新 ROADMAP**（finishing 流程的一步）。细节去 `docs/superpowers/specs/`（设计）与 `docs/superpowers/plans/`（实现计划）。
 

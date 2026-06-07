@@ -44,7 +44,7 @@ export function LibraryView() {
     },
   });
 
-  // 删书：调既有 library:delete IPC（主进程级联删 DB + unlink epub 副本），成功后失效刷新书库 + toast。
+  // 删书：调既有 library:delete IPC（主进程级联删 DB + unlink 导入书籍副本），成功后失效刷新书库 + toast。
   const deleteBook = useMutation({
     mutationFn: (b: BookSummaryDto) => window.api.library.delete({ bookId: b.id }),
     onSuccess: (_r, b) => {
