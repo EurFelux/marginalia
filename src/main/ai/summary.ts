@@ -11,7 +11,7 @@ import type { LoadBytes } from "@main/ai/tools";
 export const SUMMARY_SYSTEM =
   "You summarize a single book chapter for a reading assistant. Produce a concise, faithful summary (a few sentences) capturing the chapter's key events, ideas, and terms. Output only the summary, no preamble.";
 
-const SUMMARY_INPUT_MAX_CHARS = 12_000; // 截断喂模型的章节正文（拉丁文约 3k tokens、CJK 最多约 12k），避免爆上下文
+const SUMMARY_INPUT_MAX_CHARS = 180_000; // 章节摘要输入预算（适配 200k 上下文摘要模型；超长章前载截断）
 
 export interface SummaryDeps {
   db: DB;
