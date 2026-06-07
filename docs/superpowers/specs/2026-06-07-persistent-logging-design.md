@@ -17,7 +17,7 @@
 | 本期范围          | 主进程替换 + 渲染层 funnel（ErrorBoundary + 全局钩子 → IPC）**一次交付**；渲染层目前零错误捕获，顺手接上成本低                                                                                                                                                                                                                                                                                                |
 | 日志格式          | 人类可读文本行（非 JSON lines）：消费者是开发者本人与贴日志的用户，无日志聚合系统                                                                                                                                                                                                                                                                                                                             |
 | 写入策略          | 同步 `appendFileSync`：日志量小（错误/警告为主），崩溃前必落盘，免异步队列 flush 复杂度                                                                                                                                                                                                                                                                                                                       |
-| Electron 环境依赖 | **`LoggerService` 依赖 `AppService`**（独立 spec：`2026-06-07-app-service-design.md`，先行实现）经 `appService.getPath("logsDir")` 取专有日志目录、`appService.isDev` 判 dev 双写（均**恒可用**，fail-fast 保证，见该 spec v2）——logger 模块不 import electron，零判空零降级，整条依赖链无头可测                                                                                                              |
+| Electron 环境依赖 | **`LoggerService` 依赖 `AppService`**（独立 spec：`2026-06-07-app-service-design.md`，先行实现）经 `appService.getPath("logsDir")` 取专有日志目录、`appService.isDev` 判 debug 级别是否记录（均**恒可用**，fail-fast 保证，见该 spec v2）——logger 模块不 import electron，零判空零降级，整条依赖链无头可测                                                                                                    |
 | 轮转              | 按日期：每天一个文件 `main-YYYY-MM-DD.log`，日期翻转自然切新文件；保留最近 30 天，过期文件在启动与翻转时清理                                                                                                                                                                                                                                                                                                  |
 | 测试环境行为      | **与生产同构，无降级分支**：vitest 全局 setup 注入测试 env（tmp dataDir），`appService` 在测试中同样恒可用——logger 正常写 tmp 文件，测试直接断言文件内容                                                                                                                                                                                                                                                      |
 | 入口位置          | 设置页新增**「高级」（advanced）分类**，首条目「打开日志文件夹」；不引入应用 Menu（超范围）。#19 代理、#28 备份将来同归此分类                                                                                                                                                                                                                                                                                 |
@@ -39,7 +39,7 @@ AppService（外部依赖，见独立 spec v2；getPath("logsDir") / isDev / ope
                                                                       ↓
 主进程模块 ─ createLogger("send")（薄实例）─┐
 process.on(uncaughtException/…) ────────────┤→ LoggerService → file-sink → userData/logs/main-YYYY-MM-DD.log
-渲染层 createLogger("boundary") ─ log:write IPC ─┘      （dev 双写 console）
+渲染层 createLogger("boundary") ─ log:write IPC ─┘      （恒双写 console + 文件）
 ```
 
 **封装规则**：两侧 `logger-service.ts` 组织形式完全相同——`LoggerService` 类在模块内实现并单例化，**类与实例均不导出**。**barrel（`index.ts`）仅 re-export `createLogger`**，业务代码一律 import barrel，公共面收口为单一入口。`createLogger` 实例只持有 module 与四个级别方法，所有格式化、级别过滤、文件写入、console 输出都收敛在 service——多实例零逻辑冗余。两侧唯一差异是 service 实现：主进程写 fs（经 file-sink），渲染层经 `api.log.write` IPC 转发主进程。**Electron 环境依赖**：主进程 `LoggerService` 经 `appService`（`import { appService } from "../app"`，见独立 spec）每次写入时调 `appService.getPath("logsDir")` 与 `appService.isDev`（恒可用，fail-fast 保证，不缓存）——logger 模块不 import electron、不知道根目录在哪（目录布局知识在 AppService），零判空零降级，barrel 零例外（仅 `createLogger`）。渲染层无需任何 init（`api.log.write` 常在）。
@@ -48,7 +48,7 @@ process.on(uncaughtException/…) ────────────┤→ Log
 
 ## 4. 日志核心行为
 
-- **级别**：`error / warn / info / debug`。文件写 info 及以上；debug 仅 dev 写。
+- **级别**：`error / warn / info / debug`。记录门槛 info 及以上，debug 仅 dev（`appService.isDev`）记录；**凡被记录的日志恒双写 console + 文件**（不存在「只进文件」的级别）。
 - **格式**：
 
   ```
@@ -60,7 +60,7 @@ process.on(uncaughtException/…) ────────────┤→ Log
   **四段式 `[timestamp] [source] [level] [module]`** + 消息：时间戳 ISO 8601（UTC）、来源（`main` / `renderer`）、级别、模块（`createLogger` 的参数）；Error 对象展开 message + stack，后续行缩进两格。来源段显式区分进程：主进程 `createLogger` 产出的实例固定 `[main]`，渲染层经 `log:write` 汇入的固定 `[renderer]`——单文件时间线上一眼分清来源，每段独立可 grep（按来源、按级别、按模块均可过滤）。
 
 - **轮转**：按日期——写入时以当前日期决定目标文件 `main-YYYY-MM-DD.log`（文件名缓存，日期翻转自动切新文件）；首次写入与日期翻转时扫描 `logs/` 目录，删除文件名日期早于 30 天的日志。无大小上限（错误/警告量级小，单日文件天然有界）。
-- **dev 双写**：`appService.isDev` 时同时输出 console，保留现有 stdout 体验；**按 level 着色**便于扫读——error 红、warn 黄、info 青、debug 灰暗。零依赖手写 ANSI 码（~10 行常量，不引入 chalk/picocolors），仅 `process.stdout.isTTY` 时启用（管道重定向时不输出转义码）。文件落盘永远是纯文本，不含 ANSI 码。
+- **恒双写（console + 文件）**：所有被记录的日志同时写 stdout 与日志文件——dev 保留现有终端体验，打包 app 从终端启动时同样可见，文件保证无终端场景留痕；**console 按 level 着色**便于扫读——error 红、warn 黄、info 青、debug 灰暗。零依赖手写 ANSI 码（~10 行常量，不引入 chalk/picocolors），仅 `process.stdout.isTTY` 时启用（管道重定向时不输出转义码）。文件落盘永远是纯文本，不含 ANSI 码。
 - **写入故障降级**：`appService` 恒可用（fail-fast 保证），LoggerService 无「未注入」分支；唯一的降级是**运行中文件写入失败**（磁盘满、目录不可写等）——静默退 console、绝不抛错（日志系统不能搞崩业务，与决策摘要一致）。
 
 ## 5. 主进程集成
@@ -93,7 +93,7 @@ preload 暴露 `api.log.write` 与 `api.app.openLogsDir`。
 
 ## 8. 测试策略
 
-- `logger-service.test.ts`：全局 setup 已注入 tmp env，直接断言写入内容；级别过滤（debug 不落盘）；写入故障（目标不可写）静默退 console、不抛错；Error 格式化（含 stack 缩进）；文件内容不含 ANSI 转义码；barrel 导出面断言（`logger` 仅 `createLogger`，封装不泄露；`app` 侧断言归 AppService spec）。
+- `logger-service.test.ts`：全局 setup 已注入 tmp env，直接断言写入内容；级别门槛（isDev=false 时 debug 不记录）；console 双写断言（spy console 确认每条落盘日志同步输出）；写入故障（目标不可写）静默退 console、不抛错；Error 格式化（含 stack 缩进）；文件内容不含 ANSI 转义码；barrel 导出面断言（`logger` 仅 `createLogger`，封装不泄露；`app` 侧断言归 AppService spec）。
 - `file-sink.test.ts`：按日期写对目标文件；日期翻转切新文件；30 天前的过期文件被清理、30 天内的保留；非日志文件（命名不匹配）不误删。
 - IPC handler：`log:write` 入参校验走现有 validateInput 测试模式。
 - 交付前打包验证：`pnpm package` 产物以 `--user-data-dir=/tmp/<x>` 冒烟启动，确认 `logs/main-<当日>.log` 生成且含启动日志。
