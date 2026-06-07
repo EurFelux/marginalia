@@ -19,6 +19,7 @@ export type ToolStepStatus = "loading" | "done" | "failed";
 export function toolStepStatus(part: ToolPart): ToolStepStatus {
   if (part.state === "output-error") return "failed";
   if (part.state === "output-available") return isErrorShape(part.output) ? "failed" : "done";
+  // 其余 state（含未用到的 approval/denied 态）一律视作进行中；本项目工具不走 approval。
   return "loading";
 }
 
@@ -29,7 +30,7 @@ export function toolStepStatus(part: ToolPart): ToolStepStatus {
  */
 function chapterTitle(chapters: ChapterRefDto[], ref: string): string | null {
   const byId = chapters.find((c) => c.id === ref);
-  if (byId) return byId.title;
+  if (byId) return byId.title; // 命中但 title 为 null（无目录条目）同样走调用方回退
   const byHref = chapters.find((c) => c.href === ref);
   if (byHref) return byHref.title;
   const wanted = ref.trim().toLowerCase();

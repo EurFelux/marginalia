@@ -124,7 +124,7 @@ React Compiler 已启用：不手写 memo；流式中 part 对象引用更新驱
 
 ## 7. i18n
 
-- 新增 key：`ai.toolStep.readPage`、`ai.toolStep.readChapterText`、`ai.toolStep.readChapterFallback`、`ai.toolStep.getChapterSummary`、`ai.toolStep.getToc`、状态后缀沿用现有 `ai.toolStep.{loading,done,failed}` key，其中 `done` 文案由「已读取」改为「完成」（人话标题已含「读取」动词，避免重复）。
+- 新增 key：`ai.toolStep.readPage`、`ai.toolStep.readChapterText`、`ai.toolStep.readChapterTextFallback`、`ai.toolStep.readPageFallback`、`ai.toolStep.getChapterSummary`、`ai.toolStep.getChapterSummaryFallback`、`ai.toolStep.getToc`、状态后缀沿用现有 `ai.toolStep.{loading,done,failed}` key，其中 `done` 文案由「已读取」改为「完成」（人话标题已含「读取」动词，避免重复）。
 - 注意 i18n 工作流坑：`pnpm i18n:extract` 先于 typecheck 跑；改键结构警惕 extract 用旧 fallback 反向覆盖 locale。
 
 ## 8. 交付物清单
