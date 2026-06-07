@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  pdfjs-dist: 9c0067337732fbb06d52f8767914aa706446290314f1b62e56aab943f2a919c5
+
 importers:
 
   .:
@@ -91,7 +94,7 @@ importers:
         version: 1.7.0
       pdfjs-dist:
         specifier: ^6.0.227
-        version: 6.0.227
+        version: 6.0.227(patch_hash=9c0067337732fbb06d52f8767914aa706446290314f1b62e56aab943f2a919c5)
       react:
         specifier: ^19.2.6
         version: 19.2.6
@@ -261,7 +264,7 @@ importers:
         version: 1.0.0
       pdfjs-dist:
         specifier: ^6.0.227
-        version: 6.0.227
+        version: 6.0.227(patch_hash=9c0067337732fbb06d52f8767914aa706446290314f1b62e56aab943f2a919c5)
     devDependencies:
       pdf-lib:
         specifier: ^1.17.1
@@ -13643,7 +13646,7 @@ snapshots:
       pako: 1.0.11
       tslib: 1.14.1
 
-  pdfjs-dist@6.0.227:
+  pdfjs-dist@6.0.227(patch_hash=9c0067337732fbb06d52f8767914aa706446290314f1b62e56aab943f2a919c5):
     optionalDependencies:
       '@napi-rs/canvas': 1.0.0
 

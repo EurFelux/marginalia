@@ -1,0 +1,192 @@
+diff --git a/build/pdf.worker.mjs b/build/pdf.worker.mjs
+index 14aaa0e2fd7fd0cdfc7440b91fe071d2e2b9995c..ab1e0209ce5b41e758b0034f6c9544cd60a005f6 100644
+--- a/build/pdf.worker.mjs
++++ b/build/pdf.worker.mjs
+@@ -20402,6 +20402,9 @@ const getSupplementalGlyphMapForCalibri = getLookupTableFactory(function (t) {
+   t[1086] = 45;
+ });
+ function getStandardFontName(name) {
++  if (/^[A-Z]{6}\+/.test(name)) {
++    name = name.slice(7);
++  }
+   const fontName = normalizeFontName(name);
+   const stdFontMap = getStdFontMap();
+   return stdFontMap[fontName];
+@@ -32551,7 +32554,167 @@ const BOLDITALIC = {
+   style: "italic",
+   weight: "bold"
+ };
+-const substitutionMap = new Map([["Times-Roman", {
++const substitutionMap = new Map([
++// __MARGINALIA_WESTERN_SUBSTITUTION__ — western serif/sans fallback chains (pnpm patch)
++// NOTE: Chromium local() matches PostScript/full names only, NOT family names (crbug.com/627143).
++["Georgia", {
++  local: ["Georgia", "LiberationSerif", "Liberation Serif", "NotoSerif-Regular", "DejaVuSerif"],
++  style: NORMAL,
++  ultimate: "serif"
++}], ["Verdana", {
++  local: ["Verdana", "DejaVuSans", "LiberationSans", "NotoSans-Regular", "Tahoma"],
++  style: NORMAL,
++  ultimate: "sans-serif"
++}], ["Tahoma", {
++  local: ["Tahoma", "Verdana", "DejaVuSans", "LiberationSans", "NotoSans-Regular"],
++  style: NORMAL,
++  ultimate: "sans-serif"
++}], ["TrebuchetMS", {
++  local: ["TrebuchetMS", "Trebuchet MS", "Verdana", "LiberationSans", "NotoSans-Regular"],
++  style: NORMAL,
++  ultimate: "sans-serif"
++}], ["SegoeUI", {
++  local: ["SegoeUI", "Segoe UI", "HelveticaNeue", "Helvetica Neue", "LiberationSans", "NotoSans-Regular", "Cantarell-Regular"],
++  style: NORMAL,
++  ultimate: "sans-serif"
++}], ["Cambria", {
++  local: ["Cambria", "Georgia", "Palatino-Roman", "Caladea-Regular", "LiberationSerif"],
++  style: NORMAL,
++  ultimate: "serif"
++}], ["Constantia", {
++  local: ["Constantia", "Georgia", "Palatino-Roman", "LiberationSerif"],
++  style: NORMAL,
++  ultimate: "serif"
++}], ["Candara", {
++  local: ["Candara", "Optima-Regular", "TrebuchetMS", "Trebuchet MS", "LiberationSans"],
++  style: NORMAL,
++  ultimate: "sans-serif"
++}], ["Corbel", {
++  local: ["Corbel", "HelveticaNeue", "Helvetica Neue", "LiberationSans", "NotoSans-Regular"],
++  style: NORMAL,
++  ultimate: "sans-serif"
++}], ["Consolas", {
++  local: ["Consolas", "Menlo-Regular", "Monaco", "LiberationMono", "DejaVuSansMono", "NotoSansMono-Regular"],
++  style: NORMAL,
++  ultimate: "monospace"
++}], ["Garamond", {
++  local: ["Garamond", "EBGaramond-Regular", "AGaramondPro-Regular", "Palatino-Roman", "TimesNewRomanPSMT", "Times New Roman"],
++  style: NORMAL,
++  ultimate: "serif"
++}], ["MinionPro", {
++  local: ["MinionPro-Regular", "Minion Pro", "Georgia", "Palatino-Roman", "TimesNewRomanPSMT"],
++  style: NORMAL,
++  ultimate: "serif"
++}], ["Palatino", {
++  local: ["Palatino-Roman", "PalatinoLinotype-Roman", "Palatino Linotype", "BookAntiqua", "Book Antiqua", "P052-Roman", "URWPalladioL-Roma"],
++  style: NORMAL,
++  ultimate: "serif"
++}], ["BookAntiqua", {
++  alias: "Palatino",
++  style: NORMAL,
++  ultimate: "serif"
++}], ["CenturySchoolbook", {
++  local: ["CenturySchoolbook", "Century Schoolbook", "C059-Roman", "CenturySchL-Roma", "Georgia"],
++  style: NORMAL,
++  ultimate: "serif"
++}], ["BookmanOldStyle", {
++  local: ["BookmanOldStyle", "Bookman Old Style", "URWBookman-Regular", "Georgia"],
++  style: NORMAL,
++  ultimate: "serif"
++}], ["FranklinGothic", {
++  local: ["FranklinGothic-Medium", "Franklin Gothic Medium", "ArialNarrow", "Arial Narrow", "Helvetica"],
++  style: NORMAL,
++  ultimate: "sans-serif"
++}], ["GillSans", {
++  local: ["GillSans", "GillSansMT", "Gill Sans MT", "TrebuchetMS", "Lato-Regular"],
++  style: NORMAL,
++  ultimate: "sans-serif"
++}], ["Futura", {
++  local: ["Futura-Medium", "Futura Medium", "AvenirNext-Regular", "CenturyGothic", "Century Gothic", "URWGothic-Book"],
++  style: NORMAL,
++  ultimate: "sans-serif"
++}], ["Optima", {
++  local: ["Optima-Regular", "Optima Regular", "Candara", "NotoSans-Regular"],
++  style: NORMAL,
++  ultimate: "sans-serif"
++}], ["Baskerville", {
++  local: ["Baskerville", "LibreBaskerville-Regular", "Libre Baskerville", "Georgia", "TimesNewRomanPSMT"],
++  style: NORMAL,
++  ultimate: "serif"
++}],
++// __MARGINALIA_CJK_SUBSTITUTION__ — CJK fallback chains for non-embedded fonts (pnpm patch)
++["MicrosoftYaHei", {
++  local: ["MicrosoftYaHei", "Microsoft YaHei", "PingFangSC-Regular", "HiraginoSansGB-W3", "NotoSansCJKsc-Regular", "SourceHanSansSC-Regular"],
++  style: NORMAL,
++  ultimate: "sans-serif"
++}], ["MicrosoftYaHei-Bold", {
++  alias: "MicrosoftYaHei",
++  style: BOLD,
++  ultimate: "sans-serif"
++}], ["SimSun", {
++  local: ["SimSun", "STSongti-SC-Regular", "STSong", "NotoSerifCJKsc-Regular", "SourceHanSerifSC-Regular"],
++  style: NORMAL,
++  ultimate: "serif"
++}], ["NSimSun", {
++  alias: "SimSun",
++  style: NORMAL,
++  ultimate: "serif"
++}], ["SimHei", {
++  local: ["SimHei", "STHeitiSC-Medium", "PingFangSC-Semibold", "NotoSansCJKsc-Bold", "SourceHanSansSC-Bold"],
++  style: NORMAL,
++  ultimate: "sans-serif"
++}], ["KaiTi", {
++  local: ["KaiTi", "STKaitiSC-Regular", "STKaiti", "ARPLUKaiCN"],
++  style: NORMAL,
++  ultimate: "serif"
++}], ["FangSong", {
++  local: ["FangSong", "STFangsong", "FangSong_GB2312"],
++  style: NORMAL,
++  ultimate: "serif"
++}], ["FZSSJW--GB1-0", {
++  local: ["FZShuSong-Z01S", "STSongti-SC-Regular", "SimSun", "NotoSerifCJKsc-Regular", "SourceHanSerifSC-Regular"],
++  style: NORMAL,
++  ultimate: "serif"
++}], ["FZHTJW--GB1-0", {
++  local: ["FZHei-B01S", "STHeitiSC-Medium", "SimHei", "PingFangSC-Regular", "NotoSansCJKsc-Regular"],
++  style: NORMAL,
++  ultimate: "sans-serif"
++}], ["FZDHTJW--GB1-0", {
++  local: ["FZDaHei-B02S", "STHeitiSC-Medium", "SimHei", "PingFangSC-Semibold", "NotoSansCJKsc-Bold"],
++  style: {
++    style: "normal",
++    weight: "600"
++  },
++  ultimate: "sans-serif"
++}], ["FZKTJW--GB1-0", {
++  local: ["FZKai-Z03S", "STKaitiSC-Regular", "KaiTi", "STKaiti"],
++  style: NORMAL,
++  ultimate: "serif"
++}], ["FZFSJW--GB1-0", {
++  local: ["FZFangSong-Z02S", "STFangsong", "FangSong"],
++  style: NORMAL,
++  ultimate: "serif"
++}], ["FZXBSJW--GB1-0", {
++  local: ["FZXiaoBiaoSong-B05S", "STSongti-SC-Bold", "SimSun"],
++  style: {
++    style: "normal",
++    weight: "600"
++  },
++  ultimate: "serif"
++}], ["PMingLiU", {
++  local: ["PMingLiU", "STSongti-TC-Regular", "NotoSerifCJKtc-Regular"],
++  style: NORMAL,
++  ultimate: "serif"
++}], ["MS-Mincho", {
++  local: ["MS-Mincho", "MS Mincho", "HiraMinProN-W3", "YuMincho-Regular", "NotoSerifCJKjp-Regular"],
++  style: NORMAL,
++  ultimate: "serif"
++}], ["MS-Gothic", {
++  local: ["MS-Gothic", "MS Gothic", "HiraKakuProN-W3", "YuGothic-Medium", "NotoSansCJKjp-Regular"],
++  style: NORMAL,
++  ultimate: "sans-serif"
++}],
++["Times-Roman", {
+   local: ["Times New Roman", "Times-Roman", "Times", "Liberation Serif", "Nimbus Roman", "Nimbus Roman L", "Tinos", "Thorndale", "TeX Gyre Termes", "FreeSerif", "Linux Libertine O", "Libertinus Serif", "PT Astra Serif", "DejaVu Serif", "Bitstream Vera Serif", "Ubuntu"],
+   style: NORMAL,
+   ultimate: "serif"
+@@ -32827,7 +32990,7 @@ function getFontSubstitution(systemFontCache, idFactory, localFontPath, baseFont
+   if (baseFontName.startsWith("InvalidPDFjsFont_")) {
+     return null;
+   }
+-  if ((type === "TrueType" || type === "Type1") && /^[A-Z]{6}\+/.test(baseFontName)) {
++  if (/^[A-Z]{6}\+/.test(baseFontName)) {
+     baseFontName = baseFontName.slice(7);
+   }
+   baseFontName = normalizeFontName(baseFontName);

@@ -26,3 +26,5 @@ allowBuilds:
   "@swc/core": true
   fs-xattr: true
   macos-alias: true
+patchedDependencies:
+  pdfjs-dist: patches/pdfjs-dist.patch
