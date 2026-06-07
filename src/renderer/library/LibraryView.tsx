@@ -62,6 +62,9 @@ export function LibraryView() {
     mutationFn: (b: BookSummaryDto) => window.api.library.delete({ bookId: b.id }),
     onSuccess: (_r, b) => {
       void qc.invalidateQueries({ queryKey: qk.library });
+      // shelf 键不含 bookId（["recently-read"]），下面的谓词移除轮不到它；删的书可能正在
+      // shelf 上（DB 侧 progress 已级联删），不失效就一直挂着死书（staleTime:0 只救重挂载）。
+      void qc.invalidateQueries({ queryKey: qk.recentlyRead });
       // 该书的 per-book 缓存（book/chapters/toc/bytes/progress/annotations/summary/conversations…）
       // 整体移除（remove 非 invalidate——书已不在，不该 refetch）。否则重导同一文件（id=文件哈希
       // 不变）后开书会命中删除前的陈旧缓存（staleTime=∞），如旧 title=null 致侧栏书卡显示 id 哈希。
