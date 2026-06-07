@@ -48,6 +48,7 @@ export const libraryBindings: Binding[] = [
     const bytes = new Uint8Array(buf);
     const book = await importBook(getDb(), { bytes, fileName: path.basename(input.filePath) });
     await writeBookFile(appService.getPath("booksDir"), book.id, book.format, bytes); // 复制进 app 自有位置（relink/重导即覆盖）
+    log.info(`book imported: ${book.id} (${book.format}, ${Math.round(bytes.length / 1024)}KB)`);
     return toDto({ ...book, hasCover: book.cover != null && book.cover.length > 0 });
   }),
 

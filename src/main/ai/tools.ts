@@ -8,6 +8,9 @@ import { listChapters, readChapterText } from "@main/library/content";
 import { getChapterSummaryView } from "@main/ai/summary";
 import { getBook, resolveChapterByHref } from "@main/library/repository";
 import { extractPdfText, renderPageImage } from "@marginalia/pdf-parser";
+import { createLogger } from "@main/logger";
+
+const log = createLogger("tools");
 
 /** 取某书原始字节（生产实现读 app 自有派生路径；测试注入 fixture 字节）。 */
 export type LoadBytes = (bookId: string) => Promise<Uint8Array>;
@@ -60,10 +63,11 @@ export function resolveChapterRef(db: DB, bookId: string, ref: string): string {
  * 回复（onError → 该轮 status=error），模型没有自我纠正的机会；转 result 后错误进入
  * 对话流，模型可据错误信息（如 resolveChapterRef 的章节清单）换参重试。
  */
-async function runTool<T>(fn: () => Promise<T> | T): Promise<T | { error: string }> {
+async function runTool<T>(name: string, fn: () => Promise<T> | T): Promise<T | { error: string }> {
   try {
     return await fn();
   } catch (err) {
+    log.warn(`tool ${name} failed (error returned to model for self-correction)`, err);
     return { error: err instanceof Error ? err.message : String(err) };
   }
 }
@@ -84,7 +88,9 @@ export function createReadingTools(deps: ReadingToolsDeps) {
         "Get the cached AI summary (and its status) of a chapter by its id (from getToc).",
       inputSchema: z.object({ chapterId: z.string().min(1) }),
       execute: async ({ chapterId }) =>
-        runTool(() => getChapterSummaryView(db, bookId, resolveChapterRef(db, bookId, chapterId))),
+        runTool("getChapterSummary", () =>
+          getChapterSummaryView(db, bookId, resolveChapterRef(db, bookId, chapterId)),
+        ),
     }),
     readChapterText: tool({
       description:
@@ -95,7 +101,7 @@ export function createReadingTools(deps: ReadingToolsDeps) {
         maxChars: z.number().int().positive().optional(),
       }),
       execute: async ({ chapterId, offset, maxChars }) =>
-        runTool(async () => {
+        runTool("readChapterText", async () => {
           const id = resolveChapterRef(db, bookId, chapterId);
           const bytes = await loadBytes(bookId);
           return await readChapterText(db, bytes, bookId, id, { offset, maxChars });
@@ -124,7 +130,7 @@ export function createReadingTools(deps: ReadingToolsDeps) {
         mode: z.enum(modes).default("text"),
       }),
       execute: async ({ page, mode }) =>
-        runTool(async () => {
+        runTool("readPage", async () => {
           if (page > pageCount) {
             throw new Error(`page ${page} is out of range (this book has ${pageCount} pages)`);
           }
