@@ -39,6 +39,7 @@
 - **DD-6 职责分层**：`ConversationRow`（同文件私有子组件）管自身 ContextMenu + hover 按钮，上抛 `onDeleteRequest`；`ConversationsTab` 持有 mutation、共享 AlertDialog、缓存清理与 toast（镜像删书 DD-5 的 BookCover/LibraryView 分工）。
 
 - **DD-7 嵌套交互的结构约束**：会话行本身是 `<button>`，hover 垃圾桶**不得嵌套其中**（HTML 禁止 button 套 button）——垃圾桶为绝对定位的兄弟元素，外层 `div.group.relative` 由 `ContextMenuTrigger render` 提供。时间戳 `group-hover:opacity-0`（保留占位防行宽跳动），垃圾桶 `hidden group-hover:flex` 覆盖其位。
+  - **垂直居中必须用 `inset-y-0 my-auto`，禁用 `top-1/2 -translate-y-1/2`**（CDP 冒烟实测修正，commit `77bf1af`）：Button 组件自带 `active:translate-y-px`（按下下沉效果），`:active` 瞬间会覆盖同为 `translate` 属性的定位偏移——按钮在 mousedown 与 mouseup 之间跳离指针 15px，click 在共同祖先上合成、永远到不了按钮（落到行内时间戳），hover 删除入口完全失效。另需 `z-10` 显式提层（时间戳 `opacity-0` 后仍占位接收 pointer events）。
 
 - **DD-8 幂等与防御边界**：`deleteConversation` 幂等（0-row delete 不抛）；重复删除/竞态安全。`conversations:delete` 不校验会话归属（任何 id 可删）——单用户本地 app，无越权面；与 `annotationsDelete` 同形状（`{ id }`，`conversationIdInput` 复用）。
 
