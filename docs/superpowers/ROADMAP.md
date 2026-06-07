@@ -12,10 +12,6 @@
 
 **PDF 支持已收敛，产品定位更新为 ePub + PDF AI 阅读器**（2026-06-07）：PDF 轨 P1–P3 与用户反馈修复批已落地，Marginalia 不再只是 ePub reader。现支持 ePub / PDF 拖拽导入、PDF 渲染与进度、textLayer 选区问 AI、`readPage` 页级工具、PDF 标注恢复、TOC 跳页、超链接点击、缩放偏好和扫描版文本层门控；入口文档同步更新为「ePub and PDF AI reader」。PDF 仍保留若干体验/工程延后项（OCR、页内精确恢复、pdfjs 体积裁剪等），但核心阅读/选择/提问/标注闭环已收口。
 
-**独立摘要模型已交付**（2026-06-05）：章节摘要、全书摘要、会话自动命名三个轻量任务改走独立配置的「摘要模型」（设置 → 模型 → 摘要模型），与聊天主模型分流。① **存储/解析**：`preferences` 注册 `summaryModel` key（原子 `{providerId, model}` 对，无 DB 迁移）；`resolveSummaryModel(db)` 与 `resolveAssistantModel` 并列同构——**未设报错、provider 被删报错，绝不回退聊天模型**（用户显式决策）；错误经现有 `ResolvedModel` 语义透传（手动生成 toast 真实原因 / 开章自动触发静默 pending / naming 跳过保 null 占位）。② **链路**：`makeSummaryDeps` 改接；`SendDeps` 新增 `resolveSummaryModel` 字段供 onFinish 起名（聊天本体零改动，测试用 doStream-only/doGenerate-only 双 mock 锁分流）。③ **设置 UI**：提取 `ModelPickerSection` 共享基件（provider/model 双 Select + 测试连接；testResult 退役 settings-store 单槽改基件本地态）；新 `SummaryModelPicker`（draft 持本地、选定 model 才原子落盘；切回已存 provider 恢复已存 model）。④ **冒烟揪出隐藏 bug**：`preferences:set` handler 的按 key switch 缺 case 时静默吞写（IPC 返回成功但不落盘）——`summaryModel` 中招，且**既有 `readerLayout` 持久化从未工作过**同因；修复补 case + `never` 穷尽性守卫（今后漏 case 直接 typecheck 红）。subagent-driven 执行（6 任务双评审 + opus 终审 READY TO MERGE），388 测试 + CDP 真启动冒烟全场景（未配置 toast、配置落盘、deepseek-v4-flash 真实生成摘要、auto naming 起名「阿德勒目的论：为目的而选择」而聊天走 v4-pro、readerLayout 修复验证）。**留债已清**（同日）：共用错误 key 改名 `errors.configuredProvider*`（`providerNotFound` 名已被带 `{{id}}` 的占用，故取 configured 前缀）；`ContextPillBar` chip toggle 懒生成吞错改 toast 透传（复用 `ai.summary.generateFailed`，真启动验证「译者序」pending 章 chip 点亮 → toast「未配置摘要模型」）。详见 `specs/2026-06-05-summary-model-design.md` / `plans/2026-06-05-summary-model.md`。
-
-**断网本地数据不可用已修复**（2026-06-06）：用户报告断网时设置页已配置数据（providers/模型等）取不到，但数据明明在本地 db——根因：React Query 默认 `networkMode: "online"` 在 `navigator.onLine=false` 时把**所有** query/mutation 整体 pause（`queryFn` 根本不执行），而本 app 全部 queryFn/mutationFn 走 IPC 读写本地 SQLite、不经网络；`query/client.ts` 注释自述「适配本地 IPC」却漏配此项（受影响面=全 app 读+写，断网时写入也静默卡住）。修复：`defaultOptions` 给 queries+mutations 双双加 `networkMode: "always"`；真正的网络请求都在主进程 `net.fetch` 发起、失败透传真实错误，渲染层一律按本地调用处理是安全的。CDP 真启动复现实锤（dispatch offline 事件 → `fetchStatus: "paused"`；修复后 offline 照常取回 4 个 provider）+ 行为级回归测试 2 枚（`onlineManager.setOnline(false)` 断言 query/mutation 仍执行）。
-
 **下一目标候选**：PDF 收敛后的延后项（OCR / pdfjs 体积裁剪 / 页内精确恢复 / 真实 provider 图像模式验证）、workspace packages 预构建治理、设置/产品 backlog（最大并发数 / 代理 / stepLimit / onboarding 引导）、其余延后项（选区工具栏 → Base UI 原语、自绘窗口 chrome、嵌套 TOC / 章内分页）。类型设计债清理 ✅、颜色模式 ✅、`preferences` ✅、RA5 ✅、RA1-full「精度/内存 pass」✅、IPC 契约注册表 #8 ✅、类 macOS 自绘滚动条 ✅、会话 tab ✅、三向可收起布局 ✅、**会话-章节解耦 ✅** 均已完成。
 
 ---
@@ -27,8 +23,9 @@
 - **2026-06-02**：最小可用竖切（PR #6） · RA1-full（epub.js 真实渲染 + CFI 锚定）
 - **2026-06-03**：RA3+M-b 标注与笔记 · RA5 多 provider · i18n 双语 · 书库拖拽导入 · 书库封面墙 · 书库右键删书 · #9 DB 生命周期规则（P1–P4） · IPC 契约注册表（#8） · 阅读精度 / 长书内存 pass
 - **2026-06-04**：类 macOS 自绘滚动条 · 会话 tab · API key 明文落库 · ReaderView 三向可收起布局 · 章节名显示 · 空摘要防御 + 章节摘要重生成 · 摘要状态卡死 + 生成错误静默修复 · GitHub Release 发布流程 · macOS ad-hoc 签名 · Homebrew tap 分发 · v0.2.0 发布
-- **2026-06-05**：会话-章节解耦 + 摘要 chip 化 + 自动命名 · v0.3.0 发布
-- **2026-06-07**：PDF 支持收敛（导入 / 渲染 / textLayer 选区问 AI / readPage / 标注 / 链接 / 缩放）· 产品定位更新为 ePub + PDF AI 阅读器
+- **2026-06-05**：会话-章节解耦 + 摘要 chip 化 + 自动命名 · v0.3.0 发布 · 上下文 pill 体系迭代 · 独立摘要模型
+- **2026-06-06**：断网本地数据不可用修复（React Query networkMode）
+- **2026-06-07**：PDF 支持收敛——整轨 P1 渲染/进度 · P2 选区问 AI/readPage · P3 标注 + 体验修复批（缩放弹层 / textLayer 对齐 / 字体替代链 / 选区交互对齐）· 链接可点击 · AI 阅读位置注入 · 产品定位更新为 ePub + PDF AI 阅读器
 
 ---
 
