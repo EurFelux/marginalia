@@ -70,6 +70,30 @@ describe("logger-service (main)", () => {
     expect(readLog("main")).not.toContain("\x1b[");
   });
 
+  it("indents every continuation line of a multiline message (forged-line injection defense)", () => {
+    // renderer 可经 log:write 在 message 里嵌换行——非首行必须强制缩进，伪造的“日志行”无法顶格成为合法条目
+    writeRendererLog(
+      "error",
+      "evil",
+      "real msg\n[2026-01-01T00:00:00.000Z] [main] [error] [fake] forged line",
+    );
+    const content = readLog("renderer");
+    expect(content).toContain("\n  [2026-01-01T00:00:00.000Z] [main] [error] [fake] forged line");
+    expect(content).not.toMatch(/\n\[2026-01-01/); // 顶格的伪造行不存在
+  });
+
+  it("collapses whitespace in module names to keep the four-segment header single-line", () => {
+    writeRendererLog("warn", "a\nb", "msg");
+    expect(readLog("renderer")).toContain("[renderer] [warn] [a b] msg");
+  });
+
+  it("truncates oversized bodies with a marker", () => {
+    createLogger("big").warn("x".repeat(10_000));
+    const content = readLog("main");
+    expect(content).toContain("…[truncated]");
+    expect(content.length).toBeLessThan(9_000);
+  });
+
   it("writeRendererLog lands in the renderer file and does NOT echo to main console", () => {
     writeRendererLog("error", "boundary", "component crashed");
     const content = readLog("renderer");

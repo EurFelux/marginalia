@@ -41,6 +41,10 @@ function withErr(message: string, err?: unknown): string {
   return `${message}\n${text}`;
 }
 
+/** schema 的 message.max 上限以内预截断——超长日志应截断落盘而非被校验整条拒收 */
+const MESSAGE_MAX = 8192;
+const MODULE_MAX = 64;
+
 class LoggerService {
   log(level: LogLevel, module: string, message: string, err?: unknown): void {
     // DevTools console：保留原始 err 对象（可展开 inspect），格式与文件侧四段式对齐
@@ -49,7 +53,13 @@ class LoggerService {
       ...(err === undefined ? [] : [err]),
     );
     // IPC 落盘：fire-and-forget，失败静默——日志绝不搞崩 UI
-    void window.api.log.write({ level, module, message: withErr(message, err) }).catch(() => {});
+    void window.api.log
+      .write({
+        level,
+        module: module.slice(0, MODULE_MAX) || "renderer",
+        message: withErr(message, err).slice(0, MESSAGE_MAX),
+      })
+      .catch(() => {});
   }
 }
 

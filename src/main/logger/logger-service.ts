@@ -32,7 +32,10 @@ const CONSOLE_FN: Record<LogLevel, (msg: string) => void> = {
   debug: (m) => console.log(m),
 };
 
-/** Error/unknown 展开为缩进两格的附加行；非 Error 值 JSON.stringify 兜底（不可序列化则取 "[unserializable]"） */
+const MODULE_MAX = 64;
+const BODY_MAX = 8192;
+
+/** Error/unknown 展开为附加行（缩进统一由 normalizeBody 做）；非 Error 值 JSON.stringify 兜底 */
 function formatErr(err: unknown): string {
   if (err === undefined) return "";
   let text: string;
@@ -47,10 +50,21 @@ function formatErr(err: unknown): string {
       text = "[unserializable]";
     }
   }
-  return `\n${text
-    .split("\n")
-    .map((l) => `  ${l.trimStart()}`)
-    .join("\n")}`;
+  return `\n${text}`;
+}
+
+/** module 折叠为单行并截断——防经 IPC 注入换行/超长破坏四段式头（schema 限长是第一层，这里兜内部调用） */
+function sanitizeModule(module: string): string {
+  return module.replace(/\s+/g, " ").trim().slice(0, MODULE_MAX);
+}
+
+/** body（message + err 展开）规范化：超长截断；非首行统一缩进两格——
+ * 保持四段式首行可 grep，也让多行 message 无法注入顶格的伪造日志行 */
+function normalizeBody(body: string): string {
+  const capped = body.length > BODY_MAX ? `${body.slice(0, BODY_MAX)}…[truncated]` : body;
+  const [first = "", ...rest] = capped.split("\n");
+  if (rest.length === 0) return first;
+  return [first, ...rest.map((l) => `  ${l.trimStart()}`)].join("\n");
 }
 
 /** 类不导出：公共面仅 createLogger（barrel）与 writeRendererLog（log-handlers 深导入） */
@@ -62,7 +76,8 @@ class LoggerService {
     if (level === "debug" && !appService.isDev) return;
 
     const now = new Date();
-    const line = `[${now.toISOString()}] [${source}] [${level}] [${module}] ${message}${formatErr(err)}`;
+    const body = normalizeBody(`${message}${formatErr(err)}`);
+    const line = `[${now.toISOString()}] [${source}] [${level}] [${sanitizeModule(module)}] ${body}`;
 
     // 恒双写之 console 侧：仅 main 来源回显 stdout——renderer 日志已在 DevTools 输出过，不混流
     if (source === "main") {
