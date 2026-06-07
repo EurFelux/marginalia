@@ -1,6 +1,18 @@
+import { createRequire } from "node:module";
+import path from "node:path";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import type { ChapterRange, ParsedPdf, TocNode } from "./types";
+
+// pdfjs 资源目录（Node 环境 factory 用 fs 读普通路径；打包后位于 asar 内 node_modules，
+// Electron 的 fs 对 asar 透明可读）。cmaps = CID 字体编码映射——缺失时部分 CJK 书
+// getTextContent 解码出乱码（文本提取/选区上下文/AI 阅读全受影响）。
+// 解析锚点双环境兼容：主进程 vite 产物是 CJS（import.meta.url 为 undefined，但全局
+// require 真实可用）；vitest 跑 ESM 源码（无全局 require，import.meta.url 可用）。
+const requireFn = typeof require !== "undefined" ? require : createRequire(import.meta.url);
+const PDFJS_ROOT = path.dirname(requireFn.resolve("pdfjs-dist/package.json"));
+const CMAP_URL = path.join(PDFJS_ROOT, "cmaps") + path.sep;
+const STANDARD_FONT_DATA_URL = path.join(PDFJS_ROOT, "standard_fonts") + path.sep;
 
 /** 文本层检测：采样页平均字符数低于此阈值 → 视为扫描版。 */
 const TEXT_LAYER_MIN_AVG_CHARS = 50;
@@ -10,7 +22,12 @@ const TEXT_LAYER_SAMPLE_PAGES = 8;
  * 打开 PDF 文档。pdfjs 会 transfer 传入 buffer（之后原数组不可用），故一律传副本。
  */
 export async function openPdf(bytes: Uint8Array): Promise<PDFDocumentProxy> {
-  const task = getDocument({ data: bytes.slice() });
+  const task = getDocument({
+    data: bytes.slice(),
+    cMapUrl: CMAP_URL,
+    cMapPacked: true,
+    standardFontDataUrl: STANDARD_FONT_DATA_URL,
+  });
   try {
     return await task.promise;
   } catch (err) {

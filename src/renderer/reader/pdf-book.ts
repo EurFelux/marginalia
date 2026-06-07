@@ -31,9 +31,23 @@ export interface PdfBook {
   destroy: () => void;
 }
 
+// pdfjs 资源目录（vite-plugin-static-copy 输出到产物根；dev 由插件中间件同路径供给）。
+// 相对 document.baseURI 绝对化：dev = devserver 根，prod = .vite/renderer/main_window/。
+const CMAP_URL = new URL("cmaps/", document.baseURI).href;
+const STANDARD_FONT_DATA_URL = new URL("standard_fonts/", document.baseURI).href;
+
 export async function createPdfBook(bytes: Uint8Array): Promise<PdfBook> {
   // pdfjs 会 transfer 传入 buffer——传副本，避免 react-query 缓存的 bytes 被 neuter。
-  const loadingTask = pdfjsLib.getDocument({ data: bytes.slice() });
+  // cMapUrl：CID 字体（CJK 书常见）的编码映射，缺失会致部分书文字画错/textLayer 乱码；
+  // standardFontDataUrl：标准 14 字体字形数据，非嵌入西文字体（Times/Arial 等）替代渲染用。
+  // 注：未嵌入且替代表不认识的 CJK 字体名（方正系等）仍会回退默认字体——pdfjs 字体替代
+  // 能力不及 Chrome 内置 PDFium（系统级 CJK 字体匹配链），属引擎边界非配置缺失。
+  const loadingTask = pdfjsLib.getDocument({
+    data: bytes.slice(),
+    cMapUrl: CMAP_URL,
+    cMapPacked: true,
+    standardFontDataUrl: STANDARD_FONT_DATA_URL,
+  });
   let doc: PDFDocumentProxy;
   try {
     doc = await loadingTask.promise;
