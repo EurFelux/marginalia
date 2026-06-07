@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { BookOpen, FolderOpen, Settings } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import type { BookSummaryDto } from "@shared/library";
+import type { BookSummaryDto, UpdateBookInput } from "@shared/library";
 import { Button } from "@renderer/components/ui/button";
 import { ScrollArea } from "@renderer/components/ui/scroll-area";
 import { qk } from "@renderer/query/keys";
@@ -60,6 +60,25 @@ export function LibraryView() {
       toast.error(
         t("library.deleteFailed", "{{title}} 删除失败：{{error}}", {
           title: b.title ?? b.id,
+          error: (e as Error).message,
+        }),
+        { closeButton: true, duration: Infinity },
+      );
+    },
+  });
+
+  // 编辑书名/作者：成功静默（卡片即时刷新就是反馈）；失败 toast 透传主进程真实错误（honest-error）。
+  // qk.book(bookId) 必须一并失效——reader 侧栏 BookCard 与顶栏面包屑共用该 key，且 staleTime=∞。
+  const updateBook = useMutation({
+    mutationFn: (input: UpdateBookInput) => window.api.library.update(input),
+    onSuccess: (_r, input) => {
+      void qc.invalidateQueries({ queryKey: qk.library });
+      void qc.invalidateQueries({ queryKey: qk.book(input.bookId) });
+    },
+    onError: (e, input) => {
+      toast.error(
+        t("library.updateFailed", "{{title}} 保存失败：{{error}}", {
+          title: input.title,
           error: (e as Error).message,
         }),
         { closeButton: true, duration: Infinity },
@@ -170,6 +189,7 @@ export function LibraryView() {
                   book={b}
                   onOpen={() => openBook(b.id)}
                   onDelete={() => deleteBook.mutate(b)}
+                  onUpdate={(patch) => updateBook.mutate({ bookId: b.id, ...patch })}
                 />
               </li>
             ))}
