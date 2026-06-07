@@ -212,5 +212,11 @@ export default {
   "settings.summaryModel.desc": "Used for chapter/book summaries and conversation auto-naming",
   "settings.system": "System",
   "settings.title": "Settings",
+  "streamdown.close": "Close",
+  "streamdown.copied": "Copied",
+  "streamdown.copyLink": "Copy link",
+  "streamdown.externalLinkWarning": "You're about to visit an external website.",
+  "streamdown.openExternalLink": "Open external link?",
+  "streamdown.openLink": "Open link",
   "terms.provider": "provider",
 } as const;

@@ -201,5 +201,11 @@ export default {
   "settings.summaryModel.desc": "用于章节/全书摘要与会话自动命名",
   "settings.system": "跟随系统",
   "settings.title": "设置",
+  "streamdown.close": "关闭",
+  "streamdown.copied": "已复制",
+  "streamdown.copyLink": "复制链接",
+  "streamdown.externalLinkWarning": "即将访问外部网站。",
+  "streamdown.openExternalLink": "打开外部链接？",
+  "streamdown.openLink": "打开链接",
   "terms.provider": "模型服务商",
 } as const;

@@ -1,11 +1,11 @@
 import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Streamdown } from "streamdown";
 import type { SummaryStatus } from "@shared/library";
 import { qk } from "@renderer/query/keys";
 import { bookSummaryQuery } from "@renderer/query/summary-queries";
 import { cn } from "@renderer/lib/utils";
+import { LocalizedStreamdown } from "@renderer/components/LocalizedStreamdown";
 import { Button } from "@renderer/components/ui/button";
 import { ScrollArea } from "@renderer/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@renderer/components/ui/popover";
@@ -133,7 +133,7 @@ export function BookCard({ bookId }: { bookId: string }) {
             <div className="text-sm leading-relaxed text-foreground">
               {text ? (
                 // Streamdown 渲染 markdown（同 AI 消息）；生成中即流式渲染累积的 partial
-                <Streamdown>{text}</Streamdown>
+                <LocalizedStreamdown>{text}</LocalizedStreamdown>
               ) : (
                 <p className="whitespace-pre-wrap text-xs text-muted-foreground">
                   {noTextLayer

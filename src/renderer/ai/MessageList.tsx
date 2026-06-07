@@ -1,9 +1,9 @@
 import type { ChatStatus } from "ai";
 import { Sparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { Streamdown } from "streamdown";
 import { chipLabel } from "@renderer/ai/chip-label";
 import type { ChatUIMessage } from "@renderer/ai/types";
+import { LocalizedStreamdown } from "@renderer/components/LocalizedStreamdown";
 
 function textOf(m: ChatUIMessage): string {
   return m.parts.map((p) => (p.type === "text" ? p.text : "")).join("");
@@ -82,7 +82,7 @@ function AssistantBubble({ m, streaming }: { m: ChatUIMessage; streaming: boolea
       {showBubble && (
         <div className="max-w-[88%] rounded-2xl rounded-bl-sm bg-muted px-3.5 py-2 text-sm leading-relaxed text-foreground">
           {/* Streamdown 自带 markdown 排版（经 @source 由 Tailwind 生成其类）；不叠 prose 以免边距打架 */}
-          <Streamdown>{text}</Streamdown>
+          <LocalizedStreamdown>{text}</LocalizedStreamdown>
           {streaming && text === "" && (
             <span className="inline-block animate-pulse text-primary">▍</span>
           )}
