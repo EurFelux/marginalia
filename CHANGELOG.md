@@ -1,5 +1,24 @@
 # marginalia
 
+## 0.5.0
+
+### Minor Changes
+
+- d6a5e93: You can now edit a book's title and author right from the library: right-click a book cover and choose "Edit details". This finally gives you a way to clean up messy metadata from repackaged files (site-suffixed titles, garbled authors) or name books that imported without a title — no more deleting and re-importing. Leaving the author field empty shows the book as "Unknown author"; titles can't be empty. Changes show up immediately on the library card and inside the reader.
+- 2065af2: Conversations in the sidebar can now be deleted — right-click one or hover and hit the trash icon, then confirm. Deleting the conversation you're currently in clears the AI panel back to a fresh-start state, and if the AI is mid-reply for it, the stream is stopped cleanly. All of the conversation's messages are removed with it.
+- d10e0dd: Add a "Continue reading" shelf, manual library ordering, and reading progress display
+  - **Continue reading shelf**: the library now shows your 3 most recently read books above the grid, as info cards with cover, title, author, and a reading progress bar. Click a card to jump back in. The shelf hides itself until you've read something.
+  - **Drag to reorder**: rearrange books in the library grid by dragging. Your custom order persists; newly imported books land at the front.
+  - **Reading progress in the reader**: the header breadcrumb now shows how far you are — a percentage for ePubs, page numbers plus percentage for PDFs (e.g. `12 / 304 · 4%`).
+
+- 24616f3: Marginalia now keeps persistent logs, so problems can be diagnosed after the fact instead of vanishing with the session. Notable events — errors, AI pipeline hiccups, import and migration activity — are written to daily log files (kept for 30 days) under the app's data directory, with main-process and reader-window logs stored in separate files. A new "Advanced" section in Settings provides an "Open logs folder" button so you can grab the files when reporting an issue.
+
+  Crashes and silent failures leave traces too: the reader window now reports script errors and component crashes (showing a friendly reload screen instead of a blank page), and operations that used to fail invisibly — AI tool calls, summary generation, reading-progress saves — are all recorded.
+
+### Patch Changes
+
+- 2eb00ab: Tool-call steps in AI replies now appear inside the assistant bubble, inline with the response text in the order they happened, instead of stacking as separate cards above it. Each step is a compact one-line row with a human-readable description — "Reading page 12" or "Reading “Preface”" rather than raw tool names — and a live status (loading / done / failed). Failed steps are shown honestly in red, so you can see the AI correct itself and retry. Works for past conversations too.
+
 ## 0.4.0
 
 ### Minor Changes
