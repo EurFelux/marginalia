@@ -2,11 +2,11 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { createDb, runMigrations } from "@main/db/client";
 import { books } from "@main/db/schema";
-import { getAppInfo, ping } from "@main/app-service";
+import { getAppInfo, ping } from "@main/app-info";
 
 const MIGRATIONS = path.resolve(__dirname, "db/migrations");
 
-describe("app-service", () => {
+describe("app-info", () => {
   it("ping echoes the message", () => {
     expect(ping({ msg: "hello" })).toEqual({ echo: "hello" });
   });

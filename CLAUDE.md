@@ -29,7 +29,7 @@ pnpm format:check   # oxfmt --check
 # 测试（headless；vitest 跑在 Electron 运行时，与 app 同 ABI，无需翻转）
 pnpm test           # vitest run（一次性跑完）
 pnpm test:watch     # vitest（监视模式）
-pnpm test src/main/app-service.test.ts   # 运行单个文件
+pnpm test src/main/app-info.test.ts   # 运行单个文件
 pnpm test -t "getAppInfo counts"         # 按测试名称过滤
 
 # 数据库
@@ -87,7 +87,7 @@ IPC 通道名、输入/输出 Zod schema 以及通过 `z.infer` 推导出的 Typ
 - `src/main/ipc/registry.ts`：`handle(channel, zodSchema, fn)` 封装器，调用 `validateInput` 校验不可信入参后再交给业务函数。
 - `src/main/ipc/validate.ts`：`validateInput()` 用 Zod `safeParse` 校验原始入参，失败时抛出带通道名和详情的可读错误。
 - `src/main/ipc/app-handlers.ts`：胶水层——调用 `handle()` 并将 `getDb()` / `app.getVersion()` 等 Electron 依赖注入给纯函数。
-- `src/main/app-service.ts`：**纯函数**，接受注入的 `DB`，不引用任何 Electron API，可在 vitest Node 环境中直接测试。
+- `src/main/app-info.ts`：**纯函数**，接受注入的 `DB`，不引用任何 Electron API，可在 vitest Node 环境中直接测试。
 
 这套"纯业务函数 + 胶水层注入"的设计是测试策略的核心：只有 `registry.ts`、`*-handlers.ts`、`instance.ts`、`preload.ts`、`main.ts` 接触 Electron；业务逻辑保持无头可测。
 
