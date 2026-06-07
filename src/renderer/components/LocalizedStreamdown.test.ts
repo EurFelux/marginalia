@@ -1,26 +1,54 @@
 import { describe, expect, it } from "vitest";
 import type { TFunction } from "i18next";
+import { defaultTranslations, type StreamdownTranslations } from "streamdown";
 import { buildStreamdownTranslations } from "./LocalizedStreamdown";
 
-describe("buildStreamdownTranslations", () => {
-  it("maps external-link modal labels through i18n", () => {
-    const t = ((key: string) =>
-      ({
-        "streamdown.close": "关闭",
-        "streamdown.copied": "已复制",
-        "streamdown.copyLink": "复制链接",
-        "streamdown.externalLinkWarning": "即将访问外部网站。",
-        "streamdown.openExternalLink": "打开外部链接？",
-        "streamdown.openLink": "打开链接",
-      })[key] ?? key) as TFunction;
+const streamdownKeys: Array<keyof StreamdownTranslations> = [
+  "close",
+  "copied",
+  "copyCode",
+  "copyLink",
+  "copyTable",
+  "copyTableAsCsv",
+  "copyTableAsMarkdown",
+  "copyTableAsTsv",
+  "downloadDiagram",
+  "downloadDiagramAsMmd",
+  "downloadDiagramAsPng",
+  "downloadDiagramAsSvg",
+  "downloadFile",
+  "downloadImage",
+  "downloadTable",
+  "downloadTableAsCsv",
+  "downloadTableAsMarkdown",
+  "exitFullscreen",
+  "externalLinkWarning",
+  "imageNotAvailable",
+  "mermaidFormatMmd",
+  "mermaidFormatPng",
+  "mermaidFormatSvg",
+  "openExternalLink",
+  "openLink",
+  "tableFormatCsv",
+  "tableFormatMarkdown",
+  "tableFormatTsv",
+  "viewFullscreen",
+];
 
-    expect(buildStreamdownTranslations(t)).toMatchObject({
-      close: "关闭",
-      copied: "已复制",
-      copyLink: "复制链接",
-      externalLinkWarning: "即将访问外部网站。",
-      openExternalLink: "打开外部链接？",
-      openLink: "打开链接",
-    });
+describe("buildStreamdownTranslations", () => {
+  it("maps every Streamdown UI label through i18n", () => {
+    const t = ((key: string) => `[${key}]`) as TFunction;
+    const out = buildStreamdownTranslations(t);
+
+    expect(Object.keys(out).sort()).toEqual([...streamdownKeys].sort());
+    expect(out.openExternalLink).toBe("[streamdown.openExternalLink]");
+    expect(out.copyCode).toBe("[streamdown.copyCode]");
+    expect(out.downloadTableAsMarkdown).toBe("[streamdown.downloadTableAsMarkdown]");
+  });
+
+  it("falls back to Streamdown's upstream default labels", () => {
+    const t = ((_: string, fallback: string) => fallback) as TFunction;
+
+    expect(buildStreamdownTranslations(t)).toEqual(defaultTranslations);
   });
 });
