@@ -18,6 +18,7 @@ export function segments(parts: ChatUIMessage["parts"]): Segment[] {
   for (const p of parts) {
     if (p.type === "text") {
       if (p.text === "") continue;
+      // 累积仅发生在本次调用新建的对象上；调用方不得跨调用缓存返回的 Segment。
       const last = out.at(-1);
       if (last?.kind === "text") last.text += p.text;
       else out.push({ kind: "text", text: p.text });
