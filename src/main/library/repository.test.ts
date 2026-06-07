@@ -18,9 +18,12 @@ import {
   getBook,
   importBook,
   listBooks,
+  listRecentlyRead,
+  reorderBooks,
   resolveChapterByHref,
   updateBook,
 } from "@main/library/repository";
+import { saveProgress } from "@main/library/progress";
 import { storedBookPath } from "@main/library/book-files";
 import { makeFixtureEpub } from "@marginalia/epub-parser";
 import { renderPageImage } from "@marginalia/pdf-parser";
@@ -314,5 +317,74 @@ describe("updateBook", () => {
     expect(after.toc).toEqual(before.toc);
     expect(after.format).toBe(before.format);
     expect(after.summary).toBe(before.summary);
+  });
+});
+
+// 裸插书行（绕过 importBook 的 fixture 同 bytes→同 id 幂等限制；只测排序/查询无需完整导入）。
+let _seedSeq = 0;
+const seedBook = (db: ReturnType<typeof createDb>, id: string, position = 0) => {
+  db.insert(books).values({ id, title: id, position, addedAt: ++_seedSeq }).run();
+};
+
+describe("listBooks ordering (#48)", () => {
+  it("orders by position, then added_at for ties", () => {
+    const db = createDb(":memory:");
+    runMigrations(db, MIGRATIONS);
+    seedBook(db, "a"); // position 全 0 → added_at（插入序）平断
+    seedBook(db, "b");
+    seedBook(db, "c", -1); // 模拟新导入排最前
+    expect(listBooks(db).map((b) => b.id)).toEqual(["c", "a", "b"]);
+  });
+});
+
+describe("listRecentlyRead (#48)", () => {
+  const setupRead = () => {
+    const db = createDb(":memory:");
+    runMigrations(db, MIGRATIONS);
+    for (const id of ["a", "b", "c", "d"]) seedBook(db, id);
+    return db;
+  };
+  const touch = (db: ReturnType<typeof createDb>, id: string, at: number, percent?: number) => {
+    saveProgress(db, id, "epubcfi(/6/2!/4/1:0)", percent);
+    db.update(progress).set({ updatedAt: at }).where(eq(progress.bookId, id)).run();
+  };
+
+  it("returns only read books, most recent first", () => {
+    const db = setupRead();
+    touch(db, "a", 1000);
+    touch(db, "b", 3000);
+    expect(listRecentlyRead(db).map((r) => r.id)).toEqual(["b", "a"]); // d/c 未读不出现
+  });
+
+  it("caps at limit 3 and carries percent + lastReadAt", () => {
+    const db = setupRead();
+    touch(db, "a", 1000, 0.1);
+    touch(db, "b", 2000); // percent 未传 → null
+    touch(db, "c", 3000, 0.5);
+    touch(db, "d", 4000, 0.9);
+    const r = listRecentlyRead(db);
+    expect(r.map((x) => x.id)).toEqual(["d", "c", "b"]);
+    expect(r[0]).toMatchObject({ percent: 0.9, lastReadAt: 4000 });
+    expect(r[2]!.percent).toBeNull();
+  });
+});
+
+describe("reorderBooks (#48)", () => {
+  it("rewrites positions so listBooks follows the given order", () => {
+    const db = createDb(":memory:");
+    runMigrations(db, MIGRATIONS);
+    for (const id of ["a", "b", "c"]) seedBook(db, id);
+    reorderBooks(db, ["c", "a", "b"]);
+    expect(listBooks(db).map((b) => b.id)).toEqual(["c", "a", "b"]);
+  });
+});
+
+describe("import position (#48)", () => {
+  it("new imports land before existing books (MIN - 1; 0 on empty library)", async () => {
+    const db = createDb(":memory:");
+    runMigrations(db, MIGRATIONS);
+    const epub = await importBook(db, { bytes: makeFixtureEpub() }); // 空库 → 0
+    const pdf = await importBook(db, { bytes: await makeTextPdf({ outline: false }) }); // → -1，排最前
+    expect(listBooks(db).map((b) => b.id)).toEqual([pdf.id, epub.id]);
   });
 });

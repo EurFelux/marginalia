@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
-import { and, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { parseEpub, type TocNode } from "@marginalia/epub-parser";
 import { parsePdf, renderPageImage } from "@marginalia/pdf-parser";
 import type { DB } from "@main/db/client";
-import { books, chapters } from "@main/db/schema";
+import { books, chapters, progress } from "@main/db/schema";
 import { deleteBookFile } from "@main/library/book-files";
 import { createLogger } from "@main/logger";
 
@@ -64,6 +64,8 @@ function importEpubBook(db: DB, bytes: Uint8Array): BookRow {
         author: parsed.author ?? null,
         cover: parsed.cover ? Buffer.from(parsed.cover) : null,
         toc: parsed.toc,
+        // 新导入排最前（spec §3）：自引用标量子查询，空库 coalesce(NULL,1)-1 = 0。
+        position: sql`(coalesce((select min(position) from books), 1) - 1)`,
       })
       .run();
 
@@ -113,6 +115,8 @@ async function importPdfBook(db: DB, bytes: Uint8Array, fileName?: string): Prom
         format: "pdf",
         pageCount: parsed.pageCount,
         hasTextLayer: parsed.hasTextLayer,
+        // 新导入排最前（spec §3）：自引用标量子查询，空库 coalesce(NULL,1)-1 = 0。
+        position: sql`(coalesce((select min(position) from books), 1) - 1)`,
       })
       .run();
 
@@ -136,6 +140,9 @@ async function importPdfBook(db: DB, bytes: Uint8Array, fileName?: string): Prom
   });
 }
 
+/** 「继续阅读」shelf 容量（spec §4）。 */
+export const RECENT_SHELF_LIMIT = 3;
+
 export function listBooks(db: DB) {
   return db
     .select({
@@ -148,7 +155,41 @@ export function listBooks(db: DB) {
       hasTextLayer: books.hasTextLayer,
     })
     .from(books)
+    .orderBy(asc(books.position), asc(books.addedAt))
     .all();
+}
+
+/**
+ * 「继续阅读」shelf 数据（#48）：JOIN progress 按最近阅读排序。未读过的书（无 progress 行）
+ * 天然不出现；percent 为 null（老数据）由渲染层降级。不解析 locator——黑盒保持。
+ */
+export function listRecentlyRead(db: DB, limit = RECENT_SHELF_LIMIT) {
+  return db
+    .select({
+      id: books.id,
+      title: books.title,
+      author: books.author,
+      hasCover: sql<boolean>`${books.cover} is not null and length(${books.cover}) > 0`,
+      format: books.format,
+      pageCount: books.pageCount,
+      hasTextLayer: books.hasTextLayer,
+      percent: progress.percent,
+      lastReadAt: progress.updatedAt,
+    })
+    .from(books)
+    .innerJoin(progress, eq(progress.bookId, books.id))
+    .orderBy(desc(progress.updatedAt))
+    .limit(limit)
+    .all();
+}
+
+/** 手动排序全量重写（#48）：position = orderedIds 下标。未知 id 的 UPDATE 是 no-op，无害。 */
+export function reorderBooks(db: DB, orderedIds: string[]): void {
+  db.transaction((tx) => {
+    orderedIds.forEach((id, index) => {
+      tx.update(books).set({ position: index }).where(eq(books.id, id)).run();
+    });
+  });
 }
 export function getBook(db: DB, id: string): BookRow | undefined {
   return db.select().from(books).where(eq(books.id, id)).get();
