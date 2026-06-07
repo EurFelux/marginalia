@@ -21,6 +21,7 @@
 | 重导入覆盖 | **天然安全，无需处理**：导入幂等检查是 early return（`repository.ts` 的 `if (existing) return existing`），重导同一文件根本不会走到 insert，手动改名不会被解析元数据冲掉  |
 | 缓存一致性 | 保存成功后 invalidate `qk.library` **和** `qk.book(bookId)`——后者有两个消费点（reader 侧栏 `BookCard` + 顶栏面包屑 `ReaderView`），且渲染层 staleTime=∞，不失效就永远陈旧 |
 | 成功反馈   | 静默（卡片标题即时刷新就是反馈）；**失败必须 toast**，透传主进程真实错误（honest-error），`closeButton` + `duration: Infinity`，与删除失败模式一致                        |
+| 顺手项     | 修正 `schema.ts` `books.id` 过时列注释（现仍写「ePub 自然键」，未提 PDF 恒文件哈希的分支）；「统一 id 为 contentHash」议题已另记 #50（P2 debt），不入本范围               |
 
 ## 3. 数据流（IPC 脊柱五层）
 
