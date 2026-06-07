@@ -17,6 +17,7 @@ import { pdfAnnosByPage, rangeFromOffsets, relativeRects } from "./pdf-annotatio
 import { buildPdfSelectionInfo, flatOffsetOf, pointInDomSelection } from "./pdf-selection";
 import { chapterIdAtPage } from "./pdf-chapter-at-page";
 import { clampPdfZoom } from "./pdf-zoom";
+import { pdfPercent } from "./percent";
 import { findPdfTextLinks } from "./pdf-autolink";
 import { OVERLAY_FILL } from "./highlight";
 import type { PdfPageAnno } from "./pdf-annotations";
@@ -49,6 +50,7 @@ export function PdfReader({ bookId, chapters }: Props) {
   const currentChapterId = useNavigationStore((s) => s.currentChapterId);
   const setCurrentChapter = useNavigationStore((s) => s.setCurrentChapter);
   const setReadingContext = useNavigationStore((s) => s.setReadingContext);
+  const setReadingPercent = useNavigationStore((s) => s.setReadingPercent);
   const virtuosoRef = useRef<VirtuosoHandle | null>(null);
   // Virtuoso 滚动容器（rangeChanged 里从 scrollTop 推视口顶部页用）。
   const scrollerRef = useRef<HTMLElement | null>(null);
@@ -215,12 +217,12 @@ export function PdfReader({ bookId, chapters }: Props) {
     return () => document.removeEventListener("scroll", onScroll, true);
   }, [closeStyleBar, setSelection]);
 
-  const saveAt = (page: number) => {
+  const saveAt = (page: number, percent: number) => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       const locator = makePdfLocator({ page, scrollRatio: 0 }); // 页级精度（页内比例留打磨期）
       void window.api.progress
-        .save({ bookId, locator })
+        .save({ bookId, locator, percent })
         .catch((err: unknown) => log.warn("save progress failed", err));
       qc.setQueryData(qk.progress(bookId), { locator });
     }, SAVE_DEBOUNCE_MS);
@@ -297,6 +299,7 @@ export function PdfReader({ bookId, chapters }: Props) {
             chapterId: chId,
             chapterTitle: ch?.title ?? null,
           });
+          setReadingPercent(pdfPercent(page, book.pageCount));
           if (chId) {
             topChapterIdRef.current = chId;
             if (chId !== currentChapterId) setCurrentChapter(chId);
@@ -305,7 +308,7 @@ export function PdfReader({ bookId, chapters }: Props) {
             sawInitialRange.current = true;
             return; // 首发非用户滚动，不写进度
           }
-          saveAt(page);
+          saveAt(page, pdfPercent(page, book.pageCount));
         }}
         // 缩放换档时 key 变化 → 可视页整体重挂（拿到新 canvas，满足 pdf-book 同 canvas 约束）。
         // v1 接受全量重挂；离屏页经 cssWidth dep 自然重渲。
