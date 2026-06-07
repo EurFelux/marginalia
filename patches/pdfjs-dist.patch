@@ -1,5 +1,5 @@
 diff --git a/build/pdf.worker.mjs b/build/pdf.worker.mjs
-index 14aaa0e2fd7fd0cdfc7440b91fe071d2e2b9995c..ab1e0209ce5b41e758b0034f6c9544cd60a005f6 100644
+index 14aaa0e2fd7fd0cdfc7440b91fe071d2e2b9995c..055efd840de8d2690c986fa7d21f3d265e528657 100644
 --- a/build/pdf.worker.mjs
 +++ b/build/pdf.worker.mjs
 @@ -20402,6 +20402,9 @@ const getSupplementalGlyphMapForCalibri = getLookupTableFactory(function (t) {
@@ -12,13 +12,74 @@ index 14aaa0e2fd7fd0cdfc7440b91fe071d2e2b9995c..ab1e0209ce5b41e758b0034f6c9544cd
    const fontName = normalizeFontName(name);
    const stdFontMap = getStdFontMap();
    return stdFontMap[fontName];
-@@ -32551,7 +32554,167 @@ const BOLDITALIC = {
+@@ -32551,7 +32554,228 @@ const BOLDITALIC = {
    style: "italic",
    weight: "bold"
  };
 -const substitutionMap = new Map([["Times-Roman", {
 +const substitutionMap = new Map([
 +// __MARGINALIA_WESTERN_SUBSTITUTION__ — western serif/sans fallback chains (pnpm patch)
++// TeX/URW clones (LaTeX-produced PDFs without embedded fonts, e.g. OSTEP repacks):
++// URW Palladio = Palatino clone, Nimbus Mono = Courier clone, Nimbus Sans = Helvetica clone,
++// CMR = Computer Modern Roman (serif approximation; CMMI/CMSY math symbol fonts are left to
++// the generic fallback — arbitrary substitutes would map glyphs wrong).
++["URWPalladioL-Roma", {
++  local: ["Palatino-Roman", "URWPalladioL-Roma", "P052-Roman", "PalatinoLinotype-Roman", "Book Antiqua"],
++  style: NORMAL,
++  ultimate: "serif"
++}], ["URWPalladioL-Bold", {
++  local: ["Palatino-Bold", "URWPalladioL-Bold", "P052-Bold", "PalatinoLinotype-Bold"],
++  style: BOLD,
++  ultimate: "serif"
++}], ["URWPalladioL-Ital", {
++  local: ["Palatino-Italic", "URWPalladioL-Ital", "P052-Italic", "PalatinoLinotype-Italic"],
++  style: ITALIC,
++  ultimate: "serif"
++}], ["URWPalladioL-BoldItal", {
++  local: ["Palatino-BoldItalic", "URWPalladioL-BoldItal", "P052-BoldItalic"],
++  style: BOLDITALIC,
++  ultimate: "serif"
++}], ["NimbusMonL-Regu", {
++  local: ["Courier", "CourierNewPSMT", "Courier New", "NimbusMonL-Regu", "NimbusMonoPS-Regular", "Menlo-Regular"],
++  style: NORMAL,
++  ultimate: "monospace"
++}], ["NimbusMonL-Bold", {
++  local: ["Courier-Bold", "CourierNewPS-BoldMT", "NimbusMonL-Bold", "NimbusMonoPS-Bold", "Menlo-Bold"],
++  style: BOLD,
++  ultimate: "monospace"
++}], ["NimbusSanL-Regu", {
++  local: ["Helvetica", "ArialMT", "Arial", "NimbusSanL-Regu", "NimbusSans-Regular", "LiberationSans"],
++  style: NORMAL,
++  ultimate: "sans-serif"
++}], ["NimbusSanL-Bold", {
++  local: ["Helvetica-Bold", "Arial-BoldMT", "NimbusSanL-Bold", "NimbusSans-Bold", "LiberationSans-Bold"],
++  style: BOLD,
++  ultimate: "sans-serif"
++}], ["NimbusRomNo9L-Regu", {
++  local: ["TimesNewRomanPSMT", "Times New Roman", "Times-Roman", "NimbusRomNo9L-Regu", "NimbusRoman-Regular", "LiberationSerif"],
++  style: NORMAL,
++  ultimate: "serif"
++}], ["CMR10", {
++  local: ["CMUSerif-Roman", "CMU Serif", "LMRoman10-Regular", "Georgia", "TimesNewRomanPSMT"],
++  style: NORMAL,
++  ultimate: "serif"
++}], ["CMR9", {
++  alias: "CMR10",
++  style: NORMAL,
++  ultimate: "serif"
++}], ["CMR6", {
++  alias: "CMR10",
++  style: NORMAL,
++  ultimate: "serif"
++}], ["CMBX10", {
++  local: ["CMUSerif-Bold", "LMRoman10-Bold", "Georgia-Bold"],
++  style: BOLD,
++  ultimate: "serif"
++}], ["CMTT10", {
++  local: ["CMUTypewriter-Regular", "LMMono10-Regular", "Courier", "Menlo-Regular"],
++  style: NORMAL,
++  ultimate: "monospace"
++}],
 +// NOTE: Chromium local() matches PostScript/full names only, NOT family names (crbug.com/627143).
 +["Georgia", {
 +  local: ["Georgia", "LiberationSerif", "Liberation Serif", "NotoSerif-Regular", "DejaVuSerif"],
@@ -181,7 +242,7 @@ index 14aaa0e2fd7fd0cdfc7440b91fe071d2e2b9995c..ab1e0209ce5b41e758b0034f6c9544cd
    local: ["Times New Roman", "Times-Roman", "Times", "Liberation Serif", "Nimbus Roman", "Nimbus Roman L", "Tinos", "Thorndale", "TeX Gyre Termes", "FreeSerif", "Linux Libertine O", "Libertinus Serif", "PT Astra Serif", "DejaVu Serif", "Bitstream Vera Serif", "Ubuntu"],
    style: NORMAL,
    ultimate: "serif"
-@@ -32827,7 +32990,7 @@ function getFontSubstitution(systemFontCache, idFactory, localFontPath, baseFont
+@@ -32827,7 +33051,7 @@ function getFontSubstitution(systemFontCache, idFactory, localFontPath, baseFont
    if (baseFontName.startsWith("InvalidPDFjsFont_")) {
      return null;
    }
