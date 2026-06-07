@@ -101,6 +101,13 @@ Drizzle ORM over better-sqlite3，Schema 定义在 `src/main/db/schema.ts`。
 - **枚举列**：文本枚举列均附带 SQL `CHECK` 约束，在 DB 层强制合法值。
 - **消息存储**：`messages` 表持久化 AI SDK v6 的 `UIMessage`（存 `parts` 字段）；每次请求按需派生 `ModelMessage`，不持久化。
 
+## 代码规范（日志）
+
+- **禁止裸 `console.*` 记录诊断信息**：主进程 `import { createLogger } from "@main/logger"`，渲染层 `@renderer/logger`；每文件模块级 `const log = createLogger("<module>")`（module 用短域名：`send`/`summary`/`library`/`db`/`ipc`/`tools`/`ai`/`reader`/`pdf`/`epub`…，参考既有分配）。logger 恒双写 console + 文件（`userData/logs/{main,renderer}-YYYY-MM-DD.log`，30 天保留）；renderer 日志双写 DevTools console 并经 IPC 落 renderer 专属文件、不回显主进程 stdout。
+- **消息规范**：不带 `[xxx]` 前缀（module 段自动携带）、不带尾冒号；Error/unknown 一律作第二参（`log.warn("save failed", err)`），service 自动展开 stack 并缩进——别手动拼 err 进 message。
+- **级别语义**：`error` = 不可恢复/需关注；`warn` = 降级/被吞的软失败——**凡优雅吞错处必须留 warn**（降级越优雅，日志越必要）；`info` = 关键锚点（启动标记、迁移、导入成功），克制使用防噪音；`debug` = 仅 dev 落盘。替换既有日志调用时**不得擅自升降级别语义**。
+- IPC handler 抛出的错误由 `registry.ts` catch-all 自动落盘，handler 内无需重复记录；设计细节见 `docs/superpowers/specs/2026-06-07-persistent-logging-design.md`。
+
 ## 代码规范（UI 样式）
 
 - **优先 Tailwind 工具类；非必要禁止内联 CSS（`style={{}}`）**。静态的尺寸 / 颜色 / 间距 / 字体一律用类（如 `w-80`、`max-h-40`、`bg-popover`、`font-sans`）。
