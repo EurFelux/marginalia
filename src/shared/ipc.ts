@@ -6,6 +6,7 @@ import type {
   ChapterRefDto,
   ChapterSummaryDto,
   ChapterTextSlice,
+  RecentlyReadDto,
 } from "@shared/library";
 import {
   bookIdInput,
@@ -13,6 +14,7 @@ import {
   generateChapterSummaryInput,
   importBookInput,
   readChapterTextInput,
+  reorderBooksInput,
   saveProgressInput,
   updateBookInput,
 } from "@shared/library";
@@ -116,6 +118,8 @@ export const C = {
   libraryReadBookBytes: def("library:read-book-bytes", "invoke", bookIdInput, out<Uint8Array>()),
   libraryDelete: def("library:delete", "invoke", bookIdInput, out<void>()),
   libraryUpdate: def("library:update", "invoke", updateBookInput, out<BookSummaryDto>()),
+  libraryRecentlyRead: def("library:recently-read", "invoke", z.void(), out<RecentlyReadDto[]>()),
+  libraryReorder: def("library:reorder", "invoke", reorderBooksInput, out<void>()),
 
   // progress
   progressGet: def("progress:get", "invoke", bookIdInput, out<{ locator: string } | null>()),

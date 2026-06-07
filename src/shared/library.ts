@@ -17,6 +17,8 @@ export type UpdateBookInput = z.infer<typeof updateBookInput>;
 export const saveProgressInput = z.object({
   bookId: z.string().min(1),
   locator: z.string().min(1),
+  /** 0–1 阅读进度快照；reader 计算上送（spec 2026-06-07-library-shelf-reorder §4）。 */
+  percent: z.number().min(0).max(1).nullish(),
 });
 export type SaveProgressInput = z.infer<typeof saveProgressInput>;
 
@@ -46,6 +48,17 @@ export interface BookSummaryDto {
   format: "epub" | "pdf";
   pageCount: number | null;
   hasTextLayer: boolean;
+}
+
+export const reorderBooksInput = z.object({
+  orderedIds: z.array(z.string().min(1)).min(1),
+});
+export type ReorderBooksInput = z.infer<typeof reorderBooksInput>;
+
+/** 「继续阅读」shelf 条目（#48）：书摘要 + 进度快照。 */
+export interface RecentlyReadDto extends BookSummaryDto {
+  percent: number | null; // 0–1；老数据 null → 卡片不渲染进度行
+  lastReadAt: number; // = progress.updatedAt
 }
 
 /**

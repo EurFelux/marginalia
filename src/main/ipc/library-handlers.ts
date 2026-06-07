@@ -5,7 +5,15 @@ import { C } from "@shared/ipc";
 import type { BookSummaryDto } from "@shared/library";
 import { getDb } from "@main/db/instance";
 import { appService } from "@main/app";
-import { deleteBook, getBook, importBook, listBooks, updateBook } from "@main/library/repository";
+import {
+  deleteBook,
+  getBook,
+  importBook,
+  listBooks,
+  listRecentlyRead,
+  reorderBooks,
+  updateBook,
+} from "@main/library/repository";
 import { readBookFile, writeBookFile } from "@main/library/book-files";
 import { getProgress, saveProgress } from "@main/library/progress";
 import { assertTextLayer, getToc, listChapters, readChapterText } from "@main/library/content";
@@ -84,6 +92,17 @@ export const libraryBindings: Binding[] = [
     return toDto({ ...book, hasCover: book.cover != null && book.cover.length > 0 });
   }),
 
+  // shelf 数据：toDto 复用保证 hasCover 布尔化等口径一致，percent/lastReadAt 原样透传。
+  bind(C.libraryRecentlyRead, () =>
+    listRecentlyRead(getDb()).map((r) => ({
+      ...toDto(r),
+      percent: r.percent,
+      lastReadAt: r.lastReadAt,
+    })),
+  ),
+
+  bind(C.libraryReorder, (input) => reorderBooks(getDb(), input.orderedIds)),
+
   bind(C.progressGet, (input) => {
     const p = getProgress(getDb(), input.bookId);
     return p ? { locator: p.locator } : null;
@@ -93,7 +112,7 @@ export const libraryBindings: Binding[] = [
     const db = getDb();
     if (!getBook(db, input.bookId))
       throw new Error(`progress:save — book ${input.bookId} not found`);
-    saveProgress(db, input.bookId, input.locator);
+    saveProgress(db, input.bookId, input.locator, input.percent);
   }),
 
   bind(C.contentToc, (input) => {
