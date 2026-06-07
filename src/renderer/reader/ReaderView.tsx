@@ -39,6 +39,8 @@ export function ReaderView() {
   useRestoreConversation(bookId);
   const chapterId = useNavigationStore((s) => s.currentChapterId);
   const backToLibrary = useNavigationStore((s) => s.backToLibrary);
+  const readingPercent = useNavigationStore((s) => s.readingPercent);
+  const readingContext = useNavigationStore((s) => s.readingContext);
   const openSettings = useSettingsStore((s) => s.setOpen);
   const autoSummarize = usePrefsStore((s) => s.autoSummarize);
   const layout = usePrefsStore((s) => s.layout);
@@ -86,9 +88,17 @@ export function ReaderView() {
     ? t("reader.collapseHeader", "收起顶栏")
     : t("reader.expandHeader", "展开顶栏");
 
-  // 顶栏面包屑「书名 · 章节名」（移植 UP1 TopBar）：任一为 null（如 epub 无 TOC 时章节 title 缺失）则只显示有的部分。
+  // 顶栏面包屑「书名 · 章节名 · 进度」：任一缺失只显示有的部分。进度：epub 纯百分比；
+  // PDF 带页码（page/pageCount 从 readingContext 读——pdf 分支已有，percent 走独立 store 字段）。
   const chapterTitle = chapters.data?.find((c) => c.id === chapterId)?.title ?? null;
-  const breadcrumb = [book.data?.title, chapterTitle].filter(Boolean).join(" · ");
+  const progressLabel = (() => {
+    if (readingPercent == null) return null;
+    const pct = `${Math.round(readingPercent * 100)}%`;
+    return readingContext?.format === "pdf" && readingContext.pageCount != null
+      ? `${readingContext.page} / ${readingContext.pageCount} · ${pct}`
+      : pct;
+  })();
+  const breadcrumb = [book.data?.title, chapterTitle, progressLabel].filter(Boolean).join(" · ");
 
   return (
     <div className="relative flex h-screen flex-col bg-background font-sans text-foreground">

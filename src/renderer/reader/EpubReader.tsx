@@ -14,6 +14,7 @@ import { usePrefsStore } from "@renderer/store/prefs-store";
 import { qk } from "../query/keys";
 import { chapterIdByHref } from "./chapter-id-by-href";
 import { createEpubBook, type EpubBook } from "./epub-book";
+import { epubPercent } from "./percent";
 import { prefsToCss } from "./prefs-to-css";
 import { readerThemeCss } from "./reader-theme-css";
 import { sectionSelectToSelectionInfo } from "./epub-selection";
@@ -42,6 +43,7 @@ export function EpubReader({ bookId, chapters }: Props) {
   const currentChapterId = useNavigationStore((s) => s.currentChapterId);
   const setCurrentChapter = useNavigationStore((s) => s.setCurrentChapter);
   const setReadingContext = useNavigationStore((s) => s.setReadingContext);
+  const setReadingPercent = useNavigationStore((s) => s.setReadingPercent);
   const prefs = usePrefsStore((s) => s.prefs);
   const setSelection = useAnnotationStore((s) => s.setSelection);
   const openStyleBar = useAnnotationStore((s) => s.openStyleBar);
@@ -139,6 +141,8 @@ export function EpubReader({ bookId, chapters }: Props) {
 
   const onTopSectionChange = (index: number, meta: { scrollRatio: number }) => {
     if (!book) return;
+    const percent = epubPercent(index, meta.scrollRatio, book.count);
+    setReadingPercent(percent);
     // 当前章高亮
     const href = book.hrefAtIndex(index);
     const chId = href ? chapterIdByHref(chapters, href) : null;
@@ -167,7 +171,7 @@ export function EpubReader({ bookId, chapters }: Props) {
       if (saveTimer.current) clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(() => {
         void window.api.progress
-          .save({ bookId, locator: cfi })
+          .save({ bookId, locator: cfi, percent })
           .catch((err: unknown) => log.warn("save progress failed", err));
         // 同步写入查询缓存：progress 查询 staleTime=Infinity，不写缓存的话重开书会读到首开时
         // 的旧值（通常是 null）→ initialIndex 永远 0 → 回到开头。

@@ -7,12 +7,15 @@ interface NavigationState {
   currentBookId: string | null;
   currentChapterId: string | null;
   readingContext: ReadingContext | null;
+  /** 0–1 阅读进度（header 面包屑显示用；#48）。与 readingContext 分离——后者是 AI 聊天契约。 */
+  readingPercent: number | null;
 }
 interface NavigationActions {
   openBook: (bookId: string, chapterId?: string | null) => void;
   backToLibrary: () => void;
   setCurrentChapter: (chapterId: string) => void;
   setReadingContext: (readingContext: ReadingContext | null) => void;
+  setReadingPercent: (readingPercent: number | null) => void;
 }
 
 export const NAVIGATION_INITIAL: NavigationState = {
@@ -20,6 +23,7 @@ export const NAVIGATION_INITIAL: NavigationState = {
   currentBookId: null,
   currentChapterId: null,
   readingContext: null,
+  readingPercent: null,
 };
 
 export const useNavigationStore = create<NavigationState & NavigationActions>((set) => ({
@@ -30,6 +34,7 @@ export const useNavigationStore = create<NavigationState & NavigationActions>((s
       currentBookId: bookId,
       currentChapterId: chapterId,
       readingContext: null,
+      readingPercent: null,
     });
     useChatStore.getState().setActiveConversation(null); // 开书清上本会话（跨 store 协调）
   },
@@ -37,4 +42,5 @@ export const useNavigationStore = create<NavigationState & NavigationActions>((s
   backToLibrary: () => set({ view: "library" }),
   setCurrentChapter: (currentChapterId) => set({ currentChapterId }),
   setReadingContext: (readingContext) => set({ readingContext }),
+  setReadingPercent: (readingPercent) => set({ readingPercent }),
 }));
