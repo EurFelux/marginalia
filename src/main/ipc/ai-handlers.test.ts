@@ -86,10 +86,13 @@ describe("abortConversationStreams", () => {
   it("aborts only the streams that belong to the conversation", () => {
     const a = new AbortController();
     const b = new AbortController();
+    const c = new AbortController();
     __registerStream("s1", "conv-1", a);
     __registerStream("s2", "conv-2", b);
+    __registerStream("s3", "conv-1", c);
     abortConversationStreams("conv-1");
     expect(a.signal.aborted).toBe(true);
+    expect(c.signal.aborted).toBe(true);
     expect(b.signal.aborted).toBe(false);
   });
 
