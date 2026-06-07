@@ -81,7 +81,7 @@ export const books = sqliteTable(
       .$defaultFn(() => Date.now()),
     // 手动排序位（#48）：默认 0；listBooks 按 (position, added_at) 排——既有书全 0 时按导入序平断，
     // 首次拖拽全量重写后 position 唯一。新导入 = MIN(position) - 1（排最前）。无唯一约束：
-    // 重复 position 以 rowid 平断，下次拖拽自愈（spec §3）。
+    // 重复 position 以 added_at 平断（added_at 亦同则退 SQLite 隐式 rowid），下次拖拽全量重写自愈（spec §3）。
     position: integer("position").notNull().default(0),
   },
   (t) => [check("books_format_check", sql`${t.format} in ('epub','pdf')`)],
