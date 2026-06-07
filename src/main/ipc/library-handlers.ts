@@ -5,7 +5,7 @@ import { C } from "@shared/ipc";
 import type { BookSummaryDto } from "@shared/library";
 import { getDb } from "@main/db/instance";
 import { appService } from "@main/app";
-import { deleteBook, getBook, importBook, listBooks } from "@main/library/repository";
+import { deleteBook, getBook, importBook, listBooks, updateBook } from "@main/library/repository";
 import { readBookFile, writeBookFile } from "@main/library/book-files";
 import { getProgress, saveProgress } from "@main/library/progress";
 import { assertTextLayer, getToc, listChapters, readChapterText } from "@main/library/content";
@@ -78,6 +78,11 @@ export const libraryBindings: Binding[] = [
   bind(C.libraryDelete, (input) =>
     deleteBook(getDb(), appService.getPath("booksDir"), input.bookId),
   ),
+
+  bind(C.libraryUpdate, (input) => {
+    const book = updateBook(getDb(), input);
+    return toDto({ ...book, hasCover: book.cover != null && book.cover.length > 0 });
+  }),
 
   bind(C.progressGet, (input) => {
     const p = getProgress(getDb(), input.bookId);
