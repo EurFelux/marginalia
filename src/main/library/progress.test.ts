@@ -28,6 +28,10 @@ describe("progress repository", () => {
 
   it("saves percent and overwrites it on update (null when omitted)", async () => {
     const { db, book } = await setup();
+    saveProgress(db, book.id, "epubcfi(/6/2!/4/1:0)", 0);
+    expect(getProgress(db, book.id)?.percent).toBe(0);
+    saveProgress(db, book.id, "epubcfi(/6/2!/4/1:0)", 1);
+    expect(getProgress(db, book.id)?.percent).toBe(1);
     saveProgress(db, book.id, "epubcfi(/6/2!/4/1:0)", 0.25);
     expect(getProgress(db, book.id)?.percent).toBe(0.25);
     saveProgress(db, book.id, "epubcfi(/6/4!/4/1:0)", 0.5);
