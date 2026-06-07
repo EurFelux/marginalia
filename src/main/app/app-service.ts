@@ -12,7 +12,8 @@ export interface AppServiceEnv {
   dataDir: string;
   /** 是否开发模式（Electron 适配 = !app.isPackaged） */
   isDev: boolean;
-  /** 在系统文件管理器中打开目录（Electron 适配 = shell.openPath，吞掉其 string 返回值） */
+  /** 在系统文件管理器中打开目录（Electron 适配 = shell.openPath，吞掉其 string 返回值）。
+   * 归属注：语义上更适合未来的 FileService（文件管理模块）；该模块尚无设计，暂栖于此。 */
   openFolder: (dir: string) => Promise<void>;
 }
 
