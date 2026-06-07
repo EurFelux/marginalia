@@ -22,7 +22,7 @@ if (!app.isPackaged) {
   app.setName(`${app.getName()}-dev`); // marginalia → marginalia-dev
 }
 
-// AppService 注入：Electron 环境/能力的适配器实现止步于此（业务面向 appService.env 抽象）。
+// AppService 注入：Electron 环境/能力的适配器实现止步于此（业务面向 appService 抽象）。
 // 必须在 setName 之后（dataDir 跟随 dev/prod 隔离）、一切消费方之前；
 // fail-fast——初始化失败直接崩，不带病运行，下游消费零判空零降级。
 initAppService({

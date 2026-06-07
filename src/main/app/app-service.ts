@@ -17,7 +17,7 @@ export interface AppServiceEnv {
 }
 
 /** 各 module 的专有数据目录 scope（类型化 key，按需扩展）。
- * "logs" → LoggerService；"books" → 书籍副本（替代 instance.ts 的 getBooksDir，布局不变） */
+ * "logs" → LoggerService；"books" → 书籍副本（沿用 userData/books 布局，零数据迁移） */
 export type DataScope = "logs" | "books";
 
 /** 类不导出：消费方只能经 barrel 拿 appService，无法绕过封装 */

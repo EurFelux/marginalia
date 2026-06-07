@@ -1,4 +1,5 @@
-import { getBooksDir, getDb } from "@main/db/instance";
+import { getDb } from "@main/db/instance";
+import { appService } from "@main/app";
 import { readBookFile } from "@main/library/book-files";
 import { getBook } from "@main/library/repository";
 import { resolveAssistantModel, resolveSummaryModel } from "@main/ai/assistant-model";
@@ -21,7 +22,7 @@ export function createLoadBytes(booksDir: string, db: DB): LoadBytes {
 /** 组装 runSend 所需的全部生产依赖（注入 Electron 侧单例）。 */
 export function makeSendDeps(): SendDeps {
   const db = getDb();
-  const loadBytes = createLoadBytes(getBooksDir(), db);
+  const loadBytes = createLoadBytes(appService.getPath("books"), db);
   const resolveModel = () => resolveAssistantModel(db);
   return { db, loadBytes, resolveModel, resolveSummaryModel: () => resolveSummaryModel(db) };
 }
@@ -32,7 +33,7 @@ export function makeSummaryDeps(): SummaryDeps {
   const db = getDb();
   return {
     db,
-    loadBytes: createLoadBytes(getBooksDir(), db),
+    loadBytes: createLoadBytes(appService.getPath("books"), db),
     resolveModel: () => resolveSummaryModel(db),
   };
 }
