@@ -108,6 +108,12 @@ describe("toolStepLabel", () => {
     ).toBe("读取〈Preface〉摘要");
   });
 
+  it("getChapterSummary falls back when unresolved", () => {
+    expect(
+      toolStepLabel(part("tool-getChapterSummary", { input: { chapterId: "nope" } }), chapters, t),
+    ).toBe("读取章节摘要");
+  });
+
   it("getToc", () => {
     expect(toolStepLabel(part("tool-getToc"), chapters, t)).toBe("读取目录");
   });
