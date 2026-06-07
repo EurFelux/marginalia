@@ -67,7 +67,7 @@ export default {
   "errors.requestFailed": "请求失败",
   "errors.summaryModelNotConfigured": "未配置摘要模型",
   "library.deleteConfirm.body":
-    "将永久移除这本书及其所有标注、笔记、对话，以及导入的 epub 副本。此操作不可撤销。",
+    "将永久移除这本书及其所有标注、笔记、对话，以及导入的书籍文件。此操作不可撤销。",
   "library.deleteConfirm.cancel": "取消",
   "library.deleteConfirm.confirm": "删除",
   "library.deleteConfirm.title": "删除《{{title}}》？",
