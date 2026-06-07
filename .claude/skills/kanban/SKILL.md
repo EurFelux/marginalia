@@ -10,13 +10,15 @@ description: Marginalia 的需求管理工作流——GitHub Issues + Projects k
 
 ## 关键常量（实测固化，勿重查）
 
-| 项              | 值                                                                                                      |
-| --------------- | ------------------------------------------------------------------------------------------------------- |
-| Repo            | `EurFelux/marginalia`                                                                                   |
-| Project         | number `1`，owner `EurFelux`（user-level）                                                              |
-| Project ID      | `PVT_kwHOA4Ur5c4BZ8B7`                                                                                  |
-| Status field ID | `PVTSSF_lAHOA4Ur5c4BZ8B7zhU3Kj4`                                                                        |
-| 列 option ID    | Backlog `f75ad846` · Ready `61e4505c` · In progress `47fc9ee4` · In review `df73e18b` · Done `98236657` |
+| 项                 | 值                                                                                                      |
+| ------------------ | ------------------------------------------------------------------------------------------------------- |
+| Repo               | `EurFelux/marginalia`                                                                                   |
+| Project            | number `1`，owner `EurFelux`（user-level）                                                              |
+| Project ID         | `PVT_kwHOA4Ur5c4BZ8B7`                                                                                  |
+| Status field ID    | `PVTSSF_lAHOA4Ur5c4BZ8B7zhU3Kj4`                                                                        |
+| 列 option ID       | Backlog `f75ad846` · Ready `61e4505c` · In progress `47fc9ee4` · In review `df73e18b` · Done `98236657` |
+| Priority field ID  | `PVTSSF_lAHOA4Ur5c4BZ8B7zhU3KmM`                                                                        |
+| Priority option ID | P0 `79628723` · P1 `0a877460` · P2 `da944a9c`                                                           |
 
 权限：gh token 需要 `project` scope。命令报 `missing required scopes` 时，让用户在输入框跑 `! gh auth refresh -s project --hostname github.com`（交互式，agent 跑不了）。
 
@@ -30,6 +32,23 @@ description: Marginalia 的需求管理工作流——GitHub Issues + Projects k
 - **领域轴**（可多个）：`area:reader` · `area:pdf` · `area:ai` · `area:library` · `area:settings` · `area:ui` · `area:build`
 
 区分 `enhancement` 和 `polish` 的标准：给用户带来新能力的是 enhancement，让已有能力更顺手的是 polish。
+
+## Priority 分级（建卡时顺手设）
+
+- **P0**：用户明确表达的直接痛点，近期就做（用户说「很烦」「赶紧」或反复提到的）
+- **P1**：重要但不紧迫——实际发生过的问题、分发前必修项、数据安全
+- **P2**：远期/择机——工程债、UI 打磨、边缘场景
+
+新需求默认 **P1**；用户语气透出紧迫感或当场被坑了 → P0；明显远期想法（「以后可以…」）→ P2。拿不准就建完卡问一句。设置命令（item-add 返回的 `$ITEM_ID` 直接复用）：
+
+```bash
+gh project item-edit --id "$ITEM_ID" --project-id PVT_kwHOA4Ur5c4BZ8B7 \
+  --field-id PVTSSF_lAHOA4Ur5c4BZ8B7zhU3KmM --single-select-option-id <P0/P1/P2 的 option ID>
+```
+
+## 外部 issue（GitHub 网页表单）
+
+`.github/ISSUE_TEMPLATE/` 有 Bug report / Feature request 两个表单，自动打类型 label（bug/enhancement）。triage 外部 issue 时：按表单的 Kind 答案校正 enhancement↔polish、按 Area 答案补 `area:*` label、设 Priority、挂卡进 kanban（表单不会自动挂）。
 
 ## 四个环节
 
@@ -79,9 +98,9 @@ gh project item-edit --id "$ITEM_ID" --project-id PVT_kwHOA4Ur5c4BZ8B7 \
 ### ④ 盘点
 
 ```bash
-# 看板总览（各列卡片）
-gh project item-list 1 --owner EurFelux --format json \
-  --jq '.items[] | "\(.status)\t#\(.content.number // "-")\t\(.title)"' | sort
+# 看板总览（列 + 优先级 + 卡片）
+gh project item-list 1 --owner EurFelux --limit 50 --format json \
+  --jq '.items[] | "\(.status)\t\(.priority // "-")\t#\(.content.number // "-")\t\(.title)"' | sort
 # 按 label 筛 issue
 gh issue list --repo EurFelux/marginalia --label "area:pdf" --state open
 ```
