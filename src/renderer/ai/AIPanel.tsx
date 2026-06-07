@@ -126,7 +126,7 @@ export function AIPanel() {
 
       <ScrollArea className="min-h-0 flex-1" viewportRef={scrollRef}>
         <div className="p-4">
-          <MessageList messages={messages} status={status} />
+          <MessageList messages={messages} status={status} bookId={bookId} />
         </div>
       </ScrollArea>
 
