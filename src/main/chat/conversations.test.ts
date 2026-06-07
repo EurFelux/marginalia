@@ -3,9 +3,10 @@ import path from "node:path";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { createDb, runMigrations } from "@main/db/client";
-import { books, chapters, conversations } from "@main/db/schema";
+import { books, chapters, conversations, messages } from "@main/db/schema";
 import {
   createConversation,
+  deleteConversation,
   getConversation,
   listConversationsByBook,
   setConversationTitle,
@@ -110,5 +111,41 @@ describe("setConversationTitle", () => {
     const conv = createConversation(db, { bookId: "book-1" });
     setConversationTitle(db, conv.id, "关于灯塔的光");
     expect(getConversation(db, conv.id)?.title).toBe("关于灯塔的光");
+  });
+});
+
+describe("deleteConversation", () => {
+  it("removes the conversation and cascades its messages", () => {
+    const db = freshDb();
+    seedBookWithChapters(db);
+    const convo = createConversation(db, { bookId: "book-1" });
+    appendMessage(db, {
+      conversationId: convo.id,
+      role: "user",
+      parts: [{ type: "text", text: "hi" }],
+    });
+    deleteConversation(db, convo.id);
+    expect(getConversation(db, convo.id)).toBeNull();
+    const remaining = db.select().from(messages).where(eq(messages.conversationId, convo.id)).all();
+    expect(remaining).toEqual([]);
+  });
+
+  it("is idempotent: deleting an unknown id does not throw", () => {
+    const db = freshDb();
+    expect(() => deleteConversation(db, "nope")).not.toThrow();
+  });
+
+  it("does not touch other conversations of the same book", () => {
+    const db = freshDb();
+    seedBookWithChapters(db);
+    const a = createConversation(db, { bookId: "book-1" });
+    appendMessage(db, {
+      conversationId: a.id,
+      role: "user",
+      parts: [{ type: "text", text: "hi" }],
+    });
+    const b = createConversation(db, { bookId: "book-1" });
+    deleteConversation(db, a.id);
+    expect(getConversation(db, b.id)?.id).toBe(b.id);
   });
 });
