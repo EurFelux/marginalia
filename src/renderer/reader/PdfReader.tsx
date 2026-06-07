@@ -137,11 +137,20 @@ export function PdfReader({ bookId, chapters }: Props) {
     if (r) virtuosoRef.current?.scrollToIndex({ index: r.page - 1, align: "start" });
   }, [book, scrollCommand]);
 
+  // .selecting 清理挂 document 捕获：拖选释放在容器外（窗外/浮层上）时容器 onMouseUp
+  // 不触发，class 残留会让该页链接层一直收不到 pointer 事件（链接永久不可点）。
+  useEffect(() => {
+    const clearSelecting = () => {
+      containerRef.current
+        ?.querySelectorAll(".textLayer.selecting")
+        .forEach((el) => el.classList.remove("selecting"));
+    };
+    document.addEventListener("mouseup", clearSelecting, true);
+    return () => document.removeEventListener("mouseup", clearSelecting, true);
+  }, []);
+
   // 选区：textLayer 原生 DOM selection（同文档，无 iframe 桥）→ 页内偏移 + 字符窗口上下文。
   const onMouseUp = () => {
-    containerRef.current
-      ?.querySelectorAll(".textLayer.selecting")
-      .forEach((el) => el.classList.remove("selecting"));
     const sel = document.getSelection();
     if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
     const range = sel.getRangeAt(0);

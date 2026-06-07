@@ -25,4 +25,22 @@ describe("findPdfTextLinks", () => {
   it("skips numeric TLD email matches", () => {
     expect(findPdfTextLinks("bad user@example.123")).toEqual([]);
   });
+
+  it("keeps balanced trailing parens (wiki-style URLs)", () => {
+    expect(
+      findPdfTextLinks("see https://en.wikipedia.org/wiki/Lottery_(scheduling)")[0]?.href,
+    ).toBe("https://en.wikipedia.org/wiki/Lottery_(scheduling)");
+  });
+
+  it("trims unbalanced closing paren from surrounding text", () => {
+    expect(findPdfTextLinks("(see https://example.com/docs)")[0]?.href).toBe(
+      "https://example.com/docs",
+    );
+  });
+
+  it("trims punctuation after a balanced paren", () => {
+    expect(findPdfTextLinks("https://en.wikipedia.org/wiki/Foo_(bar).")[0]?.href).toBe(
+      "https://en.wikipedia.org/wiki/Foo_(bar)",
+    );
+  });
 });

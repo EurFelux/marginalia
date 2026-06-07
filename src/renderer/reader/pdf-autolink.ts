@@ -1,7 +1,29 @@
 const URL_OR_EMAIL_RE =
   /\b(?:(?:https?:\/\/|mailto:|www\.)[^\s<>"']+|[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']+)/gi;
-const TRAILING_PUNCT_RE = /[.,;:!?，。；：！？、）)\]}]+$/;
+const TRAILING_PUNCT_RE = /[.,;:!?，。；：！？、]$/;
+/** 尾部闭括号 → 对应开括号（仅在 URL 内不配对时剥，保住 wiki 式 `…_(scheduling)` 链接）。 */
+const BRACKET_PAIRS: Record<string, string> = { ")": "(", "）": "（", "]": "[", "}": "{" };
 const NUMERIC_TLD_RE = /\.\d+$/;
+
+const countOf = (s: string, ch: string): number => s.split(ch).length - 1;
+
+/** 逐字符剥尾部句读；闭括号仅在不配对（闭多于开）时剥。 */
+function trimTrailing(raw: string): string {
+  let s = raw;
+  for (;;) {
+    const last = s[s.length - 1] ?? "";
+    if (TRAILING_PUNCT_RE.test(last)) {
+      s = s.slice(0, -1);
+      continue;
+    }
+    const open = BRACKET_PAIRS[last];
+    if (open && countOf(s, last) > countOf(s, open)) {
+      s = s.slice(0, -1);
+      continue;
+    }
+    return s;
+  }
+}
 
 export interface PdfTextLink {
   href: string;
@@ -15,7 +37,7 @@ export function findPdfTextLinks(text: string): PdfTextLink[] {
     const start = m.index;
     let raw = m[0] ?? "";
     if (start == null || raw.length === 0) continue;
-    raw = raw.replace(TRAILING_PUNCT_RE, "");
+    raw = trimTrailing(raw);
     if (raw.length === 0) continue;
 
     const href = hrefForPdfTextLink(raw);

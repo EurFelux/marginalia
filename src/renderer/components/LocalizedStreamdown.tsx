@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import {
@@ -65,6 +64,7 @@ export function buildStreamdownTranslations(t: TFunction): StreamdownTranslation
 
 export function LocalizedStreamdown({ translations, ...props }: StreamdownProps) {
   const { t } = useTranslation();
-  const localized = useMemo(() => buildStreamdownTranslations(t), [t]);
+  // 不手写 useMemo：渲染层启用 React Compiler，自动记忆化。
+  const localized = buildStreamdownTranslations(t);
   return <Streamdown translations={{ ...localized, ...translations }} {...props} />;
 }
