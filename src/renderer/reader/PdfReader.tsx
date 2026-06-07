@@ -13,7 +13,7 @@ import { qk } from "../query/keys";
 import { createPdfBook, type PdfBook } from "./pdf-book";
 import { makePdfLocator, parsePdfLocator, parsePdfLocatorRange } from "./pdf-locator";
 import { pdfAnnosByPage } from "./pdf-annotations";
-import { buildPdfSelectionInfo, flatOffsetOf } from "./pdf-selection";
+import { buildPdfSelectionInfo, flatOffsetOf, pointInDomSelection } from "./pdf-selection";
 import { chapterIdAtPage } from "./pdf-chapter-at-page";
 import { clampPdfZoom } from "./pdf-zoom";
 import { OVERLAY_FILL } from "./highlight";
@@ -170,7 +170,14 @@ export function PdfReader({ bookId, chapters }: Props) {
   };
   // 正文 mousedown：关样式栏并清选区（对齐 EpubReader 的 onContentMouseDown——
   // P3 引入 styleBar 后若不关，残留的栏会让 SelectionToolbar 永久让位）。
-  const onMouseDown = () => {
+  // 例外（对齐 virtual-docs SectionFrame.onContentDown）：点在已有选区内部 → 阻止默认
+  // 塌缩、保留选区与 store，随后 mouseup 照常重建 SelectionInfo → 工具栏在新位置重弹
+  // （滚动隐藏工具栏后，点回选区即可找回）。
+  const onMouseDown = (e: ReactMouseEvent) => {
+    if (pointInDomSelection(e.clientX, e.clientY)) {
+      e.preventDefault();
+      return;
+    }
     closeStyleBar();
     setSelection(null);
   };
@@ -346,20 +353,22 @@ function PdfPage(props: {
     });
   };
 
-  // hover 高亮 → pointer cursor（对齐 ePub mark.anno 的 cursor:pointer）。overlay 不接事件
-  // （不挡划词），改在容器 mousemove 命中测试；直写 data 属性（零重渲染），CSS 据此切
-  // span 的 cursor——指针仅一处，整层切换在视觉上即「高亮区域内变 pointer」。
+  // hover 可点击目标（标注高亮 / 活跃选区）→ pointer cursor（对齐 ePub：mark.anno 的
+  // cursor:pointer + SectionFrame 选区 hover 手型）。overlay 不接事件（不挡划词），改在
+  // 容器 mousemove 命中测试；直写 data 属性（零重渲染），CSS 据此切 span 的 cursor——
+  // 指针仅一处，整层切换在视觉上即「目标区域内变 pointer」。
   const onMouseMove = (e: ReactMouseEvent) => {
     const layer = textLayerRef.current;
     if (!layer) return;
-    const base = layer.getBoundingClientRect();
-    const over =
-      highlights.length > 0 &&
-      hitHighlight(highlights, e.clientX - base.x, e.clientY - base.y) !== undefined;
-    if (over) layer.setAttribute("data-over-highlight", "");
-    else layer.removeAttribute("data-over-highlight");
+    let over = pointInDomSelection(e.clientX, e.clientY);
+    if (!over && highlights.length > 0) {
+      const base = layer.getBoundingClientRect();
+      over = hitHighlight(highlights, e.clientX - base.x, e.clientY - base.y) !== undefined;
+    }
+    if (over) layer.setAttribute("data-pointer", "");
+    else layer.removeAttribute("data-pointer");
   };
-  const onMouseLeave = () => textLayerRef.current?.removeAttribute("data-over-highlight");
+  const onMouseLeave = () => textLayerRef.current?.removeAttribute("data-pointer");
 
   return (
     // w-max + min-w-full：页宽超过视口（高缩放）时外壳随内容撑开（横向可滚、左缘可达），

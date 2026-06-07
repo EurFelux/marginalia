@@ -22,6 +22,25 @@ export function flatOffsetOf(root: Node, node: Node, offsetInNode: number): numb
   return null;
 }
 
+/**
+ * (clientX, clientY) 是否落在当前非塌缩 DOM 选区内。
+ * caretRangeFromPoint + isPointInRange = 字符级命中（跨行选区的锯齿边界也精确），
+ * 与 virtual-docs SectionFrame 的 pointInSelection 同款（那边作用于 iframe doc）。
+ * 消费方：mousedown 守卫（点选区→保留并重弹工具栏）与 hover cursor。
+ */
+export function pointInDomSelection(x: number, y: number): boolean {
+  const sel = document.getSelection();
+  if (!sel || sel.isCollapsed || sel.rangeCount === 0) return false;
+  try {
+    const caret = (
+      document as Document & { caretRangeFromPoint?(x: number, y: number): Range | null }
+    ).caretRangeFromPoint?.(x, y);
+    return !!caret && sel.getRangeAt(0).isPointInRange(caret.startContainer, caret.startOffset);
+  } catch {
+    return false;
+  }
+}
+
 export interface PdfSelectionArgs {
   page: number; // 1-based
   /** 该页 textLayer 的扁平文本（element.textContent）。 */
