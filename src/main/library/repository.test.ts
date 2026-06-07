@@ -19,6 +19,7 @@ import {
   importBook,
   listBooks,
   resolveChapterByHref,
+  updateBook,
 } from "@main/library/repository";
 import { storedBookPath } from "@main/library/book-files";
 import { makeFixtureEpub } from "@marginalia/epub-parser";
@@ -271,5 +272,47 @@ describe("importBook (pdf)", () => {
     const bytes = await makeTextPdf({ outline: false, title: "Real Title" });
     const book = await importBook(db, { bytes, fileName: "whatever.pdf" });
     expect(book.title).toBe("Real Title");
+  });
+});
+
+describe("updateBook", () => {
+  it("updates title and author and persists", async () => {
+    const db = freshDb();
+    const book = await importBook(db, { bytes: makeFixtureEpub() });
+    const updated = updateBook(db, {
+      bookId: book.id,
+      title: "Clean Title",
+      author: "Real Author",
+    });
+    expect(updated.title).toBe("Clean Title");
+    expect(updated.author).toBe("Real Author");
+    const row = db.select().from(books).where(eq(books.id, book.id)).get()!;
+    expect(row.title).toBe("Clean Title");
+    expect(row.author).toBe("Real Author");
+  });
+
+  it("clears author with null", async () => {
+    const db = freshDb();
+    const book = await importBook(db, { bytes: makeFixtureEpub() });
+    updateBook(db, { bookId: book.id, title: "T", author: null });
+    const row = db.select().from(books).where(eq(books.id, book.id)).get()!;
+    expect(row.author).toBeNull();
+  });
+
+  it("throws for unknown book id", () => {
+    const db = freshDb();
+    expect(() => updateBook(db, { bookId: "nope", title: "X", author: null })).toThrow(/not found/);
+  });
+
+  it("does not touch other columns", async () => {
+    const db = freshDb();
+    const book = await importBook(db, { bytes: makeFixtureEpub() });
+    const before = db.select().from(books).where(eq(books.id, book.id)).get()!;
+    updateBook(db, { bookId: book.id, title: "New", author: null });
+    const after = db.select().from(books).where(eq(books.id, book.id)).get()!;
+    expect(after.cover).toEqual(before.cover);
+    expect(after.toc).toEqual(before.toc);
+    expect(after.format).toBe(before.format);
+    expect(after.summary).toBe(before.summary);
   });
 });
