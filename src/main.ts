@@ -35,6 +35,7 @@ initAppService({
   },
 });
 
+const appLog = createLogger("app");
 const windowLog = createLogger("window");
 const dbLog = createLogger("db");
 
@@ -114,6 +115,8 @@ const createWindow = () => {
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.on("ready", () => {
+  // 会话开始标记：每次启动在日志里留一条锚点（排障时定位「这次启动」的边界）
+  appLog.info(`marginalia ${app.getVersion()} started`);
   try {
     initDb();
   } catch (err) {
