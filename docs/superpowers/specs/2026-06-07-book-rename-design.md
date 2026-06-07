@@ -129,10 +129,10 @@ en + zh-CN 双语新键（代码内默认值为中文，与既有 `t("key", "中
 | `library.editDialog.title`             | 编辑书籍信息                  | Edit book details                   |
 | `library.editDialog.bookTitle`         | 书名                          | Title                               |
 | `library.editDialog.author`            | 作者                          | Author                              |
-| `library.editDialog.authorPlaceholder` | 留空显示「未知作者」          | Leave empty for unknown author      |
-| `library.editDialog.cancel`            | 取消                          | Cancel                              |
-| `library.editDialog.save`              | 保存                          | Save                                |
-| `library.updateFailed`                 | {{title}} 保存失败：{{error}} | Failed to save {{title}}: {{error}} |
+| `library.editDialog.authorPlaceholder` | 留空则显示「未知作者」        | Leave empty for unknown author      |
+| `library.updateFailed`                 | {{title}} 保存失败：{{error}} | {{title}} failed to save: {{error}} |
+
+取消/保存按钮复用既有 `common.cancel` / `common.save`，不另建键。`updateFailed` 的 en 措辞对齐既有 `deleteFailed`（`{{title}} failed to delete: {{error}}`）。
 
 i18n 操作注意（既有坑）：extract 先于 typecheck 跑；extract 可能用旧 fallback 反向覆盖 locale 修正，提交前 diff 校验两个 locale 文件。
 
