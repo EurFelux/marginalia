@@ -52,7 +52,7 @@ export const assistants = sqliteTable("assistants", {
 export const books = sqliteTable(
   "books",
   {
-    id: text("id").primaryKey(), // ePub 自然键，由导入流程提供（标识符缺失时回退文件哈希）
+    id: text("id").primaryKey(), // 内容稳定 ID：ePub 取 dc:identifier（缺失回退文件哈希）；PDF 恒为文件哈希（#50 记有统一议题）
     title: text("title"),
     author: text("author"),
     cover: blob("cover", { mode: "buffer" }),

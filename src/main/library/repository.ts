@@ -153,6 +153,24 @@ export function listBooks(db: DB) {
 export function getBook(db: DB, id: string): BookRow | undefined {
   return db.select().from(books).where(eq(books.id, id)).get();
 }
+
+/**
+ * 更新书名/作者（#29）。put 语义：author=null 显式清空。
+ * 注：导入幂等是 early return（见 importBook），重导同一文件不会触碰已有行——手动修改不会被解析元数据冲掉。
+ */
+export function updateBook(
+  db: DB,
+  input: { bookId: string; title: string; author: string | null },
+): BookRow {
+  const row = db
+    .update(books)
+    .set({ title: input.title, author: input.author })
+    .where(eq(books.id, input.bookId))
+    .returning()
+    .get();
+  if (!row) throw new Error(`library: book ${input.bookId} not found`);
+  return row;
+}
 export function resolveChapterByHref(db: DB, bookId: string, href: string): ChapterRow | undefined {
   return db
     .select()
