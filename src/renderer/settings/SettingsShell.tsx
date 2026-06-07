@@ -8,6 +8,7 @@ import { ScrollArea } from "@renderer/components/ui/scroll-area";
 import { ModelsSettings } from "./ModelsSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { ReadingSettings } from "./ReadingSettings";
+import { AdvancedSettings } from "./AdvancedSettings";
 
 export function SettingsShell() {
   const { t } = useTranslation();
@@ -20,6 +21,7 @@ export function SettingsShell() {
     { key: "models", label: t("settings.models", "模型") },
     { key: "appearance", label: t("settings.appearance", "外观") },
     { key: "reading", label: t("settings.reading", "阅读") },
+    { key: "advanced", label: t("settings.advanced", "高级") },
   ];
 
   useEffect(() => {
@@ -72,6 +74,7 @@ export function SettingsShell() {
             {active === "models" && <ModelsSettings />}
             {active === "appearance" && <AppearanceSettings />}
             {active === "reading" && <ReadingSettings />}
+            {active === "advanced" && <AdvancedSettings />}
           </div>
         </ScrollArea>
       </div>
