@@ -42,7 +42,7 @@
 ## 4. IPC 契约（`src/shared`）
 
 - `saveProgressInput` 加 `percent: z.number().min(0).max(1).nullish()`。
-- 新通道 `library:recentlyRead`：入参无；出参 `RecentlyReadDto[]`：
+- 新通道 `library:recently-read`：入参无；出参 `RecentlyReadDto[]`：
 
   ```ts
   interface RecentlyReadDto extends BookSummaryDto {
@@ -66,7 +66,7 @@
   - `reorderBooks(db, orderedIds)`：事务内逐 id `UPDATE books SET position = <index>`。
   - 导入路径：插入时 `position = MIN(position) - 1`（空库为 0）。
 - `progress.ts`：`saveProgress(db, bookId, locator, percent?)`——upsert 的 insert/update 两路径均带 percent。
-- handlers + `preload.ts`：注册 `library:recentlyRead`、`library:reorder`，暴露 `window.api.library.recentlyRead()` / `.reorder()`。
+- handlers + `preload.ts`：注册 `library:recently-read`、`library:reorder`，暴露 `window.api.library.recentlyRead()` / `.reorder()`。
 
 ## 6. 渲染层
 
@@ -89,7 +89,7 @@
 
 ### 6.3 reader 进度显示（与 percent 同源）
 
-- `ReadingContext` 类型加 `percent: number | null`：
+- `navigation-store` 加独立字段 `readingPercent: number | null`（实现阶段定案：percent 是纯 UI 状态，不进 `ReadingContext`——那是 AI 聊天契约；PDF 面包屑的 page/pageCount 仍从 readingContext 读）：
   - epub：`(index + scrollRatio) / book.count`——spine 比例近似（`textLengths` 惰性填充，字符加权不可行）；
   - PDF：`page / pageCount`，精确。
 - 两个 reader 在现有 `setReadingContext` 调用点顺手计算；**同一个值**双消费：

@@ -73,6 +73,7 @@ export default {
   "errors.providerNotFound": "未找到$t(terms.provider) {{id}}",
   "errors.requestFailed": "请求失败",
   "errors.summaryModelNotConfigured": "未配置摘要模型",
+  "library.continueReading": "继续阅读",
   "library.deleteConfirm.body":
     "将永久移除这本书及其所有标注、笔记、对话，以及导入的书籍文件。此操作不可撤销。",
   "library.deleteConfirm.cancel": "取消",
@@ -98,6 +99,7 @@ export default {
   "library.loading": "加载书库…",
   "library.menu.delete": "删除",
   "library.menu.edit": "编辑信息",
+  "library.reorderFailed": "排序保存失败：{{error}}",
   "library.title": "Marginalia",
   "library.unknownAuthor": "未知作者",
   "library.updateFailed": "{{title}} 保存失败：{{error}}",
