@@ -3,9 +3,8 @@ import type { MouseEvent as ReactMouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
-import { Minus, Plus } from "lucide-react";
-import { Button } from "@renderer/components/ui/button";
 import { cn } from "@renderer/lib/utils";
+import { usePrefsStore } from "@renderer/store/prefs-store";
 import { useThemeStore } from "@renderer/store/theme-store";
 import { useAnnotationStore } from "@renderer/store/annotation-store";
 import { useNavigationStore } from "@renderer/store/navigation-store";
@@ -16,6 +15,7 @@ import { makePdfLocator, parsePdfLocator, parsePdfLocatorRange } from "./pdf-loc
 import { pdfAnnosByPage } from "./pdf-annotations";
 import { buildPdfSelectionInfo, flatOffsetOf } from "./pdf-selection";
 import { chapterIdAtPage } from "./pdf-chapter-at-page";
+import { clampPdfZoom } from "./pdf-zoom";
 import { OVERLAY_FILL } from "./highlight";
 import type { PdfPageAnno } from "./pdf-annotations";
 import { usePdfHighlights } from "./use-pdf-highlights";
@@ -26,8 +26,6 @@ interface Props {
 }
 
 const SAVE_DEBOUNCE_MS = 1000; // 对齐 EpubReader
-/** 缩放档位：相对适宽的倍率。 */
-const ZOOM_STEPS = [0.75, 1, 1.25, 1.5, 2] as const;
 /** 页列表左右留白（px）。 */
 const PAGE_GUTTER = 48;
 
@@ -37,7 +35,8 @@ export function PdfReader({ bookId, chapters }: Props) {
   const qc = useQueryClient();
   const [book, setBook] = useState<PdfBook | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
-  const [zoomIdx, setZoomIdx] = useState(1); // 1 = 适宽 100%
+  // 缩放倍率由顶栏 PdfPrefs 调整、落盘记忆；这里只读（clamp 防越界旧值）。
+  const zoom = clampPdfZoom(usePrefsStore((s) => s.pdfZoom));
   const [containerW, setContainerW] = useState(0);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -215,7 +214,7 @@ export function PdfReader({ bookId, chapters }: Props) {
   }
 
   // 页 CSS 尺寸：适宽 × 档位。
-  const pageW = Math.max(200, (containerW - PAGE_GUTTER) * ZOOM_STEPS[zoomIdx]!);
+  const pageW = Math.max(200, (containerW - PAGE_GUTTER) * zoom);
   const pageH = pageW * (book.baseSize.height / book.baseSize.width);
 
   // 标注按页分组（每渲染重算；可见页 × 条数级，开销可忽略——React Compiler 亦会缓存）。
@@ -283,29 +282,6 @@ export function PdfReader({ bookId, chapters }: Props) {
           />
         )}
       />
-      <div className="absolute right-4 top-3 z-10 flex items-center gap-1 rounded-md border border-border bg-background/90 px-1.5 py-1 shadow-sm backdrop-blur">
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={t("reader.pdf.zoomOut", "缩小")}
-          disabled={zoomIdx === 0}
-          onClick={() => setZoomIdx((i) => Math.max(0, i - 1))}
-        >
-          <Minus />
-        </Button>
-        <span className="min-w-12 text-center font-sans text-xs text-muted-foreground">
-          {Math.round(ZOOM_STEPS[zoomIdx]! * 100)}%
-        </span>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={t("reader.pdf.zoomIn", "放大")}
-          disabled={zoomIdx === ZOOM_STEPS.length - 1}
-          onClick={() => setZoomIdx((i) => Math.min(ZOOM_STEPS.length - 1, i + 1))}
-        >
-          <Plus />
-        </Button>
-      </div>
     </div>
   );
 }
@@ -379,10 +355,12 @@ function PdfPage(props: {
   };
 
   return (
-    <div className="flex justify-center py-2">
+    // w-max + min-w-full：页宽超过视口（高缩放）时外壳随内容撑开（横向可滚、左缘可达），
+    // 未超时占满视口居中。shrink-0 禁止 flex 把超宽页压回容器宽——否则只有纵向放大（比例失调）。
+    <div className="flex w-max min-w-full justify-center py-2">
       {renderError ? (
         <div
-          className="flex items-center justify-center bg-muted font-sans text-xs text-muted-foreground"
+          className="flex shrink-0 items-center justify-center bg-muted font-sans text-xs text-muted-foreground"
           // 运行时计算的页面尺寸（规范允许内联承载运行时值）
           style={{ width: cssWidth, height: cssHeight }}
         >
@@ -390,7 +368,7 @@ function PdfPage(props: {
         </div>
       ) : (
         <div
-          className="relative shadow-sm"
+          className="relative shrink-0 shadow-sm"
           style={{ width: cssWidth, height: cssHeight }}
           onClick={onClick}
         >

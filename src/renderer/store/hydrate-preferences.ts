@@ -18,4 +18,5 @@ export function hydratePreferences(): void {
     usePrefsStore.setState({ autoSummarize: snap.autoSummarize });
   }
   if (snap.summaryModel) usePrefsStore.setState({ summaryModel: snap.summaryModel });
+  if (snap.pdfZoom !== undefined) usePrefsStore.setState({ pdfZoom: snap.pdfZoom });
 }

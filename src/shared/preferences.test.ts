@@ -24,6 +24,7 @@ describe("preferences schemas", () => {
       "colorMode",
       "language",
       "lastHighlightStyle",
+      "pdfZoom",
       "readerLayout",
       "readerPrefs",
       "summaryModel",
@@ -91,6 +92,9 @@ describe("preferences schemas", () => {
         value: { providerId: "", model: "m" },
       }).success,
     ).toBe(false);
+    expect(setPreferenceInput.safeParse({ key: "pdfZoom", value: 1.25 }).success).toBe(true);
+    expect(setPreferenceInput.safeParse({ key: "pdfZoom", value: 0 }).success).toBe(false); // 须为正数
+    expect(setPreferenceInput.safeParse({ key: "pdfZoom", value: "1.25" }).success).toBe(false);
   });
 
   it("readerPrefs 旧 JSON(无 fontFamily)parse 成功且默认 default", () => {

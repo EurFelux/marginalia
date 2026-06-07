@@ -28,6 +28,9 @@ export const readerLayoutSchema = z.object({
 });
 export type ReaderLayout = z.infer<typeof readerLayoutSchema>;
 
+/** PDF 缩放倍率（相对适宽）。存倍率而非档位索引：档位表增删时旧倍率仍可收敛到最近档，索引则会错位。 */
+export const pdfZoomSchema = z.number().positive();
+
 /** 摘要模型（章节/全书摘要 + 会话自动命名）：显式 (provider, model) 对；未存 = 未配置（报错态，无回退）。 */
 export const summaryModelSchema = z.object({
   providerId: z.string().min(1),
@@ -47,6 +50,7 @@ export const PREFERENCE_SCHEMAS = {
   language: uiLanguage,
   readerLayout: readerLayoutSchema,
   summaryModel: summaryModelSchema,
+  pdfZoom: pdfZoomSchema,
 } as const;
 
 export type PreferenceKey = keyof typeof PREFERENCE_SCHEMAS;
@@ -72,5 +76,6 @@ export const setPreferenceInput = z.discriminatedUnion("key", [
   z.object({ key: z.literal("language"), value: uiLanguage }),
   z.object({ key: z.literal("readerLayout"), value: readerLayoutSchema }),
   z.object({ key: z.literal("summaryModel"), value: summaryModelSchema }),
+  z.object({ key: z.literal("pdfZoom"), value: pdfZoomSchema }),
 ]);
 export type SetPreferenceInput = z.infer<typeof setPreferenceInput>;

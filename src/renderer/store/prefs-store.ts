@@ -15,6 +15,8 @@ interface PrefsState {
   lastHighlightStyle: AnnotationStyle;
   /** 阅读器三向布局开关（左栏 / AI 面板 / 顶栏）；落盘记忆，重启恢复。 */
   layout: ReaderLayout;
+  /** PDF 缩放倍率（相对适宽）；落盘记忆，重启恢复。存倍率非档位索引（见 @shared/preferences）。 */
+  pdfZoom: number;
 }
 interface PrefsActions {
   setAutoSummarize: (v: boolean) => void;
@@ -22,6 +24,7 @@ interface PrefsActions {
   updatePrefs: (patch: Partial<ReaderPrefs>) => void;
   setLastHighlightStyle: (style: AnnotationStyle) => void;
   updateLayout: (patch: Partial<ReaderLayout>) => void;
+  setPdfZoom: (v: number) => void;
 }
 
 export const PREFS_INITIAL: PrefsState = {
@@ -30,6 +33,7 @@ export const PREFS_INITIAL: PrefsState = {
   prefs: { fontScale: 1, lineHeight: 1.9, maxWidth: 640, fontFamily: "default" },
   lastHighlightStyle: "yellow",
   layout: { sidebarOpen: true, panelOpen: false, headerOpen: true },
+  pdfZoom: 1,
 };
 
 /**
@@ -62,4 +66,8 @@ export const usePrefsStore = create<PrefsState & PrefsActions>()((set) => ({
       persistPreference({ key: "readerLayout", value: layout });
       return { layout };
     }),
+  setPdfZoom: (pdfZoom) => {
+    persistPreference({ key: "pdfZoom", value: pdfZoom });
+    set({ pdfZoom });
+  },
 }));

@@ -22,6 +22,7 @@ import { Sidebar } from "@renderer/reader/Sidebar";
 import { EpubReader } from "@renderer/reader/EpubReader";
 import { PdfReader } from "@renderer/reader/PdfReader";
 import { ReaderPrefs } from "@renderer/reader/ReaderPrefs";
+import { PdfPrefs } from "@renderer/reader/PdfPrefs";
 import { SelectionToolbar } from "@renderer/reader/SelectionToolbar";
 import { HighlightStyleBar } from "@renderer/reader/HighlightStyleBar";
 import { NoteModal } from "@renderer/reader/NoteModal";
@@ -135,7 +136,7 @@ export function ReaderView() {
             )}
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            {!book.isPending && book.data?.format !== "pdf" && <ReaderPrefs />}
+            {!book.isPending && (book.data?.format === "pdf" ? <PdfPrefs /> : <ReaderPrefs />)}
             <Tooltip>
               <TooltipTrigger
                 render={
