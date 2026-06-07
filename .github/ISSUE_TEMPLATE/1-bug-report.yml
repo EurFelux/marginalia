@@ -1,0 +1,55 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: A clear description of the bug.
+      placeholder: Selecting text in a PDF shows the toolbar in the wrong position...
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Import '...' (ePub/PDF)
+        2. Open the book and ...
+        3. See error
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: The toolbar should appear right above the selection.
+  - type: dropdown
+    id: format
+    attributes:
+      label: Book format
+      options:
+        - ePub
+        - PDF
+        - Both / not format-specific
+      default: 2
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: Visible in Settings, or `brew info --cask marginalia`.
+      placeholder: 0.4.0
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS version
+      placeholder: macOS 15.4 (Apple Silicon)
+  - type: textarea
+    id: context
+    attributes:
+      label: Logs / screenshots / sample file
+      description: |
+        Anything that helps reproduce — console output, screenshots, or a link to a sample book that triggers the bug (please don't attach copyrighted books).

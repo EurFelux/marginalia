@@ -1,0 +1,47 @@
+name: Feature request / improvement
+description: Suggest a new capability or an improvement to an existing one
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Problem / motivation
+      description: What are you trying to do, and what gets in the way today?
+      placeholder: My library has 50+ books and I can't find anything because the grid has no sorting...
+    validations:
+      required: true
+  - type: textarea
+    id: desired
+    attributes:
+      label: Desired behavior
+      description: What you'd like to happen. A rough direction is fine — it doesn't need to be a full design.
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      description: Helps triage — new capability vs. making an existing one nicer.
+      options:
+        - New capability (something the app can't do at all today)
+        - Refinement of an existing feature (it works, but could be smoother)
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      multiple: true
+      options:
+        - Reader (reading view)
+        - PDF-specific
+        - AI chat / tools
+        - Library / imports
+        - Settings / preferences
+        - UI / design
+        - Packaging / build
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives / additional context
+      description: Workarounds you use today, examples from other apps, mockups, etc.
