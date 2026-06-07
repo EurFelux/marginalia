@@ -1,7 +1,7 @@
 import { app, ipcMain } from "electron";
 import { C } from "@shared/ipc";
 import { getDb } from "@main/db/instance";
-import { getAppInfo, ping } from "@main/app-service";
+import { getAppInfo, ping } from "@main/app-info";
 import { bind, register, type Binding } from "@main/ipc/registry";
 
 export const appBindings: Binding[] = [
