@@ -364,19 +364,27 @@ a {
 
 /* pdfjs textLayer（v6）：透明 span 绝对定位叠在页面 canvas 上，仅承载原生文本选区。
    --total-scale-factor 由 pdf-book renderPage 按页设置；--scale-round-* 是 pdfjs
-   round() 表达式要求的量化步长（官方默认 1px）。 */
+   round() 表达式要求的量化步长（官方默认 1px）。
+   几何规则须与官方 pdf_viewer.css 对齐：pdfjs v6 只往 span 写 CSS 变量
+   （--font-height / --scale-x / --rotate），字号与横向校正全靠下方 calc() 消费——
+   漏掉任何一条 span 都会偏离 canvas 文字实际位置（选区对不上字）。 */
 .textLayer {
   position: absolute;
   inset: 0;
   overflow: clip;
   text-align: initial;
   line-height: 1;
+  letter-spacing: normal;
+  word-spacing: normal;
   text-size-adjust: none;
   forced-color-adjust: none;
   transform-origin: 0 0;
   caret-color: CanvasText;
   --scale-round-x: 1px;
   --scale-round-y: 1px;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
 }
 .textLayer :is(span, br) {
   color: transparent;
@@ -385,9 +393,17 @@ a {
   cursor: text;
   transform-origin: 0% 0%;
 }
-.textLayer span.markedContent {
-  top: 0;
-  height: 0;
+.textLayer > :not(.markedContent),
+.textLayer .markedContent span:not(.markedContent) {
+  z-index: 1;
+  --font-height: 0;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  --scale-x: 1;
+  --rotate: 0deg;
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+.textLayer .markedContent {
+  display: contents;
 }
 .textLayer ::selection {
   background: rgb(59 130 246 / 0.35);
