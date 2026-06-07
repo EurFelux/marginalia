@@ -1,0 +1,40 @@
+import { describe, expect, it } from "vitest";
+import { updateBookInput } from "@shared/library";
+
+describe("updateBookInput", () => {
+  it("accepts valid input and trims fields", () => {
+    const r = updateBookInput.parse({ bookId: "b1", title: "  Clean  ", author: "  A  " });
+    expect(r.title).toBe("Clean");
+    expect(r.author).toBe("A");
+  });
+
+  it("accepts null author (explicit clear)", () => {
+    const r = updateBookInput.parse({ bookId: "b1", title: "T", author: null });
+    expect(r.author).toBeNull();
+  });
+
+  it("rejects empty or whitespace-only title", () => {
+    expect(updateBookInput.safeParse({ bookId: "b", title: "", author: null }).success).toBe(false);
+    expect(updateBookInput.safeParse({ bookId: "b", title: "   ", author: null }).success).toBe(
+      false,
+    );
+  });
+
+  it("rejects missing author key (put semantics, not patch)", () => {
+    expect(updateBookInput.safeParse({ bookId: "b", title: "T" }).success).toBe(false);
+  });
+
+  it("rejects empty-string author (renderer coerces '' to null before send)", () => {
+    expect(updateBookInput.safeParse({ bookId: "b", title: "T", author: "" }).success).toBe(false);
+  });
+
+  it("rejects overlong fields", () => {
+    const long = "x".repeat(501);
+    expect(updateBookInput.safeParse({ bookId: "b", title: long, author: null }).success).toBe(
+      false,
+    );
+    expect(updateBookInput.safeParse({ bookId: "b", title: "T", author: long }).success).toBe(
+      false,
+    );
+  });
+});
