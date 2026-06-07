@@ -78,10 +78,10 @@ process.on(uncaughtException/…) ────────────┴→ Log
 
 新增通道（Zod schema 进 `src/shared/ipc.ts`，走 `registry.handle` + `validateInput` 既有模式）：
 
-| 通道              | 方向            | 契约                                                                                                                                                                        |
-| ----------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `log:write`       | renderer → main | `{ level, module, message }` → void；主进程侧强制：来源段写 `[renderer]`（不可伪装 `[main]`）、落 `renderer-*.log` 专属文件、**不回显 main stdout**（已在 DevTools 输出过） |
-| `app:openLogsDir` | renderer → main | void → void；handler 经 `appService.openFolder(appService.getPath("logsDir"))` 调用（恒可用；不直 import shell，见 AppService spec）                                        |
+| 通道                | 方向            | 契约                                                                                                                                                                        |
+| ------------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `log:write`         | renderer → main | `{ level, module, message }` → void；主进程侧强制：来源段写 `[renderer]`（不可伪装 `[main]`）、落 `renderer-*.log` 专属文件、**不回显 main stdout**（已在 DevTools 输出过） |
+| `app:open-logs-dir` | renderer → main | void → void；handler 经 `appService.openFolder(appService.getPath("logsDir"))` 调用（恒可用；不直 import shell，见 AppService spec）                                        |
 
 preload 暴露 `api.log.write` 与 `api.app.openLogsDir`。
 
