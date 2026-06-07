@@ -14,6 +14,7 @@ import {
   importBookInput,
   readChapterTextInput,
   saveProgressInput,
+  updateBookInput,
 } from "@shared/library";
 import type { ListModelsResult, ProviderDto, RevealResult, TestResult } from "@shared/providers";
 import {
@@ -114,6 +115,7 @@ export const C = {
   libraryPickBook: def("library:pick-book", "invoke", z.void(), out<string | null>()),
   libraryReadBookBytes: def("library:read-book-bytes", "invoke", bookIdInput, out<Uint8Array>()),
   libraryDelete: def("library:delete", "invoke", bookIdInput, out<void>()),
+  libraryUpdate: def("library:update", "invoke", updateBookInput, out<BookSummaryDto>()),
 
   // progress
   progressGet: def("progress:get", "invoke", bookIdInput, out<{ locator: string } | null>()),
