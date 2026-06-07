@@ -87,7 +87,7 @@ export async function readBookText(
  */
 export function assertTextLayer(db: DB, bookId: string): void {
   const book = getBook(db, bookId);
-  // 缺书也要抛：静默通过会让后续 fire-and-forget ensure* 把 not-found 吞进 console.warn，
+  // 缺书也要抛：静默通过会让后续 fire-and-forget ensure* 把 not-found 吞进 warn 日志，
   // 渲染层收不到任何 reject，摘要永远卡 pending。
   if (!book) throw new Error(`content: book ${bookId} not found`);
   if (!book.hasTextLayer) {
