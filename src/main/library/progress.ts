@@ -8,9 +8,18 @@ export function getProgress(db: DB, bookId: string): ProgressRow | undefined {
   return db.select().from(progress).where(eq(progress.bookId, bookId)).get();
 }
 
-export function saveProgress(db: DB, bookId: string, locator: string): void {
+export function saveProgress(
+  db: DB,
+  bookId: string,
+  locator: string,
+  percent?: number | null,
+): void {
+  // percent 未传时写 null（而非保留旧值）：locator 与 percent 是同一位置的快照，半更新即脏数据。
   db.insert(progress)
-    .values({ bookId, locator, updatedAt: Date.now() })
-    .onConflictDoUpdate({ target: progress.bookId, set: { locator, updatedAt: Date.now() } })
+    .values({ bookId, locator, percent: percent ?? null, updatedAt: Date.now() })
+    .onConflictDoUpdate({
+      target: progress.bookId,
+      set: { locator, percent: percent ?? null, updatedAt: Date.now() },
+    })
     .run();
 }
