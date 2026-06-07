@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type SettingsCategory = "models" | "appearance" | "reading";
+export type SettingsCategory = "models" | "appearance" | "reading" | "advanced";
 
 interface SettingsState {
   open: boolean;
