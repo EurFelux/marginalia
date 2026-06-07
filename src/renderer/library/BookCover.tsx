@@ -24,7 +24,7 @@ import {
 } from "@renderer/components/ui/dialog";
 import { Input } from "@renderer/components/ui/input";
 import { Label } from "@renderer/components/ui/label";
-import { coverGradientClass } from "./cover-palette";
+import { CoverImage } from "./CoverImage";
 
 export function BookCover({
   book,
@@ -74,21 +74,7 @@ export function BookCover({
             />
           }
         >
-          {book.hasCover ? (
-            <img
-              src={`cover://b/${encodeURIComponent(book.id)}`}
-              alt=""
-              loading="lazy"
-              className="aspect-[2/3] w-full object-cover"
-            />
-          ) : (
-            <div
-              className={`flex aspect-[2/3] w-full flex-col justify-between bg-gradient-to-br ${coverGradientClass(book.id)} p-3 text-white`}
-            >
-              <span className="line-clamp-4 font-serif text-base font-semibold">{title}</span>
-              <span className="truncate text-xs text-white/80">{author}</span>
-            </div>
-          )}
+          <CoverImage book={book} />
         </ContextMenuTrigger>
         <ContextMenuContent>
           <ContextMenuItem onClick={openEdit}>{t("library.menu.edit", "编辑信息")}</ContextMenuItem>
