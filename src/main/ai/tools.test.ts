@@ -76,18 +76,22 @@ describe("createReadingTools", () => {
     });
   });
 
-  it("readChapterText rejects on an unknown chapterId (error propagates to the agent loop)", async () => {
+  it("readChapterText returns an { error } result on an unknown chapterId (no throw — a thrown tool error would abort the whole stream)", async () => {
     const { tools } = await setup();
-    await expect(tools.readChapterText.execute!({ chapterId: "nope" }, opts)).rejects.toThrow(
-      "not found",
-    );
+    const out = (await tools.readChapterText.execute!({ chapterId: "nope" }, opts)) as {
+      error?: string;
+    };
+    expect(out.error).toMatch(/not found/);
+    // 自愈数据：错误信息附带真实章节清单，模型可据此换参重试
+    expect(out.error).toMatch(/Known chapters include/);
   });
 
-  it("getChapterSummary rejects on an unknown chapterId", async () => {
+  it("getChapterSummary returns an { error } result on an unknown chapterId", async () => {
     const { tools } = await setup();
-    await expect(tools.getChapterSummary.execute!({ chapterId: "nope" }, opts)).rejects.toThrow(
-      "not found",
-    );
+    const out = (await tools.getChapterSummary.execute!({ chapterId: "nope" }, opts)) as {
+      error?: string;
+    };
+    expect(out.error).toMatch(/not found/);
   });
 
   it("readChapterText inputSchema rejects an empty chapterId", async () => {
@@ -167,20 +171,28 @@ describe("readPage tool (pdf)", () => {
     expect(schema.safeParse({ page: 1, mode: "text" }).success).toBe(true);
   });
 
-  it("mode text rejects for scanned pdfs with an actionable error", async () => {
+  it("mode text returns an { error } result for scanned pdfs with an actionable message", async () => {
     const { tools } = await setupPdf({ scanned: true, imageToolResults: true });
     if (!("readPage" in tools)) throw new Error("readPage missing");
-    await expect(tools.readPage.execute!({ page: 1, mode: "text" }, opts)).rejects.toThrow(
-      /scanned|text layer/,
-    );
+    const out = (await tools.readPage.execute!({ page: 1, mode: "text" }, opts)) as {
+      error?: string;
+    };
+    expect(out.error).toMatch(/scanned|text layer/);
   });
 
-  it("rejects out-of-range pages", async () => {
+  it("returns an { error } result for out-of-range pages and toModelOutput passes it through as json", async () => {
     const { tools } = await setupPdf();
     if (!("readPage" in tools)) throw new Error("readPage missing");
-    await expect(tools.readPage.execute!({ page: 99, mode: "text" }, opts)).rejects.toThrow(
-      /out of range/,
-    );
+    const out = (await tools.readPage.execute!({ page: 99, mode: "text" }, opts)) as {
+      error?: string;
+    };
+    expect(out.error).toMatch(/out of range/);
+    const modelOut = await tools.readPage.toModelOutput!({
+      toolCallId: "t",
+      input: { page: 99, mode: "text" },
+      output: out,
+    } as never);
+    expect(modelOut).toEqual({ type: "json", value: out });
   });
 });
 
@@ -191,8 +203,15 @@ describe("resolveChapterRef", () => {
     expect(resolveChapterRef(db, book.id, "OEBPS/ch1.xhtml")).toBe(ch1.id);
   });
 
-  it("throws for a ref that is neither a known id nor href", async () => {
+  it('resolves a unique chapter title case-insensitively (models pass titles like "Preface")', async () => {
+    const { db, book, ch1 } = await setup();
+    if (!ch1.title) throw new Error("fixture chapter has no title");
+    expect(resolveChapterRef(db, book.id, ch1.title.toUpperCase())).toBe(ch1.id);
+    expect(resolveChapterRef(db, book.id, ` ${ch1.title.toLowerCase()} `)).toBe(ch1.id);
+  });
+
+  it("throws with the chapter list for a ref that matches nothing", async () => {
     const { db, book } = await setup();
-    expect(() => resolveChapterRef(db, book.id, "night_3")).toThrow(/not found/);
+    expect(() => resolveChapterRef(db, book.id, "night_3")).toThrow(/Known chapters include/);
   });
 });
