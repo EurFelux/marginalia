@@ -15,6 +15,9 @@ import { Composer } from "@renderer/ai/Composer";
 import { messagesToUI } from "@renderer/ai/message-history";
 import { conversationsQuery } from "@renderer/query/conversation-queries";
 import type { Chip } from "@shared/chat";
+import { createLogger } from "@renderer/logger";
+
+const log = createLogger("ai");
 
 export function AIPanel() {
   const { t } = useTranslation();
@@ -51,7 +54,7 @@ export function AIPanel() {
       .then((dtos) => {
         if (!cancelled) setMessages(messagesToUI(dtos));
       })
-      .catch((err: unknown) => console.warn("[ai] load conversation history failed:", err));
+      .catch((err: unknown) => log.warn("load conversation history failed", err));
     return () => {
       cancelled = true;
     };
@@ -82,7 +85,7 @@ export function AIPanel() {
       useChatStore.getState().setSummaryChipsPreset();
       void qc.invalidateQueries({ queryKey: ["conversations"] });
     } catch (err) {
-      console.warn("[ai] create conversation failed:", err);
+      log.warn("create conversation failed", err);
     }
   };
 

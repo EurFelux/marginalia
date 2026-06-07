@@ -1,6 +1,9 @@
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { createLogger } from "@renderer/logger";
+
+const log = createLogger("reader");
 import {
   ArrowLeft,
   PanelLeftClose,
@@ -66,7 +69,7 @@ export function ReaderView() {
       void window.api.content
         .generateChapterSummary({ bookId, chapterId })
         .then(() => qc.invalidateQueries({ queryKey: qk.chapterSummary(bookId, chapterId) }))
-        .catch(() => {});
+        .catch((err: unknown) => log.warn("auto chapter summary failed", err));
     }, 800);
     return () => clearTimeout(t);
   }, [autoSummarize, bookId, chapterId, qc, book.data?.hasTextLayer]);

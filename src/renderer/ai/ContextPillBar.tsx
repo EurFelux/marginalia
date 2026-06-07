@@ -13,6 +13,9 @@ import { bookSummaryQuery, chapterSummaryQuery } from "@renderer/query/summary-q
 import { qk } from "@renderer/query/keys";
 import type { SummaryView } from "@renderer/ai/summary-chips";
 import { selectionContextOf, withoutSelectionContext } from "@renderer/ai/selection-context";
+import { createLogger } from "@renderer/logger";
+
+const log = createLogger("ai");
 
 /**
  * 统一上下文 pill 基件（spec §4）：实线亮(on)/实线灰(off)/虚线缺失(missing，正交于亮灰)。
@@ -126,10 +129,12 @@ export function ContextPillBar() {
 
   // 手动点亮触发的生成失败要透传真实原因（如「未配置摘要模型」）——与 SummaryPill 显式生成同款 toast；
   // 开章自动触发的静默路径在 ReaderView，不经此处。
-  const surfaceGenerateError = (e: unknown) =>
+  const surfaceGenerateError = (e: unknown) => {
+    log.warn("summary generation failed", e);
     toast.error(
       t("ai.summary.generateFailed", "生成摘要失败：{{error}}", { error: (e as Error).message }),
     );
+  };
 
   const toggle = (kind: "chapter" | "book", status: SummaryStatus | undefined, on: boolean) => {
     if (!on && (status === "pending" || status === "unavailable")) {
