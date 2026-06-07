@@ -154,6 +154,18 @@ export function runSend(
       return errorInfo.message;
     },
     onFinish: ({ responseMessage, isAborted }) => {
+      // 会话可能在流中途被删除（conversations:delete 先 abort 在跑流再删行）：此时行已不在，
+      // 落库必撞 FK。这是删除操作的预期后续而非失败——有意丢弃本轮 assistant 消息，仅留 debug 痕迹。
+      // 同步回调内 check-then-act 安全（better-sqlite3 同步驱动，无写入穿插）。
+      const stillExists = db
+        .select({ id: conversations.id })
+        .from(conversations)
+        .where(eq(conversations.id, conversationId))
+        .get();
+      if (!stillExists) {
+        log.debug("conversation deleted mid-stream; dropping assistant persist", conversationId);
+        return;
+      }
       const status = streamHadError ? "error" : isAborted ? "aborted" : "complete";
       const usage =
         capturedUsage?.inputTokens != null && capturedUsage.outputTokens != null
