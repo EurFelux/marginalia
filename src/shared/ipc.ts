@@ -208,6 +208,7 @@ export const C = {
     conversationIdInput,
     out<ConversationDto | null>(),
   ),
+  conversationsDelete: def("conversations:delete", "invoke", conversationIdInput, out<void>()),
   messagesListByConversation: def(
     "messages:list-by-conversation",
     "invoke",
