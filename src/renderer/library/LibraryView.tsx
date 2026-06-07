@@ -12,6 +12,7 @@ import { fileNameOf, pickBookFiles } from "./book-drop";
 import { useEpubDrop } from "./use-epub-drop";
 import { DropOverlay } from "./DropOverlay";
 import { BookCover } from "./BookCover";
+import { RecentlyReadShelf } from "./RecentlyReadShelf";
 
 interface ImportItem {
   filePath: string;
@@ -165,6 +166,7 @@ export function LibraryView() {
 
       <ScrollArea className="flex-1">
         <main className="p-6">
+          <RecentlyReadShelf onOpen={openBook} />
           {books.isPending && (
             <p className="text-sm text-muted-foreground">{t("library.loading", "加载书库…")}</p>
           )}
