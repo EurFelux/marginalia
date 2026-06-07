@@ -13,10 +13,16 @@ export default defineConfig({
     // pdfjs 字体/编码资源（pdf-book.ts 的 cMapUrl/standardFontDataUrl 指向产物根下这两个目录）：
     // cmaps = CID 字体编码映射（CJK 书解码）；standard_fonts = 标准 14 字体字形（非嵌入西文字体替代）。
     // dev 模式插件经中间件同路径供给，URL 两环境一致。
+    // stripBase 必须有：插件 build 输出恒保留 src 目录结构（dev 中间件却平铺）——缺它产物变成
+    // cmaps/node_modules/pdfjs-dist/cmaps/*（打包冒烟实锤的生产 404）。
     viteStaticCopy({
       targets: [
-        { src: "node_modules/pdfjs-dist/cmaps/*", dest: "cmaps" },
-        { src: "node_modules/pdfjs-dist/standard_fonts/*", dest: "standard_fonts" },
+        { src: "node_modules/pdfjs-dist/cmaps/*", dest: "cmaps", rename: { stripBase: true } },
+        {
+          src: "node_modules/pdfjs-dist/standard_fonts/*",
+          dest: "standard_fonts",
+          rename: { stripBase: true },
+        },
       ],
     }),
   ],
