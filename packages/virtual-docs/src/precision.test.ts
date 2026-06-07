@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { estimateHeight, sectionsToUnload, topVisibleIndex } from "./precision";
+import { estimateHeight, sectionScrollRatio, sectionsToUnload, topVisibleIndex } from "./precision";
 
 describe("estimateHeight", () => {
   it("returns cached height when present", () => {
@@ -51,5 +51,16 @@ describe("topVisibleIndex", () => {
       { index: 1, top: -100, bottom: 20 }, // max bottom
     ];
     expect(topVisibleIndex(secs, vt)).toBe(1);
+  });
+});
+
+describe("sectionScrollRatio", () => {
+  it("returns the viewport top position within the section", () => {
+    expect(sectionScrollRatio({ top: 100, bottom: 300 }, 150)).toBe(0.25);
+  });
+
+  it("clamps outside values", () => {
+    expect(sectionScrollRatio({ top: 100, bottom: 300 }, 50)).toBe(0);
+    expect(sectionScrollRatio({ top: 100, bottom: 300 }, 400)).toBe(1);
   });
 });

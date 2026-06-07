@@ -45,6 +45,7 @@ export function PdfReader({ bookId, chapters }: Props) {
   const sawInitialRange = useRef(false);
   const currentChapterId = useNavigationStore((s) => s.currentChapterId);
   const setCurrentChapter = useNavigationStore((s) => s.setCurrentChapter);
+  const setReadingContext = useNavigationStore((s) => s.setReadingContext);
   const virtuosoRef = useRef<VirtuosoHandle | null>(null);
   // Virtuoso 滚动容器（rangeChanged 里从 scrollTop 推视口顶部页用）。
   const scrollerRef = useRef<HTMLElement | null>(null);
@@ -271,6 +272,14 @@ export function PdfReader({ bookId, chapters }: Props) {
               : range.startIndex + 1;
           // 当前章回写（含首发：开书恢复进度后侧栏即高亮正确章）。
           const chId = chapterIdAtPage(chapters, page);
+          const ch = chId ? chapters.find((c) => c.id === chId) : null;
+          setReadingContext({
+            format: "pdf",
+            page,
+            pageCount: book.pageCount,
+            chapterId: chId,
+            chapterTitle: ch?.title ?? null,
+          });
           if (chId) {
             topChapterIdRef.current = chId;
             if (chId !== currentChapterId) setCurrentChapter(chId);

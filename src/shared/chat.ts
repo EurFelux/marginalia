@@ -28,6 +28,26 @@ export const buildChipsInput = z.object({
 });
 export type BuildChipsInput = z.infer<typeof buildChipsInput>;
 
+export const readingContextSchema = z.discriminatedUnion("format", [
+  z.object({
+    format: z.literal("pdf"),
+    page: z.number().int().min(1),
+    pageCount: z.number().int().min(1).nullable().optional(),
+    chapterId: z.string().min(1).nullable().optional(),
+    chapterTitle: z.string().min(1).nullable().optional(),
+  }),
+  z.object({
+    format: z.literal("epub"),
+    chapterId: z.string().min(1),
+    chapterTitle: z.string().min(1).nullable().optional(),
+    offset: z.number().int().nonnegative().optional(),
+    maxChars: z.number().int().positive().optional(),
+    spineIndex: z.number().int().nonnegative().optional(),
+    locator: z.string().min(1).nullable().optional(),
+  }),
+]);
+export type ReadingContext = z.infer<typeof readingContextSchema>;
+
 /** conversations:create 入参。 */
 export const createConversationInput = z.object({
   bookId: z.string().min(1),
@@ -71,6 +91,7 @@ export const sendInputSchema = z.object({
   conversationId: z.string().min(1),
   chips: z.array(chipSchema),
   userText: z.string().min(1),
+  readingContext: readingContextSchema.nullish(),
 });
 export type SendInput = z.infer<typeof sendInputSchema>;
 

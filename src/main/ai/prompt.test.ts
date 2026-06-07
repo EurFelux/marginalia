@@ -150,6 +150,50 @@ describe("assemblePrompt", () => {
     );
   });
 
+  it("renders current PDF page with direct readPage params", () => {
+    const out = assemblePrompt({
+      systemPrompt: null,
+      history: [],
+      current: {
+        chips: [],
+        userText: "what am I reading?",
+        readingContext: {
+          format: "pdf",
+          page: 42,
+          pageCount: 300,
+          chapterId: "ch-1",
+          chapterTitle: "Middle",
+        },
+      },
+    });
+    expect(out[out.length - 1].content).toContain("PDF page 42 of 300");
+    expect(out[out.length - 1].content).toContain('readPage with {"page":42,"mode":"text"}');
+  });
+
+  it("renders current ePub chapter with direct readChapterText params", () => {
+    const out = assemblePrompt({
+      systemPrompt: null,
+      history: [],
+      current: {
+        chips: [],
+        userText: "what am I reading?",
+        readingContext: {
+          format: "epub",
+          chapterId: "ch-epub",
+          chapterTitle: "Opening",
+          offset: 1234,
+          maxChars: 4000,
+          spineIndex: 3,
+        },
+      },
+    });
+    expect(out[out.length - 1].content).toContain("ePub chapterId: ch-epub (Opening)");
+    expect(out[out.length - 1].content).toContain("Estimated chapter text offset: 1234");
+    expect(out[out.length - 1].content).toContain(
+      'readChapterText with {"chapterId":"ch-epub","offset":1234,"maxChars":4000}',
+    );
+  });
+
   it("re-expands each historical user turn from its own metadata chips (isomorphic with current turn)", () => {
     const history: PromptHistoryMessage[] = [
       {

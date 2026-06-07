@@ -27,6 +27,7 @@ interface Props {
 }
 
 const SAVE_DEBOUNCE_MS = 1000;
+const CURRENT_EPUB_READ_CHARS = 4_000;
 
 export function EpubReader({ bookId, chapters }: Props) {
   const { t } = useTranslation();
@@ -37,6 +38,7 @@ export function EpubReader({ bookId, chapters }: Props) {
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
   const currentChapterId = useNavigationStore((s) => s.currentChapterId);
   const setCurrentChapter = useNavigationStore((s) => s.setCurrentChapter);
+  const setReadingContext = useNavigationStore((s) => s.setReadingContext);
   const prefs = usePrefsStore((s) => s.prefs);
   const setSelection = useAnnotationStore((s) => s.setSelection);
   const openStyleBar = useAnnotationStore((s) => s.openStyleBar);
@@ -119,17 +121,42 @@ export function EpubReader({ bookId, chapters }: Props) {
   };
   const onSelectionCleared = () => setSelection(null);
 
-  const onTopSectionChange = (index: number) => {
+  const chapterTextOffsetBeforeIndex = (chapterId: string, index: number): number => {
+    let offset = 0;
+    for (let i = 0; i < index; i++) {
+      const href = book?.hrefAtIndex(i);
+      if (href && chapterIdByHref(chapters, href) === chapterId)
+        offset += book?.textLengthAtIndex(i) ?? 0;
+    }
+    return offset;
+  };
+
+  const onTopSectionChange = (index: number, meta: { scrollRatio: number }) => {
     if (!book) return;
     // 当前章高亮
     const href = book.hrefAtIndex(index);
     const chId = href ? chapterIdByHref(chapters, href) : null;
+    const ch = chId ? chapters.find((c) => c.id === chId) : null;
+    const cfi = book.cfiAtIndex(index);
+    if (chId) {
+      const sectionLength = book.textLengthAtIndex(index);
+      const offset =
+        chapterTextOffsetBeforeIndex(chId, index) + Math.floor(sectionLength * meta.scrollRatio);
+      setReadingContext({
+        format: "epub",
+        chapterId: chId,
+        chapterTitle: ch?.title ?? null,
+        offset,
+        maxChars: CURRENT_EPUB_READ_CHARS,
+        spineIndex: index,
+        locator: cfi,
+      });
+    }
     if (chId) {
       topChapterIdRef.current = chId;
       if (chId !== currentChapterId) setCurrentChapter(chId);
     }
     // 防抖存进度（section 级 CFI）
-    const cfi = book.cfiAtIndex(index);
     if (cfi) {
       if (saveTimer.current) clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(() => {

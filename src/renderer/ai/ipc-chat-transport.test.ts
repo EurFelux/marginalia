@@ -133,9 +133,19 @@ describe("createIpcChatTransport sendMessages", () => {
     vi.unstubAllGlobals();
   });
 
-  it("sends payload with conversationId and bookId (no currentChapterId/activeConversationId)", async () => {
+  it("sends payload with conversationId, bookId, and readingContext", async () => {
     const { api, sentPayloads } = makeApi();
     vi.stubGlobal("window", { api });
+    useNavigationStore.setState({
+      ...useNavigationStore.getState(),
+      readingContext: {
+        format: "pdf",
+        page: 12,
+        pageCount: 99,
+        chapterId: "ch-2",
+        chapterTitle: "Chapter Two",
+      },
+    });
 
     const transport = createIpcChatTransport();
     const stream = await transport.sendMessages({
@@ -153,6 +163,14 @@ describe("createIpcChatTransport sendMessages", () => {
     const payload = sentPayloads[0] as Record<string, unknown>;
     expect(payload).toHaveProperty("bookId", "book-1");
     expect(payload).toHaveProperty("conversationId", "existing-conv");
+    expect(payload).toHaveProperty("readingContext");
+    expect(payload.readingContext).toEqual({
+      format: "pdf",
+      page: 12,
+      pageCount: 99,
+      chapterId: "ch-2",
+      chapterTitle: "Chapter Two",
+    });
     expect(payload).not.toHaveProperty("currentChapterId");
     expect(payload).not.toHaveProperty("activeConversationId");
   });

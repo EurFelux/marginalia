@@ -1,6 +1,6 @@
 // src/main/ai/prompt.ts
 import type { ModelMessage, UIMessage } from "ai";
-import type { Chip, MessageDto } from "@shared/chat";
+import type { Chip, MessageDto, ReadingContext } from "@shared/chat";
 
 export type PromptHistoryMessage = Pick<MessageDto, "role" | "parts" | "metadata">;
 
@@ -8,7 +8,7 @@ export interface AssemblePromptParams {
   systemPrompt: string | null;
   /** 既往消息（按 seq 升序）。 */
   history: PromptHistoryMessage[];
-  current: { chips: Chip[]; userText: string };
+  current: { chips: Chip[]; userText: string; readingContext?: ReadingContext | null };
 }
 
 /** 仅保留 text part（assistant 的 tool-call/reasoning part 有意不回放，Phase 1 选择）。 */
@@ -41,6 +41,26 @@ function renderUserTurn(chips: ChipLike, userText: string): string {
   if (selection) sections.push(`## 选中文本\n${selection}`);
   const context = sections.join("\n\n");
   return context ? `${context}\n\n${userText}` : userText;
+}
+
+function renderReadingContext(ctx: ReadingContext | null | undefined): string | null {
+  if (!ctx) return null;
+  if (ctx.format === "pdf") {
+    const chapter = ctx.chapterTitle ? `, current chapter: ${ctx.chapterTitle}` : "";
+    const pageCount = ctx.pageCount != null ? ` of ${ctx.pageCount}` : "";
+    return (
+      `## Current reading position\nPDF page ${ctx.page}${pageCount}${chapter}.\n` +
+      `To read the user's current page verbatim, call readPage with {"page":${ctx.page},"mode":"text"}.`
+    );
+  }
+  const title = ctx.chapterTitle ? ` (${ctx.chapterTitle})` : "";
+  const offset = ctx.offset ?? 0;
+  const maxChars = ctx.maxChars ?? 4000;
+  return (
+    `## Current reading position\nePub chapterId: ${ctx.chapterId}${title}.\n` +
+    `Estimated chapter text offset: ${offset}.\n` +
+    `To read from the user's current ePub location without loading the whole chapter, call readChapterText with {"chapterId":"${ctx.chapterId}","offset":${offset},"maxChars":${maxChars}}.`
+  );
 }
 
 /** PDF 会话的 system prompt 附注（spec §7）：让模型知道页粒度工具的存在与扫描版的现实。 */
@@ -87,9 +107,17 @@ export function assemblePrompt(params: AssemblePromptParams): ModelMessage[] {
     });
   }
 
+  // Reading position is intentionally injected only into the live/current user turn:
+  // it changes on scroll, so putting it in system/history would churn prompt-cache prefixes.
+  // It is also not persisted in message metadata; future turns get their own fresh position.
   out.push({
     role: "user",
-    content: renderUserTurn(params.current.chips, params.current.userText),
+    content: [
+      renderReadingContext(params.current.readingContext),
+      renderUserTurn(params.current.chips, params.current.userText),
+    ]
+      .filter((s): s is string => Boolean(s))
+      .join("\n\n"),
   });
 
   return out;

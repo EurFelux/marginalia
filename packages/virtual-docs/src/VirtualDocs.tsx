@@ -2,7 +2,12 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useSta
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { SectionFrame, type SectionSelectEvent } from "./SectionFrame";
 import type { ViewportRect } from "./geometry";
-import { estimateHeight, sectionsToUnload, topVisibleIndex } from "./precision";
+import {
+  estimateHeight,
+  sectionScrollRatio,
+  sectionsToUnload,
+  topVisibleSection,
+} from "./precision";
 
 /** 未缓存 section 的默认占位高度（px）；缓存命中后用真实测高。 */
 const DEFAULT_ESTIMATE = 600;
@@ -28,7 +33,7 @@ export interface VirtualDocsProps {
    * 真实视口顶 section 索引变化时回调。优先用 IntersectionObserver 精确计算；
    * IntersectionObserver 不可用时 fallback 到 virtuoso rangeChanged.startIndex（近似，含 overscan）。
    */
-  onTopSectionChange?: (index: number) => void;
+  onTopSectionChange?: (index: number, meta: { scrollRatio: number }) => void;
   onSelect?: (e: SectionSelectEvent) => void;
   onSelectionCleared?: () => void;
   decorate?: (index: number, doc: Document) => void;
@@ -86,10 +91,10 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
       const r = el.getBoundingClientRect();
       return { index, top: r.top, bottom: r.bottom };
     });
-    const idx = topVisibleIndex(secs, vt);
-    if (idx != null && idx !== lastTop.current) {
-      lastTop.current = idx;
-      onTopSectionChange?.(idx);
+    const section = topVisibleSection(secs, vt);
+    if (section && section.index !== lastTop.current) {
+      lastTop.current = section.index;
+      onTopSectionChange?.(section.index, { scrollRatio: sectionScrollRatio(section, vt) });
     }
   };
   // IO 回调捕获 build 时的 recomputeTop；用 ref 持最新值，使 onTopSectionChange 身份变化后
@@ -185,7 +190,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
       itemContent={itemContent}
       scrollerRef={handleScrollerRef}
       rangeChanged={(range) => {
-        if (!ioSupported) onTopSectionChange?.(range.startIndex); // fallback：近似
+        if (!ioSupported) onTopSectionChange?.(range.startIndex, { scrollRatio: 0 }); // fallback：近似
         const lo = Math.max(0, range.startIndex - KEEP_DISTANCE);
         const hi = Math.min(count - 1, range.endIndex + KEEP_DISTANCE);
         for (let i = lo; i <= hi; i++) unloaded.current.delete(i);

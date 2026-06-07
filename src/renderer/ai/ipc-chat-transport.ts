@@ -56,7 +56,7 @@ function lastUserText(messages: ChatUIMessage[]): string {
 export function createIpcChatTransport(): ChatTransport<ChatUIMessage> {
   return {
     async sendMessages({ messages, abortSignal }) {
-      const { currentBookId } = useNavigationStore.getState();
+      const { currentBookId, readingContext } = useNavigationStore.getState();
       if (!currentBookId) {
         const { default: i18n } = await import("@renderer/i18n");
         throw new Error(i18n.t("ai.noBookToSend", "没有正在阅读的书，无法发送。"));
@@ -85,6 +85,7 @@ export function createIpcChatTransport(): ChatTransport<ChatUIMessage> {
         conversationId,
         chips,
         userText,
+        readingContext,
       });
       if (!ack.ok) {
         void stream.cancel(); // 触发 cancel() → 退订，避免监听器泄漏

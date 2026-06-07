@@ -46,3 +46,19 @@ export function topVisibleIndex(
   }
   return sections.reduce((a, b) => (b.bottom > a.bottom ? b : a)).index;
 }
+
+export function topVisibleSection(
+  sections: ReadonlyArray<{ index: number; top: number; bottom: number }>,
+  viewportTop: number,
+): { index: number; top: number; bottom: number } | null {
+  const index = topVisibleIndex(sections, viewportTop);
+  return index == null ? null : (sections.find((s) => s.index === index) ?? null);
+}
+
+export function sectionScrollRatio(
+  section: { top: number; bottom: number },
+  viewportTop: number,
+): number {
+  const height = Math.max(1, section.bottom - section.top);
+  return Math.min(1, Math.max(0, (viewportTop - section.top) / height));
+}

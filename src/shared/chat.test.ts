@@ -94,6 +94,28 @@ describe("sendRequest", () => {
   it("accepts a valid request with empty chips and explicit conversationId", () => {
     expect(sendRequest.safeParse(base).success).toBe(true);
   });
+  it("accepts current PDF reading context", () => {
+    expect(
+      sendRequest.safeParse({
+        ...base,
+        readingContext: { format: "pdf", page: 12, pageCount: 200 },
+      }).success,
+    ).toBe(true);
+  });
+  it("accepts current ePub reading context", () => {
+    expect(
+      sendRequest.safeParse({
+        ...base,
+        readingContext: {
+          format: "epub",
+          chapterId: "chapter-1",
+          chapterTitle: "One",
+          offset: 1200,
+          maxChars: 4000,
+        },
+      }).success,
+    ).toBe(true);
+  });
   it("rejects empty userText", () => {
     expect(sendRequest.safeParse({ ...base, userText: "" }).success).toBe(false);
   });

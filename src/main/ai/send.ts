@@ -98,7 +98,7 @@ export function runSend(
   const allMessages: ModelMessage[] = assemblePrompt({
     systemPrompt: systemPromptText,
     history,
-    current: { chips: deduped, userText: input.userText },
+    current: { chips: deduped, userText: input.userText, readingContext: input.readingContext },
   });
 
   // 将首个 system 消息提取出来，通过 system: 参数传给 streamText（避免 allowSystemInMessages 警告）

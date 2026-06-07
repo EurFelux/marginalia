@@ -1,5 +1,6 @@
 import ePub, { EpubCFI, type Book } from "epubjs";
 import type Section from "epubjs/types/section";
+import { htmlToText } from "@marginalia/epub-parser";
 import i18n from "@renderer/i18n";
 
 /** 高亮 mark 的 class；CFI 计算 / toRange 时作为 ignoreClass 传入，防止 mark 污染 CFI 路径。 */
@@ -22,6 +23,8 @@ export interface EpubBook {
   cfiFromRange: (index: number, range: Range) => string | null;
   /** CFI 区间串 → 给定 section 文档内的 DOM Range（高亮渲染）；失败返回 null。 */
   rangeFromCfi: (cfi: string, doc: Document) => Range | null;
+  /** 当前 spine section 内的纯文本长度（与 readChapterText 的文本规整口径同源），未知时返回 0。 */
+  textLengthAtIndex: (index: number) => number;
   /** 卸载第 index 个 section 的解析文档（释放内存）；幂等，未加载/越界为 no-op。仅对远离视口的 section 调用。 */
   unloadSection: (index: number) => void;
   /** 释放 epubjs 资源（卸载书、blob URL）。 */
@@ -58,6 +61,7 @@ export async function createEpubBook(bytes: Uint8Array): Promise<EpubBook> {
   // spine 项数：运行时 epubjs Spine 有 `.length`（unpack 时由 items.length 赋值），
   // 但 0.3.93 的 spine.d.ts 未声明该属性，故需断言读取。
   const count: number = (spine as unknown as { length: number }).length;
+  const textLengths = new Map<number, number>();
 
   const sectionAt = (index: number): Section | null => {
     try {
@@ -79,6 +83,7 @@ export async function createEpubBook(bytes: Uint8Array): Promise<EpubBook> {
       // （lib/section.js 里 render 返回 defer().promise），故按真实类型断言后 await。
       // 渲染后 s.document 保留，供 cfiAtIndex/cfiFromRange（不 unload）。
       const html = await (s.render(book.load.bind(book)) as unknown as Promise<string>);
+      textLengths.set(index, htmlToText(html).length);
       return html;
     },
 
@@ -154,6 +159,8 @@ export async function createEpubBook(bytes: Uint8Array): Promise<EpubBook> {
         return null;
       }
     },
+
+    textLengthAtIndex: (index) => textLengths.get(index) ?? 0,
 
     unloadSection: (index) => {
       const s = sectionAt(index);
