@@ -8,6 +8,7 @@ import { createDb, runMigrations } from "@main/db/client";
 import { importBook } from "@main/library/repository";
 import {
   createConversation,
+  deleteConversation,
   getConversation,
   listConversationsByBook,
   setConversationTitle,
@@ -288,6 +289,35 @@ describe("runSend", () => {
     await r.finished;
     const assistant = listMessages(db, r.conversationId).find((m) => m.role === "assistant");
     expect(assistant?.status).toBe("aborted");
+  });
+
+  it("drops the assistant persist when the conversation is deleted mid-stream", async () => {
+    const controller = new AbortController();
+    // 延迟分片：abort+delete 发生在分片尚未发完时（镜像 conversations:delete 的服务端顺序）。
+    const slowModel = new MockLanguageModelV3({
+      doStream: async () => ({
+        stream: simulateReadableStream({
+          chunkDelayInMs: 50,
+          chunks: [
+            { type: "text-start", id: "t1" },
+            { type: "text-delta", id: "t1", delta: "partial" },
+            { type: "text-end", id: "t1" },
+            finishChunk("stop"),
+          ],
+        }),
+      }),
+    });
+    const { db, book, deps } = await setup({ ok: true, model: slowModel, modelId: "mock" });
+    const convo = createConversation(db, { bookId: book.id });
+    const r = runSend(deps, input(book.id, convo.id), { abortSignal: controller.signal });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    // 镜像 conversations:delete binding 的顺序：先 abort 在跑流，再删行
+    controller.abort();
+    deleteConversation(db, convo.id);
+    await r.finished; // 顺利收尾，不抛
+    expect(getConversation(db, convo.id)).toBeNull();
+    expect(listMessages(db, convo.id)).toEqual([]); // 无孤儿消息（user 已级联删，assistant 不落）
   });
 
   it("omits the paragraph chip from the snapshot when it duplicates the conversation's last", async () => {
