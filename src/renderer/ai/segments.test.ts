@@ -52,4 +52,10 @@ describe("segments", () => {
     expect(segs).toHaveLength(1);
     expect(segs[0]!.kind).toBe("tool");
   });
+
+  it("merges consecutive text parts after a tool part", () => {
+    const segs = segments([toolPart(), text("a"), text("b")]);
+    expect(segs.map((s) => s.kind)).toEqual(["tool", "text"]);
+    expect(segs[1]).toEqual({ kind: "text", text: "ab" });
+  });
 });
