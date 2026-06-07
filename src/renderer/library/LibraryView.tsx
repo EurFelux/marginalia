@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { BookOpen, FolderOpen, Settings } from "lucide-react";
@@ -13,6 +14,17 @@ import { useEpubDrop } from "./use-epub-drop";
 import { DropOverlay } from "./DropOverlay";
 import { BookCover } from "./BookCover";
 import { RecentlyReadShelf } from "./RecentlyReadShelf";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import { SortableContext, arrayMove, rectSortingStrategy } from "@dnd-kit/sortable";
+import { SortableBook } from "./SortableBook";
 
 interface ImportItem {
   filePath: string;
@@ -86,6 +98,39 @@ export function LibraryView() {
       );
     },
   });
+
+  // 拖拽排序（#48 spec §6.2）：8px 位移激活（与点击打开互斥）；乐观更新缓存后全量 reorder，
+  // 失败 invalidate 恢复真序 + toast 透传真实错误（honest-error）。
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+
+  const reorder = useMutation({
+    mutationFn: (orderedIds: string[]) => window.api.library.reorder({ orderedIds }),
+    onError: (e) => {
+      void qc.invalidateQueries({ queryKey: qk.library });
+      toast.error(
+        t("library.reorderFailed", "排序保存失败：{{error}}", { error: (e as Error).message }),
+        { closeButton: true, duration: Infinity },
+      );
+    },
+  });
+
+  const onDragStart = (e: DragStartEvent) => setDraggingId(String(e.active.id));
+  const onDragEnd = (e: DragEndEvent) => {
+    setDraggingId(null);
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const list = books.data;
+    if (!list) return;
+    const from = list.findIndex((b) => b.id === active.id);
+    const to = list.findIndex((b) => b.id === over.id);
+    if (from < 0 || to < 0) return;
+    const next = arrayMove(list, from, to);
+    qc.setQueryData(qk.library, next); // 乐观：先动 UI
+    reorder.mutate(next.map((b) => b.id));
+  };
+
+  const draggingBook = draggingId ? books.data?.find((b) => b.id === draggingId) : undefined;
 
   // 即时 toast 反馈：新增 / 已在库（幂等复用）/ 忽略非 epub / 失败（透传主进程真实错误，不自动消失）。
   const runImport = async (items: ImportItem[], ignored: string[]) => {
@@ -184,18 +229,39 @@ export function LibraryView() {
               </p>
             </div>
           )}
-          <ul className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-5">
-            {books.data?.map((b) => (
-              <li key={b.id}>
+          <DndContext
+            sensors={sensors}
+            onDragStart={onDragStart}
+            onDragEnd={onDragEnd}
+            onDragCancel={() => setDraggingId(null)}
+          >
+            <SortableContext
+              items={books.data?.map((b) => b.id) ?? []}
+              strategy={rectSortingStrategy}
+            >
+              <ul className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-5">
+                {books.data?.map((b) => (
+                  <SortableBook
+                    key={b.id}
+                    book={b}
+                    onOpen={() => openBook(b.id)}
+                    onDelete={() => deleteBook.mutate(b)}
+                    onUpdate={(patch) => updateBook.mutate({ bookId: b.id, ...patch })}
+                  />
+                ))}
+              </ul>
+            </SortableContext>
+            <DragOverlay>
+              {draggingBook ? (
                 <BookCover
-                  book={b}
-                  onOpen={() => openBook(b.id)}
-                  onDelete={() => deleteBook.mutate(b)}
-                  onUpdate={(patch) => updateBook.mutate({ bookId: b.id, ...patch })}
+                  book={draggingBook}
+                  onOpen={() => {}}
+                  onDelete={() => {}}
+                  onUpdate={() => {}}
                 />
-              </li>
-            ))}
-          </ul>
+              ) : null}
+            </DragOverlay>
+          </DndContext>
         </main>
       </ScrollArea>
 
