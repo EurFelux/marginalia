@@ -16,9 +16,16 @@ export interface AppServiceEnv {
   openFolder: (dir: string) => Promise<void>;
 }
 
-/** 各 module 的专有数据目录 scope（类型化 key，按需扩展）。
- * "logs" → LoggerService；"books" → 书籍副本（沿用 userData/books 布局，零数据迁移） */
-export type DataScope = "logs" | "books";
+/** 数据路径 key（类型化，按需扩展）——dir/file 语义编码在 key 名里：*Dir 目录、*File 完整文件路径。
+ * logsDir → LoggerService；booksDir → 书籍副本；dbFile → SQLite 数据库（历史布局均零迁移） */
+export type DataPathKey = "logsDir" | "booksDir" | "dbFile";
+
+/** key → 相对 dataDir 的路径。映射是 AppService 的内部策略——布局与文件名知识收归此处 */
+const DATA_PATHS: Record<DataPathKey, string> = {
+  logsDir: "logs",
+  booksDir: "books",
+  dbFile: "marginalia.db", // 历史布局：db 三件套在 dataDir 根（改动布局需数据迁移）
+};
 
 /** 类不导出：消费方只能经 barrel 拿 appService，无法绕过封装 */
 class AppService {
@@ -40,9 +47,9 @@ class AppService {
     return this.#env;
   }
 
-  /** module 专有数据目录：<dataDir>/<scope>。纯计算不碰 fs——目录创建是消费方的事 */
-  getPath(scope: DataScope): string {
-    return path.join(this.#required.dataDir, scope);
+  /** module 专有数据路径（key → 路径的映射为内部策略）。纯计算不碰 fs——目录创建是消费方的事 */
+  getPath(key: DataPathKey): string {
+    return path.join(this.#required.dataDir, DATA_PATHS[key]);
   }
 
   get isDev(): boolean {
@@ -63,7 +70,7 @@ export function initAppService(env: AppServiceEnv): void {
 
 /** 只读单例——barrel 唯一导出。原始 dataDir 不暴露：目录布局知识收归此处 */
 export const appService: {
-  getPath(scope: DataScope): string;
+  getPath(key: DataPathKey): string;
   readonly isDev: boolean;
   openFolder(dir: string): Promise<void>;
 } = service;
