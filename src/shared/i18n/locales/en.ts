@@ -76,6 +76,7 @@ export default {
   "errors.providerNotFound": "$t(terms.provider) {{id}} not found",
   "errors.requestFailed": "Request failed",
   "errors.summaryModelNotConfigured": "Summary model is not configured",
+  "library.continueReading": "Continue reading",
   "library.deleteConfirm.body":
     "This permanently removes the book and all its annotations, notes, and conversations, plus the imported book file. This cannot be undone.",
   "library.deleteConfirm.cancel": "Cancel",
@@ -105,6 +106,7 @@ export default {
   "library.loading": "Loading library…",
   "library.menu.delete": "Delete",
   "library.menu.edit": "Edit details",
+  "library.reorderFailed": "Failed to save order: {{error}}",
   "library.title": "Marginalia",
   "library.unknownAuthor": "Unknown author",
   "library.updateFailed": "{{title}} failed to save: {{error}}",
