@@ -18,6 +18,9 @@ import {
 } from "@main/ai/summary";
 import { makeSummaryDeps } from "@main/ai/send-deps";
 import { bind, register, type Binding } from "@main/ipc/registry";
+import { createLogger } from "@main/logger";
+
+const log = createLogger("library");
 
 const toDto = (b: {
   id: string;
@@ -113,7 +116,7 @@ export const libraryBindings: Binding[] = [
     assertSummaryModelReady(deps.resolveModel);
     assertTextLayer(db, input.bookId);
     void ensureChapterSummary(deps, input.bookId, input.chapterId, input.force ?? false).catch(
-      (err) => console.warn("[content] generate chapter summary failed:", err),
+      (err) => log.warn("generate chapter summary failed", err),
     );
     return getChapterSummaryView(db, input.bookId, input.chapterId);
   }),
@@ -128,7 +131,7 @@ export const libraryBindings: Binding[] = [
     assertTextLayer(db, input.bookId);
     // force=true：书卡「生成/重新生成」总是（重）生成，覆盖旧摘要。
     void ensureBookSummary(deps, input.bookId, true).catch((err) =>
-      console.warn("[content] generate book summary failed:", err),
+      log.warn("generate book summary failed", err),
     );
     return getBookSummaryView(db, input.bookId);
   }),

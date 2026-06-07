@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { createLogger } from "@main/logger";
+
+const log = createLogger("library");
 
 export type BookFormat = "epub" | "pdf";
 
@@ -56,6 +59,6 @@ export async function deleteBookFile(
   format: BookFormat,
 ): Promise<void> {
   await unlink(storedBookPath(booksDir, bookId, format)).catch((err: NodeJS.ErrnoException) => {
-    if (err.code !== "ENOENT") console.warn(`[book-files] unlink ${bookId} failed:`, err);
+    if (err.code !== "ENOENT") log.warn(`unlink ${bookId} failed`, err);
   });
 }

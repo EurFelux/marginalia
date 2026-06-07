@@ -7,6 +7,9 @@ import { readBookText, readChapterText } from "@main/library/content";
 import type { SummaryStatus } from "@shared/library";
 import type { ResolvedModel } from "@main/ai/assistant-model";
 import type { LoadBytes } from "@main/ai/tools";
+import { createLogger } from "@main/logger";
+
+const log = createLogger("summary");
 
 export const SUMMARY_SYSTEM =
   "You summarize a single book chapter for a reading assistant. Produce a concise, faithful summary (a few sentences) capturing the chapter's key events, ideas, and terms. Output only the summary, no preamble.";
@@ -112,14 +115,14 @@ export async function ensureChapterSummary(
     });
     if (!hasText(text)) {
       // provider 不抛错但产出空文本 → 视为失败：不落库（否则派生 ready 永不重试），标 unavailable 可重试
-      console.warn(`[summary] chapter ${chapterId} generated empty text, treated as failure`);
+      log.warn(`chapter ${chapterId} generated empty text, treated as failure`);
       failedChapters.add(chapterId);
       return;
     }
     db.update(chapters).set({ summary: text }).where(eq(chapters.id, chapterId)).run();
   } catch (err) {
     // 自含全部 reject（fire-and-forget 端口为 => void）。已 claim 的标记 failed（派生 unavailable）。
-    console.warn(`[summary] chapter ${chapterId} ensure failed:`, err);
+    log.warn(`chapter ${chapterId} ensure failed`, err);
     if (claimed) failedChapters.add(chapterId);
   } finally {
     if (claimed) inFlightChapters.delete(chapterId);
@@ -203,7 +206,7 @@ export async function ensureBookSummary(
       maxRetries: 1,
       onError: ({ error }) => {
         hadError = true;
-        console.warn(`[summary] book ${bookId} stream error:`, error);
+        log.warn(`book ${bookId} stream error`, error);
       },
     });
     let acc = "";
@@ -213,12 +216,11 @@ export async function ensureBookSummary(
     }
     if (hadError || !hasText(acc)) {
       // 流错误或空产出（provider 不报错但 0 字符）均不落库（保留旧 summary 不变），标 failed 可重试
-      if (!hadError)
-        console.warn(`[summary] book ${bookId} generated empty text, treated as failure`);
+      if (!hadError) log.warn(`book ${bookId} generated empty text, treated as failure`);
       failedBooks.add(bookId);
     } else db.update(books).set({ summary: acc }).where(eq(books.id, bookId)).run();
   } catch (err) {
-    console.warn(`[summary] book ${bookId} ensure failed:`, err);
+    log.warn(`book ${bookId} ensure failed`, err);
     if (claimed) failedBooks.add(bookId);
   } finally {
     if (claimed) {

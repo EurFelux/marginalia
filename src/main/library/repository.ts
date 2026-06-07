@@ -5,6 +5,9 @@ import { parsePdf, renderPageImage } from "@marginalia/pdf-parser";
 import type { DB } from "@main/db/client";
 import { books, chapters } from "@main/db/schema";
 import { deleteBookFile } from "@main/library/book-files";
+import { createLogger } from "@main/logger";
+
+const log = createLogger("library");
 
 export interface ImportInput {
   bytes: Uint8Array;
@@ -91,7 +94,7 @@ async function importPdfBook(db: DB, bytes: Uint8Array, fileName?: string): Prom
 
   // 封面 = 首页缩略图；渲染失败不阻塞导入（书库走兜底 tile）。
   const cover = await renderPageImage(bytes, 1, { targetWidth: 600 }).catch((err: unknown) => {
-    console.warn("[library] pdf cover render failed:", err);
+    log.warn("pdf cover render failed", err);
     return null;
   });
 

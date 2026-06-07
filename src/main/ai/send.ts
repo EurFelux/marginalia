@@ -21,7 +21,10 @@ import { nameConversation } from "@main/chat/conversation-title";
 import { textOfParts } from "@main/ai/prompt";
 import { t } from "@main/i18n";
 import { type SendInput } from "@shared/chat";
+import { createLogger } from "@main/logger";
 export type { SendInput };
+
+const log = createLogger("send");
 
 export interface SendDeps {
   db: DB;
@@ -146,7 +149,7 @@ export function runSend(
         name: err instanceof Error ? err.name : "Error",
         message: err instanceof Error ? err.message : String(err),
       };
-      console.warn("[send] stream/model error:", err);
+      log.warn("stream/model error", err);
       // onError 要求返回 string（作为 error chunk 的 errorText，供 renderer 实时显示）
       return errorInfo.message;
     },
@@ -204,7 +207,7 @@ export function runSend(
       // 防御性：仅当 UI 流在迭代中真正 reject 时到这（如 onFinish 内 appendMessage DB 写入抛错）。
       // 正常的 doStream 抛错（→ error chunk）与用户 abort（→ onFinish isAborted）都正常关流、
       // 在 onFinish 落终态 assistant 消息，不会进这里。记日志以便排查 DB 落库失败。
-      console.warn("[send] assistant persist / stream drain failed:", err);
+      log.warn("assistant persist / stream drain failed", err);
     } finally {
       // 无论成功/错误，都 resolve finished，避免上层 await 永挂
       resolveDone();

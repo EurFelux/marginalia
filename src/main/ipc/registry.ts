@@ -2,6 +2,9 @@ import { ipcMain, type IpcMainInvokeEvent } from "electron";
 import type { z } from "zod";
 import { validateInput } from "@main/ipc/validate";
 import type { Contract } from "@shared/ipc";
+import { createLogger } from "@main/logger";
+
+const log = createLogger("ipc");
 
 /** 声明式绑定：契约 + 业务 fn，纯数据、不碰 Electron（供 headless 覆盖测试读取）。 */
 export interface Binding {
@@ -25,7 +28,7 @@ export function register(bindings: Binding[]): void {
         const input = validateInput(contract.channel, contract.input, raw);
         return await (fn as (i: unknown, e: IpcMainInvokeEvent) => unknown)(input, event);
       } catch (err) {
-        console.error(`[ipc] ${contract.channel} failed:`, err);
+        log.error(`${contract.channel} failed`, err);
         throw err;
       }
     });
