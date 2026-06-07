@@ -10,7 +10,7 @@ const browser = await chromium.connectOverCDP(ver.webSocketDebuggerUrl);
 const page = browser
   .contexts()[0]
   .pages()
-  .find((p) => p.url().includes("localhost:5173"));
+  .find((p) => /localhost:\d+/.test(p.url()));
 if (!page) {
   console.error("no app page");
   process.exit(1);

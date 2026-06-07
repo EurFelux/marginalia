@@ -49,6 +49,10 @@ export function LibraryView() {
     mutationFn: (b: BookSummaryDto) => window.api.library.delete({ bookId: b.id }),
     onSuccess: (_r, b) => {
       void qc.invalidateQueries({ queryKey: qk.library });
+      // 该书的 per-book 缓存（book/chapters/toc/bytes/progress/annotations/summary/conversations…）
+      // 整体移除（remove 非 invalidate——书已不在，不该 refetch）。否则重导同一文件（id=文件哈希
+      // 不变）后开书会命中删除前的陈旧缓存（staleTime=∞），如旧 title=null 致侧栏书卡显示 id 哈希。
+      qc.removeQueries({ predicate: (q) => q.queryKey.includes(b.id) });
       toast.success(t("library.deleted", "已删除《{{title}}》", { title: b.title ?? b.id }));
     },
     onError: (e, b) => {
