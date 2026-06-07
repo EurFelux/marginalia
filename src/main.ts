@@ -2,6 +2,7 @@ import { app, BrowserWindow, net, shell } from "electron";
 import path from "node:path";
 import started from "electron-squirrel-startup";
 import { initDb, getDb } from "@main/db/instance";
+import { initAppService } from "@main/app/app-service";
 import { setModelFetch } from "@main/ai/model-factory";
 import { getPreference } from "@main/preferences/repository";
 import { initMainI18n } from "@main/i18n";
@@ -20,6 +21,17 @@ import { registerCoverProtocol, registerCoverProtocolScheme } from "@main/librar
 if (!app.isPackaged) {
   app.setName(`${app.getName()}-dev`); // marginalia → marginalia-dev
 }
+
+// AppService 注入：Electron 环境/能力的适配器实现止步于此（业务面向 appService.env 抽象）。
+// 必须在 setName 之后（dataDir 跟随 dev/prod 隔离）、一切消费方之前；
+// fail-fast——初始化失败直接崩，不带病运行，下游消费零判空零降级。
+initAppService({
+  dataDir: app.getPath("userData"),
+  isDev: !app.isPackaged,
+  openFolder: async (dir) => {
+    await shell.openPath(dir); // 错误信息字符串在适配器层吞掉——打开文件夹失败不致命
+  },
+});
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
