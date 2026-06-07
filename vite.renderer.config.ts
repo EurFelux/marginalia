@@ -31,6 +31,8 @@ export default defineConfig({
   // 不看软链源码 mtime——改了包的源码（如新增 VirtualDocs.redecorate）运行时仍用旧产物。
   // 排除后由 Vite 直接从源码转译直供，源码改动即时生效、HMR 正常。
   optimizeDeps: {
-    exclude: ["@marginalia/virtual-docs"],
+    exclude: ["@marginalia/virtual-docs", "@marginalia/epub-parser", "@marginalia/pdf-parser"],
+    // epub-parser 源码直供后，其 CJS 第三方依赖仍需要由 Vite 转成浏览器可消费的 ESM。
+    include: ["node-html-parser"],
   },
 });
