@@ -1,4 +1,13 @@
-import { blob, check, index, integer, sqliteTable, text, unique } from "drizzle-orm/sqlite-core";
+import {
+  blob,
+  check,
+  index,
+  integer,
+  real,
+  sqliteTable,
+  text,
+  unique,
+} from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 import { v7 as uuidv7 } from "uuid";
 import type { UIMessage } from "ai";
@@ -70,6 +79,10 @@ export const books = sqliteTable(
     addedAt: integer("added_at")
       .notNull()
       .$defaultFn(() => Date.now()),
+    // 手动排序位（#48）：默认 0；listBooks 按 (position, added_at) 排——既有书全 0 时按导入序平断，
+    // 首次拖拽全量重写后 position 唯一。新导入 = MIN(position) - 1（排最前）。无唯一约束：
+    // 重复 position 以 rowid 平断，下次拖拽自愈（spec §3）。
+    position: integer("position").notNull().default(0),
   },
   (t) => [check("books_format_check", sql`${t.format} in ('epub','pdf')`)],
 );
@@ -91,15 +104,27 @@ export const chapters = sqliteTable(
   (t) => [unique().on(t.bookId, t.href), index("chapters_book_id_idx").on(t.bookId)],
 );
 
-export const progress = sqliteTable("progress", {
-  bookId: text("book_id")
-    .primaryKey()
-    .references(() => books.id, { onDelete: "cascade" }),
-  locator: text("locator").notNull(),
-  updatedAt: integer("updated_at")
-    .notNull()
-    .$defaultFn(() => Date.now()),
-});
+export const progress = sqliteTable(
+  "progress",
+  {
+    bookId: text("book_id")
+      .primaryKey()
+      .references(() => books.id, { onDelete: "cascade" }),
+    locator: text("locator").notNull(),
+    // 0–1 阅读进度「展示快照」（#48）：reader 保存进度时顺手上送（locator 黑盒保持，主进程不解析）。
+    // 老数据 null → shelf 卡不渲染进度行，读一次书即回填。
+    percent: real("percent"),
+    updatedAt: integer("updated_at")
+      .notNull()
+      .$defaultFn(() => Date.now()),
+  },
+  (t) => [
+    check(
+      "progress_percent_check",
+      sql`${t.percent} is null or (${t.percent} >= 0 and ${t.percent} <= 1)`,
+    ),
+  ],
+);
 
 export const annotations = sqliteTable(
   "annotations",
