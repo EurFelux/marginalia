@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { createLogger } from "@renderer/logger";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   VirtualDocs,
@@ -20,6 +21,8 @@ import { applyAnnotations } from "./apply-annotations";
 import { ANNO_IFRAME_CSS } from "./highlight";
 import { fontFaceCss } from "./reader-fonts";
 import { useThemeStore } from "../store/theme-store";
+
+const log = createLogger("epub");
 
 interface Props {
   bookId: string;
@@ -84,7 +87,10 @@ export function EpubReader({ bookId, chapters }: Props) {
         setBook(b);
       })
       .catch((err: unknown) => {
-        if (alive) setParseError(err instanceof Error ? err.message : String(err));
+        if (alive) {
+          log.error("epub parse failed", err);
+          setParseError(err instanceof Error ? err.message : String(err));
+        }
       });
     return () => {
       alive = false;
@@ -160,7 +166,9 @@ export function EpubReader({ bookId, chapters }: Props) {
     if (cfi) {
       if (saveTimer.current) clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(() => {
-        void window.api.progress.save({ bookId, locator: cfi });
+        void window.api.progress
+          .save({ bookId, locator: cfi })
+          .catch((err: unknown) => log.warn("save progress failed", err));
         // 同步写入查询缓存：progress 查询 staleTime=Infinity，不写缓存的话重开书会读到首开时
         // 的旧值（通常是 null）→ initialIndex 永远 0 → 回到开头。
         qc.setQueryData(qk.progress(bookId), { locator: cfi });

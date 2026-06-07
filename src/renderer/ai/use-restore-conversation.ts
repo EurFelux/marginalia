@@ -1,5 +1,8 @@
 import { useEffect } from "react";
 import { useChatStore } from "@renderer/store/chat-store";
+import { createLogger } from "@renderer/logger";
+
+const log = createLogger("chat");
 
 /**
  * 开书恢复最近会话（spec §7）：仅当 active 为空或不属于该书时，取该书 updatedAt 最新会话
@@ -24,7 +27,7 @@ export function useRestoreConversation(bookId: string | null) {
           s.setSummaryChipsPreset();
         }
       })
-      .catch((err: unknown) => console.warn("[chat] restore conversation failed:", err));
+      .catch((err: unknown) => log.warn("restore conversation failed", err));
     return () => {
       cancelled = true;
     };

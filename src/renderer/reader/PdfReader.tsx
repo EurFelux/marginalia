@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
+import { createLogger } from "@renderer/logger";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
@@ -20,6 +21,8 @@ import { findPdfTextLinks } from "./pdf-autolink";
 import { OVERLAY_FILL } from "./highlight";
 import type { PdfPageAnno } from "./pdf-annotations";
 import { hitHighlight, usePdfHighlights } from "./use-pdf-highlights";
+
+const log = createLogger("pdf");
 
 interface Props {
   bookId: string;
@@ -101,7 +104,10 @@ export function PdfReader({ bookId, chapters }: Props) {
         setBook(b);
       })
       .catch((err: unknown) => {
-        if (alive) setParseError(err instanceof Error ? err.message : String(err));
+        if (alive) {
+          log.error("pdf parse failed", err);
+          setParseError(err instanceof Error ? err.message : String(err));
+        }
       });
     return () => {
       alive = false;
@@ -213,7 +219,9 @@ export function PdfReader({ bookId, chapters }: Props) {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       const locator = makePdfLocator({ page, scrollRatio: 0 }); // 页级精度（页内比例留打磨期）
-      void window.api.progress.save({ bookId, locator });
+      void window.api.progress
+        .save({ bookId, locator })
+        .catch((err: unknown) => log.warn("save progress failed", err));
       qc.setQueryData(qk.progress(bookId), { locator });
     }, SAVE_DEBOUNCE_MS);
   };
