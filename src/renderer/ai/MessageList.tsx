@@ -1,9 +1,17 @@
 import type { ChatStatus } from "ai";
-import { Sparkles } from "lucide-react";
+import { getToolName } from "ai";
+import { useQuery } from "@tanstack/react-query";
+import type { LucideIcon } from "lucide-react";
+import { BookOpen, FileText, List, ScrollText, Sparkles, Wrench } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { chipLabel } from "@renderer/ai/chip-label";
+import { segments, type ToolPart } from "@renderer/ai/segments";
+import { toolStepLabel, toolStepStatus } from "@renderer/ai/tool-step-label";
 import type { ChatUIMessage } from "@renderer/ai/types";
 import { LocalizedStreamdown } from "@renderer/components/LocalizedStreamdown";
+import { cn } from "@renderer/lib/utils";
+import { qk } from "@renderer/query/keys";
+import type { ChapterRefDto } from "@shared/library";
 
 function textOf(m: ChatUIMessage): string {
   return m.parts.map((p) => (p.type === "text" ? p.text : "")).join("");
@@ -12,11 +20,20 @@ function textOf(m: ChatUIMessage): string {
 export function MessageList({
   messages,
   status,
+  bookId,
 }: {
   messages: ChatUIMessage[];
   status: ChatStatus;
+  bookId: string | null;
 }) {
   const { t } = useTranslation();
+  // 章节列表给步骤行解析人话标题（chapterId → 章节名）；静态数据，与 ChapterList 共享缓存。
+  const chaptersQuery = useQuery({
+    queryKey: qk.chapters(bookId ?? ""),
+    queryFn: () => window.api.content.chapters({ bookId: bookId ?? "" }),
+    enabled: bookId !== null,
+  });
+  const chapters = chaptersQuery.data ?? [];
   if (messages.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 px-8 text-center text-sm text-muted-foreground">
@@ -34,7 +51,12 @@ export function MessageList({
         m.role === "user" ? (
           <UserBubble key={m.id} m={m} />
         ) : (
-          <AssistantBubble key={m.id} m={m} streaming={status === "streaming" && m.id === lastId} />
+          <AssistantBubble
+            key={m.id}
+            m={m}
+            streaming={status === "streaming" && m.id === lastId}
+            chapters={chapters}
+          />
         ),
       )}
     </div>
@@ -70,44 +92,66 @@ function UserBubble({ m }: { m: ChatUIMessage }) {
   );
 }
 
-function AssistantBubble({ m, streaming }: { m: ChatUIMessage; streaming: boolean }) {
-  const text = textOf(m);
-  const toolParts = m.parts.filter((p) => p.type.startsWith("tool-") || p.type === "dynamic-tool");
-  const showBubble = text !== "" || streaming;
+function AssistantBubble({
+  m,
+  streaming,
+  chapters,
+}: {
+  m: ChatUIMessage;
+  streaming: boolean;
+  chapters: ChapterRefDto[];
+}) {
+  const segs = segments(m.parts);
+  const hasText = segs.some((s) => s.kind === "text");
+  if (segs.length === 0 && !streaming) return null;
   return (
-    <div className="flex flex-col items-start gap-2">
-      {toolParts.map((p, i) => (
-        <ToolStepCard key={i} part={p} />
-      ))}
-      {showBubble && (
-        <div className="max-w-[88%] rounded-2xl rounded-bl-sm bg-muted px-3.5 py-2 text-sm leading-relaxed text-foreground">
-          {/* Streamdown 自带 markdown 排版（经 @source 由 Tailwind 生成其类）；不叠 prose 以免边距打架 */}
-          <LocalizedStreamdown>{text}</LocalizedStreamdown>
-          {streaming && text === "" && (
-            <span className="inline-block animate-pulse text-primary">▍</span>
-          )}
-        </div>
-      )}
+    <div className="flex flex-col items-start">
+      <div className="max-w-[88%] space-y-2 rounded-2xl rounded-bl-sm bg-muted px-3.5 py-2 text-sm leading-relaxed text-foreground">
+        {segs.map((s, i) =>
+          s.kind === "text" ? (
+            // Streamdown 自带 markdown 排版（经 @source 由 Tailwind 生成其类）；不叠 prose 以免边距打架
+            <LocalizedStreamdown key={i}>{s.text}</LocalizedStreamdown>
+          ) : (
+            <ToolStepRow key={i} part={s.part} chapters={chapters} />
+          ),
+        )}
+        {streaming && !hasText && (
+          <span className="inline-block animate-pulse text-primary">▍</span>
+        )}
+      </div>
     </div>
   );
 }
 
-function ToolStepCard({ part }: { part: ChatUIMessage["parts"][number] }) {
+/** 步骤行图标：lucide 按工具映射，未知工具兜底扳手。 */
+const TOOL_ICONS: Record<string, LucideIcon> = {
+  getToc: List,
+  getChapterSummary: ScrollText,
+  readChapterText: BookOpen,
+  readPage: FileText,
+};
+
+function ToolStepRow({ part, chapters }: { part: ToolPart; chapters: ChapterRefDto[] }) {
   const { t } = useTranslation();
-  const p = part as { type: string; toolName?: string; state?: string };
-  const name = p.type === "dynamic-tool" ? (p.toolName ?? "tool") : p.type.replace(/^tool-/, "");
-  const failed = p.state === "output-error";
-  const done = p.state === "output-available" || failed;
+  const status = toolStepStatus(part);
+  const Icon = TOOL_ICONS[getToolName(part)] ?? Wrench;
   return (
-    <div className="flex w-full max-w-[88%] items-center gap-2 rounded-lg border border-border bg-card/60 px-2.5 py-1.5 text-xs">
+    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      <Icon className="size-3.5 shrink-0" aria-hidden />
+      <span className="min-w-0 truncate">{toolStepLabel(part, chapters, t)}</span>
       {/* i18next-instrument-ignore */}
-      <span>📖</span>
-      <span className="font-medium text-foreground">{name}</span>
-      <span className={failed ? "ms-auto text-destructive" : "ms-auto text-muted-foreground"}>
-        {failed
-          ? t("ai.toolStep.failed", "读取失败")
-          : done
-            ? t("ai.toolStep.done", "已读取")
+      <span className="shrink-0">·</span>
+      <span
+        className={cn(
+          "shrink-0",
+          status === "failed" && "text-destructive",
+          status === "loading" && "animate-pulse",
+        )}
+      >
+        {status === "failed"
+          ? t("ai.toolStep.failed", "失败")
+          : status === "done"
+            ? t("ai.toolStep.done", "完成")
             : t("ai.toolStep.loading", "读取中…")}
       </span>
     </div>
