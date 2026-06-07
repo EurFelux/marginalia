@@ -15,6 +15,21 @@ export interface HighlightRect {
   rect: OverlayRect;
 }
 
+/** 命中测试：相对页容器的点 (x, y) 落在哪条高亮矩形内（点击编辑与 hover cursor 共用）。 */
+export function hitHighlight(
+  highlights: HighlightRect[],
+  x: number,
+  y: number,
+): HighlightRect | undefined {
+  return highlights.find(
+    (h) =>
+      x >= h.rect.left &&
+      x <= h.rect.left + h.rect.width &&
+      y >= h.rect.top &&
+      y <= h.rect.top + h.rect.height,
+  );
+}
+
 /**
  * 本页高亮矩形组：textLayer 渲染就绪（renderPage done）后，把每条标注的页内偏移
  * 经 Range.getClientRects() 转成相对页容器的矩形。偏移越界的标注画不出 → 跳过

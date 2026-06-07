@@ -405,6 +405,11 @@ a {
 .textLayer .markedContent {
   display: contents;
 }
+/* hover 标注高亮时 pointer（对齐 ePub mark.anno）：PdfPage mousemove 命中测试挂/摘此属性。 */
+.textLayer[data-over-highlight],
+.textLayer[data-over-highlight] :is(span, br) {
+  cursor: pointer;
+}
 .textLayer ::selection {
   background: rgb(59 130 246 / 0.35);
 }

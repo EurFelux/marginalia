@@ -18,7 +18,7 @@ import { chapterIdAtPage } from "./pdf-chapter-at-page";
 import { clampPdfZoom } from "./pdf-zoom";
 import { OVERLAY_FILL } from "./highlight";
 import type { PdfPageAnno } from "./pdf-annotations";
-import { usePdfHighlights } from "./use-pdf-highlights";
+import { hitHighlight, usePdfHighlights } from "./use-pdf-highlights";
 
 interface Props {
   bookId: string;
@@ -333,15 +333,7 @@ function PdfPage(props: {
     const layer = textLayerRef.current;
     if (!layer || highlights.length === 0) return;
     const base = layer.getBoundingClientRect();
-    const x = e.clientX - base.x;
-    const y = e.clientY - base.y;
-    const hit = highlights.find(
-      (h) =>
-        x >= h.rect.left &&
-        x <= h.rect.left + h.rect.width &&
-        y >= h.rect.top &&
-        y <= h.rect.top + h.rect.height,
-    );
+    const hit = hitHighlight(highlights, e.clientX - base.x, e.clientY - base.y);
     if (!hit) return;
     openStyleBar({
       rect: {
@@ -353,6 +345,21 @@ function PdfPage(props: {
       target: { type: "edit", annotationId: hit.annoId },
     });
   };
+
+  // hover 高亮 → pointer cursor（对齐 ePub mark.anno 的 cursor:pointer）。overlay 不接事件
+  // （不挡划词），改在容器 mousemove 命中测试；直写 data 属性（零重渲染），CSS 据此切
+  // span 的 cursor——指针仅一处，整层切换在视觉上即「高亮区域内变 pointer」。
+  const onMouseMove = (e: ReactMouseEvent) => {
+    const layer = textLayerRef.current;
+    if (!layer) return;
+    const base = layer.getBoundingClientRect();
+    const over =
+      highlights.length > 0 &&
+      hitHighlight(highlights, e.clientX - base.x, e.clientY - base.y) !== undefined;
+    if (over) layer.setAttribute("data-over-highlight", "");
+    else layer.removeAttribute("data-over-highlight");
+  };
+  const onMouseLeave = () => textLayerRef.current?.removeAttribute("data-over-highlight");
 
   return (
     // w-max + min-w-full：页宽超过视口（高缩放）时外壳随内容撑开（横向可滚、左缘可达），
@@ -371,6 +378,8 @@ function PdfPage(props: {
           className="relative shrink-0 shadow-sm"
           style={{ width: cssWidth, height: cssHeight }}
           onClick={onClick}
+          onMouseMove={onMouseMove}
+          onMouseLeave={onMouseLeave}
         >
           <canvas
             ref={canvasRef}
