@@ -6,6 +6,14 @@ export type ImportBookInput = z.infer<typeof importBookInput>;
 export const bookIdInput = z.object({ bookId: z.string().min(1) });
 export type BookIdInput = z.infer<typeof bookIdInput>;
 
+/** #29 书籍信息编辑。put 语义：两字段必传；author=null 显式清空（回「未知作者」显示）。空串收敛（""→null）由 renderer 表单完成，此处 min(1) 拒空串防绕过 UI 的脏输入。 */
+export const updateBookInput = z.object({
+  bookId: z.string().min(1),
+  title: z.string().trim().min(1).max(500),
+  author: z.string().trim().min(1).max(500).nullable(),
+});
+export type UpdateBookInput = z.infer<typeof updateBookInput>;
+
 export const saveProgressInput = z.object({
   bookId: z.string().min(1),
   locator: z.string().min(1),
