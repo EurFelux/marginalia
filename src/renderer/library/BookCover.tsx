@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { BookSummaryDto } from "@shared/library";
 import { Button } from "@renderer/components/ui/button";
@@ -15,19 +15,49 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@renderer/components/ui/context-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@renderer/components/ui/dialog";
+import { Input } from "@renderer/components/ui/input";
+import { Label } from "@renderer/components/ui/label";
 import { coverGradientClass } from "./cover-palette";
 
 export function BookCover({
   book,
   onOpen,
   onDelete,
+  onUpdate,
 }: {
   book: BookSummaryDto;
   onOpen: () => void;
   onDelete: () => void;
+  onUpdate: (patch: { title: string; author: string | null }) => void;
 }) {
   const { t } = useTranslation();
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editAuthor, setEditAuthor] = useState("");
+  const fieldId = useId();
+
+  // 打开时从 book 快照初始化（不预填 id 哈希——哈希是 title=null 的显示回退，不是数据）。
+  const openEdit = () => {
+    setEditTitle(book.title ?? "");
+    setEditAuthor(book.author ?? "");
+    setEditOpen(true);
+  };
+
+  const saveEdit = () => {
+    const title = editTitle.trim();
+    if (!title) return;
+    onUpdate({ title, author: editAuthor.trim() || null }); // 空作者收敛为 null →「未知作者」
+    setEditOpen(false);
+  };
+
   const title = book.title ?? book.id;
   const author = book.author ?? t("library.unknownAuthor", "未知作者");
   const label = `${title} · ${author}`;
@@ -61,6 +91,7 @@ export function BookCover({
           )}
         </ContextMenuTrigger>
         <ContextMenuContent>
+          <ContextMenuItem onClick={openEdit}>{t("library.menu.edit", "编辑信息")}</ContextMenuItem>
           <ContextMenuItem variant="destructive" onClick={() => setConfirmOpen(true)}>
             {t("library.menu.delete", "删除")}
           </ContextMenuItem>
@@ -94,6 +125,50 @@ export function BookCover({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="font-sans sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("library.editDialog.title", "编辑书籍信息")}</DialogTitle>
+          </DialogHeader>
+          <form
+            className="flex flex-col gap-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              saveEdit();
+            }}
+          >
+            <div className="flex flex-col gap-2">
+              <Label htmlFor={`${fieldId}-title`}>
+                {t("library.editDialog.bookTitle", "书名")}
+              </Label>
+              <Input
+                id={`${fieldId}-title`}
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor={`${fieldId}-author`}>{t("library.editDialog.author", "作者")}</Label>
+              <Input
+                id={`${fieldId}-author`}
+                value={editAuthor}
+                onChange={(e) => setEditAuthor(e.target.value)}
+                placeholder={t("library.editDialog.authorPlaceholder", "留空则显示「未知作者」")}
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setEditOpen(false)}>
+                {t("common.cancel", "取消")}
+              </Button>
+              <Button type="submit" disabled={editTitle.trim() === ""}>
+                {t("common.save", "保存")}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
