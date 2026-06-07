@@ -31,27 +31,49 @@ export async function pumpStream(
   }
 }
 
-const controllers = new Map<string, AbortController>();
+/** 在跑流注册表：streamId → abort 控制器 + 所属会话（conversation deletion 按会话中止用）。 */
+const activeStreams = new Map<string, { controller: AbortController; conversationId: string }>();
+
+/** 中止某会话的全部在跑流（conversations:delete 的前置步骤——防止删行后继续推送/落库）。 */
+export function abortConversationStreams(conversationId: string): void {
+  for (const s of activeStreams.values()) {
+    if (s.conversationId === conversationId) s.controller.abort();
+  }
+}
+
+/** 仅供测试：注册一条在跑流。 */
+export function __registerStream(
+  streamId: string,
+  conversationId: string,
+  controller: AbortController,
+): void {
+  activeStreams.set(streamId, { controller, conversationId });
+}
+
+/** 仅供测试：清空在跑流注册表。 */
+export function __resetStreams(): void {
+  activeStreams.clear();
+}
 
 export const aiBindings: Binding[] = [
   bind(C.aiSend, (req, event: IpcMainInvokeEvent): SendAck => {
     const { streamId, ...input } = req;
     const controller = new AbortController();
-    controllers.set(streamId, controller);
+    activeStreams.set(streamId, { controller, conversationId: input.conversationId });
 
     const result = runSend(makeSendDeps(), input, { abortSignal: controller.signal });
     if (!result.ok) {
-      controllers.delete(streamId);
+      activeStreams.delete(streamId);
       return { ok: false, reason: result.reason };
     }
     void pumpStream(event.sender, streamId, result, controller.signal).finally(() => {
-      controllers.delete(streamId);
+      activeStreams.delete(streamId);
     });
     return { ok: true, conversationId: result.conversationId };
   }),
 
   bind(C.aiAbort, ({ streamId }) => {
-    controllers.get(streamId)?.abort();
+    activeStreams.get(streamId)?.controller.abort();
   }),
 ];
 

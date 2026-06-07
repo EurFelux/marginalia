@@ -1,6 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import { C } from "@shared/ipc";
-import { pumpStream } from "@main/ipc/ai-handlers";
+import {
+  pumpStream,
+  abortConversationStreams,
+  __registerStream,
+  __resetStreams,
+} from "@main/ipc/ai-handlers";
 import type { SendResult } from "@main/ai/send";
 
 type OkResult = Extract<SendResult, { ok: true }>;
@@ -72,5 +77,23 @@ describe("pumpStream", () => {
     const sender = { isDestroyed: () => true, send: vi.fn() };
     await pumpStream(sender, "s4", okResult([{ type: "x" }]), new AbortController().signal);
     expect(sender.send).not.toHaveBeenCalled();
+  });
+});
+
+describe("abortConversationStreams", () => {
+  beforeEach(() => __resetStreams());
+
+  it("aborts only the streams that belong to the conversation", () => {
+    const a = new AbortController();
+    const b = new AbortController();
+    __registerStream("s1", "conv-1", a);
+    __registerStream("s2", "conv-2", b);
+    abortConversationStreams("conv-1");
+    expect(a.signal.aborted).toBe(true);
+    expect(b.signal.aborted).toBe(false);
+  });
+
+  it("is a no-op when the conversation has no running stream", () => {
+    expect(() => abortConversationStreams("conv-x")).not.toThrow();
   });
 });
