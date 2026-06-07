@@ -1,6 +1,7 @@
 import * as pdfjsLib from "pdfjs-dist";
-import { TextLayer } from "pdfjs-dist";
+import { AnnotationLayer, AnnotationType, TextLayer } from "pdfjs-dist";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
+import type { PDFLinkService as PdfjsLinkService } from "pdfjs-dist/types/web/pdf_link_service.js";
 // vite `?url` 资产引用：dev 给源模块 URL、build 输出 asset——pdfjs 按 workerSrc 每文档
 // 自建 module worker，无共享状态。不用 `?worker` + GlobalWorkerOptions.workerPort：
 // 共享 port 的 PDFWorker wrapper 在文档销毁/重建间存在竞态（CDP 冒烟实测
@@ -9,6 +10,16 @@ import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.mjs?url";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+
+interface PdfLinkService {
+  externalLinkEnabled: boolean;
+  getDestinationHash(dest: string | unknown[]): string;
+  getAnchorUrl(anchor: string): string;
+  addLinkAttributes(link: HTMLAnchorElement, url: string, newWindow?: boolean): void;
+  goToDestination(dest: string | unknown[]): Promise<void>;
+  goToPage(pageNumber: number | string): void;
+  executeNamedAction(action: string): void;
+}
 
 export interface PdfBook {
   pageCount: number;
@@ -27,6 +38,8 @@ export interface PdfBook {
     canvas: HTMLCanvasElement,
     cssWidth: number,
     textLayerDiv?: HTMLDivElement,
+    annotationLayerDiv?: HTMLDivElement,
+    onLinkPage?: (pageNumber: number) => void,
   ) => { done: Promise<void>; cancel: () => void };
   destroy: () => void;
 }
@@ -61,11 +74,52 @@ export async function createPdfBook(bytes: Uint8Array): Promise<PdfBook> {
   const baseSize = { width: base.width, height: base.height };
   first.cleanup();
 
+  const makeLinkService = (goToPage: (pageNumber: number) => void): PdfLinkService => {
+    const goToDestination = async (dest: string | unknown[]) => {
+      const explicitDest = typeof dest === "string" ? await doc.getDestination(dest) : dest;
+      if (!Array.isArray(explicitDest)) return;
+      const [destRef] = explicitDest;
+      let pageNumber: number | null = null;
+      if (destRef && typeof destRef === "object") {
+        pageNumber = doc.cachedPageNumber(destRef as never);
+        if (!pageNumber) pageNumber = (await doc.getPageIndex(destRef as never)) + 1;
+      } else if (Number.isInteger(destRef)) {
+        pageNumber = (destRef as number) + 1;
+      }
+      if (pageNumber != null && pageNumber >= 1 && pageNumber <= doc.numPages) goToPage(pageNumber);
+    };
+    return {
+      externalLinkEnabled: true,
+      getDestinationHash: (dest) => {
+        if (typeof dest === "string") return dest.length > 0 ? `#${encodeURIComponent(dest)}` : "#";
+        const encoded = encodeURIComponent(JSON.stringify(dest));
+        return encoded.length > 0 ? `#${encoded}` : "#";
+      },
+      getAnchorUrl: (anchor) => anchor,
+      addLinkAttributes: (link, url, newWindow = false) => {
+        void newWindow;
+        link.href = url;
+        link.title = url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer nofollow";
+      },
+      goToDestination,
+      goToPage: (pageNumber) => {
+        const n = typeof pageNumber === "string" ? Number.parseInt(pageNumber, 10) : pageNumber;
+        if (Number.isInteger(n) && n >= 1 && n <= doc.numPages) goToPage(n);
+      },
+      executeNamedAction: (action) => {
+        if (action === "FirstPage") goToPage(1);
+        else if (action === "LastPage") goToPage(doc.numPages);
+      },
+    };
+  };
+
   return {
     pageCount: doc.numPages,
     baseSize,
 
-    renderPage: (index, canvas, cssWidth, textLayerDiv) => {
+    renderPage: (index, canvas, cssWidth, textLayerDiv, annotationLayerDiv, onLinkPage) => {
       let task: RenderTask | null = null;
       let textLayer: InstanceType<typeof TextLayer> | null = null;
       let cancelled = false;
@@ -98,7 +152,38 @@ export async function createPdfBook(bytes: Uint8Array): Promise<PdfBook> {
                 await textLayer.render();
               })()
             : Promise.resolve();
-          const [canvasR, textR] = await Promise.allSettled([
+          const annotationPromise = annotationLayerDiv
+            ? (async () => {
+                annotationLayerDiv.replaceChildren();
+                annotationLayerDiv.style.setProperty("--total-scale-factor", String(cssScale));
+                const linkService = makeLinkService((pageNumber) => onLinkPage?.(pageNumber));
+                const annotationLayer = new AnnotationLayer({
+                  div: annotationLayerDiv,
+                  page,
+                  viewport: page.getViewport({ scale: cssScale, dontFlip: true }),
+                  linkService: linkService as unknown as PdfjsLinkService,
+                  annotationStorage: doc.annotationStorage,
+                  accessibilityManager: null,
+                  annotationCanvasMap: null,
+                  annotationEditorUIManager: null,
+                  structTreeLayer: null,
+                  commentManager: null,
+                });
+                const annotations = (await page.getAnnotations({ intent: "display" })).filter(
+                  (a) => a.annotationType === AnnotationType.LINK,
+                );
+                await annotationLayer.render({
+                  annotations,
+                  div: annotationLayerDiv,
+                  page,
+                  viewport: page.getViewport({ scale: cssScale, dontFlip: true }),
+                  linkService: linkService as unknown as PdfjsLinkService,
+                  annotationStorage: doc.annotationStorage,
+                  renderForms: false,
+                });
+              })()
+            : Promise.resolve();
+          const [canvasR, textR, annotationR] = await Promise.allSettled([
             task.promise.catch((err) => {
               // RenderingCancelledException = 主动取消，静默；其他错误透传
               if ((err as Error).name !== "RenderingCancelledException") throw err;
@@ -107,9 +192,13 @@ export async function createPdfBook(bytes: Uint8Array): Promise<PdfBook> {
               // 取消时 TextLayer.render 以 AbortException reject——主动取消静默
               if (!cancelled) throw err;
             }),
+            annotationPromise.catch((err) => {
+              if (!cancelled) throw err;
+            }),
           ]);
           if (canvasR.status === "rejected") throw canvasR.reason;
           if (textR.status === "rejected") throw textR.reason;
+          if (annotationR.status === "rejected") throw annotationR.reason;
         } finally {
           page.cleanup();
         }

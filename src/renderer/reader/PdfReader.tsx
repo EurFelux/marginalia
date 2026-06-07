@@ -12,10 +12,11 @@ import type { ChapterRefDto } from "@shared/library";
 import { qk } from "../query/keys";
 import { createPdfBook, type PdfBook } from "./pdf-book";
 import { makePdfLocator, parsePdfLocator, parsePdfLocatorRange } from "./pdf-locator";
-import { pdfAnnosByPage } from "./pdf-annotations";
+import { pdfAnnosByPage, rangeFromOffsets, relativeRects } from "./pdf-annotations";
 import { buildPdfSelectionInfo, flatOffsetOf, pointInDomSelection } from "./pdf-selection";
 import { chapterIdAtPage } from "./pdf-chapter-at-page";
 import { clampPdfZoom } from "./pdf-zoom";
+import { findPdfTextLinks } from "./pdf-autolink";
 import { OVERLAY_FILL } from "./highlight";
 import type { PdfPageAnno } from "./pdf-annotations";
 import { hitHighlight, usePdfHighlights } from "./use-pdf-highlights";
@@ -137,6 +138,9 @@ export function PdfReader({ bookId, chapters }: Props) {
 
   // 选区：textLayer 原生 DOM selection（同文档，无 iframe 桥）→ 页内偏移 + 字符窗口上下文。
   const onMouseUp = () => {
+    containerRef.current
+      ?.querySelectorAll(".textLayer.selecting")
+      .forEach((el) => el.classList.remove("selecting"));
     const sel = document.getSelection();
     if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
     const range = sel.getRangeAt(0);
@@ -178,6 +182,8 @@ export function PdfReader({ bookId, chapters }: Props) {
       e.preventDefault();
       return;
     }
+    const targetLayer = (e.target as Element | null)?.closest<HTMLElement>(".textLayer");
+    targetLayer?.classList.add("selecting");
     closeStyleBar();
     setSelection(null);
   };
@@ -286,6 +292,9 @@ export function PdfReader({ bookId, chapters }: Props) {
             cssHeight={pageH}
             invert={resolvedTheme === "dark"}
             annos={annosByPage.get(index + 1) ?? []}
+            onLinkPage={(pageNumber) =>
+              virtuosoRef.current?.scrollToIndex({ index: pageNumber - 1, align: "start" })
+            }
           />
         )}
       />
@@ -301,15 +310,19 @@ function PdfPage(props: {
   cssHeight: number;
   invert: boolean;
   annos: PdfPageAnno[];
+  onLinkPage: (pageNumber: number) => void;
 }) {
-  const { book, index, cssWidth, cssHeight, invert, annos } = props;
+  const { book, index, cssWidth, cssHeight, invert, annos, onLinkPage } = props;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const textLayerRef = useRef<HTMLDivElement | null>(null);
+  const annotationLayerRef = useRef<HTMLDivElement | null>(null);
+  const autoLinkLayerRef = useRef<HTMLDivElement | null>(null);
   const [renderError, setRenderError] = useState(false);
   // renderPage done = canvas+textLayer 两路都 settle → 偏移可以安全还原成 Range。
   const [textReady, setTextReady] = useState(false);
   const openStyleBar = useAnnotationStore((s) => s.openStyleBar);
   const highlights = usePdfHighlights(annos, textLayerRef.current, textReady);
+  const [autoLinks, setAutoLinks] = useState<PdfAutoLink[]>([]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -319,10 +332,20 @@ function PdfPage(props: {
     // stale 守卫：cancel 时 done 也 resolve（pdf-book 契约）——effect 重跑后旧 task 的
     // then 绝不能再碰 state，否则会在新渲染完成前把 textReady 抢先置 true 且永不纠正。
     let stale = false;
-    const task = book.renderPage(index, canvas, cssWidth, textLayerRef.current ?? undefined);
+    const task = book.renderPage(
+      index,
+      canvas,
+      cssWidth,
+      textLayerRef.current ?? undefined,
+      annotationLayerRef.current ?? undefined,
+      onLinkPage,
+    );
     task.done
       .then(() => {
-        if (!stale) setTextReady(true);
+        if (!stale) {
+          setAutoLinks(buildPdfAutoLinks(textLayerRef.current, autoLinkLayerRef.current));
+          setTextReady(true);
+        }
       })
       .catch(() => {
         if (!stale) setRenderError(true);
@@ -336,6 +359,7 @@ function PdfPage(props: {
   // 点击命中高亮 → 编辑样式栏（对齐 ePub onHighlightClick）。视觉矩形 pointer-events-none
   // 不挡划词；命中测试走容器 click——选区未塌缩 = 拖选结尾，不当点击。
   const onClick = (e: ReactMouseEvent) => {
+    if ((e.target as Element | null)?.closest(".annotationLayer")) return;
     if (!(window.getSelection()?.isCollapsed ?? true)) return;
     const layer = textLayerRef.current;
     if (!layer || highlights.length === 0) return;
@@ -412,8 +436,50 @@ function PdfPage(props: {
           </div>
           {/* data-page：选区处理据此识别页号（1-based）。invert 滤镜只作用于 canvas。 */}
           <div ref={textLayerRef} data-page={index + 1} className="textLayer" />
+          <div ref={annotationLayerRef} className="annotationLayer" />
+          <div ref={autoLinkLayerRef} className="pdfAutoLinkLayer">
+            {autoLinks.map((link) => (
+              <a
+                key={`${link.href}-${Math.round(link.rect.left)}-${Math.round(link.rect.top)}`}
+                className="autoLinkAnnotation"
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer nofollow"
+                title={link.href}
+                style={{
+                  left: link.rect.left,
+                  top: link.rect.top,
+                  width: link.rect.width,
+                  height: link.rect.height,
+                }}
+              />
+            ))}
+          </div>
         </div>
       )}
     </div>
   );
+}
+
+interface PdfAutoLink {
+  href: string;
+  rect: { left: number; top: number; width: number; height: number };
+}
+
+function buildPdfAutoLinks(
+  textLayer: HTMLDivElement | null,
+  annotationLayer: HTMLDivElement | null,
+): PdfAutoLink[] {
+  if (!textLayer || !annotationLayer) return [];
+  const text = textLayer.textContent ?? "";
+  const base = annotationLayer.getBoundingClientRect();
+  const out: PdfAutoLink[] = [];
+  for (const link of findPdfTextLinks(text)) {
+    const range = rangeFromOffsets(textLayer, link.start, link.end);
+    if (!range) continue;
+    for (const rect of relativeRects(range.getClientRects(), base)) {
+      out.push({ href: link.href, rect });
+    }
+  }
+  return out;
 }

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, net } from "electron";
+import { app, BrowserWindow, net, shell } from "electron";
 import path from "node:path";
 import started from "electron-squirrel-startup";
 import { initDb, getDb } from "@main/db/instance";
@@ -29,6 +29,15 @@ if (started) {
 // cover:// 自定义协议：scheme 注册须在 app.ready 前。
 registerCoverProtocolScheme();
 
+function isExternalUrl(url: string): boolean {
+  try {
+    const protocol = new URL(url).protocol;
+    return protocol === "http:" || protocol === "https:" || protocol === "mailto:";
+  } catch {
+    return false;
+  }
+}
+
 const createWindow = () => {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
@@ -51,6 +60,22 @@ const createWindow = () => {
         console.error("[window] loadFile failed:", err);
       });
   }
+
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (isExternalUrl(url)) {
+      void shell.openExternal(url);
+      return { action: "deny" };
+    }
+    return { action: "deny" };
+  });
+  mainWindow.webContents.on("will-navigate", (event, url) => {
+    const isAppUrl = MAIN_WINDOW_VITE_DEV_SERVER_URL
+      ? url.startsWith(MAIN_WINDOW_VITE_DEV_SERVER_URL)
+      : url.startsWith("file:");
+    if (isAppUrl) return;
+    event.preventDefault();
+    if (isExternalUrl(url)) void shell.openExternal(url);
+  });
 
   // Open the DevTools.
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
