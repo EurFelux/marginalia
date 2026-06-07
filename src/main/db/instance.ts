@@ -2,6 +2,9 @@ import path from "node:path";
 import { appService } from "@main/app";
 import { createDb, runMigrations, type DB } from "@main/db/client";
 import { ensureBuiltinProviders } from "@main/providers/default-providers";
+import { createLogger } from "@main/logger";
+
+const log = createLogger("db");
 
 let db: DB | undefined;
 
@@ -14,7 +17,9 @@ export function initDb(): DB {
     ? path.resolve(process.cwd(), "src/main/db/migrations")
     : path.join(process.resourcesPath, "migrations");
   const candidate = createDb(dbPath);
+  log.info("running db migrations");
   runMigrations(candidate, migrationsFolder);
+  log.info("db ready");
   ensureBuiltinProviders(candidate); // 补齐缺失的内置 provider（OpenAI/Anthropic/Gemini）
   db = candidate;
   return db;

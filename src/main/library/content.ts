@@ -7,6 +7,9 @@ import { getBook, resolveChapterByHref } from "@main/library/repository";
 import { tocNodeSchema, type TocNode } from "@shared/types";
 import type { ChapterRefDto, ChapterTextSlice } from "@shared/library";
 import { t } from "@main/i18n";
+import { createLogger } from "@main/logger";
+
+const log = createLogger("library");
 
 export function getToc(db: DB, bookId: string): TocNode[] {
   const row = db.select({ toc: books.toc }).from(books).where(eq(books.id, bookId)).get();
@@ -14,7 +17,14 @@ export function getToc(db: DB, bookId: string): TocNode[] {
   // Because tocNodeSchema is recursive, a node whose *any* descendant fails validation causes the
   // entire top-level entry to be dropped — intentional defensive degradation for now; surgical
   // subtree pruning is a future follow-up.
-  return (row?.toc ?? []).filter((n) => tocNodeSchema.safeParse(n).success);
+  return (row?.toc ?? []).filter((n) => {
+    const result = tocNodeSchema.safeParse(n);
+    if (!result.success) {
+      const firstPath = result.error.issues[0]?.path.join(".") ?? "(unknown)";
+      log.warn(`toc node failed validation, skipped (book ${bookId}): ${firstPath}`);
+    }
+    return result.success;
+  });
 }
 
 export async function readChapterText(
@@ -109,7 +119,9 @@ export function listChapters(db: DB, bookId: string): ChapterRefDto[] {
     for (const n of nodes) {
       if (n.href && n.label) {
         const ch = resolveChapterByHref(db, bookId, n.href);
-        if (ch && !seen.has(ch.id)) {
+        if (!ch) {
+          log.warn(`toc href not found in chapters (book ${bookId}, href ${n.href})`);
+        } else if (!seen.has(ch.id)) {
           seen.add(ch.id);
           out.push({
             id: ch.id,

@@ -2,6 +2,9 @@ import { and, eq } from "drizzle-orm";
 import type { DB } from "@main/db/client";
 import { providers } from "@main/db/schema";
 import type { AiProviderApiType } from "@shared/providers";
+import { createLogger } from "@main/logger";
+
+const log = createLogger("providers");
 
 interface DefaultProvider {
   type: AiProviderApiType;
@@ -49,6 +52,7 @@ export const DEFAULT_PROVIDERS: DefaultProvider[] = [
  * 用户自建的同名非内置 provider 不算数（只认 isBuiltin=1），故加 config 新项即自动出现，且不与用户数据冲突。
  */
 export function ensureBuiltinProviders(db: DB): void {
+  const inserted: string[] = [];
   for (const p of DEFAULT_PROVIDERS) {
     const exists = db
       .select({ id: providers.id })
@@ -66,5 +70,9 @@ export function ensureBuiltinProviders(db: DB): void {
         isBuiltin: true,
       })
       .run();
+    inserted.push(p.label);
+  }
+  if (inserted.length > 0) {
+    log.info(`ensured builtin providers: ${inserted.join(", ")}`);
   }
 }
