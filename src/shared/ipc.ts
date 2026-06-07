@@ -44,6 +44,14 @@ import { setPreferenceInput } from "@shared/preferences";
 
 /** ping —— 演示"带入参且经 Zod 校验"的往返 */
 export const pingInput = z.object({ msg: z.string().min(1) });
+
+/** log:write —— 渲染层日志经 IPC 落 renderer-*.log */
+export const logWriteInput = z.object({
+  level: z.enum(["error", "warn", "info", "debug"]),
+  module: z.string().min(1),
+  message: z.string(),
+});
+export type LogWriteInput = z.infer<typeof logWriteInput>;
 export type PingInput = z.infer<typeof pingInput>;
 export const pingResult = z.object({ echo: z.string() });
 export type PingResult = z.infer<typeof pingResult>;
@@ -219,4 +227,8 @@ export const C = {
     out<PreferencesSnapshot>(),
   ),
   preferencesSet: def("preferences:set", "invoke", setPreferenceInput, out<void>()),
+
+  // logging
+  logWrite: def("log:write", "invoke", logWriteInput, out<void>()),
+  appOpenLogsDir: def("app:open-logs-dir", "invoke", z.void(), out<void>()),
 };
