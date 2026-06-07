@@ -4,6 +4,9 @@ import type { UIMessage } from "ai";
 import type { DB } from "@main/db/client";
 import { conversations, messages } from "@main/db/schema";
 import type { MessageDto } from "@shared/chat";
+import { createLogger } from "@main/logger";
+
+const log = createLogger("chat");
 import {
   messageMetadataSchema,
   type MessageMetadata,
@@ -18,7 +21,7 @@ function parseMetadata(raw: MessageRow["metadata"]): MessageMetadata | null {
   if (raw == null) return null;
   const parsed = messageMetadataSchema.safeParse(raw);
   if (parsed.success) return parsed.data;
-  console.warn("[messages] invalid metadata json; degrading to null:", parsed.error.message);
+  log.warn("invalid metadata json; degrading to null", parsed.error.message);
   return null;
 }
 

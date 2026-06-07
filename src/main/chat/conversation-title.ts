@@ -4,6 +4,9 @@ import { eq } from "drizzle-orm";
 import type { DB } from "@main/db/client";
 import { conversations } from "@main/db/schema";
 import type { ResolvedModel } from "@main/ai/assistant-model";
+import { createLogger } from "@main/logger";
+
+const log = createLogger("chat");
 
 const MAX_TITLE_LEN = 40;
 
@@ -64,7 +67,7 @@ export async function nameConversation(
   if (namingInFlight.has(conversationId)) return;
   const resolved = deps.resolveModel();
   if (!resolved.ok) {
-    console.warn("[naming] model not configured; keep title null:", resolved.reason);
+    log.warn("model not configured; keep title null", resolved.reason);
     return;
   }
   namingInFlight.add(conversationId);
@@ -90,7 +93,7 @@ export async function nameConversation(
         .run();
     }
   } catch (err) {
-    console.warn("[naming] failed; keep title null:", err);
+    log.warn("failed; keep title null", err);
   } finally {
     namingInFlight.delete(conversationId);
   }

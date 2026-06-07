@@ -3,6 +3,9 @@ import { resolveLanguageModel, type ChatModel } from "@main/ai/model-factory";
 import type { ProviderTestParams, ProviderTester } from "@main/secrets/tester";
 import type { TestResult } from "@shared/providers";
 import { t } from "@main/i18n";
+import { createLogger } from "@main/logger";
+
+const log = createLogger("providers");
 
 /** 对给定模型发一次最小生成；成功即返回，失败即抛出。可注入用于测试。 */
 export type GenerateProbe = (model: ChatModel) => Promise<void>;
@@ -76,7 +79,7 @@ export function createAiSdkTester(probe: GenerateProbe = realProbe): ProviderTes
       try {
         model = resolveLanguageModel(params);
       } catch (err) {
-        console.warn("[providers] testProvider: model resolution failed:", err);
+        log.warn("testProvider: model resolution failed", err);
         return { ok: false, message: err instanceof Error ? err.message : String(err) };
       }
       try {

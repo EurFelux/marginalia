@@ -7,6 +7,7 @@ import { setModelFetch } from "@main/ai/model-factory";
 import { getPreference } from "@main/preferences/repository";
 import { initMainI18n } from "@main/i18n";
 import { resolveInitialLanguage } from "@shared/i18n/language";
+import { createLogger } from "@main/logger";
 import { registerAppHandlers } from "@main/ipc/app-handlers";
 import { registerLibraryHandlers } from "@main/ipc/library-handlers";
 import { registerSettingsHandlers } from "@main/ipc/settings-handlers";
@@ -32,6 +33,19 @@ initAppService({
   openFolder: async (dir) => {
     await shell.openPath(dir); // 错误信息字符串在适配器层吞掉——打开文件夹失败不致命
   },
+});
+
+const windowLog = createLogger("window");
+const dbLog = createLogger("db");
+
+// 主进程兜底错误钩子：未捕获异常/拒绝必须留痕（fail-fast 崩溃前的最后一笔日志）
+const processLog = createLogger("process");
+process.on("uncaughtException", (err) => {
+  processLog.error("uncaught exception", err);
+  process.exit(1); // 保持 fail-fast：留痕后照常崩溃，不带病运行
+});
+process.on("unhandledRejection", (reason) => {
+  processLog.error("unhandled rejection", reason);
 });
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -64,13 +78,13 @@ const createWindow = () => {
   // and load the index.html of the app.
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     void mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL).catch((err: unknown) => {
-      console.error("[window] loadURL failed:", err);
+      windowLog.error("loadURL failed", err);
     });
   } else {
     void mainWindow
       .loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`))
       .catch((err: unknown) => {
-        console.error("[window] loadFile failed:", err);
+        windowLog.error("loadFile failed", err);
       });
   }
 
@@ -103,7 +117,7 @@ app.on("ready", () => {
   try {
     initDb();
   } catch (err) {
-    console.error("[db] failed to initialize:", err);
+    dbLog.error("failed to initialize", err);
     app.quit();
     return;
   }
