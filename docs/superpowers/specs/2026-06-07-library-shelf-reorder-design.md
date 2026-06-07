@@ -33,7 +33,7 @@
 一次迁移，两张表加列：
 
 - `progress.percent`：`real` 可空 + `CHECK (percent IS NULL OR (percent BETWEEN 0 AND 1))`。老进度行为 null，读一次书自然回填。
-- `books.position`：`integer NOT NULL DEFAULT 0`，迁移内 `UPDATE` 以 `ROW_NUMBER() OVER (ORDER BY added_at)` 回填，既有书按导入序起步（避免 NULL/0 扎堆排尾）。
+- `books.position`：`integer NOT NULL DEFAULT 0`，**不做数据回填**（实现阶段定案）：`listBooks` 用 `ORDER BY position ASC, added_at ASC`——既有书 position 全 0 时按 added_at（≈导入序）平断，与 ROW_NUMBER 回填等效且免手编迁移文件；首次拖拽全量重写后 position 唯一。
 
 **drizzle-kit 产出预案**：drizzle 的 `check()` 是表级约束，对已有表加带 CHECK 的列可能生成**表重建**迁移而非 `ADD COLUMN`。`runMigrations` 已有事务外切 FK 的基建（见 db-lifecycle 坑记录），且无表反向引用 `progress`，重建安全；以 `pnpm db:generate` 实际产出为准，迁移后跑全量 vitest 验证。
 
