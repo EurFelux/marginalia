@@ -18,16 +18,21 @@ describe("app-service", () => {
     // 用 resetModules + 动态 import 构造全新未注入实例来测 fail-fast。
     vi.resetModules();
     const fresh = await import("./app-service");
-    expect(() => fresh.appService.getPath("logs")).toThrow(/not initialized/);
+    expect(() => fresh.appService.getPath("logsDir")).toThrow(/not initialized/);
     expect(() => fresh.appService.isDev).toThrow(/not initialized/);
     // openFolder 委托前同步检查注入，因此同步 throw（而非 rejected promise）
     expect(() => fresh.appService.openFolder("/x")).toThrow(/not initialized/);
   });
 
-  it("getPath returns the scope-specific directory under dataDir", () => {
+  it("getPath maps *Dir keys to module directories under dataDir", () => {
     initAppService(makeEnv({ dataDir: "/tmp/root" }));
-    expect(appService.getPath("logs")).toBe(path.join("/tmp/root", "logs"));
-    expect(appService.getPath("books")).toBe(path.join("/tmp/root", "books"));
+    expect(appService.getPath("logsDir")).toBe(path.join("/tmp/root", "logs"));
+    expect(appService.getPath("booksDir")).toBe(path.join("/tmp/root", "books"));
+  });
+
+  it("getPath maps *File keys to full file paths (db at historical root location)", () => {
+    initAppService(makeEnv({ dataDir: "/tmp/root" }));
+    expect(appService.getPath("dbFile")).toBe(path.join("/tmp/root", "marginalia.db"));
   });
 
   it("exposes isDev from the injected env", () => {
@@ -38,7 +43,7 @@ describe("app-service", () => {
   it("last injection wins on repeated init", () => {
     initAppService(makeEnv({ dataDir: "/tmp/first" }));
     initAppService(makeEnv({ dataDir: "/tmp/second" }));
-    expect(appService.getPath("logs")).toBe(path.join("/tmp/second", "logs"));
+    expect(appService.getPath("logsDir")).toBe(path.join("/tmp/second", "logs"));
   });
 
   it("invokes the injected openFolder capability with the given dir", async () => {

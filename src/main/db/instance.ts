@@ -1,5 +1,5 @@
 import path from "node:path";
-import { app } from "electron";
+import { appService } from "@main/app";
 import { createDb, runMigrations, type DB } from "@main/db/client";
 import { ensureBuiltinProviders } from "@main/providers/default-providers";
 
@@ -7,7 +7,7 @@ let db: DB | undefined;
 
 export function initDb(): DB {
   if (db) return db;
-  const dbPath = path.join(app.getPath("userData"), "marginalia.db");
+  const dbPath = appService.getPath("dbFile"); // db 文件位置与文件名是 AppService 的布局知识
   // 开发期迁移目录在源码树；生产期由 forge.config.ts 的 packagerConfig.extraResource
   // 复制到 resources/migrations，经 process.resourcesPath 读取（asar 内取不到迁移 SQL）。
   const migrationsFolder = MAIN_WINDOW_VITE_DEV_SERVER_URL
