@@ -54,6 +54,11 @@ export function setConversationTitle(db: DB, id: string, title: string): void {
   db.update(conversations).set({ title }).where(eq(conversations.id, id)).run();
 }
 
+/** 删除会话（messages 由 FK 级联删）；幂等——未知 id 为 0-row delete。 */
+export function deleteConversation(db: DB, id: string): void {
+  db.delete(conversations).where(eq(conversations.id, id)).run();
+}
+
 /** 列出某书的会话，最近更新在前。 */
 export function listConversationsByBook(db: DB, bookId: string): ConversationDto[] {
   return db
