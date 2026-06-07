@@ -45,11 +45,13 @@ import { setPreferenceInput } from "@shared/preferences";
 /** ping —— 演示"带入参且经 Zod 校验"的往返 */
 export const pingInput = z.object({ msg: z.string().min(1) });
 
-/** log:write —— 渲染层日志经 IPC 落 renderer-*.log */
+/** log:write —— 渲染层日志经 IPC 落 renderer-*.log。
+ * 长度上限是渲染层暴露面的第一层防御（防异常对象/被污染的 renderer 灌爆日志）；
+ * 主进程 logger 内部还有第二层截断（BODY_MAX，兜不走 IPC 的调用），故此处上限取宽。 */
 export const logWriteInput = z.object({
   level: z.enum(["error", "warn", "info", "debug"]),
-  module: z.string().min(1),
-  message: z.string(),
+  module: z.string().min(1).max(64),
+  message: z.string().max(16_384),
 });
 export type LogWriteInput = z.infer<typeof logWriteInput>;
 export type PingInput = z.infer<typeof pingInput>;
