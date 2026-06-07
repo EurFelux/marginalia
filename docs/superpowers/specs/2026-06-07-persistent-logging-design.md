@@ -1,7 +1,7 @@
 # 持久化日志系统设计
 
 日期：2026-06-07
-状态：草案——未完全审查（依赖项 AppService 先行实现，本 spec 实现前需再过一轮审查）
+状态：已与用户对齐（2026-06-07 多轮修订：恒双写、进程分流文件、DataPathKey 消费），待实现；依赖 AppService 已落地
 关联：GitHub issue #32（P0）；实现前勘察见 issue 评论（17 个主进程 console 调用点盘点）；**依赖 `2026-06-07-app-service-design.md`（AppService 先行实现）**
 
 ## 1. 背景与动机
