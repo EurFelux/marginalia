@@ -187,7 +187,9 @@ function ConversationRow({
           size="icon-sm"
           onClick={onDeleteRequest}
           aria-label={t("reader.conversation.deleteAction", "删除会话")}
-          className="absolute end-1 top-1/2 hidden -translate-y-1/2 text-muted-foreground hover:text-destructive group-hover:flex"
+          // 垂直居中用 inset-y-0+my-auto 而非 top-1/2+-translate-y-1/2：Button 的 active:translate-y-px
+          // 会在 :active 瞬间覆盖 translate 定位，按钮脱离鼠标点导致 click 无法合成（mouseup 落到行内时间戳）。
+          className="absolute end-1 inset-y-0 z-10 my-auto hidden text-muted-foreground hover:text-destructive group-hover:flex"
         >
           <Trash2 />
         </Button>
