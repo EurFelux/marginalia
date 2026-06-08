@@ -14,6 +14,7 @@ import { useNoteHoverStore } from "@renderer/store/note-hover-store";
 import { usePrefsStore } from "@renderer/store/prefs-store";
 import { qk } from "../query/keys";
 import { chapterIdByHref } from "./chapter-id-by-href";
+import { pickAnchorChapterId } from "./current-anchor-chapter";
 import { createEpubBook, type EpubBook } from "./epub-book";
 import { epubPercent } from "./percent";
 import { prefsToCss } from "./prefs-to-css";
@@ -145,13 +146,43 @@ export function EpubReader({ bookId, chapters }: Props) {
     return offset;
   };
 
+  const stripFrag = (h: string) => h.split("#")[0]!;
+
   const onTopSectionChange = (index: number, meta: { scrollRatio: number }) => {
     if (!book) return;
     const percent = epubPercent(index, meta.scrollRatio, book.count);
     setReadingPercent(percent);
-    // 当前章高亮
-    const href = book.hrefAtIndex(index);
-    const chId = href ? chapterIdByHref(chapters, href) : null;
+    // 当前章高亮（锚点级）
+    const anchorChapterIdAt = (sectionIndex: number): string | null => {
+      const sHref = book.hrefAtIndex(sectionIndex);
+      if (!sHref) return null;
+      const sectionChs = chapters
+        .filter((c) => c.href === sHref || stripFrag(c.href) === stripFrag(sHref))
+        .filter((c) => c.anchor);
+      if (sectionChs.length === 0) return chapterIdByHref(chapters, sHref); // 无锚点章退回 href 级
+      const frame = document.querySelector<HTMLIFrameElement>(
+        `[data-section-index="${sectionIndex}"] iframe`,
+      );
+      const doc = frame?.contentDocument;
+      if (!doc) return chapterIdByHref(chapters, sHref);
+      const docTop = doc.documentElement.getBoundingClientRect().top;
+      const positions = sectionChs
+        .map((c) => {
+          const el = c.anchor ? doc.getElementById(c.anchor) : null;
+          return el
+            ? { id: c.id, anchor: c.anchor!, top: el.getBoundingClientRect().top - docTop }
+            : null;
+        })
+        .filter((x): x is { id: string; anchor: string; top: number } => x !== null)
+        .sort((a, b) => a.top - b.top);
+      const sectionHeight = book.textLengthAtIndex(sectionIndex)
+        ? doc.documentElement.scrollHeight
+        : 0;
+      const viewportTop = sectionHeight * meta.scrollRatio;
+      return pickAnchorChapterId(positions, viewportTop) ?? chapterIdByHref(chapters, sHref);
+    };
+
+    const chId = anchorChapterIdAt(index);
     const ch = chId ? chapters.find((c) => c.id === chId) : null;
     const cfi = book.cfiAtIndex(index);
     if (chId) {
