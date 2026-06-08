@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage, type StateStorage } from "zustand/middleware";
 import type { Chip } from "@shared/chat";
-import { usePrefsStore } from "@renderer/store/prefs-store";
+import { openPanelAndFocusComposer } from "@renderer/ai/composer-focus";
 import { useNavigationStore } from "@renderer/store/navigation-store";
 
 interface ChatState {
@@ -92,7 +92,7 @@ export const useChatStore = create<ChatState & ChatActions>()(
       setDraftText: (draftText) => set({ draftText }),
       setDraftChips: (draftChips) => set({ draftChips }),
       openConversation: (id) => {
-        usePrefsStore.getState().updateLayout({ panelOpen: true });
+        openPanelAndFocusComposer();
         return set((s) => ({
           openCommand: { conversationId: id, nonce: (s.openCommand?.nonce ?? 0) + 1 },
           summaryChips: { chapter: false, book: false },

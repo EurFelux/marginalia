@@ -15,6 +15,7 @@ import { Composer } from "@renderer/ai/Composer";
 import { messagesToUI } from "@renderer/ai/message-history";
 import { conversationsQuery } from "@renderer/query/conversation-queries";
 import type { Chip } from "@shared/chat";
+import { openPanelAndFocusComposer } from "@renderer/ai/composer-focus";
 import { createLogger } from "@renderer/logger";
 
 const log = createLogger("ai");
@@ -83,6 +84,7 @@ export function AIPanel() {
       setMessages([]);
       useChatStore.getState().setActiveConversation(convo.id);
       useChatStore.getState().setSummaryChipsPreset();
+      openPanelAndFocusComposer();
       void qc.invalidateQueries({ queryKey: ["conversations"] });
     } catch (err) {
       log.warn("create conversation failed", err);
