@@ -13,6 +13,8 @@ export default {
   "ai.chip.selectionContext": "选区上下文",
   "ai.closePanel": "关闭面板",
   "ai.composer.placeholder": "问点什么…（Enter 发送，Shift+Enter 换行）",
+  "ai.copied": "已复制",
+  "ai.copy": "复制",
   "ai.emptyHint": "划选正文后点「AI 问」，或直接在下方提问。",
   "ai.newConversation": "新对话",
   "ai.noBookToSend": "没有正在阅读的书，无法发送。",
