@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { flushSync } from "react-dom";
 import { useChat } from "@ai-sdk/react";
 import { Plus, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -16,17 +17,19 @@ import { messagesToUI } from "@renderer/ai/message-history";
 import { conversationsQuery } from "@renderer/query/conversation-queries";
 import type { Chip } from "@shared/chat";
 import { openPanelAndFocusComposer } from "@renderer/ai/composer-focus";
+import { ChatActionsContext, nextAssistantId, type ChatActions } from "@renderer/ai/chat-actions";
 import { createLogger } from "@renderer/logger";
 
 const log = createLogger("ai");
 
 export function AIPanel() {
   const { t } = useTranslation();
-  const { messages, sendMessage, status, stop, setMessages, error } = useChat<ChatUIMessage>({
-    transport: createIpcChatTransport(),
-    // 流式错误此前只塞进 error 字段弹 banner、从不落日志；补一条 warn 使渲染侧失败也有痕迹可查。
-    onError: (err) => log.warn("chat stream error", err),
-  });
+  const { messages, sendMessage, status, stop, setMessages, regenerate, error } =
+    useChat<ChatUIMessage>({
+      transport: createIpcChatTransport(),
+      // 流式错误此前只塞进 error 字段弹 banner、从不落日志；补一条 warn 使渲染侧失败也有痕迹可查。
+      onError: (err) => log.warn("chat stream error", err),
+    });
   const updateLayout = usePrefsStore((s) => s.updateLayout);
   const openCommand = useChatStore((s) => s.openCommand);
   const activeConversationId = useActiveConversationId();
@@ -64,13 +67,20 @@ export function AIPanel() {
   }, [openCommand, stop, setMessages]);
 
   // 一轮发送结束（曾 streaming/submitted → 回 ready/error）→ 刷新会话列表（新会话 / 标题 / updatedAt）。
+  // 同时从 DB 重载消息以同步 UI message ids 到持久化 ids（resend 截断后 id 会变）。
   // 用前缀 ["conversations"] 失效（不需 bookId），匹配 qk.conversations(bookId)=["conversations",bookId]。
   useEffect(() => {
     if (prevStatus.current !== "ready" && (status === "ready" || status === "error")) {
       void qc.invalidateQueries({ queryKey: ["conversations"] });
+      if (activeConversationId) {
+        void window.api.chat.messages
+          .listByConversation({ conversationId: activeConversationId })
+          .then((dtos) => setMessages(messagesToUI(dtos)))
+          .catch((err: unknown) => log.warn("reload conversation after turn failed", err));
+      }
     }
     prevStatus.current = status;
-  }, [status, qc]);
+  }, [status, qc, activeConversationId, setMessages]);
 
   // active 置空（开书无会话 / 切书）→ 清面板；初始即空时为 no-op。
   useEffect(() => {
@@ -91,6 +101,24 @@ export function AIPanel() {
     } catch (err) {
       log.warn("create conversation failed", err);
     }
+  };
+
+  const actions: ChatActions = {
+    regenerate: (a) => void regenerate({ messageId: a.id }),
+    resend: (u) => {
+      const aId = nextAssistantId(messages, u.id);
+      void regenerate(aId ? { messageId: aId } : undefined);
+    },
+    editAndResend: (u, newText) => {
+      flushSync(() =>
+        setMessages((ms) =>
+          ms.map((m) => (m.id === u.id ? { ...m, parts: [{ type: "text", text: newText }] } : m)),
+        ),
+      );
+      const aId = nextAssistantId(messages, u.id);
+      void regenerate(aId ? { messageId: aId } : undefined);
+    },
+    busy: status === "streaming" || status === "submitted",
   };
 
   const handleSend = (text: string, chips: Chip[]) => {
@@ -130,7 +158,9 @@ export function AIPanel() {
 
       <ScrollArea className="min-h-0 flex-1" viewportRef={scrollRef}>
         <div className="p-4">
-          <MessageList messages={messages} status={status} bookId={bookId} />
+          <ChatActionsContext.Provider value={actions}>
+            <MessageList messages={messages} status={status} bookId={bookId} />
+          </ChatActionsContext.Provider>
         </div>
       </ScrollArea>
 

@@ -55,30 +55,47 @@ function lastUserText(messages: ChatUIMessage[]): string {
  */
 export function createIpcChatTransport(): ChatTransport<ChatUIMessage> {
   return {
-    async sendMessages({ messages, abortSignal }) {
+    async sendMessages({ messages, abortSignal, trigger }) {
       const { currentBookId, readingContext } = useNavigationStore.getState();
       if (!currentBookId) {
         const { default: i18n } = await import("@renderer/i18n");
         throw new Error(i18n.t("ai.noBookToSend", "没有正在阅读的书，无法发送。"));
       }
-      // 发送前保证目标会话存在（spec §7）：无 active → 懒建（主进程防堆积兜底）
-      let conversationId = getActiveConversationId();
-      if (!conversationId) {
-        const convo = await window.api.chat.conversations.create({
-          bookId: currentBookId,
-        });
-        useChatStore.getState().setActiveConversation(convo.id);
-        conversationId = convo.id;
-      }
       const last = messages.at(-1);
       const userText = lastUserText(messages);
-      // off 的 chip 不发送（spec §6）；历史水合 chip 恒为 required，不受影响
-      const chips = (last?.metadata?.contextChips ?? []).filter((c) => c.state !== "off");
-
       const streamId = uuidv7();
       const stream = createEventStream(streamId, window.api.ai.onChunk);
       abortSignal?.addEventListener("abort", () => void window.api.ai.abort({ streamId }));
 
+      if (trigger === "regenerate-message") {
+        // 重发/编辑/再生成：目标 user 轮 = messages.at(-1)（regenerate 已移除其后 assistant）
+        const conversationId = getActiveConversationId();
+        if (!conversationId || !last) {
+          void stream.cancel();
+          const { default: i18n } = await import("@renderer/i18n");
+          throw new Error(i18n.t("ai.noBookToSend", "没有正在阅读的书，无法发送。"));
+        }
+        const ack = await window.api.ai.resend({
+          streamId,
+          conversationId,
+          userMessageId: last.id,
+          userText,
+        });
+        if (!ack.ok) {
+          void stream.cancel();
+          throw new Error(ack.reason);
+        }
+        return stream;
+      }
+
+      // 新发：保证会话存在（无 active → 懒建）
+      let conversationId = getActiveConversationId();
+      if (!conversationId) {
+        const convo = await window.api.chat.conversations.create({ bookId: currentBookId });
+        useChatStore.getState().setActiveConversation(convo.id);
+        conversationId = convo.id;
+      }
+      const chips = (last?.metadata?.contextChips ?? []).filter((c) => c.state !== "off");
       const ack = await window.api.ai.send({
         streamId,
         bookId: currentBookId,
