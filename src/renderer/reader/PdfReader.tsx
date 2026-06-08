@@ -22,6 +22,7 @@ import { findPdfTextLinks } from "./pdf-autolink";
 import { OVERLAY_FILL } from "./highlight";
 import type { PdfPageAnno } from "./pdf-annotations";
 import { hitHighlight, usePdfHighlights } from "./use-pdf-highlights";
+import { useNoteHoverStore } from "@renderer/store/note-hover-store";
 
 const log = createLogger("pdf");
 
@@ -59,6 +60,7 @@ export function PdfReader({ bookId, chapters }: Props) {
 
   const setSelection = useAnnotationStore((s) => s.setSelection);
   const closeStyleBar = useAnnotationStore((s) => s.closeStyleBar);
+  const closeNoteHover = useNoteHoverStore((s) => s.closeNow);
 
   const bytes = useQuery({
     queryKey: qk.bookBytes(bookId),
@@ -212,10 +214,11 @@ export function PdfReader({ bookId, chapters }: Props) {
     const onScroll = () => {
       closeStyleBar();
       setSelection(null);
+      closeNoteHover();
     };
     document.addEventListener("scroll", onScroll, true);
     return () => document.removeEventListener("scroll", onScroll, true);
-  }, [closeStyleBar, setSelection]);
+  }, [closeStyleBar, setSelection, closeNoteHover]);
 
   const saveAt = (page: number, percent: number) => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -350,6 +353,9 @@ function PdfPage(props: {
   // renderPage done = canvas+textLayer 两路都 settle → 偏移可以安全还原成 Range。
   const [textReady, setTextReady] = useState(false);
   const openStyleBar = useAnnotationStore((s) => s.openStyleBar);
+  const hoverHighlight = useNoteHoverStore((s) => s.hoverHighlight);
+  const leaveHighlight = useNoteHoverStore((s) => s.leaveHighlight);
+  const lastNotedId = useRef<string | null>(null);
   const highlights = usePdfHighlights(annos, textLayerRef.current, textReady);
   const [autoLinks, setAutoLinks] = useState<PdfAutoLink[]>([]);
 
@@ -406,22 +412,43 @@ function PdfPage(props: {
     });
   };
 
-  // hover 可点击目标（标注高亮 / 活跃选区）→ pointer cursor（对齐 ePub：mark.anno 的
-  // cursor:pointer + SectionFrame 选区 hover 手型）。overlay 不接事件（不挡划词），改在
-  // 容器 mousemove 命中测试；直写 data 属性（零重渲染），CSS 据此切 span 的 cursor——
-  // 指针仅一处，整层切换在视觉上即「目标区域内变 pointer」。
+  // hover 可点击目标（标注高亮 / 活跃选区）→ pointer cursor；命中带笔记高亮 → 弹卡片。
+  // overlay pointer-events-none 不接事件，统一在容器 mousemove 命中测试。
   const onMouseMove = (e: ReactMouseEvent) => {
     const layer = textLayerRef.current;
     if (!layer) return;
-    let over = pointInDomSelection(e.clientX, e.clientY);
-    if (!over && highlights.length > 0) {
-      const base = layer.getBoundingClientRect();
-      over = hitHighlight(highlights, e.clientX - base.x, e.clientY - base.y) !== undefined;
-    }
+    const base = layer.getBoundingClientRect();
+    const hit =
+      highlights.length > 0
+        ? hitHighlight(highlights, e.clientX - base.x, e.clientY - base.y)
+        : undefined;
+    const over = pointInDomSelection(e.clientX, e.clientY) || hit !== undefined;
     if (over) layer.setAttribute("data-pointer", "");
     else layer.removeAttribute("data-pointer");
+
+    const noted = hit?.hasNote ? hit : undefined;
+    const id = noted?.annoId ?? null;
+    if (id !== lastNotedId.current) {
+      lastNotedId.current = id;
+      if (noted) {
+        hoverHighlight(noted.annoId, {
+          x: noted.rect.left + base.x,
+          y: noted.rect.top + base.y,
+          width: noted.rect.width,
+          height: noted.rect.height,
+        });
+      } else {
+        leaveHighlight();
+      }
+    }
   };
-  const onMouseLeave = () => textLayerRef.current?.removeAttribute("data-pointer");
+  const onMouseLeave = () => {
+    textLayerRef.current?.removeAttribute("data-pointer");
+    if (lastNotedId.current !== null) {
+      lastNotedId.current = null;
+      leaveHighlight();
+    }
+  };
 
   return (
     // w-max + min-w-full：页宽超过视口（高缩放）时外壳随内容撑开（横向可滚、左缘可达），
