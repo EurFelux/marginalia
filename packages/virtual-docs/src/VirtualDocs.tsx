@@ -98,7 +98,14 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
             vRef.current?.scrollToIndex({ index, align: "start", offset });
             return;
           }
-          if (tries++ < 20) setTimeout(tick, 50); // 上限 1s，到时放弃（已滚到 section 顶，不白屏）
+          if (tries++ < 20)
+            setTimeout(tick, 50); // 上限 1s，到时放弃（已滚到 section 顶，不白屏）
+          else
+            console.warn(
+              "[virtual-docs] scrollToAnchor: anchor not ready, fell back to section top",
+              index,
+              anchorId,
+            );
         };
         setTimeout(tick, 50);
       },
