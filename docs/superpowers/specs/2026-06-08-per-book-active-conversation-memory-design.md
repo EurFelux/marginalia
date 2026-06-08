@@ -116,22 +116,31 @@ export function getActiveConversationId(): string | null {
 ### 3.3 persist 包裹
 
 ```ts
-import { persist, createJSONStorage } from "zustand/middleware";
+import { persist, createJSONStorage, type StateStorage } from "zustand/middleware";
 
-// headless 测试（vitest 跑 Electron node 运行时）无 DOM，localStorage 未定义 → 降级 noop，
+// headless 测试（vitest 跑 Electron node 运行时）无 DOM，localStorage 未定义 → noop 降级，
 // persist 仅内存、不抛错；renderer 真实环境用 window.localStorage。
-// 返回合法 Storage-like 对象（而非 undefined），不依赖 createJSONStorage 对 undefined 的内部处理。
-const noopStorage: Storage = {
+// 关键坑：createJSONStorage 仅在创建时调一次 getStorage 并捕获结果——若此刻 localStorage
+// 未定义会永久绑死 noop（DOM 后置就绪 / 测试 stubGlobal 都不再生效）。故包一层每次操作惰性
+// 重查 localStorage 现值，缺失才回退 noop。
+const noopStorage: StateStorage = {
   getItem: () => null,
   setItem: () => {},
   removeItem: () => {},
-  clear: () => {},
-  key: () => null,
-  length: 0,
 };
-const safeStorage = createJSONStorage(() =>
-  typeof localStorage !== "undefined" ? localStorage : noopStorage,
-);
+const lazyStorage: StateStorage = {
+  getItem: (name) =>
+    typeof localStorage !== "undefined" ? localStorage.getItem(name) : noopStorage.getItem(name),
+  setItem: (name, value) =>
+    typeof localStorage !== "undefined"
+      ? localStorage.setItem(name, value)
+      : noopStorage.setItem(name, value),
+  removeItem: (name) =>
+    typeof localStorage !== "undefined"
+      ? localStorage.removeItem(name)
+      : noopStorage.removeItem(name),
+};
+const safeStorage = createJSONStorage(() => lazyStorage);
 
 export const useChatStore = create<ChatState & ChatActions>()(
   persist(
@@ -147,7 +156,7 @@ export const useChatStore = create<ChatState & ChatActions>()(
 );
 ```
 
-> `partialize` 排除其余全部字段——尤其 **`openCommand` 绝不持久化**（一次性命令，持久化＝重启重放）。`localStorage` 不可用时 getter 返回 `noopStorage`，读写均 no-op（仅内存），不抛错。
+> `partialize` 排除其余全部字段——尤其 **`openCommand` 绝不持久化**（一次性命令，持久化＝重启重放）。`localStorage` 不可用时每次操作惰性回退 `noopStorage`，读写均 no-op（仅内存），不抛错。
 >
 > rehydrate：localStorage 同步 API，store 创建即同步灌入 `activeByBook`，`useRestoreConversation` 首跑时记忆已就绪，**无需** `hydratePreferences` 式手动 IPC 灌入。
 
