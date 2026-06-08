@@ -18,7 +18,7 @@
 | 反查 annotation id      | ePub mark 挂 `data-anno-id`（`apply-annotations.ts:42`）；PDF `HighlightRect.annoId` + `hitHighlight()`（`use-pdf-highlights.ts:19`） |
 | 笔记数据                | `qk.annotations(bookId)` React Query 缓存（`staleTime:Infinity`）                                                                     | `EpubReader.tsx:71`、PDF 同源                                                                                              |
 | 浮层组件                | `HoverCard`（封装 `@base-ui/react` PreviewCard）                                                                                      | `src/renderer/components/ui/hover-card.tsx`                                                                                |
-| 笔记展示样式            | 引文 blockquote（`NoteModal.tsx:100`）、`✎ + note`（`AnnotationsList.tsx:122`）                                                       |
+| 笔记展示样式            | `✎ + note`（`AnnotationsList.tsx:122`）                                                                                               |
 | ePub 跨 iframe 事件管道 | `SectionFrame` 已把 iframe 内 click→主文档回调（`onHighlightClick`）                                                                  | `SectionFrame.tsx:105`、`toViewportRect()` 坐标转换                                                                        |
 | PDF 命中管道            | `PdfPage` 容器 `onMouseMove` 已 `hitHighlight` 做 pointer cursor                                                                      | `PdfReader.tsx:413`                                                                                                        |
 
@@ -39,7 +39,7 @@
 | 架构            | 各 reader 做「命中适配」→ 共享 `useNoteHoverCard` 状态机 → 单一 `<NoteHoverCard/>` 展示                |
 | 安全 hover 逻辑 | 抽纯函数 reducer（事件→下个状态 + 定时器指令），hook 包定时器；reducer 单测                            |
 | 浮层原语        | **方案 A（受控 PreviewCard + 虚拟锚点）**；实现不顺则退**方案 B（自绘 fixed 卡片）**                   |
-| 卡片内容        | 引文 blockquote + 笔记正文 + `[✎ Edit]` 按钮                                                           |
+| 卡片内容        | 笔记正文 + `[✎ Edit]` 按钮（不重复引文——悬停的高亮选区本身即引文）                                     |
 | 编辑入口        | 点 Edit → 关卡片 + `openNoteModal({target:{type:"edit",annotationId}})`（进笔记编辑，非综合 styleBar） |
 | 触发条件        | 仅带笔记的高亮（ePub 看 `.anno-noted`，PDF 看 `hasNote`）；空笔记绝不触发                              |
 | 挂载点          | `ReaderView` 末尾那排 store 驱动浮层（`SelectionToolbar`/`HighlightStyleBar`/`NoteModal`）旁           |
@@ -93,8 +93,7 @@ function reduce(state, event): { next: HoverState; timer: "start" | "cancel" | "
 
 挂在 `ReaderView`（`ReaderView.tsx:232-234` 那排浮层旁）。按 `useNoteHoverCard` 的 `annoId` 从 `qk.annotations(bookId)` 缓存查出该条 `AnnotationDto`，渲染：
 
-- 顶部引文：复用 `NoteModal.tsx:100` 的 blockquote 样式（`selectedText`，`line-clamp`）；
-- 笔记正文：复用 `AnnotationsList.tsx:122` 的 `✎ + note`，长笔记 `max-h-*` + 内部滚动；
+- 笔记正文（卡片唯一主体内容）：复用 `AnnotationsList.tsx:122` 的 `✎ + note`，长笔记 `max-h-*` + 内部滚动。**不重复引文**：卡片悬停在高亮选区上弹出，选区文字用户正看着，再 blockquote 一遍冗余；
 - 底部 `[✎ Edit]`：点击 `closeNow()` + `openNoteModal({target:{type:"edit",annotationId}})`（`annotation-store.ts:30`、`AnnoTarget` 的 edit 分支）。
 
 组件根挂 `onMouseEnter={onCardEnter}` / `onMouseLeave={onCardLeave}`。`bookId` 从 `useNavigationStore` 取（同 `ReaderView`）。无 `annoId` 或查不到该条 → 不渲染卡片。

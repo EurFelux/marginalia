@@ -68,13 +68,8 @@ export function NoteHoverCard() {
         onMouseEnter={enterCard}
         onMouseLeave={leaveCard}
       >
-        {anno.selectedText && (
-          <blockquote className="line-clamp-2 border-s-2 border-border ps-3 font-serif text-sm italic leading-snug text-muted-foreground">
-            {anno.selectedText}
-          </blockquote>
-        )}
         {anno.note && (
-          <div className="no-scrollbar mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap text-popover-foreground">
+          <div className="no-scrollbar max-h-40 overflow-y-auto whitespace-pre-wrap text-popover-foreground">
             {anno.note}
           </div>
         )}
