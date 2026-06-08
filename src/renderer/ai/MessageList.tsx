@@ -5,6 +5,7 @@ import type { LucideIcon } from "lucide-react";
 import { BookOpen, FileText, List, ScrollText, Sparkles, Wrench } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { chipLabel } from "@renderer/ai/chip-label";
+import { textOf } from "@renderer/ai/message-text";
 import { segments, type ToolPart } from "@renderer/ai/segments";
 import { toolStepLabel, toolStepStatus } from "@renderer/ai/tool-step-label";
 import type { ChatUIMessage } from "@renderer/ai/types";
@@ -12,10 +13,6 @@ import { LocalizedStreamdown } from "@renderer/components/LocalizedStreamdown";
 import { cn } from "@renderer/lib/utils";
 import { qk } from "@renderer/query/keys";
 import type { ChapterRefDto } from "@shared/library";
-
-function textOf(m: ChatUIMessage): string {
-  return m.parts.map((p) => (p.type === "text" ? p.text : "")).join("");
-}
 
 export function MessageList({
   messages,
