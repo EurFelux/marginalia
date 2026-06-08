@@ -27,6 +27,18 @@ import { useThemeStore } from "../store/theme-store";
 
 const log = createLogger("epub");
 
+/** 深度优先取第一个非空文本节点（进度像素级 CFI 用：在视口顶块的首字符建 range）。 */
+function firstTextNode(node: Node): Text | null {
+  if (node.nodeType === Node.TEXT_NODE) {
+    return (node.textContent ?? "").length > 0 ? (node as Text) : null;
+  }
+  for (const child of Array.from(node.childNodes)) {
+    const t = firstTextNode(child);
+    if (t) return t;
+  }
+  return null;
+}
+
 interface Props {
   bookId: string;
   chapters: ChapterRefDto[];
@@ -227,20 +239,39 @@ export function EpubReader({ bookId, chapters }: Props) {
     const chId = anchorChapterIdAt(index);
     const ch = chId ? chapters.find((c) => c.id === chId) : null;
 
-    const topAnchorCfi = (sectionIndex: number, currentChId: string | null): string => {
-      const sectionFallback = book!.cfiAtIndex(sectionIndex) ?? "";
-      if (!currentChId) return sectionFallback;
-      const currentCh = chapters.find((c) => c.id === currentChId);
-      if (!currentCh?.anchor) return sectionFallback;
+    // 像素级进度：取「视口顶部那个块级元素」，存其首字符的 range CFI（range CFI 才能被 rangeFromCfi
+    // 在恢复时精确还原；cfiFromElement 的 point CFI 在恢复时 toRange 解析不出）。退化到 section 起点 CFI。
+    const topElementCfi = (sectionIndex: number): string => {
+      const fallback = book!.cfiAtIndex(sectionIndex) ?? "";
       const frame = document.querySelector<HTMLIFrameElement>(
         `[data-section-index="${sectionIndex}"] iframe`,
       );
-      const el = frame?.contentDocument?.getElementById(currentCh.anchor);
-      if (!el) return sectionFallback;
-      return book!.cfiFromElement(sectionIndex, el) ?? sectionFallback;
+      const doc = frame?.contentDocument;
+      const scroller = document.querySelector(".no-scrollbar");
+      if (!doc || !frame || !scroller) return fallback;
+      // 视口顶在该 section 文档内的 y：scroller 顶（主坐标）− iframe 顶（主坐标）。iframe 不内部滚动，
+      // 故块元素 getBoundingClientRect().top 即其 doc 内 offsetTop，可直接与之比较。
+      const targetInDoc = scroller.getBoundingClientRect().top - frame.getBoundingClientRect().top;
+      const blocks = [...doc.querySelectorAll("p,h1,h2,h3,h4,h5,h6,li,blockquote")];
+      let top: Element | null = null;
+      for (const el of blocks) {
+        if (el.getBoundingClientRect().top <= targetInDoc + 4) top = el;
+        else break;
+      }
+      const el = top ?? blocks[0] ?? null;
+      if (!el) return fallback;
+      const text = firstTextNode(el);
+      if (text) {
+        const range = doc.createRange();
+        range.setStart(text, 0);
+        range.setEnd(text, Math.min(1, text.length));
+        const c = book!.cfiFromRange(sectionIndex, range);
+        if (c) return c;
+      }
+      return book!.cfiFromElement(sectionIndex, el) ?? fallback;
     };
 
-    const cfi = topAnchorCfi(index, chId);
+    const cfi = topElementCfi(index);
     if (chId) {
       const sectionLength = book.textLengthAtIndex(index);
       const offset =
