@@ -22,6 +22,7 @@ import {
   reorderBooks,
   resolveChapterByHref,
   resolveChapter,
+  reindexBookIfStale,
   updateBook,
   CURRENT_PARSER_VERSION,
 } from "@main/library/repository";
@@ -443,6 +444,46 @@ describe("importEpubBook builds chapters from TOC entries (anchors)", () => {
     const book = await importBook(db, { bytes: anchorBook() });
     const ch = resolveChapter(db, book.id, "OEBPS/t0.xhtml", "a2");
     expect(ch?.title).toBe("第2章");
+  });
+});
+
+describe("reindexBookIfStale", () => {
+  it("rebuilds chapters + toc + parserVersion when stale; no-op when fresh", async () => {
+    const db = freshDb();
+    const bytes = anchorBook();
+    const book = await importBook(db, { bytes });
+    // 模拟存量旧书：降级 parserVersion 并把 chapters 砍成 1 行（旧 spine 口径）。
+    db.update(books).set({ parserVersion: 0 }).where(eq(books.id, book.id)).run();
+    db.delete(chapters).where(eq(chapters.bookId, book.id)).run();
+    db.insert(chapters)
+      .values({ bookId: book.id, href: "OEBPS/t0.xhtml", orderIndex: 0, title: null })
+      .run();
+
+    const changed = reindexBookIfStale(db, bytes, book.id);
+    expect(changed).toBe(true);
+    const rows = db
+      .select()
+      .from(chapters)
+      .where(eq(chapters.bookId, book.id))
+      .orderBy(asc(chapters.orderIndex))
+      .all();
+    expect(rows).toHaveLength(3);
+    expect(rows.map((r) => r.anchor)).toEqual(["a1", "a2", "b1"]);
+    expect(db.select().from(books).where(eq(books.id, book.id)).get()?.parserVersion).toBe(
+      CURRENT_PARSER_VERSION,
+    );
+
+    // 第二次调用：版本已最新 ⇒ no-op。
+    expect(reindexBookIfStale(db, bytes, book.id)).toBe(false);
+  });
+
+  it("PDF books are skipped (no epub reparse)", async () => {
+    // PDF 书 reindexBookIfStale 返回 false 不抛。
+    const db = freshDb();
+    // 裸插一个 format=pdf 的书行（绕过 importPdfBook 依赖）。
+    db.insert(books).values({ id: "pdf-fake", format: "pdf", parserVersion: 0 }).run();
+    const fakeBytes = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]); // %PDF- 魔数
+    expect(reindexBookIfStale(db, fakeBytes, "pdf-fake")).toBe(false);
   });
 });
 

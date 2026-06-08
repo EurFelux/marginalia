@@ -272,6 +272,44 @@ export function resolveChapter(
 }
 
 /**
+ * 存量书惰性升级：若 book.parserVersion < CURRENT_PARSER_VERSION，从字节重解析并事务内重建
+ * chapters + toc + parserVersion。返回是否实际重建。幂等；版本已最新 / 非 epub / 解析失败 → false。
+ * 安全性：annotations/progress/conversations 均 FK 挂 books.id（非 chapters.id），DELETE chapters 不级联误删。
+ */
+export function reindexBookIfStale(db: DB, bytes: Uint8Array, bookId: string): boolean {
+  const book = getBook(db, bookId);
+  if (!book || book.format !== "epub") return false;
+  if ((book.parserVersion ?? 0) >= CURRENT_PARSER_VERSION) return false;
+  let parsed;
+  try {
+    parsed = parseEpub(bytes);
+  } catch (err) {
+    log.warn(`reindex parse failed, keeping old index (book ${bookId})`, err);
+    return false;
+  }
+  db.transaction((tx) => {
+    tx.delete(chapters).where(eq(chapters.bookId, bookId)).run();
+    chapterSeedsFor(parsed).forEach((seed, index) => {
+      tx.insert(chapters)
+        .values({
+          bookId,
+          href: seed.href,
+          anchor: seed.anchor,
+          orderIndex: index,
+          title: seed.title,
+        })
+        .run();
+    });
+    tx.update(books)
+      .set({ toc: parsed.toc, parserVersion: CURRENT_PARSER_VERSION })
+      .where(eq(books.id, bookId))
+      .run();
+  });
+  log.info(`reindexed book ${bookId} to parser v${CURRENT_PARSER_VERSION}`);
+  return true;
+}
+
+/**
  * 删书：先删 DB 行（真相源；依赖行靠 FK ON DELETE CASCADE 自动清，P3a），再 best-effort 删自有副本文件。
  * 顺序不可反——指向已删文件的 DB 行 = 打不开的鬼书，比无主文件（可 GC）更糟（DD-§1.3）。
  * 幂等：删不存在的书是 no-op（DELETE 命中 0 行；行不存在读不到 format 则直接跳过 unlink），不抛——契合删书 UI 的重复点击 / 乐观删除竞态。
