@@ -122,8 +122,10 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
   const io = useRef<IntersectionObserver | null>(null);
   const lastTop = useRef<number | null>(null);
 
-  // 对所有当前注册的 section 同步测 rect → 纯函数挑视口顶 → 去重上报。
-  const recomputeTop = () => {
+  // 对所有当前注册的 section 同步测 rect → 纯函数挑视口顶 → 上报。
+  // force=true（滚动驱动）绕过 section index 去重：同一 section 内跨锚点滚动也上报最新 scrollRatio，
+  // 驱动消费方的锚点级当前章/进度跟随（IO 仅在 section 边界触发，section 内不重触发）。
+  const recomputeTop = (force = false) => {
     const scroller = scrollerEl.current;
     if (!scroller) return;
     const vt = scroller.getBoundingClientRect().top;
@@ -132,7 +134,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
       return { index, top: r.top, bottom: r.bottom };
     });
     const section = topVisibleSection(secs, vt);
-    if (section && section.index !== lastTop.current) {
+    if (section && (section.index !== lastTop.current || force)) {
       lastTop.current = section.index;
       onTopSectionChange?.(section.index, { scrollRatio: sectionScrollRatio(section, vt) });
     }
@@ -162,7 +164,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
     setScrollerReady((n) => n + 1);
   }, []);
 
-  // scroller 就绪后建 IO，observe 已注册的元素。
+  // scroller 就绪后建 IO，observe 已注册的元素 + throttle 滚动监听。
   useEffect(() => {
     if (!ioSupported) return;
     const scroller = scrollerEl.current;
@@ -170,9 +172,31 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
     const obs = new IntersectionObserver(() => recomputeRef.current(), { root: scroller });
     io.current = obs;
     for (const el of observedEls.current.values()) obs.observe(el);
+    // IO 仅在 section 边界触发；一个 section 含多锚点章时（锚点级切章的书），section 内滚动须靠
+    // 滚动事件以当前 scrollRatio 重算顶部（force 绕过 index 去重）。throttle（leading+trailing）抑制每帧风暴。
+    const THROTTLE_MS = 120;
+    let lastRun = 0;
+    let trailing: ReturnType<typeof setTimeout> | undefined;
+    const onScroll = () => {
+      const elapsed = performance.now() - lastRun;
+      if (elapsed >= THROTTLE_MS) {
+        lastRun = performance.now();
+        recomputeRef.current(true);
+      } else if (!trailing) {
+        // 尾随一次：滚动停在节流窗口内时，确保最终位置也重算。
+        trailing = setTimeout(() => {
+          trailing = undefined;
+          lastRun = performance.now();
+          recomputeRef.current(true);
+        }, THROTTLE_MS - elapsed);
+      }
+    };
+    scroller.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       obs.disconnect();
       io.current = null;
+      scroller.removeEventListener("scroll", onScroll);
+      if (trailing) clearTimeout(trailing);
     };
     // scrollerReady nonce 触发重建（见 Step 5 的 scrollerRef）
     // eslint-disable-next-line react-hooks/exhaustive-deps

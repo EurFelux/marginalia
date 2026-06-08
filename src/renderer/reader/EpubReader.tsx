@@ -147,6 +147,12 @@ export function EpubReader({ bookId, chapters }: Props) {
   };
 
   const stripFrag = (h: string) => h.split("#")[0]!;
+  // 取末段文件名：epubjs 的 section.href 是 OPF 内裸形（text00000.html），DB chapter.href 带 OPF 目录
+  // 前缀（OEBPS/text00000.html）——精确比对永不命中，须按 basename 归属 section（与 chapter-id-by-href 对称）。
+  const basenameOf = (h: string) => {
+    const p = stripFrag(h);
+    return p.slice(p.lastIndexOf("/") + 1);
+  };
 
   const onTopSectionChange = (index: number, meta: { scrollRatio: number }) => {
     if (!book) return;
@@ -156,8 +162,9 @@ export function EpubReader({ bookId, chapters }: Props) {
     const anchorChapterIdAt = (sectionIndex: number): string | null => {
       const sHref = book.hrefAtIndex(sectionIndex);
       if (!sHref) return null;
+      const sBase = basenameOf(sHref);
       const sectionChs = chapters
-        .filter((c) => c.href === sHref || stripFrag(c.href) === stripFrag(sHref))
+        .filter((c) => basenameOf(c.href) === sBase)
         .filter((c) => c.anchor);
       if (sectionChs.length === 0) return chapterIdByHref(chapters, sHref); // 无锚点章退回 href 级
       const frame = document.querySelector<HTMLIFrameElement>(
