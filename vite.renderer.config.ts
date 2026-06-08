@@ -32,13 +32,13 @@ export default defineConfig({
       { find: "@renderer", replacement: path.resolve(__dirname, "src/renderer") },
     ],
   },
-  // 工作区源码包（main/exports 直指 src/*.ts，经软链消费）不要预打包：
-  // 否则 Vite 会把它 bundle 进 .vite/deps 并缓存，缓存失效只看 lockfile/config、
-  // 不看软链源码 mtime——改了包的源码（如新增 VirtualDocs.redecorate）运行时仍用旧产物。
-  // 排除后由 Vite 直接从源码转译直供，源码改动即时生效、HMR 正常。
+  // 工作区源码包（经软链消费）不要预打包：Vite 会 bundle 进 .vite/deps 并缓存，缓存失效只看
+  // lockfile/config、不看软链源码 mtime——改了包源码运行时仍用旧产物。排除后 Vite 从源码直供，
+  // 源码改动即时生效、HMR 正常。
+  // epub-parser 已预构建为自包含 ESM（dist/index.js，node-html-parser 等 CJS 依赖 build 期内联），
+  // 故无需再 include 其 CJS 传递依赖；仍 exclude 以避软链 dist 的 stale 缓存。
+  // pdf-parser 渲染层不消费（仅主进程经 Rollup bundle），不在此列。
   optimizeDeps: {
-    exclude: ["@marginalia/virtual-docs", "@marginalia/epub-parser", "@marginalia/pdf-parser"],
-    // epub-parser 源码直供后，其 CJS 第三方依赖仍需要由 Vite 转成浏览器可消费的 ESM。
-    include: ["node-html-parser"],
+    exclude: ["@marginalia/virtual-docs", "@marginalia/epub-parser"],
   },
 });
