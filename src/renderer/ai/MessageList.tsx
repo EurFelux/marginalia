@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { ChatStatus } from "ai";
 import { getToolName } from "ai";
 import { useQuery } from "@tanstack/react-query";
@@ -5,6 +6,8 @@ import type { LucideIcon } from "lucide-react";
 import { BookOpen, FileText, List, ScrollText, Sparkles, Wrench } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { chipLabel } from "@renderer/ai/chip-label";
+import { useChatActions } from "@renderer/ai/chat-actions";
+import { MessageEditor } from "@renderer/ai/MessageEditor";
 import { textOf } from "@renderer/ai/message-text";
 import { MessageToolbar } from "@renderer/ai/MessageToolbar";
 import { segments, type ToolPart } from "@renderer/ai/segments";
@@ -63,7 +66,28 @@ export function MessageList({
 
 function UserBubble({ m }: { m: ChatUIMessage }) {
   const { t } = useTranslation();
+  const actions = useChatActions();
+  const [editing, setEditing] = useState(false);
   const chips = m.metadata?.contextChips ?? [];
+
+  if (editing) {
+    return (
+      <div className="flex flex-col items-end">
+        <div className="w-full max-w-[88%]">
+          <MessageEditor
+            initialText={textOf(m)}
+            busy={actions.busy}
+            onCancel={() => setEditing(false)}
+            onSave={(text) => {
+              setEditing(false);
+              actions.editAndResend(m, text);
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="group flex flex-col items-end">
       <div className="max-w-[88%] rounded-2xl rounded-br-sm bg-primary px-3 py-2.5 text-primary-foreground">
@@ -86,7 +110,7 @@ function UserBubble({ m }: { m: ChatUIMessage }) {
         )}
         <div className="whitespace-pre-wrap text-sm leading-relaxed">{textOf(m)}</div>
       </div>
-      <MessageToolbar m={m} />
+      <MessageToolbar m={m} onEdit={() => setEditing(true)} />
     </div>
   );
 }
