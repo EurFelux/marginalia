@@ -192,6 +192,10 @@ export default {
   "reader.toc.loadError": "Failed to load table of contents",
   "reader.toc.loading": "Loading contents…",
   "settings.advanced": "Advanced",
+  "settings.advanced.stepLimit": "Max steps per reply",
+  "settings.advanced.stepLimitDesc":
+    'Cap on how many consecutive tool-call steps the AI takes in a single reply — raise it for page-by-page PDF reading. With "Unlimited", only the model stopping on its own or you stopping it ends the turn; a model stuck in a loop keeps spending tokens.',
+  "settings.advanced.stepLimitUnlimited": "Unlimited",
   "settings.appearance": "Appearance",
   "settings.assistantModel": "Chat model",
   "settings.close": "Close settings",
