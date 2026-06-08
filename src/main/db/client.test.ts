@@ -67,12 +67,22 @@ describe("db client", () => {
     ).toThrow(/FOREIGN KEY/i);
   });
 
-  it("enforces UNIQUE(book_id, href) on chapters", () => {
+  it("enforces UNIQUE(book_id, href, anchor) on chapters", () => {
     const db = createDb(":memory:");
     runMigrations(db, MIGRATIONS);
     db.insert(books).values({ id: "b1" }).run();
+    // 同一 (book_id, href, anchor) 有非 null anchor 时不能重复
+    db.insert(chapters).values({ bookId: "b1", href: "big.xhtml", anchor: "a1" }).run();
+    db.insert(chapters).values({ bookId: "b1", href: "big.xhtml", anchor: "a2" }).run();
+    expect(() =>
+      db.insert(chapters).values({ bookId: "b1", href: "big.xhtml", anchor: "a1" }).run(),
+    ).toThrow();
+    // SQLite UNIQUE 约束：NULL != NULL，故 (book_id, href, null) 重复不触发约束（标准行为）；
+    // 导入层通过 chapterSeedsFromToc 去重保首个，应用层保证不写重复 null 行。
     db.insert(chapters).values({ bookId: "b1", href: "ch1.xhtml" }).run();
-    expect(() => db.insert(chapters).values({ bookId: "b1", href: "ch1.xhtml" }).run()).toThrow();
+    expect(() =>
+      db.insert(chapters).values({ bookId: "b1", href: "ch1.xhtml" }).run(),
+    ).not.toThrow(); // anchor IS NULL: SQLite UNIQUE 不拦
   });
 
   // 回归：drizzle 把迁移包在 BEGIN…COMMIT 里跑，迁移 SQL 自带的 `PRAGMA foreign_keys=OFF`

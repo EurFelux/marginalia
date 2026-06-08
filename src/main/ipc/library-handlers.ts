@@ -11,8 +11,10 @@ import {
   importBook,
   listBooks,
   listRecentlyRead,
+  reindexBookIfStale,
   reorderBooks,
   updateBook,
+  CURRENT_PARSER_VERSION,
 } from "@main/library/repository";
 import { readBookFile, writeBookFile } from "@main/library/book-files";
 import { getProgress, saveProgress } from "@main/library/progress";
@@ -29,6 +31,20 @@ import { bind, register, type Binding } from "@main/ipc/registry";
 import { createLogger } from "@main/logger";
 
 const log = createLogger("library");
+
+/** 开书惰性升级：epub 且 parserVersion 落后时载字节重建索引（幂等、版本门控）。失败不阻塞开书。 */
+async function ensureEpubIndexed(bookId: string): Promise<void> {
+  const db = getDb();
+  const book = getBook(db, bookId);
+  if (!book || book.format !== "epub") return;
+  if ((book.parserVersion ?? 0) >= CURRENT_PARSER_VERSION) return; // 已最新：不载字节
+  try {
+    const bytes = await readBookFile(appService.getPath("booksDir"), bookId, book.format);
+    reindexBookIfStale(db, bytes, bookId);
+  } catch (err) {
+    log.warn(`ensureEpubIndexed failed (book ${bookId})`, err);
+  }
+}
 
 const toDto = (b: {
   id: string;
@@ -78,8 +94,10 @@ export const libraryBindings: Binding[] = [
   }),
 
   bind(C.libraryReadBookBytes, async (input) => {
-    const book = getBook(getDb(), input.bookId);
+    const db = getDb();
+    const book = getBook(db, input.bookId);
     if (!book) throw new Error(`library: book ${input.bookId} not found`);
+    await ensureEpubIndexed(input.bookId);
     return readBookFile(appService.getPath("booksDir"), input.bookId, book.format);
   }),
 
@@ -115,15 +133,17 @@ export const libraryBindings: Binding[] = [
     saveProgress(db, input.bookId, input.locator, input.percent);
   }),
 
-  bind(C.contentToc, (input) => {
+  bind(C.contentToc, async (input) => {
     const db = getDb();
     if (!getBook(db, input.bookId)) throw new Error(`content: book ${input.bookId} not found`);
+    await ensureEpubIndexed(input.bookId);
     return getToc(db, input.bookId);
   }),
 
-  bind(C.contentChapters, (input) => {
+  bind(C.contentChapters, async (input) => {
     const db = getDb();
     if (!getBook(db, input.bookId)) throw new Error(`content: book ${input.bookId} not found`);
+    await ensureEpubIndexed(input.bookId);
     return listChapters(db, input.bookId);
   }),
 
@@ -165,6 +185,7 @@ export const libraryBindings: Binding[] = [
     const db = getDb();
     const book = getBook(db, input.bookId);
     if (!book) throw new Error(`content: book ${input.bookId} not found`);
+    await ensureEpubIndexed(input.bookId);
     // readBookFile 缺失即抛 BookFileMissingError（message 已含 bookId），其他 OS 错误原样透传——
     // 不再包一层「可能缺失/重新导入」的笼统文案（对非缺失错误属编造），与 readBookBytes handler 一致。
     const bytes = await readBookFile(appService.getPath("booksDir"), input.bookId, book.format);
