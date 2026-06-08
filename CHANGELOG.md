@@ -1,5 +1,27 @@
 # marginalia
 
+## 0.6.0
+
+### Minor Changes
+
+- a3cbff4: Add a hover card that previews a highlight's note in both the ePub and PDF readers. Hover an annotated selection to see its quote and note, move into the card to read long notes, and click Edit to jump straight to the note editor.
+- 6be4c93: Remember each book's last-active AI conversation and restore it on reopen, and fix the previous book's conversation lingering in the AI panel after switching books.
+
+### Patch Changes
+
+- 5aeebea: Fix ePub imports being wrongly rejected as "already in your library"
+
+  Some ePubs (notably ones from certain online sources) ship with a non-unique boilerplate identifier, so two completely different books could carry the same `dc:identifier`. Marginalia used that identifier as a book's identity, which made it silently refuse to import the second book as a duplicate. Book identity now derives from the file's content hash — the same approach already used for PDFs — so distinct books always import correctly, while re-importing the exact same file stays de-duplicated.
+
+- 4522516: Respect IME composition when pressing Enter. In the chat composer and the manual model-name input, Enter no longer sends/submits while an East Asian input method (Chinese/Japanese/Korean) is composing — confirming a candidate with Enter now commits the text instead of firing off a half-composed message. Shift+Enter still inserts a newline.
+- 8faea92: Stop a book from being dragged while you interact with its dialog in the library
+
+  Opening a book's "Edit info" (or delete confirmation) dialog from the library and then pressing and moving the pointer anywhere inside it would accidentally start dragging and reordering the book underneath. These dialogs render in a portal, so their pointer events still bubbled through React's component tree to the draggable book card. The grid now only begins a drag when the gesture actually starts on the card itself, so you can freely click and drag inside dialogs.
+
+- 2570842: Keep the library header fixed while only the book grid scrolls
+
+  The library view used to scroll as a whole — header included — whenever the window was short or held many books, and the page background could stop short of the scrolled content. The header now stays pinned while only the book grid scrolls inside the same subtle macOS-style overlay scrollbar used elsewhere in the app, and the background always fills the view.
+
 ## 0.5.0
 
 ### Minor Changes
