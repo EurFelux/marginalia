@@ -19,6 +19,10 @@ interface Props {
   decorate?: (index: number, doc: Document) => void;
   /** 点击带 data-anno-id 的装饰元素时回调（rect 为视口坐标）。 */
   onHighlightClick?: (annoId: string, rect: ViewportRect) => void;
+  /** 悬停带笔记的高亮 mark（class 含 anno-noted）时回调；rect 为视口坐标。 */
+  onHighlightHover?: (annoId: string, rect: ViewportRect) => void;
+  /** 离开带笔记高亮（移到非 noted 区域 / 移出 iframe）时回调。 */
+  onHighlightLeave?: () => void;
   /** 变化即对已加载文档重跑 decorate（标注增删改后由 VirtualDocs 递增）。 */
   decorateNonce?: number;
   /** iframe 内任意 mousedown 时回调；同源 iframe 内部事件不冒泡到父文档，消费方借此关闭浮层。 */
@@ -51,6 +55,8 @@ export function SectionFrame({
   onSelectionCleared,
   decorate,
   onHighlightClick,
+  onHighlightHover,
+  onHighlightLeave,
   decorateNonce,
   onContentMouseDown,
   estimatedHeight,
@@ -63,6 +69,8 @@ export function SectionFrame({
     onSelectionCleared,
     decorate,
     onHighlightClick,
+    onHighlightHover,
+    onHighlightLeave,
     onContentMouseDown,
     estimatedHeight,
     onMeasured,
@@ -72,6 +80,8 @@ export function SectionFrame({
     onSelectionCleared,
     decorate,
     onHighlightClick,
+    onHighlightHover,
+    onHighlightLeave,
     onContentMouseDown,
     estimatedHeight,
     onMeasured,
@@ -135,11 +145,35 @@ export function SectionFrame({
       }
       cbRef.current.onContentMouseDown?.();
     };
-    // 悬停在选区上 → 光标变手型，提示「可点击重弹工具栏」。
+    // 上次命中的带笔记高亮 id（仅在变化时上报，减少无谓 store 写入与重渲染）。
+    let lastNotedId: string | null = null;
+    const reportLeaveIfNeeded = () => {
+      if (lastNotedId !== null) {
+        lastNotedId = null;
+        cbRef.current.onHighlightLeave?.();
+      }
+    };
+    // 悬停在选区上 → 手型；并检测带笔记高亮 → 上报 hover/leave。
     const onContentMove = (e: MouseEvent) => {
       if (!doc?.body) return;
       const cursor = pointInSelection(e.clientX, e.clientY) ? "pointer" : "";
       if (doc.body.style.cursor !== cursor) doc.body.style.cursor = cursor;
+      const mark = (e.target as Element | null)?.closest?.("mark.anno-noted") as HTMLElement | null;
+      const id = mark?.getAttribute("data-anno-id") ?? null;
+      if (id === lastNotedId) return;
+      lastNotedId = id;
+      if (id && mark) {
+        const r = mark.getBoundingClientRect();
+        const fr = iframe.getBoundingClientRect();
+        cbRef.current.onHighlightHover?.(id, toViewportRect(r, fr));
+      } else {
+        cbRef.current.onHighlightLeave?.();
+      }
+    };
+    // 鼠标移出 iframe（含移向主文档的卡片）→ 上报 leave，起关闭窗口（移到卡片会被 enterCard 取消）。
+    const onContentOut = (e: MouseEvent) => {
+      // relatedTarget 为 null = 离开 iframe 文档边界。
+      if (e.relatedTarget === null) reportLeaveIfNeeded();
     };
     const detach = () => {
       ro?.disconnect();
@@ -159,7 +193,9 @@ export function SectionFrame({
       doc?.removeEventListener("click", onAnnoClick);
       doc?.removeEventListener("mousedown", onContentDown);
       doc?.removeEventListener("mousemove", onContentMove);
+      doc?.removeEventListener("mouseout", onContentOut);
       if (doc?.body) doc.body.style.cursor = "";
+      reportLeaveIfNeeded();
       doc = null;
       docRef.current = null;
     };
@@ -207,6 +243,7 @@ export function SectionFrame({
       doc.addEventListener("click", onAnnoClick);
       doc.addEventListener("mousedown", onContentDown);
       doc.addEventListener("mousemove", onContentMove);
+      doc.addEventListener("mouseout", onContentOut);
     };
 
     iframe.addEventListener("load", onLoad);

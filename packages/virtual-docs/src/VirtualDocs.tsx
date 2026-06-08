@@ -38,6 +38,8 @@ export interface VirtualDocsProps {
   onSelectionCleared?: () => void;
   decorate?: (index: number, doc: Document) => void;
   onHighlightClick?: (annoId: string, rect: ViewportRect) => void;
+  onHighlightHover?: (annoId: string, rect: ViewportRect) => void;
+  onHighlightLeave?: () => void;
   onContentMouseDown?: () => void;
   /** 某 section 离开「active range ± KEEP_DISTANCE」时回调一次，供消费方释放其资源。 */
   onUnloadSection?: (index: number) => void;
@@ -56,6 +58,8 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
     onSelectionCleared,
     decorate,
     onHighlightClick,
+    onHighlightHover,
+    onHighlightLeave,
     onContentMouseDown,
     onUnloadSection,
     className,
@@ -157,6 +161,8 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
         onSelectionCleared={onSelectionCleared}
         decorate={decorate}
         onHighlightClick={onHighlightClick}
+        onHighlightHover={onHighlightHover}
+        onHighlightLeave={onHighlightLeave}
         decorateNonce={decorateNonce}
         onContentMouseDown={onContentMouseDown}
         estimatedHeight={estimateHeight(heightCache.current, index, DEFAULT_ESTIMATE)}
@@ -172,6 +178,8 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
       onSelectionCleared,
       decorate,
       onHighlightClick,
+      onHighlightHover,
+      onHighlightLeave,
       decorateNonce,
       onContentMouseDown,
       onMeasured,
@@ -213,6 +221,8 @@ function LazySection({
   onSelectionCleared,
   decorate,
   onHighlightClick,
+  onHighlightHover,
+  onHighlightLeave,
   decorateNonce,
   onContentMouseDown,
   estimatedHeight,
@@ -227,6 +237,8 @@ function LazySection({
   onSelectionCleared?: () => void;
   decorate?: (index: number, doc: Document) => void;
   onHighlightClick?: (annoId: string, rect: ViewportRect) => void;
+  onHighlightHover?: (annoId: string, rect: ViewportRect) => void;
+  onHighlightLeave?: () => void;
   decorateNonce?: number;
   onContentMouseDown?: () => void;
   estimatedHeight?: number;
@@ -270,6 +282,8 @@ function LazySection({
           onSelectionCleared={onSelectionCleared}
           decorate={decorate}
           onHighlightClick={onHighlightClick}
+          onHighlightHover={onHighlightHover}
+          onHighlightLeave={onHighlightLeave}
           decorateNonce={decorateNonce}
           onContentMouseDown={onContentMouseDown}
           estimatedHeight={estimatedHeight}

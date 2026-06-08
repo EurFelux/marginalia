@@ -10,6 +10,7 @@ import {
 import type { ChapterRefDto } from "@shared/library";
 import { useNavigationStore } from "@renderer/store/navigation-store";
 import { useAnnotationStore } from "@renderer/store/annotation-store";
+import { useNoteHoverStore } from "@renderer/store/note-hover-store";
 import { usePrefsStore } from "@renderer/store/prefs-store";
 import { qk } from "../query/keys";
 import { chapterIdByHref } from "./chapter-id-by-href";
@@ -49,6 +50,9 @@ export function EpubReader({ bookId, chapters }: Props) {
   const openStyleBar = useAnnotationStore((s) => s.openStyleBar);
   const closeStyleBar = useAnnotationStore((s) => s.closeStyleBar);
   const scrollCommand = useAnnotationStore((s) => s.scrollCommand);
+  const hoverHighlight = useNoteHoverStore((s) => s.hoverHighlight);
+  const leaveHighlight = useNoteHoverStore((s) => s.leaveHighlight);
+  const closeNoteHover = useNoteHoverStore((s) => s.closeNow);
   const qc = useQueryClient();
 
   // 防循环：记录最近一次「由滚动得出的顶部章 id」；跳章 effect 只在目标≠它时滚动。
@@ -221,10 +225,11 @@ export function EpubReader({ bookId, chapters }: Props) {
     const onScroll = () => {
       closeStyleBar();
       setSelection(null);
+      closeNoteHover();
     };
     document.addEventListener("scroll", onScroll, true);
     return () => document.removeEventListener("scroll", onScroll, true);
-  }, [closeStyleBar, setSelection]);
+  }, [closeStyleBar, setSelection, closeNoteHover]);
 
   if (bytes.isError)
     return <ReaderError message={t("reader.epub.loadError", "无法读取此书的文件。")} />;
@@ -266,6 +271,8 @@ export function EpubReader({ bookId, chapters }: Props) {
         onSelectionCleared={onSelectionCleared}
         decorate={decorate}
         onHighlightClick={onHighlightClick}
+        onHighlightHover={hoverHighlight}
+        onHighlightLeave={leaveHighlight}
         onContentMouseDown={onContentMouseDown}
       />
     </div>
