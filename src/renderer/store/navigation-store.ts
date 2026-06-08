@@ -36,7 +36,7 @@ export const useNavigationStore = create<NavigationState & NavigationActions>((s
       readingContext: null,
       readingPercent: null,
     });
-    useChatStore.getState().setActiveConversation(null); // 开书清上本会话（跨 store 协调）
+    useChatStore.getState().resetForBookSwitch(); // 切书清残留 openCommand；active 由 activeByBook 派生恢复
   },
   // 仅切回 library；currentBookId/currentChapterId 有意保留（App 按 view 守卫，library 下不读这些 id）
   backToLibrary: () => set({ view: "library" }),

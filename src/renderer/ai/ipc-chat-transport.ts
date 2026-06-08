@@ -2,7 +2,7 @@ import type { ChatTransport, UIMessageChunk } from "ai";
 import { v7 as uuidv7 } from "uuid";
 import type { AiStreamEvent } from "@shared/chat";
 import { useNavigationStore } from "@renderer/store/navigation-store";
-import { useChatStore } from "@renderer/store/chat-store";
+import { useChatStore, getActiveConversationId } from "@renderer/store/chat-store";
 import type { ChatUIMessage } from "@renderer/ai/types";
 
 /** onChunk 订阅器签名（与 window.api.ai.onChunk 一致；测试可注入假实现）。 */
@@ -62,7 +62,7 @@ export function createIpcChatTransport(): ChatTransport<ChatUIMessage> {
         throw new Error(i18n.t("ai.noBookToSend", "没有正在阅读的书，无法发送。"));
       }
       // 发送前保证目标会话存在（spec §7）：无 active → 懒建（主进程防堆积兜底）
-      let conversationId = useChatStore.getState().activeConversationId;
+      let conversationId = getActiveConversationId();
       if (!conversationId) {
         const convo = await window.api.chat.conversations.create({
           bookId: currentBookId,

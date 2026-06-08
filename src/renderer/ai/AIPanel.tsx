@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@renderer/components/ui/button";
 import { ScrollArea } from "@renderer/components/ui/scroll-area";
-import { useChatStore } from "@renderer/store/chat-store";
+import { useChatStore, useActiveConversationId } from "@renderer/store/chat-store";
 import { usePrefsStore } from "@renderer/store/prefs-store";
 import { useNavigationStore } from "@renderer/store/navigation-store";
 import { createIpcChatTransport } from "@renderer/ai/ipc-chat-transport";
@@ -26,7 +26,7 @@ export function AIPanel() {
   });
   const updateLayout = usePrefsStore((s) => s.updateLayout);
   const openCommand = useChatStore((s) => s.openCommand);
-  const activeConversationId = useChatStore((s) => s.activeConversationId);
+  const activeConversationId = useActiveConversationId();
   const bookId = useNavigationStore((s) => s.currentBookId);
   const convosQuery = useQuery({ ...conversationsQuery(bookId ?? ""), enabled: !!bookId });
   const activeTitle = activeConversationId

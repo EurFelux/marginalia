@@ -3,7 +3,7 @@ import type { UIMessageChunk } from "ai";
 import type { AiStreamEvent } from "@shared/chat";
 import { createEventStream, createIpcChatTransport } from "@renderer/ai/ipc-chat-transport";
 import { useNavigationStore, NAVIGATION_INITIAL } from "@renderer/store/navigation-store";
-import { useChatStore, CHAT_INITIAL } from "@renderer/store/chat-store";
+import { useChatStore, CHAT_INITIAL, getActiveConversationId } from "@renderer/store/chat-store";
 import type { ChatUIMessage } from "@renderer/ai/types";
 
 /** 假订阅器：捕获回调，返回受控的 emit + 退订标志。 */
@@ -124,7 +124,7 @@ function makeMessage(text: string): ChatUIMessage {
 describe("createIpcChatTransport sendMessages", () => {
   beforeEach(() => {
     useNavigationStore.setState({ ...NAVIGATION_INITIAL, currentBookId: "book-1" });
-    useChatStore.setState({ ...CHAT_INITIAL, activeConversationId: "existing-conv" });
+    useChatStore.setState({ ...CHAT_INITIAL, activeByBook: { "book-1": "existing-conv" } });
   });
 
   afterEach(() => {
@@ -176,7 +176,7 @@ describe("createIpcChatTransport sendMessages", () => {
   });
 
   it("lazily creates a conversation when activeConversationId is null, then sends", async () => {
-    useChatStore.setState({ ...CHAT_INITIAL, activeConversationId: null });
+    useChatStore.setState({ ...CHAT_INITIAL, activeByBook: {} });
     const { api, sentPayloads, createdPayloads } = makeApi({ createResult: { id: "lazy-conv" } });
     vi.stubGlobal("window", { api });
 
@@ -196,7 +196,7 @@ describe("createIpcChatTransport sendMessages", () => {
     const payload = sentPayloads[0] as Record<string, unknown>;
     expect(payload).toHaveProperty("conversationId", "lazy-conv");
     // store should be updated
-    expect(useChatStore.getState().activeConversationId).toBe("lazy-conv");
+    expect(getActiveConversationId()).toBe("lazy-conv");
   });
 
   it("throws when bookId is missing", async () => {

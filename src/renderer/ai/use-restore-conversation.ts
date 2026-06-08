@@ -4,10 +4,30 @@ import { createLogger } from "@renderer/logger";
 
 const log = createLogger("chat");
 
+type RestoreTarget = { kind: "restore"; id: string } | { kind: "empty" };
+
 /**
- * 开书恢复最近会话（spec §7）：仅当 active 为空或不属于该书时，取该书 updatedAt 最新会话
- * 装入 active（restoreConversation：载历史但不强制开面板）；该书从无会话 → active 置 null
- * 并预亮摘要 chips（「将开启新会话」状态，spec §6）。
+ * 据该书会话列表（updatedAt 倒序）+ 记忆值，决定开书该恢复的目标（纯函数，便于测试）。
+ * 优先级：命中记忆 > null 空态 > 回落最新 > 无会话空态。
+ * - remembered=string 且仍在 list → 精确恢复上次正看的；
+ * - remembered=null → 上次停在「将开新会话」空态，忠实还原（empty）；
+ * - remembered 失效 / 缺键 → 回落 list[0]（最新）；list 空 → empty。
+ */
+export function pickRestoreTarget(
+  list: readonly { id: string }[],
+  remembered: string | null | undefined,
+): RestoreTarget {
+  const has = (id: string) => list.some((c) => c.id === id);
+  if (typeof remembered === "string" && has(remembered)) return { kind: "restore", id: remembered };
+  if (remembered === null) return { kind: "empty" };
+  const latest = list[0];
+  return latest ? { kind: "restore", id: latest.id } : { kind: "empty" };
+}
+
+/**
+ * 开书恢复会话（spec §7）：取该书会话列表，按 pickRestoreTarget 决定恢复哪个 /
+ * 还原空态。命中/回落 → restoreConversation（发 openCommand 载历史）；
+ * 空态 → 置 active null（写槽 null + 清 openCommand）+ 预亮摘要 chips。
  */
 export function useRestoreConversation(bookId: string | null) {
   useEffect(() => {
@@ -18,10 +38,9 @@ export function useRestoreConversation(bookId: string | null) {
       .then((list) => {
         if (cancelled) return;
         const s = useChatStore.getState();
-        if (s.activeConversationId && list.some((c) => c.id === s.activeConversationId)) return;
-        const latest = list[0]; // listByBook 已按 updatedAt 倒序
-        if (latest) {
-          s.restoreConversation(latest.id);
+        const target = pickRestoreTarget(list, s.activeByBook[bookId]);
+        if (target.kind === "restore") {
+          s.restoreConversation(target.id);
         } else {
           s.setActiveConversation(null);
           s.setSummaryChipsPreset();

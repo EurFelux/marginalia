@@ -29,9 +29,13 @@ describe("navigation-store", () => {
     useNavigationStore.getState().setCurrentChapter("c2");
     expect(useNavigationStore.getState().currentChapterId).toBe("c2");
   });
-  it("openBook clears active conversation (cross-store coordination)", () => {
-    useChatStore.getState().setActiveConversation("conv1");
+  it("openBook clears stale openCommand but keeps per-book memory", () => {
+    useChatStore.setState({
+      activeByBook: { b2: "conv-b2" },
+      openCommand: { conversationId: "stale", nonce: 1 },
+    });
     useNavigationStore.getState().openBook("b2");
-    expect(useChatStore.getState().activeConversationId).toBeNull();
+    expect(useChatStore.getState().openCommand).toBeNull(); // 残留命令被清（修 bug）
+    expect(useChatStore.getState().activeByBook.b2).toBe("conv-b2"); // 记忆保留
   });
 });

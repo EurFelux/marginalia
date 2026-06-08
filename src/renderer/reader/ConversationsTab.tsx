@@ -20,7 +20,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@renderer/components/ui/context-menu";
-import { useChatStore } from "@renderer/store/chat-store";
+import { useChatStore, getActiveConversationId } from "@renderer/store/chat-store";
 import { relativeTime } from "@renderer/lib/relative-time";
 import { conversationsQuery } from "@renderer/query/conversation-queries";
 import { qk } from "@renderer/query/keys";
@@ -28,7 +28,7 @@ import { qk } from "@renderer/query/keys";
 export function ConversationsTab({ bookId }: { bookId: string }) {
   const { t, i18n } = useTranslation();
   const qc = useQueryClient();
-  const activeId = useChatStore((s) => s.activeConversationId);
+  const activeId = useChatStore((s) => s.activeByBook[bookId] ?? null);
   const openConversation = useChatStore((s) => s.openConversation);
   const convos = useQuery(conversationsQuery(bookId));
   const [confirmTarget, setConfirmTarget] = useState<ConversationDto | null>(null);
@@ -40,7 +40,7 @@ export function ConversationsTab({ bookId }: { bookId: string }) {
       // 先清 active（防 dangling 窗口内向已删会话发送），再失效列表。
       // 回落 = 新会话空状态（spec DD-3）：AIPanel 既有 effect 清面板，chips 预亮镜像「开书无会话」。
       const s = useChatStore.getState();
-      if (s.activeConversationId === c.id) {
+      if (getActiveConversationId() === c.id) {
         s.setActiveConversation(null);
         s.setSummaryChipsPreset();
       }
