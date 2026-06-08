@@ -13,6 +13,7 @@ import {
   listRecentlyRead,
   reindexBookIfStale,
   reorderBooks,
+  setBookFinished,
   updateBook,
   CURRENT_PARSER_VERSION,
 } from "@main/library/repository";
@@ -54,6 +55,7 @@ const toDto = (b: {
   format: "epub" | "pdf";
   pageCount: number | null;
   hasTextLayer: boolean;
+  isFinished: boolean;
 }): BookSummaryDto => ({
   id: b.id,
   title: b.title,
@@ -62,6 +64,7 @@ const toDto = (b: {
   format: b.format,
   pageCount: b.pageCount,
   hasTextLayer: Boolean(b.hasTextLayer),
+  isFinished: Boolean(b.isFinished),
 });
 
 export const libraryBindings: Binding[] = [
@@ -107,6 +110,11 @@ export const libraryBindings: Binding[] = [
 
   bind(C.libraryUpdate, (input) => {
     const book = updateBook(getDb(), input);
+    return toDto({ ...book, hasCover: book.cover != null && book.cover.length > 0 });
+  }),
+
+  bind(C.librarySetFinished, (input) => {
+    const book = setBookFinished(getDb(), input.bookId, input.finished);
     return toDto({ ...book, hasCover: book.cover != null && book.cover.length > 0 });
   }),
 

@@ -46,6 +46,7 @@ export function createApi(d: PreloadDeps) {
       readBookBytes: inv(C.libraryReadBookBytes),
       delete: inv(C.libraryDelete),
       update: inv(C.libraryUpdate),
+      setFinished: inv(C.librarySetFinished),
       recentlyRead: inv(C.libraryRecentlyRead),
       reorder: inv(C.libraryReorder),
       /** 由拖入的 File 取磁盘路径（Electron 41 已移除 File.path，须经 webUtils）。同步、纯渲染端、非 IPC。 */
