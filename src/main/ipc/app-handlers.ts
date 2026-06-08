@@ -1,12 +1,23 @@
-import { app, ipcMain } from "electron";
+import { app, ipcMain, shell } from "electron";
 import { C } from "@shared/ipc";
 import { getDb } from "@main/db/instance";
 import { getAppInfo, ping } from "@main/app-info";
 import { bind, register, type Binding } from "@main/ipc/registry";
+import { isAllowedExternalUrl } from "@main/app/external-url";
+import { createLogger } from "@main/logger";
+
+const log = createLogger("app");
 
 export const appBindings: Binding[] = [
   bind(C.ping, ping),
   bind(C.appGetInfo, () => getAppInfo(getDb(), app.getVersion())),
+  bind(C.appOpenExternal, (input) => {
+    if (!isAllowedExternalUrl(input.url)) {
+      log.warn(`refused to open external url with disallowed protocol: ${input.url}`);
+      return;
+    }
+    void shell.openExternal(input.url);
+  }),
 ];
 
 export function registerAppHandlers(): void {

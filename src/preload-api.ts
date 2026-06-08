@@ -31,6 +31,7 @@ export function createApi(d: PreloadDeps) {
       /** 系统 locale（启动同步快照，供 i18n 决定默认语言）。 */
       locale: d.appLocale,
       openLogsDir: inv(C.appOpenLogsDir),
+      openExternal: inv(C.appOpenExternal),
     },
     log: {
       write: inv(C.logWrite),
