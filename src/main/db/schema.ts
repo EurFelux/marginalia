@@ -83,6 +83,8 @@ export const books = sqliteTable(
     // 首次拖拽全量重写后 position 唯一。新导入 = MIN(position) - 1（排最前）。无唯一约束：
     // 重复 position 以 added_at 平断（added_at 亦同则退 SQLite 隐式 rowid），下次拖拽全量重写自愈（spec §3）。
     position: integer("position").notNull().default(0),
+    // 解析器版本：低于 CURRENT_PARSER_VERSION 的书开书时惰性重建索引（锚点级章节升级）。null/0 = 旧。
+    parserVersion: integer("parser_version").notNull().default(0),
   },
   (t) => [check("books_format_check", sql`${t.format} in ('epub','pdf')`)],
 );
@@ -97,11 +99,12 @@ export const chapters = sqliteTable(
     title: text("title"),
     orderIndex: integer("order_index"),
     href: text("href").notNull(), // spine 项 href（书内唯一定位）
+    anchor: text("anchor"), // 章内 #fragment（如 "filepos…"）；无锚点章为 null
     startPage: integer("start_page"), // PDF 章节页范围（1-based 闭区间）；epub 为 null
     endPage: integer("end_page"),
     summary: text("summary"),
   },
-  (t) => [unique().on(t.bookId, t.href), index("chapters_book_id_idx").on(t.bookId)],
+  (t) => [unique().on(t.bookId, t.href, t.anchor), index("chapters_book_id_idx").on(t.bookId)],
 );
 
 export const progress = sqliteTable(
