@@ -68,6 +68,7 @@ export default {
   "errors.configuredProviderNotFound": "未找到所配置的$t(terms.provider)",
   "errors.conversationNotFound": "会话不存在或不属于本书",
   "errors.failedToBuildModel": "构建模型失败",
+  "errors.messageNotResendable": "消息不存在或不可重发",
   "errors.noApiKeyAvailable": "该$t(terms.provider)无可用密钥",
   "errors.noApiKeyConfigured": "未配置密钥",
   "errors.noApiKeySet": "该$t(terms.provider)未配置密钥",

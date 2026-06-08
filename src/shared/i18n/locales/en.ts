@@ -71,6 +71,7 @@ export default {
   "errors.configuredProviderNotFound": "configured $t(terms.provider) not found",
   "errors.conversationNotFound": "Conversation not found or belongs to another book",
   "errors.failedToBuildModel": "failed to build model",
+  "errors.messageNotResendable": "Message can't be resent",
   "errors.noApiKeyAvailable": "No API key available for this $t(terms.provider)",
   "errors.noApiKeyConfigured": "No API key configured",
   "errors.noApiKeySet": "No API key set for this $t(terms.provider)",

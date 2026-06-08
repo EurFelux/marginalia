@@ -115,3 +115,14 @@ export type AiStreamEvent =
   | { streamId: string; type: "chunk"; chunk: UIMessageChunk }
   | { streamId: string; type: "finish" }
   | { streamId: string; type: "error"; message: string };
+
+/** ai:resend 业务入参（不含传输层 streamId）。 */
+export const resendInputSchema = z.object({
+  conversationId: z.string().min(1),
+  userMessageId: z.string().min(1),
+  userText: z.string().min(1),
+});
+export type ResendInput = z.infer<typeof resendInputSchema>;
+/** ai:resend 入站载体 = 业务入参 + streamId。 */
+export const resendRequest = resendInputSchema.extend({ streamId: z.string().min(1) });
+export type ResendRequest = z.infer<typeof resendRequest>;

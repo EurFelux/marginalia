@@ -13,11 +13,11 @@ import {
   listConversationsByBook,
   setConversationTitle,
 } from "@main/chat/conversations";
-import { listMessages } from "@main/chat/messages";
+import { appendMessage, getMessage, listMessages } from "@main/chat/messages";
 import { buildChips } from "@main/ai/chips";
 import type { ResolvedModel } from "@main/ai/assistant-model";
 import type { LoadBytes } from "@main/ai/tools";
-import { runSend, type SendDeps, type SendInput } from "@main/ai/send";
+import { runResend, runSend, type SendDeps, type SendInput } from "@main/ai/send";
 import { __resetNamingRuntime } from "@main/chat/conversation-title";
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
@@ -534,5 +534,97 @@ describe("runSend context summary injection", () => {
     expect(joined).toContain("KEPT_ASSISTANT");
     expect(joined).not.toContain("FOLDED_USER");
     expect(joined).toContain("now");
+  });
+});
+
+describe("runResend", () => {
+  beforeEach(() => __resetNamingRuntime());
+
+  async function seedTurn(deps: SendDeps, db: ReturnType<typeof createDb>, bookId: string) {
+    const convo = createConversation(db, { bookId });
+    const r = runSend(deps, input(bookId, convo.id, { userText: "first question" }));
+    if (!r.ok) throw new Error(r.reason);
+    await r.finished;
+    return convo;
+  }
+
+  it("rejects when the model is unconfigured without mutating", async () => {
+    const { db, book, deps } = await setup({ ok: false, reason: "no model" });
+    const convo = createConversation(db, { bookId: book.id });
+    const u = appendMessage(db, {
+      conversationId: convo.id,
+      role: "user",
+      parts: [{ type: "text", text: "q" }],
+    });
+    const r = runResend(deps, { conversationId: convo.id, userMessageId: u.id, userText: "q" });
+    expect(r.ok).toBe(false);
+    expect(listMessages(db, convo.id)).toHaveLength(1); // unchanged
+  });
+
+  it("rejects an unknown / non-user / cross-conversation message", async () => {
+    const { db, book, deps } = await setup({
+      ok: true,
+      model: textStreamModel("x"),
+      modelId: "mock",
+    });
+    const convo = createConversation(db, { bookId: book.id });
+    const a = appendMessage(db, {
+      conversationId: convo.id,
+      role: "assistant",
+      parts: [{ type: "text", text: "a" }],
+    });
+    expect(
+      runResend(deps, { conversationId: convo.id, userMessageId: "nope", userText: "x" }).ok,
+    ).toBe(false);
+    expect(
+      runResend(deps, { conversationId: convo.id, userMessageId: a.id, userText: "x" }).ok,
+    ).toBe(false); // assistant
+  });
+
+  it("truncates after the user message and streams a fresh assistant reply", async () => {
+    const { db, book, deps } = await setup({
+      ok: true,
+      model: textStreamModel("regenerated"),
+      modelId: "mock",
+    });
+    const convo = await seedTurn(deps, db, book.id);
+    const msgs = listMessages(db, convo.id);
+    const user = msgs.find((m) => m.role === "user")!;
+    const r = runResend(deps, {
+      conversationId: convo.id,
+      userMessageId: user.id,
+      userText: "first question",
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    await r.finished;
+    const after = listMessages(db, convo.id);
+    expect(after.map((m) => m.role)).toEqual(["user", "assistant"]); // old assistant replaced, no dup user
+    const assistantText = after[1].parts
+      .filter((p): p is { type: "text"; text: string } => p.type === "text")
+      .map((p) => p.text)
+      .join("");
+    expect(assistantText).toContain("regenerated");
+  });
+
+  it("applies the edited user text and sends it to the model", async () => {
+    const captured: { system?: string; texts: string[] } = { texts: [] };
+    const { db, book, deps } = await setup({
+      ok: true,
+      model: promptCapturingModel(captured),
+      modelId: "mock",
+    });
+    const convo = await seedTurn(deps, db, book.id);
+    const user = listMessages(db, convo.id).find((m) => m.role === "user")!;
+    const r = runResend(deps, {
+      conversationId: convo.id,
+      userMessageId: user.id,
+      userText: "EDITED QUESTION",
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    await r.finished;
+    expect(getMessage(db, user.id)?.parts).toEqual([{ type: "text", text: "EDITED QUESTION" }]);
+    expect(captured.texts.join("\n")).toContain("EDITED QUESTION");
   });
 });

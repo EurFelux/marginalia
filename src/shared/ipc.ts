@@ -34,6 +34,7 @@ import {
   conversationIdInput,
   createConversationInput,
   messagesByConversationInput,
+  resendRequest,
   sendRequest,
 } from "@shared/chat";
 import type { AnnotationDto } from "@shared/annotations";
@@ -229,6 +230,7 @@ export const C = {
   // ai
   aiBuildChips: def("ai:build-chips", "invoke", buildChipsInput, out<Chip[]>()),
   aiSend: def("ai:send", "invoke", sendRequest, out<SendAck>()),
+  aiResend: def("ai:resend", "invoke", resendRequest, out<SendAck>()),
   aiAbort: def("ai:abort", "invoke", abortInput, out<void>()),
   aiChunk: def("ai:chunk", "event", z.void(), out<AiStreamEvent>()),
 
