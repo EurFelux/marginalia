@@ -4,7 +4,7 @@ This file provides guidance to coding agents working in this repository. It is s
 
 ## 项目简介
 
-Marginalia 是一个基于 Electron + React 的桌面 AI 阅读器，当前支持 ePub 与 PDF。主进程里程碑 **MA1–MA5** 与 UI 原型 **UP1** 已完成；**最小可用竖切**（导入 → 读 → 选 → 问 → 真模型流式回复）已实现并合并，渲染层 `src/renderer/` 已建（替换原 Forge 模板桩）。
+Marginalia 是一个基于 Electron + React 的桌面 AI 阅读器，支持 ePub 与 PDF：导入书库、阅读（进度 / 标注 / TOC）、选区问 AI（真模型流式回复）、章节与全书摘要。主进程承载全部业务逻辑；渲染层 `src/renderer/`（`library` / `reader` / `ai` / `settings` 等模块）仅做 UI。
 
 > **进度真相源 = GitHub Issues + Projects kanban**（用 `kanban` skill 操作）：需求/里程碑状态、当前焦点、待办 backlog 都在那里（别在本文件里维护会过时的状态散文）。开工定位、收尾关卡（挪列 / close issue）一律走 `kanban` skill。设计细节去 `docs/superpowers/specs/`（设计）与 `docs/superpowers/plans/`（实现计划）。`docs/superpowers/ROADMAP.md` **已退役**、仅作历史归档，勿再当真相源或更新它。
 
@@ -31,6 +31,12 @@ pnpm test           # vitest run（一次性跑完）
 pnpm test:watch     # vitest（监视模式）
 pnpm test src/main/app-info.test.ts   # 运行单个文件
 pnpm test -t "getAppInfo counts"         # 按测试名称过滤
+pnpm test:all       # 递归跑全 workspace 测试（含根包）
+
+# i18n（i18next-cli；配置 i18next.config.ts，locales 在 src/shared/i18n/locales）
+pnpm i18n:extract   # 抽取 key 并同步主语言（改文案 / 新增 t() 后跑）
+pnpm i18n:lint      # 校验 key 缺漏
+pnpm i18n:status    # 翻译覆盖率概览
 
 # 数据库
 pnpm db:generate    # drizzle-kit generate（修改 schema 后生成迁移）
@@ -113,6 +119,10 @@ Drizzle ORM over better-sqlite3，Schema 定义在 `src/main/db/schema.ts`。
 - **优先 Tailwind 工具类；非必要禁止内联 CSS（`style={{}}`）**。静态的尺寸 / 颜色 / 间距 / 字体一律用类（如 `w-80`、`max-h-40`、`bg-popover`、`font-sans`）。
 - **内联 `style` 仅允许承载运行时计算值**——无法用静态类表达者，例如：浮层的计算定位（`left/top/bottom`）、自绘滚动条 thumb 的 `height/top/opacity`、随用户偏好变化的 `maxWidth/fontSize/lineHeight`。
 - 字体走类：`font-sans` = Manrope（UI 文案），`font-serif` = Fraunces（阅读正文）；勿内联 `fontFamily`。
+
+## 代码规范（React / 渲染层）
+
+- **渲染层启用 React Compiler**（`vite.renderer.config.ts` 的 `reactCompilerPreset`）：**别手写 `useCallback` / `useMemo`**——编译器自动记忆化。审查时「缺 memo / 陈旧闭包」多为误判，按此驳回；命令式 `useEffect` 清理仍需手写。
 
 ## 技术栈
 
