@@ -19,10 +19,11 @@ export interface VirtualDocsHandle {
   /** 滚到第 index 个 section 内 id===anchorId 的元素处（先滚 section，待 iframe 就绪后按其 offsetTop 精确定位）。 */
   scrollToAnchor: (index: number, anchorId: string) => void;
   /**
-   * 滚到第 index 个 section 内由 resolveTopPx(doc) 算出的像素偏移处（doc = 该 section 的 iframe 文档；
-   * 返回 null 视为「目标未就绪」继续重试，到时退化为 section 顶）。供 CFI 等任意元素定位（如进度恢复）。
+   * 滚到第 index 个 section 内由 resolveEl(doc) 定位的元素处（doc = 该 section 的 iframe 文档；返回 null=
+   * 元素未就绪，继续重试）。收敛重试：virtuoso 须先测得 item 真高才认大 offset（冷启大 section 测量慢），
+   * 故每轮按元素当前位置重发滚动直到它贴近 scroller 顶，或超时退化为 section 顶。供 CFI/锚点等元素定位。
    */
-  scrollToSectionOffset: (index: number, resolveTopPx: (doc: Document) => number | null) => void;
+  scrollToSectionElement: (index: number, resolveEl: (doc: Document) => Element | null) => void;
   /** 对所有在挂 section 重跑 decorate（标注增删改后调用）。 */
   redecorate: () => void;
 }
@@ -83,45 +84,47 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
   const [decorateNonce, setDecorateNonce] = useState(0);
   const [scrollerReady, setScrollerReady] = useState(0);
   useImperativeHandle(ref, () => {
-    // 先滚到 section，bounded retry（≤20×50ms=1s）等 iframe 就绪后按 resolveTopPx(doc) 返回的像素
-    // 偏移精确定位；resolve 返回 null=未就绪继续重试，到时退化为 section 顶（不卡死、不白屏）。
-    const scrollToSectionOffset = (
+    // 滚到第 index 个 section 内 resolveEl(doc) 定位的元素处。先用 virtuoso scrollToIndex 把该 section
+    // 带进渲染窗口（其 iframe 才会加载），再**直接滚 DOM scroller**按真实渲染布局把元素移到 scroller 顶——
+    // 不用 virtuoso 的 scrollToIndex({offset})，因为冷启大 section 未测全真高时大 offset 会溢出到下一 section。
+    // delta = 元素在主窗口坐标的顶 − scroller 顶；元素主窗口顶 = iframe 在主窗口的顶 + 元素在 iframe 内的顶
+    //（iframe scrolling=no、不内部滚动，故后者即元素 offsetTop）。连续两轮到位（<4px）才收尾，防 virtuoso 回弹。
+    const scrollToSectionElement = (
       index: number,
-      resolveTopPx: (doc: Document) => number | null,
+      resolveEl: (doc: Document) => Element | null,
     ) => {
       vRef.current?.scrollToIndex({ index, align: "start" });
       let tries = 0;
+      let settled = 0;
       const tick = () => {
-        const frame = scrollerEl.current?.querySelector<HTMLIFrameElement>(
+        const scroller = scrollerEl.current;
+        const frame = scroller?.querySelector<HTMLIFrameElement>(
           `[data-section-index="${index}"] iframe`,
         );
         const doc = frame?.contentDocument;
-        if (doc && doc.documentElement.scrollHeight > 0) {
-          const offset = resolveTopPx(doc);
-          if (offset != null) {
-            vRef.current?.scrollToIndex({ index, align: "start", offset });
-            return;
+        const el = doc && doc.documentElement.scrollHeight > 0 ? resolveEl(doc) : null;
+        if (el && scroller && frame) {
+          const delta =
+            frame.getBoundingClientRect().top +
+            el.getBoundingClientRect().top -
+            scroller.getBoundingClientRect().top;
+          if (Math.abs(delta) < 4) {
+            if (++settled >= 2) return; // 连续两轮稳定到位
+          } else {
+            settled = 0;
+            scroller.scrollTop += delta; // 直接按真实布局定位，不溢出、不依赖 virtuoso 测高
           }
         }
-        if (tries++ < 20) setTimeout(tick, 50);
-        else
-          console.warn(
-            "[virtual-docs] scrollToSectionOffset: target not ready, fell back to section top",
-            index,
-          );
+        if (tries++ < 60) setTimeout(tick, 100);
+        else console.warn("[virtual-docs] scrollToSectionElement: did not converge", index);
       };
-      setTimeout(tick, 50);
+      setTimeout(tick, 100);
     };
     return {
       scrollToIndex: (index: number) => vRef.current?.scrollToIndex({ index, align: "start" }),
       scrollToAnchor: (index: number, anchorId: string) =>
-        scrollToSectionOffset(index, (doc) => {
-          const el = doc.getElementById(anchorId);
-          return el
-            ? el.getBoundingClientRect().top - doc.documentElement.getBoundingClientRect().top
-            : null;
-        }),
-      scrollToSectionOffset,
+        scrollToSectionElement(index, (doc) => doc.getElementById(anchorId)),
+      scrollToSectionElement,
       redecorate: () => setDecorateNonce((n) => n + 1),
     };
   }, []);

@@ -113,17 +113,23 @@ export function EpubReader({ bookId, chapters }: Props) {
   }, [bytes.data]);
 
   // 把锚点级 CFI 解析回 section 内元素并精确滚到它（恢复 / 标注跳转复用）。CFI → section index →
-  // 等 iframe 就绪后用 rangeFromCfi 定位元素的 offsetTop。失败退化为 section 顶（scrollToSectionOffset 内置）。
+  // VirtualDocs 等 iframe 就绪 + virtuoso 测量后收敛定位到该元素。失败退化为 section 顶。
   const scrollToCfi = (cfi: string) => {
     if (!book) return;
     const idx = book.indexOfCfi(cfi);
     if (idx < 0) return;
-    vRef.current?.scrollToSectionOffset(idx, (doc) => {
+    // cfiFromElement 生成的「指向元素」CFI 末段带 [id] 断言；epubjs toRange 对这类 point CFI 常返回
+    // null（"No startContainer found"），故取最后一个 [id] 断言作锚点元素 id 兜底。
+    const idAssertion = [...cfi.matchAll(/\[([^\]]+)\]/g)].at(-1)?.[1] ?? null;
+    vRef.current?.scrollToSectionElement(idx, (doc) => {
+      // 先试 rangeFromCfi（标注的 range CFI 走这条精确路）；失败再用 [id] 断言 getElementById（进度恢复）。
       const node = book.rangeFromCfi(cfi, doc)?.startContainer ?? null;
-      const el = node ? (node.nodeType === 1 ? (node as Element) : node.parentElement) : null;
-      return el
-        ? el.getBoundingClientRect().top - doc.documentElement.getBoundingClientRect().top
+      const fromRange = node
+        ? node.nodeType === 1
+          ? (node as Element)
+          : node.parentElement
         : null;
+      return fromRange ?? (idAssertion ? doc.getElementById(idAssertion) : null);
     });
   };
 
