@@ -5,6 +5,7 @@ import { ArrowUp, Square } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { Chip } from "@shared/chat";
 import { Button } from "@renderer/components/ui/button";
+import { isSubmitEnter } from "@renderer/lib/keyboard";
 import { useChatStore } from "@renderer/store/chat-store";
 import { usePrefsStore } from "@renderer/store/prefs-store";
 import { useNavigationStore } from "@renderer/store/navigation-store";
@@ -60,7 +61,7 @@ export function Composer({ status, onSend, onStop }: Props) {
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (isSubmitEnter(e)) {
       e.preventDefault();
       send();
     }

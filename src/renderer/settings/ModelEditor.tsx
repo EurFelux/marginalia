@@ -5,6 +5,7 @@ import type { AiProviderApiType } from "@shared/providers";
 import { Button } from "@renderer/components/ui/button";
 import { Input } from "@renderer/components/ui/input";
 import { Checkbox } from "@renderer/components/ui/checkbox";
+import { isSubmitEnter } from "@renderer/lib/keyboard";
 import { mergeModels } from "./settings-logic";
 
 export function ModelEditor({
@@ -153,7 +154,7 @@ export function ModelEditor({
           value={manual}
           onChange={(e) => setManual(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") {
+            if (isSubmitEnter(e)) {
               e.preventDefault();
               addManual();
             }
