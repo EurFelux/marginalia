@@ -73,7 +73,7 @@ export function createIpcChatTransport(): ChatTransport<ChatUIMessage> {
         if (!conversationId || !last) {
           void stream.cancel();
           const { default: i18n } = await import("@renderer/i18n");
-          throw new Error(i18n.t("ai.noBookToSend", "没有正在阅读的书，无法发送。"));
+          throw new Error(i18n.t("ai.cannotResend", "无法重发：找不到会话或目标消息"));
         }
         const ack = await window.api.ai.resend({
           streamId,
