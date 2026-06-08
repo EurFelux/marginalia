@@ -84,18 +84,17 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
   const [decorateNonce, setDecorateNonce] = useState(0);
   const [scrollerReady, setScrollerReady] = useState(0);
   useImperativeHandle(ref, () => {
-    // 滚到第 index 个 section 内 resolveEl(doc) 定位的元素处。先用 virtuoso scrollToIndex 把该 section
-    // 带进渲染窗口（其 iframe 才会加载），再**直接滚 DOM scroller**按真实渲染布局把元素移到 scroller 顶——
-    // 不用 virtuoso 的 scrollToIndex({offset})，因为冷启大 section 未测全真高时大 offset 会溢出到下一 section。
-    // delta = 元素在主窗口坐标的顶 − scroller 顶；元素主窗口顶 = iframe 在主窗口的顶 + 元素在 iframe 内的顶
-    //（iframe scrolling=no、不内部滚动，故后者即元素 offsetTop）。连续两轮到位（<4px）才收尾，防 virtuoso 回弹。
+    // 滚到第 index 个 section 内 resolveEl(doc) 定位的元素处。先用 scrollToIndex 把 section 带进渲染
+    // 窗口（其 iframe 才加载），轮询等 virtuoso **把该 section 真高计入总滚动高**（scroller.scrollHeight
+    // ≥ section 高）——这是「item 已测量」的可靠信号；未测量时直接发大 offset 会被 clamp/溢出到下一 section
+    //（正是「停在顶部/串章」的根因）。测量后用 virtuoso 原生 scrollToIndex({offset}) 一次精确定位（不抢
+    // 滚、不回弹）。超时（≤80×100ms=8s，留足冷启大 section 测量）退化为 section 顶（不卡死、不白屏）。
     const scrollToSectionElement = (
       index: number,
       resolveEl: (doc: Document) => Element | null,
     ) => {
       vRef.current?.scrollToIndex({ index, align: "start" });
       let tries = 0;
-      let settled = 0;
       const tick = () => {
         const scroller = scrollerEl.current;
         const frame = scroller?.querySelector<HTMLIFrameElement>(
@@ -103,20 +102,18 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
         );
         const doc = frame?.contentDocument;
         const el = doc && doc.documentElement.scrollHeight > 0 ? resolveEl(doc) : null;
-        if (el && scroller && frame) {
-          const delta =
-            frame.getBoundingClientRect().top +
-            el.getBoundingClientRect().top -
-            scroller.getBoundingClientRect().top;
-          if (Math.abs(delta) < 4) {
-            if (++settled >= 2) return; // 连续两轮稳定到位
-          } else {
-            settled = 0;
-            scroller.scrollTop += delta; // 直接按真实布局定位，不溢出、不依赖 virtuoso 测高
+        if (el && scroller && doc) {
+          const sectionH = doc.documentElement.scrollHeight;
+          // virtuoso 已把该 section 真高计入总高 ⇒ 测量完成，offset 不再被 clamp/溢出。
+          if (scroller.scrollHeight >= sectionH - 4) {
+            const offset =
+              el.getBoundingClientRect().top - doc.documentElement.getBoundingClientRect().top;
+            vRef.current?.scrollToIndex({ index, align: "start", offset });
+            return;
           }
         }
-        if (tries++ < 60) setTimeout(tick, 100);
-        else console.warn("[virtual-docs] scrollToSectionElement: did not converge", index);
+        if (tries++ < 80) setTimeout(tick, 100);
+        else console.warn("[virtual-docs] scrollToSectionElement: section not measured", index);
       };
       setTimeout(tick, 100);
     };
