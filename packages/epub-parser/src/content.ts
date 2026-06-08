@@ -1,5 +1,5 @@
 import { strFromU8, unzipSync } from "fflate";
-import { parse as parseHtml } from "node-html-parser";
+import { parse as parseHtml, type HTMLElement } from "node-html-parser";
 
 export interface ReadOptions {
   offset?: number;
@@ -13,6 +13,52 @@ export interface ChapterTextSlice {
 
 const DEFAULT_MAX_CHARS = 20_000;
 
+const BLOCK_SELECTOR = "h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,figcaption";
+const BLOCK_TAGS = new Set([
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "p",
+  "li",
+  "blockquote",
+  "pre",
+  "figcaption",
+]);
+
+/** 该元素是否嵌在另一块级元素内（其文本已被祖先块收集，跳过以免重复）。 */
+function isNestedInsideBlock(el: HTMLElement): boolean {
+  let node = el.parentNode as HTMLElement | null;
+  while (node) {
+    if (node.rawTagName && BLOCK_TAGS.has(node.rawTagName.toLowerCase())) return true;
+    node = node.parentNode as HTMLElement | null;
+  }
+  return false;
+}
+
+/** 顶层块级元素（保序）：querySelectorAll 命中后剔除嵌套块。 */
+function topLevelBlocks(body: HTMLElement): HTMLElement[] {
+  return body.querySelectorAll(BLOCK_SELECTOR).filter((b) => !isNestedInsideBlock(b));
+}
+
+/** 取某 anchor 所在 spine 文件的「本章块级文本」：[anchor 所在块, nextAnchor 所在块) 区间。 */
+function sliceTextByAnchor(xhtml: string, anchor: string, nextAnchor?: string): string {
+  const root = parseHtml(xhtml);
+  const body = (root.querySelector("body") ?? root) as HTMLElement;
+  const startEl = root.getElementById(anchor);
+  if (!startEl) return htmlToText(xhtml); // 定位不到 ⇒ 退化整文件（不静默空）
+  const startOffset = startEl.range[0];
+  const endEl = nextAnchor ? root.getElementById(nextAnchor) : null;
+  const endOffset = endEl ? endEl.range[0] : Number.POSITIVE_INFINITY;
+  const parts = topLevelBlocks(body)
+    .filter((b) => b.range[1] > startOffset && b.range[1] <= endOffset)
+    .map((b) => b.text.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+  return parts.join("\n");
+}
+
 /** XHTML → 纯文本：块级元素文本，块间换行，规整空白。
  * Known limitations:
  *   - <pre> whitespace is collapsed (not preserved).
@@ -21,40 +67,10 @@ const DEFAULT_MAX_CHARS = 20_000;
  */
 export function htmlToText(xhtml: string): string {
   const root = parseHtml(xhtml);
-  const body = root.querySelector("body") ?? root;
+  const body = (root.querySelector("body") ?? root) as HTMLElement;
 
-  // Block tags we collect. NOTE: div/section are intentionally excluded — including them
-  // would collapse <div><p>A</p><p>B</p></div> into one line instead of two.
-  const BLOCK_TAGS = new Set([
-    "h1",
-    "h2",
-    "h3",
-    "h4",
-    "h5",
-    "h6",
-    "p",
-    "li",
-    "blockquote",
-    "pre",
-    "figcaption",
-  ]);
-
-  // Returns true if any ancestor of the element is itself one of the BLOCK_TAGS.
-  // This identifies nested blocks (e.g. <li> inside <li>'s <ul>, or <p> inside <blockquote>)
-  // whose text is already included in the ancestor's .text — so we skip them to avoid duplication.
-  function isNestedInsideBlock(el: ReturnType<typeof body.querySelectorAll>[number]): boolean {
-    let node = el.parentNode;
-    while (node) {
-      // .toLowerCase() makes the check robust regardless of the node-html-parser version's rawTagName casing.
-      if (node.rawTagName && BLOCK_TAGS.has(node.rawTagName.toLowerCase())) return true;
-      node = node.parentNode;
-    }
-    return false;
-  }
-
-  const blocks = body.querySelectorAll("h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,figcaption");
   // Keep only top-level selected blocks; a block's .text already includes nested content.
-  const topLevel = blocks.filter((b) => !isNestedInsideBlock(b));
+  const topLevel = topLevelBlocks(body);
   const parts = (topLevel.length ? topLevel.map((b) => b.text) : [body.text])
     .map((t) => t.replace(/\s+/g, " ").trim())
     .filter(Boolean);
@@ -66,11 +82,14 @@ export function extractChapterText(
   bytes: Uint8Array,
   href: string,
   opts: ReadOptions,
+  anchor?: string,
+  nextAnchor?: string,
 ): ChapterTextSlice {
   const files = unzipSync(bytes);
   const entry = files[href];
   if (!entry) throw new Error(`epub: missing entry ${href}`);
-  const full = htmlToText(strFromU8(entry));
+  const xhtml = strFromU8(entry);
+  const full = anchor ? sliceTextByAnchor(xhtml, anchor, nextAnchor) : htmlToText(xhtml);
   const offset = Math.max(0, opts.offset ?? 0);
   const maxChars = Math.max(1, opts.maxChars ?? DEFAULT_MAX_CHARS);
   const slice = full.slice(offset, offset + maxChars);

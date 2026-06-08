@@ -1,6 +1,21 @@
+import { strToU8, zipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 import { extractBookText, extractChapterText, htmlToText } from "./content";
 import { makeFixtureEpub } from "./fixture";
+
+function anchorEpub(): Uint8Array {
+  const big = `<html><body>
+<p>封面无关文字</p>
+<p><span id="a1">第1章 标题</span></p>
+<p>第一章正文段落。</p>
+<p><span id="a2">第2章 标题</span></p>
+<p>第二章正文段落。</p>
+</body></html>`;
+  return zipSync({
+    mimetype: [strToU8("application/epub+zip"), { level: 0 }],
+    "big.xhtml": strToU8(big),
+  });
+}
 
 describe("htmlToText", () => {
   it("joins block text with newlines and collapses whitespace", () => {
@@ -77,5 +92,29 @@ describe("extractBookText", () => {
       maxChars: 100_000,
     });
     expect(r.text).toContain("Hello world.");
+  });
+});
+
+describe("extractChapterText anchor slicing", () => {
+  it("slices [anchor, nextAnchor) — first chapter", () => {
+    const r = extractChapterText(anchorEpub(), "big.xhtml", {}, "a1", "a2");
+    expect(r.text).toBe("第1章 标题\n第一章正文段落。");
+    expect(r.hasMore).toBe(false);
+  });
+
+  it("slices to end of file — last chapter (no nextAnchor)", () => {
+    const r = extractChapterText(anchorEpub(), "big.xhtml", {}, "a2");
+    expect(r.text).toBe("第2章 标题\n第二章正文段落。");
+  });
+
+  it("anchor undefined ⇒ whole-file behavior (unchanged)", () => {
+    const r = extractChapterText(anchorEpub(), "big.xhtml", {});
+    expect(r.text).toContain("封面无关文字");
+    expect(r.text).toContain("第二章正文段落。");
+  });
+
+  it("missing anchor element ⇒ degrades to whole file (no throw)", () => {
+    const r = extractChapterText(anchorEpub(), "big.xhtml", {}, "nope");
+    expect(r.text).toContain("封面无关文字");
   });
 });
