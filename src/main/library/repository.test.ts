@@ -21,7 +21,9 @@ import {
   listRecentlyRead,
   reorderBooks,
   resolveChapterByHref,
+  resolveChapter,
   updateBook,
+  CURRENT_PARSER_VERSION,
 } from "@main/library/repository";
 import { saveProgress } from "@main/library/progress";
 import { storedBookPath } from "@main/library/book-files";
@@ -384,6 +386,63 @@ describe("listRecentlyRead (#48)", () => {
     expect(r.map((x) => x.id)).toEqual(["d", "c", "b"]);
     expect(r[0]).toMatchObject({ percent: 0.9, lastReadAt: 4000 });
     expect(r[2]!.percent).toBeNull();
+  });
+});
+
+function anchorBook(): Uint8Array {
+  const { strToU8, zipSync } = require("fflate") as typeof import("fflate");
+  return zipSync({
+    mimetype: [strToU8("application/epub+zip"), { level: 0 }],
+    "META-INF/container.xml": strToU8(`<?xml version="1.0"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>
+</container>`),
+    "OEBPS/content.opf": strToU8(`<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="2.0" unique-identifier="bid">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="bid">urn:uuid:anchor-book</dc:identifier><dc:title>Anchor Book</dc:title></metadata>
+  <manifest>
+    <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
+    <item id="t0" href="t0.xhtml" media-type="application/xhtml+xml"/>
+    <item id="t1" href="t1.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine toc="ncx"><itemref idref="t0"/><itemref idref="t1"/></spine>
+</package>`),
+    "OEBPS/toc.ncx": strToU8(`<?xml version="1.0" encoding="utf-8"?>
+<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><navMap>
+  <navPoint id="n1"><navLabel><text>第1章</text></navLabel><content src="t0.xhtml#a1"/></navPoint>
+  <navPoint id="n2"><navLabel><text>第2章</text></navLabel><content src="t0.xhtml#a2"/></navPoint>
+  <navPoint id="n3"><navLabel><text>第3章</text></navLabel><content src="t1.xhtml#b1"/></navPoint>
+</navMap></ncx>`),
+    "OEBPS/t0.xhtml": strToU8(
+      `<html><body><p><span id="a1">第1章</span></p><p><span id="a2">第2章</span></p></body></html>`,
+    ),
+    "OEBPS/t1.xhtml": strToU8(`<html><body><p><span id="b1">第3章</span></p></body></html>`),
+  });
+}
+
+describe("importEpubBook builds chapters from TOC entries (anchors)", () => {
+  it("creates one chapter row per TOC entry with anchor", async () => {
+    const db = freshDb();
+    const book = await importBook(db, { bytes: anchorBook() });
+    const rows = db
+      .select()
+      .from(chapters)
+      .where(eq(chapters.bookId, book.id))
+      .orderBy(asc(chapters.orderIndex))
+      .all();
+    expect(rows.map((r) => [r.title, r.href, r.anchor])).toEqual([
+      ["第1章", "OEBPS/t0.xhtml", "a1"],
+      ["第2章", "OEBPS/t0.xhtml", "a2"],
+      ["第3章", "OEBPS/t1.xhtml", "b1"],
+    ]);
+    expect(book.parserVersion).toBe(CURRENT_PARSER_VERSION);
+  });
+
+  it("resolveChapter matches exact (href, anchor)", async () => {
+    const db = freshDb();
+    const book = await importBook(db, { bytes: anchorBook() });
+    const ch = resolveChapter(db, book.id, "OEBPS/t0.xhtml", "a2");
+    expect(ch?.title).toBe("第2章");
   });
 });
 

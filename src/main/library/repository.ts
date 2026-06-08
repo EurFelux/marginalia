@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import { parseEpub, type TocNode } from "@marginalia/epub-parser";
 import { parsePdf, renderPageImage } from "@marginalia/pdf-parser";
 import type { DB } from "@main/db/client";
@@ -9,6 +9,41 @@ import { createLogger } from "@main/logger";
 
 const log = createLogger("library");
 
+/** 解析器/索引结构版本。结构变更（如锚点级章节）时 +1，触发存量书惰性重建。 */
+export const CURRENT_PARSER_VERSION = 1;
+
+interface ChapterSeed {
+  href: string;
+  anchor: string | null;
+  title: string | null;
+}
+
+/** 扁平化 TOC（DFS 保序）为章节种子；按 (href, anchor) 去重保首个（防 TOC 重复条目撞唯一约束）。 */
+function chapterSeedsFromToc(toc: TocNode[]): ChapterSeed[] {
+  const seeds: ChapterSeed[] = [];
+  const seen = new Set<string>();
+  const walk = (nodes: TocNode[]): void => {
+    for (const n of nodes) {
+      const anchor = n.anchor ?? null;
+      const key = `${n.href}|${anchor ?? ""}`;
+      if (n.href && !seen.has(key)) {
+        seen.add(key);
+        seeds.push({ href: n.href, anchor, title: n.label || null });
+      }
+      if (n.children) walk(n.children);
+    }
+  };
+  walk(toc);
+  return seeds;
+}
+
+/** 章节种子：优先 TOC 条目（锚点级）；无 TOC 退回 spine 文件顺序（anchor=null, title=null）。 */
+function chapterSeedsFor(parsed: { toc: TocNode[]; spine: { href: string }[] }): ChapterSeed[] {
+  const fromToc = chapterSeedsFromToc(parsed.toc);
+  if (fromToc.length > 0) return fromToc;
+  return parsed.spine.map((s) => ({ href: s.href, anchor: null, title: null }));
+}
+
 export interface ImportInput {
   bytes: Uint8Array;
   /** 原始文件名（不含路径）。PDF 元数据缺 Title 时回退为书名（去扩展名）。 */
@@ -16,14 +51,6 @@ export interface ImportInput {
 }
 export type BookRow = typeof books.$inferSelect;
 export type ChapterRow = typeof chapters.$inferSelect;
-
-function tocLabelByHref(toc: TocNode[], acc = new Map<string, string>()): Map<string, string> {
-  for (const n of toc) {
-    if (n.href && !acc.has(n.href)) acc.set(n.href, n.label);
-    if (n.children) tocLabelByHref(n.children, acc);
-  }
-  return acc;
-}
 
 /** 魔数嗅探（不信文件后缀）：%PDF- → pdf；PK（zip 头）→ epub；其余诚实报错。 */
 export function detectFormat(bytes: Uint8Array): "epub" | "pdf" {
@@ -68,17 +95,18 @@ function importEpubBook(db: DB, bytes: Uint8Array): BookRow {
         toc: parsed.toc,
         // 新导入排最前（spec §3）：自引用标量子查询，空库 coalesce(NULL,1)-1 = 0。
         position: sql`(coalesce((select min(position) from books), 1) - 1)`,
+        parserVersion: CURRENT_PARSER_VERSION,
       })
       .run();
 
-    const labels = tocLabelByHref(parsed.toc);
-    parsed.spine.forEach((item, index) => {
+    chapterSeedsFor(parsed).forEach((seed, index) => {
       tx.insert(chapters)
         .values({
           bookId: id,
-          href: item.href,
+          href: seed.href,
+          anchor: seed.anchor,
           orderIndex: index,
-          title: labels.get(item.href) ?? null,
+          title: seed.title,
         })
         .run();
     });
@@ -119,6 +147,7 @@ async function importPdfBook(db: DB, bytes: Uint8Array, fileName?: string): Prom
         hasTextLayer: parsed.hasTextLayer,
         // 新导入排最前（spec §3）：自引用标量子查询，空库 coalesce(NULL,1)-1 = 0。
         position: sql`(coalesce((select min(position) from books), 1) - 1)`,
+        parserVersion: CURRENT_PARSER_VERSION,
       })
       .run();
 
@@ -219,6 +248,26 @@ export function resolveChapterByHref(db: DB, bookId: string, href: string): Chap
     .select()
     .from(chapters)
     .where(and(eq(chapters.bookId, bookId), eq(chapters.href, href)))
+    .get();
+}
+
+/** 按 (href, anchor) 精确解析章节行；anchor 为 null 时匹配 anchor IS NULL 行。 */
+export function resolveChapter(
+  db: DB,
+  bookId: string,
+  href: string,
+  anchor: string | null,
+): ChapterRow | undefined {
+  return db
+    .select()
+    .from(chapters)
+    .where(
+      and(
+        eq(chapters.bookId, bookId),
+        eq(chapters.href, href),
+        anchor === null ? isNull(chapters.anchor) : eq(chapters.anchor, anchor),
+      ),
+    )
     .get();
 }
 
