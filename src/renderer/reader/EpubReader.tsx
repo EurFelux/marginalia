@@ -59,6 +59,8 @@ export function EpubReader({ bookId, chapters }: Props) {
   // 防循环：记录最近一次「由滚动得出的顶部章 id」；跳章 effect 只在目标≠它时滚动。
   const topChapterIdRef = useRef<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 进度精确恢复只做一次（每次开书/换书重置）；防 progress 缓存更新触发的重复恢复。
+  const restoredRef = useRef(false);
 
   const bytes = useQuery({
     queryKey: qk.bookBytes(bookId),
@@ -106,8 +108,24 @@ export function EpubReader({ bookId, chapters }: Props) {
       // 换书/重解析时丢弃挂起的进度保存与滚动章快照，避免把上一本的状态带到下一本。
       if (saveTimer.current) clearTimeout(saveTimer.current);
       topChapterIdRef.current = null;
+      restoredRef.current = false;
     };
   }, [bytes.data]);
+
+  // 把锚点级 CFI 解析回 section 内元素并精确滚到它（恢复 / 标注跳转复用）。CFI → section index →
+  // 等 iframe 就绪后用 rangeFromCfi 定位元素的 offsetTop。失败退化为 section 顶（scrollToSectionOffset 内置）。
+  const scrollToCfi = (cfi: string) => {
+    if (!book) return;
+    const idx = book.indexOfCfi(cfi);
+    if (idx < 0) return;
+    vRef.current?.scrollToSectionOffset(idx, (doc) => {
+      const node = book.rangeFromCfi(cfi, doc)?.startContainer ?? null;
+      const el = node ? (node.nodeType === 1 ? (node as Element) : node.parentElement) : null;
+      return el
+        ? el.getBoundingClientRect().top - doc.documentElement.getBoundingClientRect().top
+        : null;
+    });
+  };
 
   // 跳章：currentChapterId 变化（ChapterList 点击）→ 滚到对应 spine index（锚点级）。
   useEffect(() => {
@@ -121,7 +139,7 @@ export function EpubReader({ bookId, chapters }: Props) {
     else vRef.current?.scrollToIndex(idx);
   }, [book, currentChapterId, chapters]);
 
-  // 恢复初始位置：进度 locator → index（仅在 book+progress 就绪时算一次初值）。
+  // 恢复初始位置：进度 locator → index（initialIndex 让 VirtualDocs 首挂即落在正确 section，免闪开头）。
   const initialIndex =
     book && progress.data?.locator != null
       ? (() => {
@@ -129,6 +147,17 @@ export function EpubReader({ bookId, chapters }: Props) {
           return i >= 0 ? i : 0;
         })()
       : 0;
+
+  // 精确恢复：initialIndex 只到 section 顶，对「一个 section 几十章」的书（如锚点切章的书）等于回开头；
+  // 故开书后一次性把锚点级 CFI 解析回 section 内元素、精确滚到上次位置。
+  useEffect(() => {
+    if (!book || progress.isLoading || restoredRef.current) return;
+    restoredRef.current = true;
+    const locator = progress.data?.locator;
+    if (locator != null) scrollToCfi(locator);
+    // scrollToCfi 依赖 book/vRef（稳定/ref）；仅 book 就绪时跑一次（restoredRef 守）。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [book, progress.isLoading]);
 
   const onSelect = (e: SectionSelectEvent) => {
     const cfiRange = book ? book.cfiFromRange(e.index, e.range) : null;
@@ -285,11 +314,11 @@ export function EpubReader({ bookId, chapters }: Props) {
       .catch((err: unknown) => log.warn("open external failed", err));
   };
 
-  // 侧栏列表点击 → 滚到该标注所在 section（best-effort：稍后把 mark 滚入视口）。
+  // 侧栏列表点击 → 精确滚到该标注（锚点级：CFI 解析回元素，不再只到 section 顶）。
   useEffect(() => {
     if (!book || !scrollCommand) return;
-    const idx = book.indexOfCfi(scrollCommand.locator);
-    if (idx >= 0) vRef.current?.scrollToIndex(idx);
+    scrollToCfi(scrollCommand.locator);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [book, scrollCommand]);
 
   // 滚动即放弃：工具栏/样式栏锚定于选区视口坐标，滚动后位置失真，故关样式栏并清选区。

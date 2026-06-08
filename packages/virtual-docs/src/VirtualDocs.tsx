@@ -18,6 +18,11 @@ export interface VirtualDocsHandle {
   scrollToIndex: (index: number) => void;
   /** 滚到第 index 个 section 内 id===anchorId 的元素处（先滚 section，待 iframe 就绪后按其 offsetTop 精确定位）。 */
   scrollToAnchor: (index: number, anchorId: string) => void;
+  /**
+   * 滚到第 index 个 section 内由 resolveTopPx(doc) 算出的像素偏移处（doc = 该 section 的 iframe 文档；
+   * 返回 null 视为「目标未就绪」继续重试，到时退化为 section 顶）。供 CFI 等任意元素定位（如进度恢复）。
+   */
+  scrollToSectionOffset: (index: number, resolveTopPx: (doc: Document) => number | null) => void;
   /** 对所有在挂 section 重跑 decorate（标注增删改后调用）。 */
   redecorate: () => void;
 }
@@ -77,42 +82,49 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
   const vRef = useRef<VirtuosoHandle | null>(null);
   const [decorateNonce, setDecorateNonce] = useState(0);
   const [scrollerReady, setScrollerReady] = useState(0);
-  useImperativeHandle(
-    ref,
-    () => ({
-      scrollToIndex: (index: number) => vRef.current?.scrollToIndex({ index, align: "start" }),
-      scrollToAnchor: (index: number, anchorId: string) => {
-        vRef.current?.scrollToIndex({ index, align: "start" });
-        let tries = 0;
-        const tick = () => {
-          const scroller = scrollerEl.current;
-          const frame = scroller?.querySelector<HTMLIFrameElement>(
-            `[data-section-index="${index}"] iframe`,
-          );
-          const doc = frame?.contentDocument;
-          const el = doc?.getElementById(anchorId);
-          // 就绪判定：iframe 已加载、锚点元素存在、文档已有高度（排版完成）。
-          if (el && doc && doc.documentElement.scrollHeight > 0) {
-            const offset =
-              el.getBoundingClientRect().top - doc.documentElement.getBoundingClientRect().top;
+  useImperativeHandle(ref, () => {
+    // 先滚到 section，bounded retry（≤20×50ms=1s）等 iframe 就绪后按 resolveTopPx(doc) 返回的像素
+    // 偏移精确定位；resolve 返回 null=未就绪继续重试，到时退化为 section 顶（不卡死、不白屏）。
+    const scrollToSectionOffset = (
+      index: number,
+      resolveTopPx: (doc: Document) => number | null,
+    ) => {
+      vRef.current?.scrollToIndex({ index, align: "start" });
+      let tries = 0;
+      const tick = () => {
+        const frame = scrollerEl.current?.querySelector<HTMLIFrameElement>(
+          `[data-section-index="${index}"] iframe`,
+        );
+        const doc = frame?.contentDocument;
+        if (doc && doc.documentElement.scrollHeight > 0) {
+          const offset = resolveTopPx(doc);
+          if (offset != null) {
             vRef.current?.scrollToIndex({ index, align: "start", offset });
             return;
           }
-          if (tries++ < 20)
-            setTimeout(tick, 50); // 上限 1s，到时放弃（已滚到 section 顶，不白屏）
-          else
-            console.warn(
-              "[virtual-docs] scrollToAnchor: anchor not ready, fell back to section top",
-              index,
-              anchorId,
-            );
-        };
-        setTimeout(tick, 50);
-      },
+        }
+        if (tries++ < 20) setTimeout(tick, 50);
+        else
+          console.warn(
+            "[virtual-docs] scrollToSectionOffset: target not ready, fell back to section top",
+            index,
+          );
+      };
+      setTimeout(tick, 50);
+    };
+    return {
+      scrollToIndex: (index: number) => vRef.current?.scrollToIndex({ index, align: "start" }),
+      scrollToAnchor: (index: number, anchorId: string) =>
+        scrollToSectionOffset(index, (doc) => {
+          const el = doc.getElementById(anchorId);
+          return el
+            ? el.getBoundingClientRect().top - doc.documentElement.getBoundingClientRect().top
+            : null;
+        }),
+      scrollToSectionOffset,
       redecorate: () => setDecorateNonce((n) => n + 1),
-    }),
-    [],
-  );
+    };
+  }, []);
 
   const heightCache = useRef<Map<number, number>>(new Map());
   // 已 unload 的 section 集：避免重复 unload；section 重新进入保留区时移除（届时会 reload）。
