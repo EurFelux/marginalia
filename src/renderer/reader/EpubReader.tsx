@@ -108,14 +108,16 @@ export function EpubReader({ bookId, chapters }: Props) {
     };
   }, [bytes.data]);
 
-  // 跳章：currentChapterId 变化（ChapterList 点击）→ 滚到对应 spine index。
+  // 跳章：currentChapterId 变化（ChapterList 点击）→ 滚到对应 spine index（锚点级）。
   useEffect(() => {
     if (!book || currentChapterId == null) return;
     if (currentChapterId === topChapterIdRef.current) return; // 由滚动引起的同步，不回滚
     const ch = chapters.find((c) => c.id === currentChapterId);
     if (!ch) return;
     const idx = book.indexOfHref(ch.href);
-    if (idx >= 0) vRef.current?.scrollToIndex(idx);
+    if (idx < 0) return;
+    if (ch.anchor) vRef.current?.scrollToAnchor(idx, ch.anchor);
+    else vRef.current?.scrollToIndex(idx);
   }, [book, currentChapterId, chapters]);
 
   // 恢复初始位置：进度 locator → index（仅在 book+progress 就绪时算一次初值）。
@@ -212,6 +214,25 @@ export function EpubReader({ bookId, chapters }: Props) {
     vRef.current?.redecorate();
   }, [annotations.data]);
 
+  const onInternalLink = ({ index, href }: { index: number; href: string }) => {
+    if (!book) return;
+    const hash = href.indexOf("#");
+    const anchor = hash >= 0 ? href.slice(hash + 1) : "";
+    // 纯 fragment（#x，无路径）→ 当前 section 内；带路径 → resolve 到目标 section。
+    const targetIdx = href.startsWith("#") ? index : book.indexOfHref(href);
+    if (targetIdx < 0) {
+      log.warn(`internal link target not found: ${href}`);
+      return;
+    }
+    if (anchor) vRef.current?.scrollToAnchor(targetIdx, anchor);
+    else vRef.current?.scrollToIndex(targetIdx);
+  };
+  const onExternalLink = (url: string) => {
+    void window.api.app
+      .openExternal({ url })
+      .catch((err: unknown) => log.warn("open external failed", err));
+  };
+
   // 侧栏列表点击 → 滚到该标注所在 section（best-effort：稍后把 mark 滚入视口）。
   useEffect(() => {
     if (!book || !scrollCommand) return;
@@ -274,6 +295,8 @@ export function EpubReader({ bookId, chapters }: Props) {
         onHighlightHover={hoverHighlight}
         onHighlightLeave={leaveHighlight}
         onContentMouseDown={onContentMouseDown}
+        onInternalLink={onInternalLink}
+        onExternalLink={onExternalLink}
       />
     </div>
   );

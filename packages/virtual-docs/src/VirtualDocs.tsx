@@ -16,6 +16,8 @@ const KEEP_DISTANCE = 5;
 
 export interface VirtualDocsHandle {
   scrollToIndex: (index: number) => void;
+  /** 滚到第 index 个 section 内 id===anchorId 的元素处（先滚 section，待 iframe 就绪后按其 offsetTop 精确定位）。 */
+  scrollToAnchor: (index: number, anchorId: string) => void;
   /** 对所有在挂 section 重跑 decorate（标注增删改后调用）。 */
   redecorate: () => void;
 }
@@ -41,6 +43,10 @@ export interface VirtualDocsProps {
   onHighlightHover?: (annoId: string, rect: ViewportRect) => void;
   onHighlightLeave?: () => void;
   onContentMouseDown?: () => void;
+  /** 点 iframe 内站内 <a>（相对路径 / #fragment）时回调；消费方据此 resolve 到 section+anchor 跳转。 */
+  onInternalLink?: (e: { index: number; href: string }) => void;
+  /** 点 iframe 内外链（http/https/mailto）时回调；消费方开系统浏览器。 */
+  onExternalLink?: (url: string) => void;
   /** 某 section 离开「active range ± KEEP_DISTANCE」时回调一次，供消费方释放其资源。 */
   onUnloadSection?: (index: number) => void;
   /** 透传给底层 Virtuoso 的 scroller 根元素的 className（如隐藏原生滚动条）。 */
@@ -61,6 +67,8 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
     onHighlightHover,
     onHighlightLeave,
     onContentMouseDown,
+    onInternalLink,
+    onExternalLink,
     onUnloadSection,
     className,
   },
@@ -73,6 +81,27 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
     ref,
     () => ({
       scrollToIndex: (index: number) => vRef.current?.scrollToIndex({ index, align: "start" }),
+      scrollToAnchor: (index: number, anchorId: string) => {
+        vRef.current?.scrollToIndex({ index, align: "start" });
+        let tries = 0;
+        const tick = () => {
+          const scroller = scrollerEl.current;
+          const frame = scroller?.querySelector<HTMLIFrameElement>(
+            `[data-section-index="${index}"] iframe`,
+          );
+          const doc = frame?.contentDocument;
+          const el = doc?.getElementById(anchorId);
+          // 就绪判定：iframe 已加载、锚点元素存在、文档已有高度（排版完成）。
+          if (el && doc && doc.documentElement.scrollHeight > 0) {
+            const offset =
+              el.getBoundingClientRect().top - doc.documentElement.getBoundingClientRect().top;
+            vRef.current?.scrollToIndex({ index, align: "start", offset });
+            return;
+          }
+          if (tries++ < 20) setTimeout(tick, 50); // 上限 1s，到时放弃（已滚到 section 顶，不白屏）
+        };
+        setTimeout(tick, 50);
+      },
       redecorate: () => setDecorateNonce((n) => n + 1),
     }),
     [],
@@ -165,6 +194,8 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
         onHighlightLeave={onHighlightLeave}
         decorateNonce={decorateNonce}
         onContentMouseDown={onContentMouseDown}
+        onInternalLink={onInternalLink}
+        onExternalLink={onExternalLink}
         estimatedHeight={estimateHeight(heightCache.current, index, DEFAULT_ESTIMATE)}
         onMeasured={onMeasured}
         registerSection={registerSection}
@@ -182,6 +213,8 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
       onHighlightLeave,
       decorateNonce,
       onContentMouseDown,
+      onInternalLink,
+      onExternalLink,
       onMeasured,
       registerSection,
       unregisterSection,
@@ -225,6 +258,8 @@ function LazySection({
   onHighlightLeave,
   decorateNonce,
   onContentMouseDown,
+  onInternalLink,
+  onExternalLink,
   estimatedHeight,
   onMeasured,
   registerSection,
@@ -241,6 +276,8 @@ function LazySection({
   onHighlightLeave?: () => void;
   decorateNonce?: number;
   onContentMouseDown?: () => void;
+  onInternalLink?: (e: { index: number; href: string }) => void;
+  onExternalLink?: (url: string) => void;
   estimatedHeight?: number;
   onMeasured?: (index: number, height: number) => void;
   registerSection: (index: number, el: HTMLElement) => void;
@@ -286,6 +323,8 @@ function LazySection({
           onHighlightLeave={onHighlightLeave}
           decorateNonce={decorateNonce}
           onContentMouseDown={onContentMouseDown}
+          onInternalLink={onInternalLink}
+          onExternalLink={onExternalLink}
           estimatedHeight={estimatedHeight}
           onMeasured={onMeasured}
         />
