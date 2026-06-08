@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { AnnotationStyle } from "@shared/annotations";
-import type { SummaryModel } from "@shared/preferences";
+import { DEFAULT_STEP_LIMIT, type SummaryModel } from "@shared/preferences";
 import type { ReaderLayout, ReaderPrefs } from "@renderer/types";
 import { persistPreference } from "@renderer/store/persist-preference";
 
@@ -17,6 +17,8 @@ interface PrefsState {
   layout: ReaderLayout;
   /** PDF 缩放倍率（相对适宽）；落盘记忆，重启恢复。存倍率非档位索引（见 @shared/preferences）。 */
   pdfZoom: number;
+  /** AI 对话 agent 循环的多步上限；0 = 不限制。落盘记忆，重启恢复。 */
+  stepLimit: number;
 }
 interface PrefsActions {
   setAutoSummarize: (v: boolean) => void;
@@ -25,6 +27,7 @@ interface PrefsActions {
   setLastHighlightStyle: (style: AnnotationStyle) => void;
   updateLayout: (patch: Partial<ReaderLayout>) => void;
   setPdfZoom: (v: number) => void;
+  setStepLimit: (v: number) => void;
 }
 
 export const PREFS_INITIAL: PrefsState = {
@@ -34,6 +37,7 @@ export const PREFS_INITIAL: PrefsState = {
   lastHighlightStyle: "yellow",
   layout: { sidebarOpen: true, panelOpen: false, headerOpen: true },
   pdfZoom: 1,
+  stepLimit: DEFAULT_STEP_LIMIT,
 };
 
 /**
@@ -69,5 +73,9 @@ export const usePrefsStore = create<PrefsState & PrefsActions>()((set) => ({
   setPdfZoom: (pdfZoom) => {
     persistPreference({ key: "pdfZoom", value: pdfZoom });
     set({ pdfZoom });
+  },
+  setStepLimit: (stepLimit) => {
+    persistPreference({ key: "stepLimit", value: stepLimit });
+    set({ stepLimit });
   },
 }));
