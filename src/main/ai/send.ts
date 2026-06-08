@@ -21,6 +21,7 @@ import { nameConversation } from "@main/chat/conversation-title";
 import { textOfParts } from "@main/ai/prompt";
 import { t } from "@main/i18n";
 import { type SendInput } from "@shared/chat";
+import { DEFAULT_STEP_LIMIT } from "@shared/preferences";
 import { createLogger } from "@main/logger";
 export type { SendInput };
 
@@ -32,7 +33,7 @@ export interface SendDeps {
   resolveModel: () => ResolvedModel;
   /** 摘要模型解析器（auto naming 用；章节/全书摘要在 makeSummaryDeps 注入同一解析器）。不回退聊天模型——未配置则 naming/摘要跳过。 */
   resolveSummaryModel: () => ResolvedModel;
-  /** agent 多步上限（默认 5）。 */
+  /** agent 多步上限（默认 DEFAULT_STEP_LIMIT=10）；0 = 不限制（永不主动刹车，靠模型自然停止 + abort）。 */
   stepLimit?: number;
 }
 
@@ -119,12 +120,13 @@ export function runSend(
   const tools = createReadingTools({ db, bookId: input.bookId, loadBytes, imageToolResults });
   // 从 streamText 自身的 onFinish 旁路捕获跨步聚合用量（toUIMessageStream 的 onFinish 不带 usage）。
   let capturedUsage: LanguageModelUsage | undefined;
+  const limit = stepLimit ?? DEFAULT_STEP_LIMIT; // ?? 不用 ||——保住合法的 0（不限制）
   const result = streamText({
     model: resolved.model,
     system: systemPrompt,
     messages,
     tools,
-    stopWhen: stepCountIs(stepLimit ?? 5),
+    stopWhen: limit === 0 ? () => false : stepCountIs(limit),
     abortSignal: opts?.abortSignal,
     onFinish: ({ totalUsage }) => {
       capturedUsage = totalUsage;
