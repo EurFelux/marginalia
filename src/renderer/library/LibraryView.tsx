@@ -36,7 +36,10 @@ export function LibraryView() {
   const qc = useQueryClient();
   const openBook = useNavigationStore((s) => s.openBook);
   const openSettings = useSettingsStore((s) => s.setOpen);
-  const books = useQuery({ queryKey: qk.library, queryFn: () => window.api.library.list() });
+  const books = useQuery({
+    queryKey: qk.library,
+    queryFn: () => window.api.library.list(),
+  });
 
   // 按钮导入与拖拽导入收敛到同一批量 mutation：顺序逐本导入，收集成功的书与失败项。
   const importBooks = useMutation({
@@ -112,7 +115,9 @@ export function LibraryView() {
     onError: (e) => {
       void qc.invalidateQueries({ queryKey: qk.library });
       toast.error(
-        t("library.reorderFailed", "排序保存失败：{{error}}", { error: (e as Error).message }),
+        t("library.reorderFailed", "排序保存失败：{{error}}", {
+          error: (e as Error).message,
+        }),
         { closeButton: true, duration: Infinity },
       );
     },
@@ -149,9 +154,10 @@ export function LibraryView() {
     }
     if (ignored.length > 0) {
       // 列表分隔符按当前 UI 语言本地化（中文顿号 / 英文逗号），勿硬编码。
-      const names = new Intl.ListFormat(i18n.language, { style: "narrow", type: "unit" }).format(
-        ignored,
-      );
+      const names = new Intl.ListFormat(i18n.language, {
+        style: "narrow",
+        type: "unit",
+      }).format(ignored);
       toast.warning(
         t("library.ignored", "已忽略 {{count}} 个不支持的文件：{{names}}", {
           count: ignored.length,
@@ -161,7 +167,10 @@ export function LibraryView() {
     }
     for (const f of r.failed) {
       toast.error(
-        t("library.importFailed", "{{name}} 导入失败：{{error}}", { name: f.name, error: f.error }),
+        t("library.importFailed", "{{name}} 导入失败：{{error}}", {
+          name: f.name,
+          error: f.error,
+        }),
         { closeButton: true, duration: Infinity },
       );
     }
@@ -170,7 +179,10 @@ export function LibraryView() {
   // 拖拽落点：过滤受支持书籍格式 → 取路径 → 批量导入；忽略项进 toast。
   const onFiles = (files: File[]) => {
     const { books, ignored } = pickBookFiles(files);
-    const items = books.map((f) => ({ filePath: window.api.library.pathForFile(f), name: f.name }));
+    const items = books.map((f) => ({
+      filePath: window.api.library.pathForFile(f),
+      name: f.name,
+    }));
     void runImport(
       items,
       ignored.map((f) => f.name),
@@ -189,7 +201,7 @@ export function LibraryView() {
   return (
     <div
       {...rootHandlers}
-      className="flex h-screen flex-col bg-background font-sans text-foreground"
+      className="flex h-screen flex-col bg-background font-sans text-foreground overflow-hidden"
     >
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-6">
         <h1 className="font-serif text-xl font-semibold">{t("library.title", "Marginalia")}</h1>
@@ -212,7 +224,7 @@ export function LibraryView() {
         </div>
       </header>
 
-      <ScrollArea className="flex-1">
+      <ScrollArea className="min-h-0 flex-1">
         <main className="p-6">
           <RecentlyReadShelf onOpen={openBook} />
           {books.isPending && (
