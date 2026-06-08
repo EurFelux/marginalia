@@ -273,9 +273,13 @@ export function EpubReader({ bookId, chapters }: Props) {
 
     const cfi = topElementCfi(index);
     if (chId) {
+      // 锚点章 = 整 spine 文件里的一小片（正文从锚点切到下一锚点），整章一次 readChapterText 即读全 →
+      // offset 从 0 起。section 相对 offset（= 在整个大文件里的字符位置）对锚点章无意义：会远超章长、
+      // 取到空文本，使「读我当前位置」的 AI 工具拿不到内容。无锚点的整文件章仍用 section 相对 offset（正确）。
       const sectionLength = book.textLengthAtIndex(index);
-      const offset =
-        chapterTextOffsetBeforeIndex(chId, index) + Math.floor(sectionLength * meta.scrollRatio);
+      const offset = ch?.anchor
+        ? 0
+        : chapterTextOffsetBeforeIndex(chId, index) + Math.floor(sectionLength * meta.scrollRatio);
       setReadingContext({
         format: "epub",
         chapterId: chId,
