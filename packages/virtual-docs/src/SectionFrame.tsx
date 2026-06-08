@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { toViewportRect, type ViewportRect } from "./geometry";
+import { classifyLink } from "./link-target";
 
 export interface SectionSelectEvent {
   index: number;
@@ -27,6 +28,10 @@ interface Props {
   decorateNonce?: number;
   /** iframe 内任意 mousedown 时回调；同源 iframe 内部事件不冒泡到父文档，消费方借此关闭浮层。 */
   onContentMouseDown?: () => void;
+  /** 点 iframe 内站内 <a>（相对路径 / #fragment）时回调；消费方据此 resolve 到 section+anchor 跳转。 */
+  onInternalLink?: (e: { index: number; href: string }) => void;
+  /** 点 iframe 内外链（http/https/mailto）时回调；消费方开系统浏览器。 */
+  onExternalLink?: (url: string) => void;
   /** 就绪前的占位高度（来自 VirtualDocs 测高缓存）；避免就绪前 0/默认高度造成跳变。 */
   estimatedHeight?: number;
   /** 内容就绪、测得稳定高度后回调（index, heightPx），供 VirtualDocs 写测高缓存。 */
@@ -61,6 +66,8 @@ export function SectionFrame({
   onContentMouseDown,
   estimatedHeight,
   onMeasured,
+  onInternalLink,
+  onExternalLink,
 }: Props) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   // 用 ref 持最新回调，避免回调身份变化触发 effect 重挂
@@ -74,6 +81,8 @@ export function SectionFrame({
     onContentMouseDown,
     estimatedHeight,
     onMeasured,
+    onInternalLink,
+    onExternalLink,
   });
   cbRef.current = {
     onSelect,
@@ -85,6 +94,8 @@ export function SectionFrame({
     onContentMouseDown,
     estimatedHeight,
     onMeasured,
+    onInternalLink,
+    onExternalLink,
   };
   const docRef = useRef<Document | null>(null);
 
@@ -175,6 +186,20 @@ export function SectionFrame({
       // relatedTarget 为 null = 离开 iframe 文档边界。
       if (e.relatedTarget === null) reportLeaveIfNeeded();
     };
+    const onLinkClick = (e: MouseEvent) => {
+      const a = (e.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!a) return;
+      // 取原始 href 属性（非 a.href——后者会被 about:srcdoc 解析成绝对无效地址）。
+      const raw = a.getAttribute("href") ?? "";
+      const target = classifyLink(raw);
+      if (!target) {
+        e.preventDefault(); // 裸 "#"：阻止默认导航即可，不白屏
+        return;
+      }
+      e.preventDefault(); // 关键：阻止 iframe 自身导航（否则白屏）
+      if (target.type === "external") cbRef.current.onExternalLink?.(target.url);
+      else cbRef.current.onInternalLink?.({ index, href: target.href });
+    };
     const detach = () => {
       ro?.disconnect();
       ro = undefined;
@@ -191,6 +216,7 @@ export function SectionFrame({
       doc?.removeEventListener("mouseup", onMouseUp);
       doc?.removeEventListener("selectionchange", onSelChange);
       doc?.removeEventListener("click", onAnnoClick);
+      doc?.removeEventListener("click", onLinkClick);
       doc?.removeEventListener("mousedown", onContentDown);
       doc?.removeEventListener("mousemove", onContentMove);
       doc?.removeEventListener("mouseout", onContentOut);
@@ -241,6 +267,7 @@ export function SectionFrame({
       docRef.current = doc;
       cbRef.current.decorate?.(index, doc);
       doc.addEventListener("click", onAnnoClick);
+      doc.addEventListener("click", onLinkClick);
       doc.addEventListener("mousedown", onContentDown);
       doc.addEventListener("mousemove", onContentMove);
       doc.addEventListener("mouseout", onContentOut);
