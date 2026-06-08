@@ -3,6 +3,8 @@ import { appService } from "@main/app";
 import { readBookFile } from "@main/library/book-files";
 import { getBook } from "@main/library/repository";
 import { resolveAssistantModel, resolveSummaryModel } from "@main/ai/assistant-model";
+import { getPreference } from "@main/preferences/repository";
+import { DEFAULT_STEP_LIMIT } from "@shared/preferences";
 import type { DB } from "@main/db/client";
 import type { SummaryDeps } from "@main/ai/summary";
 import type { LoadBytes } from "@main/ai/tools";
@@ -24,7 +26,13 @@ export function makeSendDeps(): SendDeps {
   const db = getDb();
   const loadBytes = createLoadBytes(appService.getPath("booksDir"), db);
   const resolveModel = () => resolveAssistantModel(db);
-  return { db, loadBytes, resolveModel, resolveSummaryModel: () => resolveSummaryModel(db) };
+  return {
+    db,
+    loadBytes,
+    resolveModel,
+    resolveSummaryModel: () => resolveSummaryModel(db),
+    stepLimit: getPreference(db, "stepLimit") ?? DEFAULT_STEP_LIMIT,
+  };
 }
 
 /** 章摘懒生成所需依赖（供 content:generate-chapter-summary handler 用）。
