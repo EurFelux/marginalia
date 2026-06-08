@@ -5,6 +5,8 @@
 export interface TocNode {
   label: string;
   href: string;
+  /** 章内 #fragment（如 "filepos0000044175"）；仅当 TOC 条目带锚点时存在。无锚点时此键缺省。 */
+  anchor?: string;
   children?: TocNode[];
 }
 

@@ -17,6 +17,7 @@ export const tocNodeSchema: z.ZodType<TocNode> = z.lazy(() =>
   z.object({
     label: z.string(),
     href: z.string(),
+    anchor: z.string().optional(),
     children: z.array(tocNodeSchema).optional(),
   }),
 );

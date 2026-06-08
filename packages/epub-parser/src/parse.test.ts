@@ -180,4 +180,63 @@ describe("parseEpub", () => {
       /epub: OPF at "content\.opf" has no <package> root element/,
     );
   });
+
+  it("NCX: preserves #fragment into TocNode.anchor", () => {
+    const bytes = buildEpub({
+      "META-INF/container.xml": `<?xml version="1.0"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>
+</container>`,
+      "OEBPS/content.opf": `<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="2.0" unique-identifier="bookid">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:identifier id="bookid">urn:uuid:anchor-ncx</dc:identifier><dc:title>Anchor NCX</dc:title>
+  </metadata>
+  <manifest>
+    <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
+    <item id="big" href="big.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine toc="ncx"><itemref idref="big"/></spine>
+</package>`,
+      "OEBPS/toc.ncx": `<?xml version="1.0" encoding="utf-8"?>
+<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><navMap>
+  <navPoint id="n1"><navLabel><text>第1章</text></navLabel><content src="big.xhtml#a1"/></navPoint>
+  <navPoint id="n2"><navLabel><text>第2章</text></navLabel><content src="big.xhtml#a2"/></navPoint>
+</navMap></ncx>`,
+      "OEBPS/big.xhtml": `<html><body><p><span id="a1">第1章</span></p><p><span id="a2">第2章</span></p></body></html>`,
+    });
+    const toc = parseEpub(bytes).toc;
+    expect(toc).toEqual([
+      { label: "第1章", href: "OEBPS/big.xhtml", anchor: "a1" },
+      { label: "第2章", href: "OEBPS/big.xhtml", anchor: "a2" },
+    ]);
+  });
+
+  it("EPUB3 nav: preserves #fragment into TocNode.anchor; no fragment ⇒ no anchor key", () => {
+    const bytes = buildEpub({
+      "META-INF/container.xml": `<?xml version="1.0"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles><rootfile full-path="content.opf" media-type="application/oebps-package+xml"/></rootfiles>
+</container>`,
+      "content.opf": `<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Anchor Nav</dc:title></metadata>
+  <manifest>
+    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+    <item id="big" href="big.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine><itemref idref="big"/></spine>
+</package>`,
+      "nav.xhtml": `<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"><body><nav epub:type="toc" xmlns:epub="http://www.idpf.org/2007/ops"><ol>
+  <li><a href="big.xhtml#s1">Sec 1</a></li>
+  <li><a href="big.xhtml">Whole</a></li>
+</ol></nav></body></html>`,
+      "big.xhtml": `<html><body><p><span id="s1">Sec 1</span></p></body></html>`,
+    });
+    const toc = parseEpub(bytes).toc;
+    expect(toc).toEqual([
+      { label: "Sec 1", href: "big.xhtml", anchor: "s1" },
+      { label: "Whole", href: "big.xhtml" },
+    ]);
+  });
 });

@@ -123,11 +123,13 @@ function readToc(
             const a = li.querySelector("a");
             const childOls = li.querySelectorAll("ol");
             const childOl = childOls.find((o) => o.parentNode === li) ?? null;
-            const href = a?.getAttribute("href")?.split("#")[0] ?? "";
+            const rawHref = a?.getAttribute("href") ?? "";
+            const [path, frag] = rawHref.split("#");
             const node: TocNode = {
               label: (a?.text ?? "").trim(),
-              href: href ? resolveHref(navDir, href) : "",
+              href: path ? resolveHref(navDir, path) : "",
             };
+            if (frag) node.anchor = frag;
             const children = walk(childOl);
             if (children.length) node.children = children;
             return node;
@@ -151,11 +153,13 @@ function readToc(
     };
     const toNode = (np: unknown): TocNode => {
       const p = np as NavPoint;
-      const src = p.content?.["@_src"]?.split("#")[0] ?? "";
+      const raw = p.content?.["@_src"] ?? "";
+      const [path, frag] = raw.split("#");
       const node: TocNode = {
         label: (p.navLabel?.text ?? "").toString().trim(),
-        href: src ? resolveHref(ncxDir, src) : "",
+        href: path ? resolveHref(ncxDir, path) : "",
       };
+      if (frag) node.anchor = frag;
       const kids = asArray(p.navPoint).map(toNode);
       if (kids.length) node.children = kids;
       return node;
