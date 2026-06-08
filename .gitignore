@@ -96,3 +96,6 @@ out/
 
 # Brainstorm visual companion (superpowers)
 .superpowers/
+
+# Workspace package build output (tsup)
+packages/*/dist/
