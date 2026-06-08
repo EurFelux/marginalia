@@ -105,6 +105,7 @@ export default {
   "library.editDialog.title": "Edit book details",
   "library.empty":
     'Library is empty. Click "Import books" in the top right, or drag .epub / .pdf files into the window.',
+  "library.finishedBadge": "",
   "library.ignored_one": "Ignored {{count}} unsupported file: {{names}}",
   "library.ignored_other": "Ignored {{count}} unsupported files: {{names}}",
   "library.import": "Import books",
@@ -116,7 +117,10 @@ export default {
   "library.loading": "Loading library…",
   "library.menu.delete": "Delete",
   "library.menu.edit": "Edit details",
+  "library.menu.markFinished": "",
+  "library.menu.unmarkFinished": "",
   "library.reorderFailed": "Failed to save order: {{error}}",
+  "library.setFinishedFailed": "",
   "library.title": "Marginalia",
   "library.unknownAuthor": "Unknown author",
   "library.updateFailed": "{{title}} failed to save: {{error}}",

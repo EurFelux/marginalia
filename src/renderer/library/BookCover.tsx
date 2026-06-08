@@ -31,11 +31,13 @@ export function BookCover({
   onOpen,
   onDelete,
   onUpdate,
+  onToggleFinished,
 }: {
   book: BookSummaryDto;
   onOpen: () => void;
   onDelete: () => void;
   onUpdate: (patch: { title: string; author: string | null }) => void;
+  onToggleFinished: () => void;
 }) {
   const { t } = useTranslation();
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -77,6 +79,11 @@ export function BookCover({
           <CoverImage book={book} />
         </ContextMenuTrigger>
         <ContextMenuContent>
+          <ContextMenuItem onClick={onToggleFinished}>
+            {book.isFinished
+              ? t("library.menu.unmarkFinished", "取消已读完")
+              : t("library.menu.markFinished", "标记已读完")}
+          </ContextMenuItem>
           <ContextMenuItem onClick={openEdit}>{t("library.menu.edit", "编辑信息")}</ContextMenuItem>
           <ContextMenuItem variant="destructive" onClick={() => setConfirmOpen(true)}>
             {t("library.menu.delete", "删除")}
