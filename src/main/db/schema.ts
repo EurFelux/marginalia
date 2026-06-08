@@ -165,6 +165,10 @@ export const conversations = sqliteTable(
       .notNull()
       .references(() => assistants.id),
     title: text("title"),
+    // 上下文管理（spec 2026-06-08）：滚动概要 + 已折叠到的消息 seq。
+    // null = 尚未折叠（全量逐字，等价旧行为）。
+    contextSummary: text("context_summary"),
+    summarizedThroughSeq: integer("summarized_through_seq"),
     createdAt: nowMs(),
     updatedAt: integer("updated_at")
       .notNull()
