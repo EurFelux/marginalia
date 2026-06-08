@@ -1,5 +1,5 @@
 // src/main/chat/messages.ts
-import { asc, desc, eq, max } from "drizzle-orm";
+import { and, asc, desc, eq, gt, max } from "drizzle-orm";
 import type { UIMessage } from "ai";
 import type { DB } from "@main/db/client";
 import { conversations, messages } from "@main/db/schema";
@@ -89,6 +89,19 @@ export function listMessages(db: DB, conversationId: string): MessageDto[] {
     .orderBy(asc(messages.seq))
     .all()
     .map(toDto);
+}
+
+/** 列出 seq > afterSeq 的尾轮（升序）；afterSeq 为 null 取全量（等价 listMessages）。 */
+export function listMessagesAfterSeq(
+  db: DB,
+  conversationId: string,
+  afterSeq: number | null,
+): MessageDto[] {
+  const where =
+    afterSeq == null
+      ? eq(messages.conversationId, conversationId)
+      : and(eq(messages.conversationId, conversationId), gt(messages.seq, afterSeq));
+  return db.select().from(messages).where(where).orderBy(asc(messages.seq)).all().map(toDto);
 }
 
 /** 倒序找最近一条带段落 chip 的 user 消息，返回其段落内容（设计文档 §6「上一次插入的」）；无则 null。 */

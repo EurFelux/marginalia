@@ -9,6 +9,7 @@ import {
   getLastParagraphContent,
   isLastTurnIncomplete,
   listMessages,
+  listMessagesAfterSeq,
 } from "@main/chat/messages";
 import { buildChips, dedupeParagraph } from "@main/ai/chips";
 
@@ -238,5 +239,35 @@ describe("isLastTurnIncomplete", () => {
       status: "complete",
     });
     expect(isLastTurnIncomplete(db, cid)).toBe(false);
+  });
+});
+
+describe("listMessagesAfterSeq", () => {
+  function seedFourMessages() {
+    const db = freshDb();
+    const cid = seedConversation(db);
+    for (let i = 0; i < 4; i++) {
+      appendMessage(db, {
+        conversationId: cid,
+        role: i % 2 === 0 ? "user" : "assistant",
+        parts: [{ type: "text", text: `m${i}` }],
+      });
+    }
+    return { db, conversationId: cid };
+  }
+
+  it("returns all messages when afterSeq is null", () => {
+    const { db, conversationId } = seedFourMessages();
+    expect(listMessagesAfterSeq(db, conversationId, null).map((m) => m.seq)).toEqual([0, 1, 2, 3]);
+  });
+
+  it("returns only the tail with seq > afterSeq", () => {
+    const { db, conversationId } = seedFourMessages();
+    expect(listMessagesAfterSeq(db, conversationId, 1).map((m) => m.seq)).toEqual([2, 3]);
+  });
+
+  it("returns an empty array when afterSeq is at or past the last seq", () => {
+    const { db, conversationId } = seedFourMessages();
+    expect(listMessagesAfterSeq(db, conversationId, 3)).toEqual([]);
   });
 });
