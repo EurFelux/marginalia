@@ -3,7 +3,9 @@ import {
   mergeModels,
   providerModelOptions,
   providerFormToUpsertInput,
+  clampStepLimit,
 } from "@renderer/settings/settings-logic";
+import { DEFAULT_STEP_LIMIT } from "@shared/preferences";
 
 describe("mergeModels", () => {
   it("unions and dedups, preserving order", () => {
@@ -16,6 +18,16 @@ describe("providerModelOptions", () => {
     expect(providerModelOptions(["a", "b"], "x")).toEqual(["a", "b", "x"]);
     expect(providerModelOptions(["a", "b"], "a")).toEqual(["a", "b"]);
     expect(providerModelOptions(["a"], null)).toEqual(["a"]);
+  });
+});
+
+describe("clampStepLimit", () => {
+  it("clamps to [1,99], truncates floats, falls back on non-finite", () => {
+    expect(clampStepLimit(5)).toBe(5);
+    expect(clampStepLimit(0)).toBe(1); // 0 不经数字框——这里是防御性收敛
+    expect(clampStepLimit(100)).toBe(99);
+    expect(clampStepLimit(3.7)).toBe(3);
+    expect(clampStepLimit(NaN)).toBe(DEFAULT_STEP_LIMIT);
   });
 });
 
