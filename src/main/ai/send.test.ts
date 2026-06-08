@@ -472,3 +472,67 @@ describe("pdf system prompt injection", () => {
     expect(captured.system).not.toContain("is a PDF");
   });
 });
+
+function promptCapturingModel(captured: { system?: string; texts: string[] }) {
+  return new MockLanguageModelV3({
+    doStream: async ({ prompt }) => {
+      const sys = prompt.find((m) => m.role === "system");
+      captured.system = sys && typeof sys.content === "string" ? sys.content : undefined;
+      captured.texts = prompt
+        .filter((m) => m.role === "user" || m.role === "assistant")
+        .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)));
+      return {
+        stream: simulateReadableStream({
+          chunks: [
+            { type: "text-start", id: "t1" },
+            { type: "text-delta", id: "t1", delta: "ok" },
+            { type: "text-end", id: "t1" },
+            finishChunk("stop"),
+          ],
+        }),
+      };
+    },
+  });
+}
+
+describe("runSend context summary injection", () => {
+  it("injects the stored summary into system and sends only the tail history", async () => {
+    const captured: { system?: string; texts: string[] } = { texts: [] };
+    const { db, book, deps } = await setup({
+      ok: true,
+      model: promptCapturingModel(captured),
+      modelId: "mock",
+    });
+    const { createConversation } = await import("@main/chat/conversations");
+    const { appendMessage } = await import("@main/chat/messages");
+    const { conversations } = await import("@main/db/schema");
+    const { eq } = await import("drizzle-orm");
+
+    const convo = createConversation(db, { bookId: book.id });
+    appendMessage(db, {
+      conversationId: convo.id,
+      role: "user",
+      parts: [{ type: "text", text: "FOLDED_USER" }],
+    });
+    appendMessage(db, {
+      conversationId: convo.id,
+      role: "assistant",
+      parts: [{ type: "text", text: "KEPT_ASSISTANT" }],
+    });
+    db.update(conversations)
+      .set({ contextSummary: "EARLIER_SUMMARY", summarizedThroughSeq: 0 })
+      .where(eq(conversations.id, convo.id))
+      .run();
+
+    const r = runSend(deps, input(book.id, convo.id, { chips: [], userText: "now" }));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    await r.finished;
+
+    expect(captured.system).toContain("## Conversation summary so far\nEARLIER_SUMMARY");
+    const joined = captured.texts.join("\n");
+    expect(joined).toContain("KEPT_ASSISTANT");
+    expect(joined).not.toContain("FOLDED_USER");
+    expect(joined).toContain("now");
+  });
+});

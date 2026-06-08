@@ -12,11 +12,12 @@ import { conversations } from "@main/db/schema";
 import { getDefaultAssistant } from "@main/providers/assistant";
 import { assemblePrompt, pdfSystemNote } from "@main/ai/prompt";
 import { dedupeParagraph, toContextChips } from "@main/ai/chips";
+import { maybeCompactConversation } from "@main/ai/context-compaction";
 import { createReadingTools, type LoadBytes } from "@main/ai/tools";
 import { supportsImageToolResults } from "@main/ai/model-factory";
 import { getBook } from "@main/library/repository";
 import type { ResolvedModel } from "@main/ai/assistant-model";
-import { appendMessage, getLastParagraphContent, listMessages } from "@main/chat/messages";
+import { appendMessage, getLastParagraphContent, listMessagesAfterSeq } from "@main/chat/messages";
 import { nameConversation } from "@main/chat/conversation-title";
 import { textOfParts } from "@main/ai/prompt";
 import { t } from "@main/i18n";
@@ -61,7 +62,11 @@ export function runSend(
 
   // 1b. 校验会话存在且属于本书（spec §5：只校验不分配，绝不默默新建）
   const convo = db
-    .select({ bookId: conversations.bookId })
+    .select({
+      bookId: conversations.bookId,
+      contextSummary: conversations.contextSummary,
+      summarizedThroughSeq: conversations.summarizedThroughSeq,
+    })
     .from(conversations)
     .where(eq(conversations.id, input.conversationId))
     .get();
@@ -74,8 +79,8 @@ export function runSend(
   const activeChips = input.chips.filter((c) => c.state !== "off");
   const deduped = dedupeParagraph(activeChips, getLastParagraphContent(db, conversationId));
 
-  // 3. 取历史（在落入本轮 user 消息之前）
-  const history = listMessages(db, conversationId);
+  // 3. 取尾轮历史（seq > S；S=null 取全量。在落入本轮 user 消息之前）
+  const history = listMessagesAfterSeq(db, conversationId, convo.summarizedThroughSeq);
 
   // 4. 落 user 消息（chips 快照入 metadata）
   appendMessage(db, {
@@ -101,6 +106,7 @@ export function runSend(
   }
   const allMessages: ModelMessage[] = assemblePrompt({
     systemPrompt: systemPromptText,
+    priorSummary: convo.contextSummary,
     history,
     current: { chips: deduped, userText: input.userText, readingContext: input.readingContext },
   });
@@ -210,6 +216,8 @@ export function runSend(
             assistantText,
           );
         }
+        // 轮后后台压缩（fire-and-forget）：尾轮超预算时折叠旧轮进滚动概要。复用摘要模型。
+        void maybeCompactConversation({ db, resolveModel: resolveSummaryModel }, conversationId);
       }
     },
   });
