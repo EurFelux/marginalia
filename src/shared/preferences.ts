@@ -38,6 +38,12 @@ export const summaryModelSchema = z.object({
 });
 export type SummaryModel = z.infer<typeof summaryModelSchema>;
 
+/** AI 对话 agent 循环的多步上限。0 = 不限制（永不主动刹车，仅靠模型自然停止 + 用户 abort）；≥1 = 具体步数上限。 */
+export const stepLimitSchema = z.number().int().min(0);
+
+/** stepLimit 缺省值：主进程兜底（makeSendDeps / runSend）与渲染层初值共用单一源。 */
+export const DEFAULT_STEP_LIMIT = 10;
+
 /**
  * 可持久化用户偏好的单一源：key → 值 Zod schema。
  * 新增偏好＝在此注册一个 key + schema；DB / 服务 / IPC / 类型全部据此推导。
@@ -51,6 +57,7 @@ export const PREFERENCE_SCHEMAS = {
   readerLayout: readerLayoutSchema,
   summaryModel: summaryModelSchema,
   pdfZoom: pdfZoomSchema,
+  stepLimit: stepLimitSchema,
 } as const;
 
 export type PreferenceKey = keyof typeof PREFERENCE_SCHEMAS;
@@ -77,5 +84,6 @@ export const setPreferenceInput = z.discriminatedUnion("key", [
   z.object({ key: z.literal("readerLayout"), value: readerLayoutSchema }),
   z.object({ key: z.literal("summaryModel"), value: summaryModelSchema }),
   z.object({ key: z.literal("pdfZoom"), value: pdfZoomSchema }),
+  z.object({ key: z.literal("stepLimit"), value: stepLimitSchema }),
 ]);
 export type SetPreferenceInput = z.infer<typeof setPreferenceInput>;

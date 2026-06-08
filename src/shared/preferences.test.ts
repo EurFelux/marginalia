@@ -27,6 +27,7 @@ describe("preferences schemas", () => {
       "pdfZoom",
       "readerLayout",
       "readerPrefs",
+      "stepLimit",
       "summaryModel",
     ]);
   });
@@ -108,6 +109,16 @@ describe("preferences schemas", () => {
       expect(readerPrefsSchema.safeParse({ ...base, fontFamily: v }).success).toBe(true);
     }
     expect(readerPrefsSchema.safeParse({ ...base, fontFamily: "comic-sans" }).success).toBe(false);
+  });
+});
+
+describe("stepLimit preference", () => {
+  it("accepts 0 (unlimited) and positive ints, rejects negatives/floats", () => {
+    expect(setPreferenceInput.safeParse({ key: "stepLimit", value: 0 }).success).toBe(true);
+    expect(setPreferenceInput.safeParse({ key: "stepLimit", value: 10 }).success).toBe(true);
+    expect(setPreferenceInput.safeParse({ key: "stepLimit", value: -1 }).success).toBe(false);
+    expect(setPreferenceInput.safeParse({ key: "stepLimit", value: 3.5 }).success).toBe(false);
+    expect(setPreferenceInput.safeParse({ key: "stepLimit", value: "5" }).success).toBe(false);
   });
 });
 
