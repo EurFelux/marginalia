@@ -181,6 +181,10 @@ export default {
   "reader.toc.loadError": "目录读取失败",
   "reader.toc.loading": "加载目录…",
   "settings.advanced": "高级",
+  "settings.advanced.stepLimit": "单次回复最多步数",
+  "settings.advanced.stepLimitDesc":
+    "AI 单次回复中连续调用工具的步数上限，阅读 PDF 逐页时需要调高。勾选「不限制」后仅靠模型自然停止与手动停止收尾——模型若陷入循环会持续消耗额度。",
+  "settings.advanced.stepLimitUnlimited": "不限制",
   "settings.appearance": "外观",
   "settings.assistantModel": "对话模型",
   "settings.close": "关闭设置",
