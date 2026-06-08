@@ -6,6 +6,7 @@ import { BookOpen, FileText, List, ScrollText, Sparkles, Wrench } from "lucide-r
 import { useTranslation } from "react-i18next";
 import { chipLabel } from "@renderer/ai/chip-label";
 import { textOf } from "@renderer/ai/message-text";
+import { MessageToolbar } from "@renderer/ai/MessageToolbar";
 import { segments, type ToolPart } from "@renderer/ai/segments";
 import { toolStepLabel, toolStepStatus } from "@renderer/ai/tool-step-label";
 import type { ChatUIMessage } from "@renderer/ai/types";
@@ -64,7 +65,7 @@ function UserBubble({ m }: { m: ChatUIMessage }) {
   const { t } = useTranslation();
   const chips = m.metadata?.contextChips ?? [];
   return (
-    <div className="flex flex-col items-end">
+    <div className="group flex flex-col items-end">
       <div className="max-w-[88%] rounded-2xl rounded-br-sm bg-primary px-3 py-2.5 text-primary-foreground">
         {chips.length > 0 && (
           <div className="mb-2 space-y-1.5 border-b border-primary-foreground/20 pb-2">
@@ -85,6 +86,7 @@ function UserBubble({ m }: { m: ChatUIMessage }) {
         )}
         <div className="whitespace-pre-wrap text-sm leading-relaxed">{textOf(m)}</div>
       </div>
+      <MessageToolbar m={m} />
     </div>
   );
 }
@@ -102,7 +104,7 @@ function AssistantBubble({
   const hasText = segs.some((s) => s.kind === "text");
   if (segs.length === 0 && !streaming) return null;
   return (
-    <div className="flex flex-col items-start">
+    <div className="group flex flex-col items-start">
       <div className="max-w-[88%] space-y-2 rounded-2xl rounded-bl-sm bg-muted px-3.5 py-2 text-sm leading-relaxed text-foreground">
         {segs.map((s, i) =>
           s.kind === "text" ? (
@@ -116,6 +118,7 @@ function AssistantBubble({
           <span className="inline-block animate-pulse text-primary">▍</span>
         )}
       </div>
+      {!streaming && <MessageToolbar m={m} />}
     </div>
   );
 }

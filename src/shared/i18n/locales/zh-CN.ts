@@ -16,6 +16,7 @@ export default {
   "ai.copied": "已复制",
   "ai.copy": "复制",
   "ai.emptyHint": "划选正文后点「AI 问」，或直接在下方提问。",
+  "ai.messageActions": "消息操作",
   "ai.newConversation": "新对话",
   "ai.noBookToSend": "没有正在阅读的书，无法发送。",
   "ai.panelTitle": "AI 助手",
