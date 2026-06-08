@@ -6,7 +6,7 @@ This file provides guidance to coding agents working in this repository. It is s
 
 Marginalia 是一个基于 Electron + React 的桌面 AI 阅读器，当前支持 ePub 与 PDF。主进程里程碑 **MA1–MA5** 与 UI 原型 **UP1** 已完成；**最小可用竖切**（导入 → 读 → 选 → 问 → 真模型流式回复）已实现并合并，渲染层 `src/renderer/` 已建（替换原 Forge 模板桩）。
 
-> **进度真相源 = [`docs/superpowers/ROADMAP.md`](docs/superpowers/ROADMAP.md)**：里程碑状态、当前焦点、待办 backlog 都看那里（别在本文件里维护会过时的状态散文）。**每次合并分支时顺手更新 ROADMAP**（finishing 流程的一步）。细节去 `docs/superpowers/specs/`（设计）与 `docs/superpowers/plans/`（实现计划）。
+> **进度真相源 = GitHub Issues + Projects kanban**（用 `kanban` skill 操作）：需求/里程碑状态、当前焦点、待办 backlog 都在那里（别在本文件里维护会过时的状态散文）。开工定位、收尾关卡（挪列 / close issue）一律走 `kanban` skill。设计细节去 `docs/superpowers/specs/`（设计）与 `docs/superpowers/plans/`（实现计划）。`docs/superpowers/ROADMAP.md` **已退役**、仅作历史归档，勿再当真相源或更新它。
 
 ## 常用命令
 
@@ -128,10 +128,11 @@ Drizzle ORM over better-sqlite3，Schema 定义在 `src/main/db/schema.ts`。
 | Lint/Format | oxlint + oxfmt                                                                      |
 | 包管理      | pnpm 11（`nodeLinker: hoisted`，Electron Forge 强制；设置见 `pnpm-workspace.yaml`） |
 
-## 设计文档与路线图
+## 进度管理与设计文档
 
-- **`docs/superpowers/ROADMAP.md`**：**进度真相源**——里程碑状态、当前焦点、待办 backlog。开工前先看这里定位「在哪 / 下一步 / 欠了什么」，合并分支后回来更新它。
+- **进度真相源 = GitHub Issues + Projects kanban**（用 `kanban` skill）：需求/里程碑状态、当前焦点、待办 backlog 都在那里。开工前先看 kanban 定位「在哪 / 下一步 / 欠了什么」，收尾时用 `kanban` skill 挪列 / close 对应 issue（含合并分支时检查有无可 close 的 issue）。
 - `docs/superpowers/specs/`：产品设计与技术决策的设计文档（核心阅读闭环、UP1 UI 原型、最小可用竖切）。
 - `docs/superpowers/plans/`：里程碑 bite-sized 实现计划（MA1–MA5、竖切 P1–P4、RA 轨任务分解 + DAG）。
+- `docs/superpowers/ROADMAP.md`：**已退役**——历史里程碑/backlog 归档，仅作上下文参考；进度管理已转入上面的 GitHub Projects kanban，勿再当真相源或更新它。
 
-新功能开发前，优先阅读 ROADMAP 与相关设计文档，了解进度、产品意图和架构约束。
+新功能开发前，先看 GitHub Projects kanban（`kanban` skill）与相关设计文档，了解进度、产品意图和架构约束。
