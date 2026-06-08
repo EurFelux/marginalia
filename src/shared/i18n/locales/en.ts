@@ -2,6 +2,7 @@ export default {
   "ai.action.explain": "Please explain the selected content.",
   "ai.action.summarize": "Please summarize the selected content.",
   "ai.action.translate": "Please translate the selected content into English.",
+  "ai.cannotResend": "Can't resend: conversation or message not found",
   "ai.chip.bookSummary": "Book summary",
   "ai.chip.chapterSummary": "Chapter summary",
   "ai.chip.hoverGenerating": "Generating…",

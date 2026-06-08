@@ -62,6 +62,7 @@ describe("createEventStream", () => {
 /** 构建最小假 window.api */
 function makeApi(overrides?: {
   sendResult?: { ok: true; conversationId: string } | { ok: false; reason: string };
+  resendResult?: { ok: true; conversationId: string } | { ok: false; reason: string };
   createResult?: { id: string };
 }) {
   const sentPayloads: unknown[] = [];
@@ -85,6 +86,15 @@ function makeApi(overrides?: {
           0,
         );
         return overrides?.sendResult ?? { ok: true, conversationId: "conv-from-send" };
+      }),
+      resend: vi.fn(async (payload: unknown) => {
+        // 在 resend 返回后触发 finish（使 stream 关闭）
+        setTimeout(
+          () =>
+            onChunkCb?.({ streamId: (payload as { streamId: string }).streamId, type: "finish" }),
+          0,
+        );
+        return overrides?.resendResult ?? { ok: true, conversationId: "existing-conv" };
       }),
       abort: vi.fn(),
       onChunk,
@@ -112,10 +122,10 @@ function makeApi(overrides?: {
   return { api, sentPayloads, createdPayloads };
 }
 
-function makeMessage(text: string): ChatUIMessage {
+function makeMessage(text: string, id = "msg-1"): ChatUIMessage {
   return {
     role: "user",
-    id: "msg-1",
+    id,
     parts: [{ type: "text", text }],
     metadata: undefined,
   } as ChatUIMessage;
@@ -260,5 +270,34 @@ describe("createIpcChatTransport sendMessages", () => {
 
     // stream.cancel() 触发 ReadableStream cancel → 调用 unsub
     expect(unsubCalled).toBe(true);
+  });
+
+  it("resend branch: calls ai.resend (not ai.send) with correct payload", async () => {
+    const { api } = makeApi();
+    vi.stubGlobal("window", { api });
+
+    const transport = createIpcChatTransport();
+    const stream = await transport.sendMessages({
+      messages: [makeMessage("edit this", "u1")],
+      abortSignal: undefined,
+      trigger: "regenerate-message" as const,
+      chatId: "chat-1",
+      messageId: undefined,
+    });
+    // drain stream
+    const reader = stream.getReader();
+    await reader.read(); // done=true from finish
+
+    // ai.resend should have been called exactly once with the correct payload
+    expect(api.ai.resend).toHaveBeenCalledOnce();
+    const resendArg = api.ai.resend.mock.calls[0][0] as Record<string, unknown>;
+    expect(resendArg).toHaveProperty("conversationId", "existing-conv");
+    expect(resendArg).toHaveProperty("userMessageId", "u1");
+    expect(resendArg).toHaveProperty("userText", "edit this");
+    expect(typeof resendArg.streamId).toBe("string");
+    expect((resendArg.streamId as string).length).toBeGreaterThan(0);
+
+    // ai.send must NOT have been called
+    expect(api.ai.send).not.toHaveBeenCalled();
   });
 });
