@@ -184,6 +184,7 @@ export function listBooks(db: DB) {
       format: books.format,
       pageCount: books.pageCount,
       hasTextLayer: books.hasTextLayer,
+      isFinished: books.isFinished,
     })
     .from(books)
     .orderBy(asc(books.position), asc(books.addedAt))
@@ -204,6 +205,7 @@ export function listRecentlyRead(db: DB, limit = RECENT_SHELF_LIMIT) {
       format: books.format,
       pageCount: books.pageCount,
       hasTextLayer: books.hasTextLayer,
+      isFinished: books.isFinished,
       percent: progress.percent,
       lastReadAt: progress.updatedAt,
     })
@@ -241,6 +243,18 @@ export function updateBook(
     .returning()
     .get();
   if (!row) throw new Error(`library: book ${input.bookId} not found`);
+  return row;
+}
+
+/** #70 切换「已读完」标记。独立于 progress；命中 0 行（书不存在）抛错（镜像 updateBook）。 */
+export function setBookFinished(db: DB, bookId: string, finished: boolean): BookRow {
+  const row = db
+    .update(books)
+    .set({ isFinished: finished })
+    .where(eq(books.id, bookId))
+    .returning()
+    .get();
+  if (!row) throw new Error(`library: book ${bookId} not found`);
   return row;
 }
 export function resolveChapterByHref(db: DB, bookId: string, href: string): ChapterRow | undefined {

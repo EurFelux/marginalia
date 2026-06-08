@@ -23,6 +23,7 @@ import {
   resolveChapterByHref,
   resolveChapter,
   reindexBookIfStale,
+  setBookFinished,
   updateBook,
   CURRENT_PARSER_VERSION,
 } from "@main/library/repository";
@@ -211,6 +212,39 @@ describe("library repository", () => {
       .run();
     const item = listBooks(db).find((b) => b.id === "empty-cover")!;
     expect(Boolean(item.hasCover)).toBe(false);
+  });
+
+  it("imports a book with isFinished=false by default", async () => {
+    const db = freshDb();
+    const book = await importBook(db, { bytes: makeFixtureEpub() });
+    expect(listBooks(db)[0].isFinished).toBe(false);
+    expect(book.isFinished).toBe(false);
+  });
+
+  it("setBookFinished toggles the flag and returns the updated row", async () => {
+    const db = freshDb();
+    const book = await importBook(db, { bytes: makeFixtureEpub() });
+
+    const marked = setBookFinished(db, book.id, true);
+    expect(marked.isFinished).toBe(true);
+    expect(listBooks(db)[0].isFinished).toBe(true);
+
+    const unmarked = setBookFinished(db, book.id, false);
+    expect(unmarked.isFinished).toBe(false);
+    expect(listBooks(db)[0].isFinished).toBe(false);
+  });
+
+  it("setBookFinished throws when the book does not exist", () => {
+    const db = freshDb();
+    expect(() => setBookFinished(db, "nope", true)).toThrow(/not found/);
+  });
+
+  it("listRecentlyRead projects isFinished", async () => {
+    const db = freshDb();
+    const book = await importBook(db, { bytes: makeFixtureEpub() });
+    saveProgress(db, book.id, "loc-1", 0.5);
+    setBookFinished(db, book.id, true);
+    expect(listRecentlyRead(db)[0].isFinished).toBe(true);
   });
 });
 
