@@ -85,6 +85,24 @@ describe("mapTestError", () => {
       message: "HTTP 500: the provider had a server-side error",
     });
   });
+  // reasoning 模型探针预算不足时，provider 回 HTTP 2xx 但响应 incomplete/无法解析，
+  // AI SDK 带 statusCode=200 抛 APICallError。裸 "HTTP 200" 自相矛盾（200=成功却报失败），
+  // 必须给诚实可读的诊断（响应无法解析），绝不输出误导性的成功状态码。
+  it("2xx without an extractable error → explains the response could not be parsed, never bare 'HTTP 200'", () => {
+    // stringMatching 既断言诚实诊断，又隐含排除了自相矛盾的裸 "HTTP 200"（不匹配该正则）。
+    expect(mapTestError(apiErr(200))).toMatchObject({
+      ok: false,
+      status: 200,
+      message: expect.stringMatching(/could not be parsed/i),
+    });
+  });
+  it("2xx with a non-error body surfaces a parse diagnostic, not a contradictory HTTP 200", () => {
+    expect(mapTestError(apiErr(200, JSON.stringify({ status: "incomplete" })))).toMatchObject({
+      ok: false,
+      status: 200,
+      message: expect.stringMatching(/could not be parsed/i),
+    });
+  });
   it("LoadAPIKeyError → no key configured", () => {
     expect(mapTestError(new LoadAPIKeyError({ message: "no key" }))).toEqual({
       ok: false,

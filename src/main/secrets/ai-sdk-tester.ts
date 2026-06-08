@@ -11,8 +11,10 @@ const log = createLogger("providers");
 export type GenerateProbe = (model: ChatModel) => Promise<void>;
 
 const realProbe: GenerateProbe = async (model) => {
-  // maxOutputTokens:1 把成本压到最低；连通性以 HTTP 往返是否成功为准。
-  await generateText({ model, prompt: "ping", maxOutputTokens: 1, maxRetries: 0 });
+  // maxOutputTokens 须容纳 reasoning 模型的推理预算：设为 1 时，强制思考的模型（如 Kimi K2.6、
+  // gpt-5.x reasoning）连推理都开不了头，provider 回 HTTP 200 但响应 incomplete/无有效输出，
+  // AI SDK 解析失败抛 statusCode=200 的 APICallError。64 留出最小推理余量；测试低频，成本可忽略。
+  await generateText({ model, prompt: "ping", maxOutputTokens: 64, maxRetries: 0 });
 };
 
 /**
@@ -56,6 +58,12 @@ function describeFallback(status: number | undefined, err: unknown): string {
   }
   if (HTTP_HINT[status]) return `HTTP ${status}: ${HTTP_HINT[status]}`;
   if (status >= 500) return `HTTP ${status}: the provider had a server-side error`;
+  if (status >= 200 && status < 300) {
+    // 成功状态码却抛错：provider 回了 2xx，但 AI SDK 无法解析响应——常见于 reasoning 模型在
+    // maxOutputTokens 过小时返回 incomplete/无有效输出。透传 SDK 的诊断文案，绝不报误导性的裸 "HTTP 200"。
+    const detail = err instanceof Error && err.message ? ` (${err.message})` : "";
+    return `HTTP ${status}: the provider returned a success status but the response could not be parsed${detail}`;
+  }
   return `HTTP ${status}`;
 }
 
@@ -86,6 +94,9 @@ export function createAiSdkTester(probe: GenerateProbe = realProbe): ProviderTes
         await probe(model);
         return { ok: true };
       } catch (err) {
+        // 优雅吞错（转成 TestResult 返回、不抛）必须留 warn——否则测试失败全程无日志：
+        // 既未抛异常（registry catch-all 碰不到），自身又不记录，排障时一片空白。
+        log.warn("provider connectivity test failed", err);
         return mapTestError(err);
       }
     },
