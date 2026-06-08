@@ -61,7 +61,8 @@ export function planFold(
 
   // 对齐：保留区须以 user 起（折叠区以 assistant 收）；若首条是 assistant，多保留它前面的 user。
   let keepStart = tail.length - keep;
-  if (keepStart > 0 && tail[keepStart]!.role === "assistant") keepStart--;
+  if (keepStart > 0 && keepStart < tail.length && tail[keepStart]!.role === "assistant")
+    keepStart--;
 
   const foldCount = keepStart;
   if (foldCount <= 0) return null;

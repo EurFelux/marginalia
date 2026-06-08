@@ -64,6 +64,14 @@ describe("planFold", () => {
     expect(plan!.foldedTurns.map((m) => m.seq)).toEqual([0, 1]);
     expect(plan!.foldThroughSeq).toBe(1);
   });
+
+  it("does not crash and folds everything when minRecent is 0 forces an empty kept set", () => {
+    // 退化预算 minRecent:0 + 极小 low → keep 累积为 0；此前会越界 tail[tail.length]。
+    const plan = planFold(tail(4), each10, { high: 1, low: 1, minRecent: 0 });
+    expect(plan).not.toBeNull();
+    expect(plan!.foldedTurns.map((m) => m.seq)).toEqual([0, 1, 2, 3]);
+    expect(plan!.foldThroughSeq).toBe(3);
+  });
 });
 
 function summaryModel(text: string): ResolvedModel {
