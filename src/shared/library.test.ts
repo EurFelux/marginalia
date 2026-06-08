@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { updateBookInput } from "@shared/library";
+import { setBookFinishedInput, updateBookInput } from "@shared/library";
 
 describe("updateBookInput", () => {
   it("accepts valid input and trims fields", () => {
@@ -36,5 +36,22 @@ describe("updateBookInput", () => {
     expect(updateBookInput.safeParse({ bookId: "b", title: "T", author: long }).success).toBe(
       false,
     );
+  });
+});
+
+describe("setBookFinishedInput", () => {
+  it("accepts valid input", () => {
+    const r = setBookFinishedInput.parse({ bookId: "b1", finished: true });
+    expect(r).toEqual({ bookId: "b1", finished: true });
+    expect(setBookFinishedInput.safeParse({ bookId: "b1", finished: false }).success).toBe(true);
+  });
+
+  it("rejects empty bookId", () => {
+    expect(setBookFinishedInput.safeParse({ bookId: "", finished: true }).success).toBe(false);
+  });
+
+  it("rejects non-boolean / missing finished (not a patch)", () => {
+    expect(setBookFinishedInput.safeParse({ bookId: "b1", finished: "yes" }).success).toBe(false);
+    expect(setBookFinishedInput.safeParse({ bookId: "b1" }).success).toBe(false);
   });
 });
