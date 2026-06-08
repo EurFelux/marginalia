@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useAnnotationStore } from "@renderer/store/annotation-store";
 import { useChatStore } from "@renderer/store/chat-store";
-import { usePrefsStore } from "@renderer/store/prefs-store";
+import { openPanelAndFocusComposer } from "@renderer/ai/composer-focus";
 import i18n from "@renderer/i18n";
 
 export type PresetId = "explain" | "translate" | "summarize";
@@ -31,7 +31,7 @@ export function useAiActions() {
     });
     setDraftChips(chips);
     setDraftText(preset ? resolvePresetPrompt(preset) : "");
-    usePrefsStore.getState().updateLayout({ panelOpen: true });
+    openPanelAndFocusComposer();
     setSelection(null); // 收起工具栏
   }, []);
 
