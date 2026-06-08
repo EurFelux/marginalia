@@ -121,6 +121,56 @@ export function getLastParagraphContent(db: DB, conversationId: string): string 
   return null;
 }
 
+/** 取单条消息 dto；无则 null。 */
+export function getMessage(db: DB, messageId: string): MessageDto | null {
+  const row = db.select().from(messages).where(eq(messages.id, messageId)).get();
+  return row ? toDto(row) : null;
+}
+
+/**
+ * 重置 user 轮以重发（事务）：① 设该 user 消息 parts=[{text}]（保留 metadata 快照）；
+ * ② 删 seq > 其 seq 的全部消息；③ 若 summarizedThroughSeq >= 其 seq，重置滚动摘要
+ * （contextSummary=null, summarizedThroughSeq=null，否则摘要引用已删消息）；④ 推进 updatedAt。
+ * 返回该 user 消息 seq。调用方须已校验 messageId 为本会话 user 消息。
+ */
+export function resetUserTurnForResend(
+  db: DB,
+  conversationId: string,
+  messageId: string,
+  text: string,
+): number {
+  return db.transaction((tx) => {
+    const row = tx
+      .select({ seq: messages.seq })
+      .from(messages)
+      .where(and(eq(messages.id, messageId), eq(messages.conversationId, conversationId)))
+      .get();
+    if (!row) throw new Error("message not found in conversation");
+    const seq = row.seq;
+    tx.update(messages)
+      .set({ parts: [{ type: "text", text }] })
+      .where(eq(messages.id, messageId))
+      .run();
+    tx.delete(messages)
+      .where(and(eq(messages.conversationId, conversationId), gt(messages.seq, seq)))
+      .run();
+    const convo = tx
+      .select({ s: conversations.summarizedThroughSeq })
+      .from(conversations)
+      .where(eq(conversations.id, conversationId))
+      .get();
+    const resetSummary = convo?.s != null && convo.s >= seq;
+    tx.update(conversations)
+      .set({
+        updatedAt: Date.now(),
+        ...(resetSummary ? { contextSummary: null, summarizedThroughSeq: null } : {}),
+      })
+      .where(eq(conversations.id, conversationId))
+      .run();
+    return seq;
+  });
+}
+
 /**
  * 崩溃恢复派生（DD-§3.1）：会话尾消息是 user 行（其后无 assistant）即「未获回复的未完成轮」。
  * 进程硬崩溃流到一半时不落 assistant，故只靠此读时派生识别——无需持久化任何运行态。

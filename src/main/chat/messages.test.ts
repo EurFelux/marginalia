@@ -6,12 +6,17 @@ import { createDb, runMigrations } from "@main/db/client";
 import { assistants, books, conversations } from "@main/db/schema";
 import {
   appendMessage,
+  getMessage,
   getLastParagraphContent,
   isLastTurnIncomplete,
   listMessages,
   listMessagesAfterSeq,
+  resetUserTurnForResend,
 } from "@main/chat/messages";
 import { buildChips, dedupeParagraph } from "@main/ai/chips";
+import { createConversation } from "@main/chat/conversations";
+import { importBook } from "@main/library/repository";
+import { makeFixtureEpub } from "@marginalia/epub-parser";
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
 
@@ -269,5 +274,135 @@ describe("listMessagesAfterSeq", () => {
   it("returns an empty array when afterSeq is at or past the last seq", () => {
     const { db, conversationId } = seedFourMessages();
     expect(listMessagesAfterSeq(db, conversationId, 3)).toEqual([]);
+  });
+});
+
+function freshConvoDb() {
+  const db = createDb(":memory:");
+  runMigrations(db, MIGRATIONS);
+  // book.id 是 epub 自然键；建会话需有效 bookId
+  return importBook(db, { bytes: makeFixtureEpub() }).then((book) => ({
+    db,
+    convoId: createConversation(db, { bookId: book.id }).id,
+  }));
+}
+
+describe("getMessage", () => {
+  it("returns the message dto or null", async () => {
+    const { db: d, convoId } = await freshConvoDb();
+    const m = appendMessage(d, {
+      conversationId: convoId,
+      role: "user",
+      parts: [{ type: "text", text: "hi" }],
+    });
+    expect(getMessage(d, m.id)?.id).toBe(m.id);
+    expect(getMessage(d, "nope")).toBeNull();
+  });
+});
+
+describe("resetUserTurnForResend", () => {
+  it("sets the user text, deletes everything after it, and returns its seq", async () => {
+    const { db, convoId } = await freshConvoDb();
+    const u = appendMessage(db, {
+      conversationId: convoId,
+      role: "user",
+      parts: [{ type: "text", text: "old" }],
+    });
+    appendMessage(db, {
+      conversationId: convoId,
+      role: "assistant",
+      parts: [{ type: "text", text: "a1" }],
+    });
+    appendMessage(db, {
+      conversationId: convoId,
+      role: "user",
+      parts: [{ type: "text", text: "u2" }],
+    });
+    const seq = resetUserTurnForResend(db, convoId, u.id, "new");
+    expect(seq).toBe(u.seq);
+    const left = listMessages(db, convoId);
+    expect(left).toHaveLength(1);
+    expect(left[0].parts).toEqual([{ type: "text", text: "new" }]);
+  });
+
+  it("preserves the user message metadata snapshot", async () => {
+    const { db, convoId } = await freshConvoDb();
+    const u = appendMessage(db, {
+      conversationId: convoId,
+      role: "user",
+      parts: [{ type: "text", text: "q" }],
+      metadata: { contextChips: [{ id: "selection", content: "sel", tokenCount: 1 }] },
+    });
+    appendMessage(db, {
+      conversationId: convoId,
+      role: "assistant",
+      parts: [{ type: "text", text: "a" }],
+    });
+    resetUserTurnForResend(db, convoId, u.id, "edited");
+    expect(getMessage(db, u.id)?.metadata?.contextChips).toEqual([
+      { id: "selection", content: "sel", tokenCount: 1 },
+    ]);
+  });
+
+  it("resets the rolling summary when truncating into or before the summarized boundary", async () => {
+    const { db, convoId } = await freshConvoDb();
+    const u0 = appendMessage(db, {
+      conversationId: convoId,
+      role: "user",
+      parts: [{ type: "text", text: "u0" }],
+    });
+    appendMessage(db, {
+      conversationId: convoId,
+      role: "assistant",
+      parts: [{ type: "text", text: "a0" }],
+    });
+    db.update(conversations)
+      .set({ contextSummary: "S", summarizedThroughSeq: u0.seq + 1 })
+      .where(eq(conversations.id, convoId))
+      .run();
+    resetUserTurnForResend(db, convoId, u0.id, "u0"); // S(seq+1) >= u0.seq → reset
+    const c = db
+      .select({ s: conversations.summarizedThroughSeq, sum: conversations.contextSummary })
+      .from(conversations)
+      .where(eq(conversations.id, convoId))
+      .get();
+    expect(c?.s).toBeNull();
+    expect(c?.sum).toBeNull();
+  });
+
+  it("keeps the rolling summary when the boundary is older than the truncation point", async () => {
+    const { db, convoId } = await freshConvoDb();
+    const u0 = appendMessage(db, {
+      conversationId: convoId,
+      role: "user",
+      parts: [{ type: "text", text: "u0" }],
+    });
+    appendMessage(db, {
+      conversationId: convoId,
+      role: "assistant",
+      parts: [{ type: "text", text: "a0" }],
+    });
+    const u1 = appendMessage(db, {
+      conversationId: convoId,
+      role: "user",
+      parts: [{ type: "text", text: "u1" }],
+    });
+    appendMessage(db, {
+      conversationId: convoId,
+      role: "assistant",
+      parts: [{ type: "text", text: "a1" }],
+    });
+    db.update(conversations)
+      .set({ contextSummary: "S", summarizedThroughSeq: u0.seq })
+      .where(eq(conversations.id, convoId))
+      .run();
+    resetUserTurnForResend(db, convoId, u1.id, "u1"); // boundary(u0.seq) < u1.seq → keep
+    const c = db
+      .select({ s: conversations.summarizedThroughSeq, sum: conversations.contextSummary })
+      .from(conversations)
+      .where(eq(conversations.id, convoId))
+      .get();
+    expect(c?.s).toBe(u0.seq);
+    expect(c?.sum).toBe("S");
   });
 });
