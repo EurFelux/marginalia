@@ -20,6 +20,7 @@ const chapter = (over: Partial<ChapterRefDto>): ChapterRefDto => ({
   id: "ch-uuid-1",
   title: "Preface",
   href: "text/preface.xhtml",
+  anchor: null,
   orderIndex: 0,
   level: 0,
   startPage: null,

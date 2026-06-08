@@ -1,6 +1,7 @@
 import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
+import { strToU8, zipSync } from "fflate";
 import { createDb, runMigrations } from "@main/db/client";
 import { chapters } from "@main/db/schema";
 import { importBook, resolveChapterByHref } from "@main/library/repository";
@@ -14,6 +15,36 @@ import {
 import { initMainI18n } from "@main/i18n";
 import { makeFixtureEpub } from "@marginalia/epub-parser";
 import { makeScannedPdf, makeTextPdf } from "@marginalia/pdf-parser/fixture";
+
+function anchorBook(): Uint8Array {
+  return zipSync({
+    mimetype: [strToU8("application/epub+zip"), { level: 0 }],
+    "META-INF/container.xml": strToU8(`<?xml version="1.0"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>
+</container>`),
+    "OEBPS/content.opf": strToU8(`<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="2.0" unique-identifier="bid">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="bid">urn:uuid:anchor-book</dc:identifier><dc:title>Anchor Book</dc:title></metadata>
+  <manifest>
+    <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
+    <item id="t0" href="t0.xhtml" media-type="application/xhtml+xml"/>
+    <item id="t1" href="t1.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine toc="ncx"><itemref idref="t0"/><itemref idref="t1"/></spine>
+</package>`),
+    "OEBPS/toc.ncx": strToU8(`<?xml version="1.0" encoding="utf-8"?>
+<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><navMap>
+  <navPoint id="n1"><navLabel><text>第1章</text></navLabel><content src="t0.xhtml#a1"/></navPoint>
+  <navPoint id="n2"><navLabel><text>第2章</text></navLabel><content src="t0.xhtml#a2"/></navPoint>
+  <navPoint id="n3"><navLabel><text>第3章</text></navLabel><content src="t1.xhtml#b1"/></navPoint>
+</navMap></ncx>`),
+    "OEBPS/t0.xhtml": strToU8(
+      `<html><body><p><span id="a1">第1章</span></p><p><span id="a2">第2章</span></p></body></html>`,
+    ),
+    "OEBPS/t1.xhtml": strToU8(`<html><body><p><span id="b1">第3章</span></p></body></html>`),
+  });
+}
 
 beforeAll(() => initMainI18n("zh-CN"));
 
@@ -143,6 +174,30 @@ describe("content (pdf)", () => {
     expect(() => assertTextLayer(db, pdf.id)).not.toThrow();
     const epub = await importBook(db, { bytes: makeFixtureEpub() });
     expect(() => assertTextLayer(db, epub.id)).not.toThrow();
+  });
+});
+
+describe("listChapters with anchors", () => {
+  it("returns one entry per TOC anchor (no collapse), with anchor + level", async () => {
+    const db = freshDb();
+    const book = await importBook(db, { bytes: anchorBook() });
+    const list = listChapters(db, book.id);
+    expect(list.map((c) => [c.title, c.href, c.anchor, c.level])).toEqual([
+      ["第1章", "OEBPS/t0.xhtml", "a1", 0],
+      ["第2章", "OEBPS/t0.xhtml", "a2", 0],
+      ["第3章", "OEBPS/t1.xhtml", "b1", 0],
+    ]);
+  });
+});
+
+describe("readChapterText with anchors", () => {
+  it("reads only the target chapter's text (anchor → next anchor in same file)", async () => {
+    const db = freshDb();
+    const book = await importBook(db, { bytes: anchorBook() });
+    const ch2 = listChapters(db, book.id).find((c) => c.anchor === "a2")!;
+    const slice = await readChapterText(db, anchorBook(), book.id, ch2.id, {});
+    expect(slice.text).toBe("第2章");
+    expect(slice.text).not.toContain("第1章");
   });
 });
 

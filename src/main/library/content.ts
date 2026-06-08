@@ -1,9 +1,9 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, gt } from "drizzle-orm";
 import { extractBookText, extractChapterText, type ReadOptions } from "@marginalia/epub-parser";
 import { extractPdfText } from "@marginalia/pdf-parser";
 import type { DB } from "@main/db/client";
 import { books, chapters } from "@main/db/schema";
-import { getBook, resolveChapterByHref } from "@main/library/repository";
+import { getBook, resolveChapter } from "@main/library/repository";
 import { tocNodeSchema, type TocNode } from "@shared/types";
 import type { ChapterRefDto, ChapterTextSlice } from "@shared/library";
 import { t } from "@main/i18n";
@@ -37,7 +37,13 @@ export async function readChapterText(
   const book = getBook(db, bookId);
   if (!book) throw new Error(`content: book ${bookId} not found`);
   const ch = db
-    .select({ href: chapters.href, startPage: chapters.startPage, endPage: chapters.endPage })
+    .select({
+      href: chapters.href,
+      anchor: chapters.anchor,
+      orderIndex: chapters.orderIndex,
+      startPage: chapters.startPage,
+      endPage: chapters.endPage,
+    })
     .from(chapters)
     .where(and(eq(chapters.bookId, bookId), eq(chapters.id, chapterId)))
     .get();
@@ -54,7 +60,25 @@ export async function readChapterText(
       maxChars: opts.maxChars,
     });
   }
-  return extractChapterText(bytes, ch.href, opts);
+  // epub：同 href、orderIndex 更大的下一边界 anchor 作为本章终点（无则到文件末）。
+  let nextAnchor: string | undefined;
+  if (ch.anchor != null && ch.orderIndex != null) {
+    const next = db
+      .select({ anchor: chapters.anchor })
+      .from(chapters)
+      .where(
+        and(
+          eq(chapters.bookId, bookId),
+          eq(chapters.href, ch.href),
+          gt(chapters.orderIndex, ch.orderIndex),
+        ),
+      )
+      .orderBy(asc(chapters.orderIndex))
+      .limit(1)
+      .get();
+    nextAnchor = next?.anchor ?? undefined;
+  }
+  return extractChapterText(bytes, ch.href, opts, ch.anchor ?? undefined, nextAnchor);
 }
 
 /**
@@ -82,13 +106,14 @@ export async function readBookText(
     });
     return { text: slice.text, truncated: slice.hasMore };
   }
-  const hrefs = db
+  const rows = db
     .select({ href: chapters.href })
     .from(chapters)
     .where(eq(chapters.bookId, bookId))
     .orderBy(asc(chapters.orderIndex))
-    .all()
-    .map((r) => r.href);
+    .all();
+  const seen = new Set<string>();
+  const hrefs = rows.map((r) => r.href).filter((h) => (seen.has(h) ? false : (seen.add(h), true)));
   return extractBookText(bytes, hrefs, opts);
 }
 
@@ -118,15 +143,18 @@ export function listChapters(db: DB, bookId: string): ChapterRefDto[] {
   const walk = (nodes: TocNode[], level: number): void => {
     for (const n of nodes) {
       if (n.href && n.label) {
-        const ch = resolveChapterByHref(db, bookId, n.href);
+        const ch = resolveChapter(db, bookId, n.href, n.anchor ?? null);
         if (!ch) {
-          log.warn(`toc href not found in chapters (book ${bookId}, href ${n.href})`);
+          log.warn(
+            `toc entry not found in chapters (book ${bookId}, href ${n.href}, anchor ${n.anchor ?? "∅"})`,
+          );
         } else if (!seen.has(ch.id)) {
           seen.add(ch.id);
           out.push({
             id: ch.id,
             title: n.label,
             href: ch.href,
+            anchor: ch.anchor ?? null,
             orderIndex: ch.orderIndex ?? 0,
             level,
             startPage: ch.startPage ?? null,
@@ -146,6 +174,7 @@ export function listChapters(db: DB, bookId: string): ChapterRefDto[] {
       id: chapters.id,
       title: chapters.title,
       href: chapters.href,
+      anchor: chapters.anchor,
       orderIndex: chapters.orderIndex,
       startPage: chapters.startPage,
       endPage: chapters.endPage,
@@ -158,6 +187,7 @@ export function listChapters(db: DB, bookId: string): ChapterRefDto[] {
       id: c.id,
       title: c.title,
       href: c.href,
+      anchor: c.anchor ?? null,
       orderIndex: c.orderIndex ?? 0,
       level: 0,
       startPage: c.startPage ?? null,

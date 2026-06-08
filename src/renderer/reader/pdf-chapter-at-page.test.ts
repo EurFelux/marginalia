@@ -6,6 +6,7 @@ const ch = (id: string, startPage: number | null, orderIndex: number): ChapterRe
   id,
   title: id,
   href: `pdf-ch:${orderIndex}`,
+  anchor: null,
   orderIndex,
   level: 0,
   startPage,

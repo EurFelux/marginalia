@@ -76,6 +76,7 @@ export interface ChapterRefDto {
   id: string;
   title: string | null;
   href: string;
+  anchor: string | null; // 章内 #fragment（锚点级章节）；无锚点章为 null
   orderIndex: number;
   level: number;
   startPage: number | null; // PDF 章节页范围（1-based 闭区间）；epub 为 null
