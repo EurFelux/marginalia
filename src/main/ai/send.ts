@@ -131,6 +131,13 @@ export function runSend(
     onFinish: ({ totalUsage }) => {
       capturedUsage = totalUsage;
     },
+    // 诊断探针（dev 落盘）：钉死「模型到底有没有发 tool_call」。finishReason=tool-calls 但 UI 无工具步
+    // = SDK 静默丢弃（真 bug）；finishReason=stop 且 toolCalls=0 = 模型只吐文本、压根没调（模型/代理行为）。
+    onStepFinish: ({ finishReason, toolCalls, text }) => {
+      log.debug(
+        `step finished (finishReason=${finishReason}, toolCalls=${toolCalls.length}, textChars=${text.length})`,
+      );
+    },
   });
 
   // 7. 一轮终止时落 assistant 消息——出生即终态（complete|error|aborted），设计文档 §3 / DD-§3.1 / DD-§3.2。

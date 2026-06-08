@@ -24,6 +24,8 @@ export function AIPanel() {
   const { t } = useTranslation();
   const { messages, sendMessage, status, stop, setMessages, error } = useChat<ChatUIMessage>({
     transport: createIpcChatTransport(),
+    // 流式错误此前只塞进 error 字段弹 banner、从不落日志；补一条 warn 使渲染侧失败也有痕迹可查。
+    onError: (err) => log.warn("chat stream error", err),
   });
   const updateLayout = usePrefsStore((s) => s.updateLayout);
   const openCommand = useChatStore((s) => s.openCommand);
