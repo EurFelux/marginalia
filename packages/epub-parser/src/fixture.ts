@@ -4,9 +4,12 @@ import { strToU8, zipSync } from "fflate";
 export function makeFixtureEpub(opts?: {
   identifier?: string | null;
   coverViaMeta?: boolean;
+  /** 覆盖 <dc:title>；变更标题即改变字节流，用于构造「同 identifier、不同内容」的夹具。 */
+  title?: string;
 }): Uint8Array {
   const identifier = opts?.identifier === undefined ? "urn:uuid:fixture-001" : opts.identifier;
   const coverViaMeta = opts?.coverViaMeta ?? false;
+  const title = opts?.title ?? "Fixture Book";
 
   const container = `<?xml version="1.0"?>
 <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
@@ -25,7 +28,7 @@ export function makeFixtureEpub(opts?: {
   const opf = `<?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0"${uniqueIdentifierAttr}>
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">${identifierEl}
-    <dc:title>Fixture Book</dc:title>
+    <dc:title>${title}</dc:title>
     <dc:creator>Test Author</dc:creator>${coverMetaEl}
   </metadata>
   <manifest>

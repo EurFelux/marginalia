@@ -49,9 +49,11 @@ export async function importBook(db: DB, input: ImportInput): Promise<BookRow> {
 /** 原 importBook 函数体原样改名为 importEpubBook（保持同步实现；async 包装由 importBook 承担）。 */
 function importEpubBook(db: DB, bytes: Uint8Array): BookRow {
   const parsed = parseEpub(bytes);
-  const id = parsed.uid ?? createHash("sha256").update(bytes).digest("hex");
+  // 身份＝内容哈希（与 PDF 一致）。epub 的 dc:identifier 现实中并不唯一——z-library 等转换源会给
+  // 不同的书盖同一个写死的 boilerplate uid，若用它当主键，第二本会撞主键被误判「已存在」而丢失。
+  const id = createHash("sha256").update(bytes).digest("hex");
 
-  // 幂等：已在库则直接返回，不写入 books/chapters（零 DB churn）。注：parseEpub 在幂等检查前已执行（id 派生需要它）。
+  // 幂等：同字节流（即同一文件重导）已在库则直接返回，不写入 books/chapters（零 DB churn）。
   // "显式刷新/重新导入"留后续里程碑（按 (book_id, href) 稳定 upsert 保 chapter id）。
   const existing = db.select().from(books).where(eq(books.id, id)).get();
   if (existing) return existing;

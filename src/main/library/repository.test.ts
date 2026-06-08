@@ -46,7 +46,7 @@ describe("library repository", () => {
   it("imports a book and persists metadata + ordered chapters (pending)", async () => {
     const db = freshDb();
     const book = await importBook(db, { bytes: makeFixtureEpub() });
-    expect(book.id).toBe("urn:uuid:fixture-001");
+    expect(book.id).toMatch(/^[0-9a-f]{64}$/); // 身份＝内容哈希（不再用 dc:identifier）
     expect(book.title).toBe("Fixture Book");
     expect(listBooks(db)).toHaveLength(1);
 
@@ -73,6 +73,24 @@ describe("library repository", () => {
     });
     expect(book.id).toMatch(/^[0-9a-f]{64}$/);
     expect(getBook(db, book.id)).toBeDefined();
+  });
+
+  it("imports two different books that share the same epub dc:identifier (boilerplate uid collision)", async () => {
+    const db = freshDb();
+    // 现实坑：z-library 等转换源会给不同的书盖同一个写死的 dc:identifier。
+    // 身份必须由内容决定，否则第二本会被误判「已存在」而丢失。
+    const sharedUid = "urn:uuid:273fd756-collision";
+    const a = await importBook(db, {
+      bytes: makeFixtureEpub({ identifier: sharedUid, title: "Book A" }),
+    });
+    const b = await importBook(db, {
+      bytes: makeFixtureEpub({ identifier: sharedUid, title: "Book B" }),
+    });
+
+    expect(listBooks(db)).toHaveLength(2);
+    expect(a.id).not.toBe(b.id);
+    expect(a.title).toBe("Book A");
+    expect(b.title).toBe("Book B");
   });
 
   it("idempotent import: re-importing the same epub does not create duplicate books or change chapter ids", async () => {
