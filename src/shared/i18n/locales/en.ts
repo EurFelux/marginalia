@@ -162,6 +162,7 @@ export default {
   "reader.highlight.colorLabel": "Highlight {{color}}",
   "reader.highlight.underline": "Underline",
   "reader.note.addTitle": "Add note",
+  "reader.note.edit": "Edit",
   "reader.note.editTitle": "Edit note",
   "reader.note.label": "Note",
   "reader.note.placeholder": "Write your thoughts…",

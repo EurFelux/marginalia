@@ -29,6 +29,7 @@ import { PdfPrefs } from "@renderer/reader/PdfPrefs";
 import { SelectionToolbar } from "@renderer/reader/SelectionToolbar";
 import { HighlightStyleBar } from "@renderer/reader/HighlightStyleBar";
 import { NoteModal } from "@renderer/reader/NoteModal";
+import { NoteHoverCard } from "@renderer/reader/NoteHoverCard";
 import { AIPanel } from "@renderer/ai/AIPanel";
 import { SummaryPill } from "@renderer/ai/SummaryPill";
 import { useRestoreConversation } from "@renderer/ai/use-restore-conversation";
@@ -232,6 +233,7 @@ export function ReaderView() {
       <SelectionToolbar />
       <HighlightStyleBar />
       <NoteModal />
+      <NoteHoverCard />
     </div>
   );
 }

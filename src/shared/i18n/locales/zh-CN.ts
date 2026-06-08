@@ -151,6 +151,7 @@ export default {
   "reader.highlight.colorLabel": "高亮 {{color}}",
   "reader.highlight.underline": "下划线",
   "reader.note.addTitle": "添加笔记",
+  "reader.note.edit": "编辑",
   "reader.note.editTitle": "编辑笔记",
   "reader.note.label": "笔记",
   "reader.note.placeholder": "写点想法…",
