@@ -10,7 +10,11 @@ export interface AssemblePromptParams {
   history: PromptHistoryMessage[];
   /** 滚动概要（已折叠的早期轮）；非空时拼入 system。null = 无概要。 */
   priorSummary?: string | null;
-  current: { chips: Chip[]; userText: string; readingContext?: ReadingContext | null };
+  current: {
+    chips: ReadonlyArray<{ id: string; content: string }>;
+    userText: string;
+    readingContext?: ReadingContext | null;
+  };
 }
 
 /** 仅保留 text part（assistant 的 tool-call/reasoning part 有意不回放，Phase 1 选择）。 */

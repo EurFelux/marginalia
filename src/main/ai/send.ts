@@ -1,32 +1,20 @@
 // src/main/ai/send.ts
-import {
-  stepCountIs,
-  streamText,
-  type LanguageModelUsage,
-  type ModelMessage,
-  type UIMessageChunk,
-} from "ai";
+import { type ModelMessage } from "ai";
 import { eq } from "drizzle-orm";
 import type { DB } from "@main/db/client";
 import { conversations } from "@main/db/schema";
 import { getDefaultAssistant } from "@main/providers/assistant";
 import { assemblePrompt, pdfSystemNote } from "@main/ai/prompt";
 import { dedupeParagraph, toContextChips } from "@main/ai/chips";
-import { maybeCompactConversation } from "@main/ai/context-compaction";
-import { createReadingTools, type LoadBytes } from "@main/ai/tools";
+import { type LoadBytes } from "@main/ai/tools";
 import { supportsImageToolResults } from "@main/ai/model-factory";
 import { getBook } from "@main/library/repository";
 import type { ResolvedModel } from "@main/ai/assistant-model";
 import { appendMessage, getLastParagraphContent, listMessagesAfterSeq } from "@main/chat/messages";
-import { nameConversation } from "@main/chat/conversation-title";
-import { textOfParts } from "@main/ai/prompt";
 import { t } from "@main/i18n";
 import { type SendInput } from "@shared/chat";
-import { DEFAULT_STEP_LIMIT } from "@shared/preferences";
-import { createLogger } from "@main/logger";
+import { streamAssistantReply, type OkSendResult } from "@main/ai/stream-assistant";
 export type { SendInput };
-
-const log = createLogger("send");
 
 export interface SendDeps {
   db: DB;
@@ -38,15 +26,7 @@ export interface SendDeps {
   stepLimit?: number;
 }
 
-export type SendResult =
-  | {
-      ok: true;
-      conversationId: string;
-      /** UI message stream（chunk 为 UIMessageChunk）供 UI 轨 IPC 订阅推送。 */
-      stream: AsyncIterable<UIMessageChunk>;
-      finished: Promise<void>;
-    }
-  | { ok: false; reason: string };
+export type SendResult = OkSendResult | { ok: false; reason: string };
 
 /** 选区 → AI 发送编排（设计文档 §9）。 */
 export function runSend(
@@ -54,7 +34,7 @@ export function runSend(
   input: SendInput,
   opts?: { abortSignal?: AbortSignal },
 ): SendResult {
-  const { db, loadBytes, resolveModel, resolveSummaryModel, stepLimit } = deps;
+  const { db, resolveModel } = deps;
 
   // 1. 先解析模型——未配置即返回错误，不落库
   const resolved = resolveModel();
@@ -122,131 +102,12 @@ export function runSend(
     messages = allMessages;
   }
 
-  // 6. streamText + tools + agent 循环
-  const tools = createReadingTools({ db, bookId: input.bookId, loadBytes, imageToolResults });
-  // 从 streamText 自身的 onFinish 旁路捕获跨步聚合用量（toUIMessageStream 的 onFinish 不带 usage）。
-  let capturedUsage: LanguageModelUsage | undefined;
-  const limit = stepLimit ?? DEFAULT_STEP_LIMIT; // ?? 不用 ||——保住合法的 0（不限制）
-  const result = streamText({
-    model: resolved.model,
-    system: systemPrompt,
+  // 6. 流式回复（共享尾段）
+  return streamAssistantReply(
+    deps,
+    { conversationId, bookId: input.bookId, resolved, userText: input.userText },
     messages,
-    tools,
-    stopWhen: limit === 0 ? () => false : stepCountIs(limit),
-    abortSignal: opts?.abortSignal,
-    onFinish: ({ totalUsage }) => {
-      capturedUsage = totalUsage;
-    },
-    // 诊断探针（dev 落盘）：钉死「模型到底有没有发 tool_call」。finishReason=tool-calls 但 UI 无工具步
-    // = SDK 静默丢弃（真 bug）；finishReason=stop 且 toolCalls=0 = 模型只吐文本、压根没调（模型/代理行为）。
-    onStepFinish: ({ finishReason, toolCalls, text }) => {
-      log.debug(
-        `step finished (finishReason=${finishReason}, toolCalls=${toolCalls.length}, textChars=${text.length})`,
-      );
-    },
-  });
-
-  // 7. 一轮终止时落 assistant 消息——出生即终态（complete|error|aborted），设计文档 §3 / DD-§3.1 / DD-§3.2。
-  let resolveDone!: () => void;
-  const finished = new Promise<void>((res) => {
-    resolveDone = res;
-  });
-
-  // streamText 遇 doStream 错误时发 error chunk 并正常关流（isAborted 仍 false），故用 streamHadError 标志区分；
-  // 用户中止经 abortSignal → onFinish 的 isAborted=true（SDK 权威信号，非嗅探 AbortError，DD-§3.2）。
-  // 两种终止都补落带终态的 assistant（不再用双守卫跳过 → 不再产生孤儿 user turn）。
-  let streamHadError = false;
-  let errorInfo: { name: string; message: string } | undefined;
-  const uiStream = result.toUIMessageStream({
-    onError: (err) => {
-      streamHadError = true;
-      errorInfo = {
-        name: err instanceof Error ? err.name : "Error",
-        message: err instanceof Error ? err.message : String(err),
-      };
-      log.warn("stream/model error", err);
-      // onError 要求返回 string（作为 error chunk 的 errorText，供 renderer 实时显示）
-      return errorInfo.message;
-    },
-    onFinish: ({ responseMessage, isAborted }) => {
-      // 会话可能在流中途被删除（conversations:delete 先 abort 在跑流再删行）：此时行已不在，
-      // 落库必撞 FK。这是删除操作的预期后续而非失败——有意丢弃本轮 assistant 消息，仅留 debug 痕迹。
-      // 同步回调内 check-then-act 安全（better-sqlite3 同步驱动，无写入穿插）。
-      const stillExists = db
-        .select({ id: conversations.id })
-        .from(conversations)
-        .where(eq(conversations.id, conversationId))
-        .get();
-      if (!stillExists) {
-        log.debug("conversation deleted mid-stream; dropping assistant persist", conversationId);
-        return;
-      }
-      const status = streamHadError ? "error" : isAborted ? "aborted" : "complete";
-      const usage =
-        capturedUsage?.inputTokens != null && capturedUsage.outputTokens != null
-          ? { inputTokens: capturedUsage.inputTokens, outputTokens: capturedUsage.outputTokens }
-          : undefined;
-      appendMessage(db, {
-        conversationId,
-        role: "assistant",
-        parts: responseMessage.parts, // 完整 / 中止前的 partial / 报错前已流出
-        status,
-        metadata: {
-          model: resolved.modelId,
-          usage,
-          error: streamHadError ? errorInfo : undefined,
-        },
-      });
-      // 首轮完成 → 自动命名（spec §5）：title 仍 null 且本轮 complete 且有文本回复才触发；fire-and-forget
-      // tool-only 轮（无文本回复）不触发命名——上下文不完整不起名
-      // namingInFlight 在本同步回调内置位，先于任何 IPC 往返——renderer 发送结束后的列表刷新必然观察到
-      // isNaming=true（轮询启动依赖此顺序）
-      if (status === "complete") {
-        const assistantText = textOfParts(responseMessage.parts);
-        const row = db
-          .select({ title: conversations.title })
-          .from(conversations)
-          .where(eq(conversations.id, conversationId))
-          .get();
-        if (assistantText && row && row.title == null) {
-          void nameConversation(
-            { db, resolveModel: resolveSummaryModel },
-            conversationId,
-            input.userText,
-            assistantText,
-          );
-        }
-        // 轮后后台压缩（fire-and-forget）：尾轮超预算时折叠旧轮进滚动概要。复用摘要模型。
-        void maybeCompactConversation({ db, resolveModel: resolveSummaryModel }, conversationId);
-      }
-    },
-  });
-
-  // tee：[consumer, caller]
-  const [internalStream, callerStream] = uiStream.tee();
-
-  // 驱动内部流到完成（触发 onFinish）；出错吞掉但仍 resolve finished
-  void (async () => {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      for await (const _chunk of internalStream) {
-        // drain
-      }
-    } catch (err) {
-      // 防御性：仅当 UI 流在迭代中真正 reject 时到这（如 onFinish 内 appendMessage DB 写入抛错）。
-      // 正常的 doStream 抛错（→ error chunk）与用户 abort（→ onFinish isAborted）都正常关流、
-      // 在 onFinish 落终态 assistant 消息，不会进这里。记日志以便排查 DB 落库失败。
-      log.warn("assistant persist / stream drain failed", err);
-    } finally {
-      // 无论成功/错误，都 resolve finished，避免上层 await 永挂
-      resolveDone();
-    }
-  })();
-
-  return {
-    ok: true,
-    conversationId,
-    stream: callerStream,
-    finished,
-  };
+    systemPrompt,
+    opts,
+  );
 }
