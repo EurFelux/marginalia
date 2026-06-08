@@ -7,8 +7,8 @@ import type { Chip } from "@shared/chat";
 import { Button } from "@renderer/components/ui/button";
 import { isSubmitEnter } from "@renderer/lib/keyboard";
 import { useChatStore } from "@renderer/store/chat-store";
-import { usePrefsStore } from "@renderer/store/prefs-store";
 import { useNavigationStore } from "@renderer/store/navigation-store";
+import { registerComposerFocus } from "@renderer/ai/composer-focus";
 import { ContextPillBar } from "@renderer/ai/ContextPillBar";
 import { materializeSummaryChips } from "@renderer/ai/summary-chips";
 import { bookSummaryQuery, chapterSummaryQuery } from "@renderer/query/summary-queries";
@@ -26,21 +26,28 @@ export function Composer({ status, onSend, onStop }: Props) {
   const setDraftText = useChatStore((s) => s.setDraftText);
   const setDraftChips = useChatStore((s) => s.setDraftChips);
   const summaryChips = useChatStore((s) => s.summaryChips);
-  const panelOpen = usePrefsStore((s) => s.layout.panelOpen);
   const bookId = useNavigationStore((s) => s.currentBookId);
   const chapterId = useNavigationStore((s) => s.currentChapterId);
   const ref = useRef<HTMLTextAreaElement | null>(null);
   const isStreaming = status === "streaming" || status === "submitted";
+
+  useEffect(() => {
+    registerComposerFocus(() => {
+      const el = ref.current;
+      if (!el) return;
+      el.focus({ preventScroll: true });
+      // 光标置末尾：预设提示语场景可直接 Enter 或追加，符合直觉
+      const end = el.value.length;
+      el.setSelectionRange(end, end);
+    });
+    return () => registerComposerFocus(null);
+  }, []);
 
   const chapterSummary = useQuery({
     ...chapterSummaryQuery(bookId ?? "", chapterId ?? ""),
     enabled: !!bookId && !!chapterId,
   });
   const bookSummary = useQuery({ ...bookSummaryQuery(bookId ?? ""), enabled: !!bookId });
-
-  useEffect(() => {
-    if (panelOpen) ref.current?.focus({ preventScroll: true });
-  }, [panelOpen]);
 
   const send = () => {
     const text = draftText.trim();
