@@ -2,7 +2,7 @@ import type { IpcMainInvokeEvent, WebContents } from "electron";
 import { C } from "@shared/ipc";
 import type { AiStreamEvent, SendAck } from "@shared/chat";
 import { bind, register, type Binding } from "@main/ipc/registry";
-import { runSend, type SendResult } from "@main/ai/send";
+import { runResend, runSend, type SendResult } from "@main/ai/send";
 import { makeSendDeps } from "@main/ai/send-deps";
 import { createLogger } from "@main/logger";
 
@@ -85,6 +85,21 @@ export const aiBindings: Binding[] = [
     activeStreams.set(streamId, { controller, conversationId: input.conversationId });
 
     const result = runSend(makeSendDeps(), input, { abortSignal: controller.signal });
+    if (!result.ok) {
+      activeStreams.delete(streamId);
+      return { ok: false, reason: result.reason };
+    }
+    void pumpStream(event.sender, streamId, result, controller.signal).finally(() => {
+      activeStreams.delete(streamId);
+    });
+    return { ok: true, conversationId: result.conversationId };
+  }),
+
+  bind(C.aiResend, (req, event: IpcMainInvokeEvent): SendAck => {
+    const { streamId, ...input } = req;
+    const controller = new AbortController();
+    activeStreams.set(streamId, { controller, conversationId: input.conversationId });
+    const result = runResend(makeSendDeps(), input, { abortSignal: controller.signal });
     if (!result.ok) {
       activeStreams.delete(streamId);
       return { ok: false, reason: result.reason };

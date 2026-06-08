@@ -4,15 +4,21 @@ import { eq } from "drizzle-orm";
 import type { DB } from "@main/db/client";
 import { conversations } from "@main/db/schema";
 import { getDefaultAssistant } from "@main/providers/assistant";
-import { assemblePrompt, pdfSystemNote } from "@main/ai/prompt";
+import { assemblePrompt, pdfSystemNote, textOfParts } from "@main/ai/prompt";
 import { dedupeParagraph, toContextChips } from "@main/ai/chips";
 import { type LoadBytes } from "@main/ai/tools";
 import { supportsImageToolResults } from "@main/ai/model-factory";
 import { getBook } from "@main/library/repository";
 import type { ResolvedModel } from "@main/ai/assistant-model";
-import { appendMessage, getLastParagraphContent, listMessagesAfterSeq } from "@main/chat/messages";
+import {
+  appendMessage,
+  getMessage,
+  getLastParagraphContent,
+  listMessagesAfterSeq,
+  resetUserTurnForResend,
+} from "@main/chat/messages";
 import { t } from "@main/i18n";
-import { type SendInput } from "@shared/chat";
+import { type ResendInput, type SendInput } from "@shared/chat";
 import { streamAssistantReply, type OkSendResult } from "@main/ai/stream-assistant";
 export type { SendInput };
 
@@ -106,6 +112,105 @@ export function runSend(
   return streamAssistantReply(
     deps,
     { conversationId, bookId: input.bookId, resolved, userText: input.userText },
+    messages,
+    systemPrompt,
+    opts,
+  );
+}
+
+/** 编辑重发 / 直接重发：设 user 文本 + 截断其后 + 从持久化消息重组 prompt + 流式。 */
+export function runResend(
+  deps: SendDeps,
+  input: ResendInput,
+  opts?: { abortSignal?: AbortSignal },
+): SendResult {
+  const { db, resolveModel } = deps;
+
+  const resolved = resolveModel();
+  if (!resolved.ok) return { ok: false, reason: resolved.reason };
+
+  const convo = db
+    .select({
+      bookId: conversations.bookId,
+      contextSummary: conversations.contextSummary,
+      summarizedThroughSeq: conversations.summarizedThroughSeq,
+    })
+    .from(conversations)
+    .where(eq(conversations.id, input.conversationId))
+    .get();
+  if (!convo) {
+    return { ok: false, reason: t("errors.conversationNotFound", "会话不存在或不属于本书") };
+  }
+
+  const target = getMessage(db, input.userMessageId);
+  if (!target || target.conversationId !== input.conversationId || target.role !== "user") {
+    return { ok: false, reason: t("errors.messageNotResendable", "消息不存在或不可重发") };
+  }
+
+  // 事务：设文本 + 截断其后 + 按需重置摘要
+  resetUserTurnForResend(db, input.conversationId, input.userMessageId, input.userText);
+
+  // 重读摘要态（可能刚被重置）
+  const c2 = db
+    .select({
+      contextSummary: conversations.contextSummary,
+      summarizedThroughSeq: conversations.summarizedThroughSeq,
+    })
+    .from(conversations)
+    .where(eq(conversations.id, input.conversationId))
+    .get();
+
+  // 窗口历史（末条 = 目标 user 轮）
+  const window = listMessagesAfterSeq(db, input.conversationId, c2?.summarizedThroughSeq ?? null);
+  const current = window.at(-1);
+  if (!current) {
+    return { ok: false, reason: t("errors.messageNotResendable", "消息不存在或不可重发") };
+  }
+  const history = window.slice(0, -1);
+
+  // system（同 runSend：默认 Assistant + PDF 注记）
+  const assistant = getDefaultAssistant(db);
+  const book = getBook(db, convo.bookId);
+  const imageToolResults = supportsImageToolResults(resolved.providerType);
+  let systemPromptText = assistant.systemPrompt;
+  if (book?.format === "pdf") {
+    const note = pdfSystemNote({
+      pageCount: book.pageCount,
+      hasTextLayer: Boolean(book.hasTextLayer),
+      imageMode: imageToolResults,
+    });
+    systemPromptText = systemPromptText ? `${systemPromptText}\n\n${note}` : note;
+  }
+
+  const allMessages: ModelMessage[] = assemblePrompt({
+    systemPrompt: systemPromptText,
+    priorSummary: c2?.contextSummary ?? null,
+    history,
+    current: {
+      chips: current.metadata?.contextChips ?? [],
+      userText: textOfParts(current.parts),
+      readingContext: null,
+    },
+  });
+
+  let systemPrompt: string | undefined;
+  let messages: ModelMessage[];
+  if (allMessages.length > 0 && allMessages[0].role === "system") {
+    const sysMsg = allMessages[0];
+    systemPrompt = typeof sysMsg.content === "string" ? sysMsg.content : undefined;
+    messages = allMessages.slice(1);
+  } else {
+    messages = allMessages;
+  }
+
+  return streamAssistantReply(
+    deps,
+    {
+      conversationId: input.conversationId,
+      bookId: convo.bookId,
+      resolved,
+      userText: input.userText,
+    },
     messages,
     systemPrompt,
     opts,

@@ -111,6 +111,7 @@ export function createApi(d: PreloadDeps) {
     ai: {
       buildChips: inv(C.aiBuildChips),
       send: inv(C.aiSend),
+      resend: inv(C.aiResend),
       abort: inv(C.aiAbort),
       /** 订阅本 streamId 的增量；返回退订函数。 */
       onChunk: (streamId: string, cb: (ev: AiStreamEvent) => void): (() => void) =>
