@@ -27,6 +27,8 @@ export interface EpubBook {
   textLengthAtIndex: (index: number) => number;
   /** 卸载第 index 个 section 的解析文档（释放内存）；幂等，未加载/越界为 no-op。仅对远离视口的 section 调用。 */
   unloadSection: (index: number) => void;
+  /** 给定 section 文档与其内某元素，算该元素起点 CFI（进度锚点级存储）。失败返回 null。 */
+  cfiFromElement: (index: number, el: Element) => string | null;
   /** 释放 epubjs 资源（卸载书、blob URL）。 */
   destroy: () => void;
 }
@@ -161,6 +163,16 @@ export async function createEpubBook(bytes: Uint8Array): Promise<EpubBook> {
     },
 
     textLengthAtIndex: (index) => textLengths.get(index) ?? 0,
+
+    cfiFromElement: (index, el) => {
+      const s = sectionAt(index);
+      if (!s) return null;
+      try {
+        return new EpubCFI(el, s.cfiBase, ANNO_IGNORE_CLASS).toString();
+      } catch {
+        return null;
+      }
+    },
 
     unloadSection: (index) => {
       const s = sectionAt(index);

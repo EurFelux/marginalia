@@ -184,7 +184,21 @@ export function EpubReader({ bookId, chapters }: Props) {
 
     const chId = anchorChapterIdAt(index);
     const ch = chId ? chapters.find((c) => c.id === chId) : null;
-    const cfi = book.cfiAtIndex(index);
+
+    const topAnchorCfi = (sectionIndex: number, currentChId: string | null): string => {
+      const sectionFallback = book!.cfiAtIndex(sectionIndex) ?? "";
+      if (!currentChId) return sectionFallback;
+      const currentCh = chapters.find((c) => c.id === currentChId);
+      if (!currentCh?.anchor) return sectionFallback;
+      const frame = document.querySelector<HTMLIFrameElement>(
+        `[data-section-index="${sectionIndex}"] iframe`,
+      );
+      const el = frame?.contentDocument?.getElementById(currentCh.anchor);
+      if (!el) return sectionFallback;
+      return book!.cfiFromElement(sectionIndex, el) ?? sectionFallback;
+    };
+
+    const cfi = topAnchorCfi(index, chId);
     if (chId) {
       const sectionLength = book.textLengthAtIndex(index);
       const offset =
