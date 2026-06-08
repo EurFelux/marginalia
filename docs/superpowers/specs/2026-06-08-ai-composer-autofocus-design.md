@@ -46,6 +46,7 @@ HTML 规范规定 **`inert` 子树内的元素无法被聚焦，`.focus()` 调�
 - 选择**任意** AI panel 入口后，输入框获得焦点：选区工具栏 action（`startAiAction`，含 null/explain/translate/summarize）、侧栏打开已有会话（`openConversation`）、新对话按钮（`newConversation`）。
 - 覆盖「panel 已开着」与「panel 关→开」两种时序，均生效。
 - 聚焦走**命令式**，不引入 effect 驱动聚焦（删掉现有 `useEffect([panelOpen])`）。
+- **回归防护**：删掉 `useEffect([panelOpen])` 后，原本「任意 panel 开→聚焦」的覆盖面收窄；header 工具栏的开/合面板切换按钮（`ReaderView.tsx`）此前靠该 effect 在手动开面板时聚焦，故其「开」路径也接入 `openPanelAndFocusComposer()`（「关」仍 `updateLayout({ panelOpen: false })`），保留既有行为、避免回归。
 
 **非目标**：`restoreConversation`（开书被动恢复上次会话）**不**纳入——用户未主动选 action，开书时抢焦点会从正文夺走光标，与其「不强制开面板」的既有语义一致。
 

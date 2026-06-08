@@ -33,6 +33,7 @@ import { NoteHoverCard } from "@renderer/reader/NoteHoverCard";
 import { AIPanel } from "@renderer/ai/AIPanel";
 import { SummaryPill } from "@renderer/ai/SummaryPill";
 import { useRestoreConversation } from "@renderer/ai/use-restore-conversation";
+import { openPanelAndFocusComposer } from "@renderer/ai/composer-focus";
 
 export function ReaderView() {
   const { t } = useTranslation();
@@ -157,7 +158,11 @@ export function ReaderView() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => updateLayout({ panelOpen: !layout.panelOpen })}
+                    onClick={() =>
+                      layout.panelOpen
+                        ? updateLayout({ panelOpen: false })
+                        : openPanelAndFocusComposer()
+                    }
                     aria-label={panelLabel}
                     className="text-muted-foreground"
                   />
