@@ -4,6 +4,7 @@ vi.mock("@renderer/store/persist-preference", () => ({ persistPreference: vi.fn(
 
 import { persistPreference } from "@renderer/store/persist-preference";
 import { usePrefsStore, PREFS_INITIAL } from "@renderer/store/prefs-store";
+import { DEFAULT_STEP_LIMIT } from "@shared/preferences";
 
 beforeEach(() => {
   usePrefsStore.setState(PREFS_INITIAL);
@@ -42,5 +43,13 @@ describe("prefs-store", () => {
       panelOpen: false,
       headerOpen: true,
     });
+  });
+  it("setStepLimit updates value and persists", () => {
+    usePrefsStore.getState().setStepLimit(0);
+    expect(usePrefsStore.getState().stepLimit).toBe(0);
+    expect(persistPreference).toHaveBeenCalledWith({ key: "stepLimit", value: 0 });
+  });
+  it("stepLimit defaults to DEFAULT_STEP_LIMIT", () => {
+    expect(PREFS_INITIAL.stepLimit).toBe(DEFAULT_STEP_LIMIT);
   });
 });
