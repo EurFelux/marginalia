@@ -8,6 +8,8 @@ export interface AssemblePromptParams {
   systemPrompt: string | null;
   /** 既往消息（按 seq 升序）。 */
   history: PromptHistoryMessage[];
+  /** 滚动概要（已折叠的早期轮）；非空时拼入 system。null = 无概要。 */
+  priorSummary?: string | null;
   current: { chips: Chip[]; userText: string; readingContext?: ReadingContext | null };
 }
 
@@ -41,6 +43,16 @@ function renderUserTurn(chips: ChipLike, userText: string): string {
   if (selection) sections.push(`## 选中文本\n${selection}`);
   const context = sections.join("\n\n");
   return context ? `${context}\n\n${userText}` : userText;
+}
+
+/**
+ * 把单条历史消息渲染成喂模型的纯文本：assistant 取 text part（reasoning/tool part 不回放），
+ * user 轮带其 chips。assemblePrompt 与上下文压缩共用此单一渲染口径。
+ */
+export function renderHistoryMessage(h: PromptHistoryMessage): string {
+  return h.role === "assistant"
+    ? textOfParts(h.parts)
+    : renderUserTurn(h.metadata?.contextChips ?? [], textOfParts(h.parts));
 }
 
 function renderReadingContext(ctx: ReadingContext | null | undefined): string | null {
@@ -92,19 +104,20 @@ export function pdfSystemNote(p: {
 export function assemblePrompt(params: AssemblePromptParams): ModelMessage[] {
   const out: ModelMessage[] = [];
 
-  if (params.systemPrompt) out.push({ role: "system", content: params.systemPrompt });
+  const summary = params.priorSummary?.trim() ? params.priorSummary.trim() : null;
+  const sysParts: string[] = [];
+  if (params.systemPrompt) sysParts.push(params.systemPrompt);
+  if (summary) sysParts.push(`## Conversation summary so far\n${summary}`);
+  if (sysParts.length > 0) out.push({ role: "system", content: sysParts.join("\n\n") });
 
   for (const h of params.history) {
     // 历史里的 system 消息丢弃：系统提示词由当前 Assistant 重新注入，避免重复/冲突
     if (h.role === "system") continue;
     if (h.role === "assistant") {
-      out.push({ role: "assistant", content: textOfParts(h.parts) });
+      out.push({ role: "assistant", content: renderHistoryMessage(h) });
       continue;
     }
-    out.push({
-      role: "user",
-      content: renderUserTurn(h.metadata?.contextChips ?? [], textOfParts(h.parts)),
-    });
+    out.push({ role: "user", content: renderHistoryMessage(h) });
   }
 
   // Reading position is intentionally injected only into the live/current user turn:

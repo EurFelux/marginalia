@@ -1,6 +1,11 @@
 // src/main/ai/prompt.test.ts
 import { describe, expect, it } from "vitest";
-import { assemblePrompt, pdfSystemNote, type PromptHistoryMessage } from "@main/ai/prompt";
+import {
+  assemblePrompt,
+  pdfSystemNote,
+  renderHistoryMessage,
+  type PromptHistoryMessage,
+} from "@main/ai/prompt";
 import type { Chip } from "@shared/chat";
 
 function userChips(selection: string, paragraph?: string): Chip[] {
@@ -248,5 +253,66 @@ describe("pdfSystemNote", () => {
     const s = pdfSystemNote({ pageCount: null, hasTextLayer: false, imageMode: true });
     expect(s).toContain("scanned");
     expect(s).not.toContain("[p.N]");
+  });
+});
+
+describe("renderHistoryMessage", () => {
+  it("renders an assistant turn as its text parts only", () => {
+    expect(
+      renderHistoryMessage({
+        role: "assistant",
+        parts: [
+          { type: "reasoning", text: "ignored", state: "done" },
+          { type: "text", text: "hello" },
+        ],
+        metadata: null,
+      }),
+    ).toBe("hello");
+  });
+
+  it("renders a user turn with its chip sections then the text", () => {
+    const out = renderHistoryMessage({
+      role: "user",
+      parts: [{ type: "text", text: "why?" }],
+      metadata: { contextChips: [{ id: "selection", content: "the cat", tokenCount: 1 }] },
+    });
+    expect(out).toContain("## 选中文本\nthe cat");
+    expect(out).toContain("why?");
+  });
+});
+
+describe("assemblePrompt priorSummary", () => {
+  it("appends the summary to the system message when present", () => {
+    const msgs = assemblePrompt({
+      systemPrompt: "BASE",
+      priorSummary: "earlier we discussed X",
+      history: [],
+      current: { chips: [], userText: "hi" },
+    });
+    expect(msgs[0]?.role).toBe("system");
+    expect(msgs[0]?.content).toContain("BASE");
+    expect(msgs[0]?.content).toContain("## Conversation summary so far\nearlier we discussed X");
+  });
+
+  it("leaves the system message unchanged when priorSummary is null", () => {
+    const msgs = assemblePrompt({
+      systemPrompt: "BASE",
+      priorSummary: null,
+      history: [],
+      current: { chips: [], userText: "hi" },
+    });
+    expect(msgs[0]?.content).toBe("BASE");
+  });
+
+  it("only renders the tail history it is given", () => {
+    const msgs = assemblePrompt({
+      systemPrompt: "BASE",
+      priorSummary: "S",
+      history: [{ role: "assistant", parts: [{ type: "text", text: "kept" }], metadata: null }],
+      current: { chips: [], userText: "now" },
+    });
+    const joined = JSON.stringify(msgs);
+    expect(joined).toContain("kept");
+    expect(joined).toContain("now");
   });
 });
