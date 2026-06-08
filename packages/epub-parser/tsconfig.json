@@ -8,6 +8,9 @@
     "skipLibCheck": true,
     "esModuleInterop": true,
     "noEmit": true,
+    // tsup 的 dts 生成（rollup.js）硬编码注入 baseUrl="."，TS 6.0 默认对 deprecated 的 baseUrl
+    // 报 TS5101；此项 silence 之（仅本包范围，主 app tsconfig 不受影响）。
+    "ignoreDeprecations": "6.0",
     "types": []
   },
   "include": ["src"]
