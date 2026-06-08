@@ -13,6 +13,8 @@ export default {
   "ai.chip.selectionContext": "Selection context",
   "ai.closePanel": "Close panel",
   "ai.composer.placeholder": "Ask anything… (Enter to send, Shift+Enter for newline)",
+  "ai.copied": "Copied",
+  "ai.copy": "Copy",
   "ai.emptyHint": "Select text and tap 「Ask AI」, or just ask below.",
   "ai.newConversation": "New conversation",
   "ai.noBookToSend": "No book is open; cannot send.",
