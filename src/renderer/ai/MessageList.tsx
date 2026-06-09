@@ -60,6 +60,24 @@ export function MessageList({
           />
         ),
       )}
+      {/* submitted 空窗（已发送、首 chunk 未到）：即时占位，无缝交接到 streaming 的 ▍。 */}
+      {status === "submitted" && <PendingBubble />}
+    </div>
+  );
+}
+
+/** 脉冲光标：streaming 无文本与 submitted 占位共用的「正在思考」指示。 */
+function ThinkingCursor() {
+  return <span className="inline-block animate-pulse text-primary">▍</span>;
+}
+
+/** submitted 空窗占位气泡：发送后首 chunk 到达前即时显示，与 streaming 的 ThinkingCursor 无缝交接。 */
+function PendingBubble() {
+  return (
+    <div className="group flex flex-col items-start">
+      <div className="max-w-[88%] space-y-2 rounded-2xl rounded-bl-sm bg-muted px-3.5 py-2 text-sm leading-relaxed text-foreground">
+        <ThinkingCursor />
+      </div>
     </div>
   );
 }
@@ -138,9 +156,7 @@ function AssistantBubble({
             <ToolStepRow key={i} part={s.part} chapters={chapters} />
           ),
         )}
-        {streaming && !hasText && (
-          <span className="inline-block animate-pulse text-primary">▍</span>
-        )}
+        {streaming && !hasText && <ThinkingCursor />}
       </div>
       {!streaming && <MessageToolbar m={m} />}
     </div>
