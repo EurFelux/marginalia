@@ -23,7 +23,7 @@ function toDto(row: AnnotationRow): AnnotationDto {
   };
 }
 
-/** 列出某书的全部标注（最近创建在前；阅读序排序在渲染层做）。 */
+/** 列出某书的全部标注（按 createdAt 降序，最近创建在前；此即渲染层的展示顺序）。 */
 export function listAnnotationsByBook(db: DB, bookId: string): AnnotationDto[] {
   return db
     .select()

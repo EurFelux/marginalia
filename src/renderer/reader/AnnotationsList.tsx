@@ -12,9 +12,7 @@ import { useAnnotationStore } from "@renderer/store/annotation-store";
 import { STYLE_STRIPE } from "./highlight";
 import { chapterIdAtPage } from "./pdf-chapter-at-page";
 import { parsePdfLocatorRange } from "./pdf-locator";
-import { pdfOrderKey } from "./pdf-annotations";
 
-const cfiCompare = new EpubCFI();
 function spineOf(cfi: string): number {
   try {
     return new EpubCFI(cfi).spinePos ?? -1;
@@ -60,18 +58,7 @@ export function AnnotationsList({ bookId }: { bookId: string }) {
       </p>
     );
 
-  // 阅读序排序：PDF 标注按页+页内偏移；ePub 走 CFI compare（不可比时回退 spinePos）。
-  // 同一本书不会混两种 locator，两键同时非 null 即 PDF 书。
-  const sorted = [...list].sort((a, b) => {
-    const ka = pdfOrderKey(a.locatorRange);
-    const kb = pdfOrderKey(b.locatorRange);
-    if (ka != null && kb != null) return ka - kb;
-    try {
-      return cfiCompare.compare(a.locatorRange, b.locatorRange);
-    } catch {
-      return spineOf(a.locatorRange) - spineOf(b.locatorRange);
-    }
-  });
+  // 显示顺序＝后端 listByBook 的 desc(createdAt)：最近创建在前。
   const chapterTitle = (locator: string): string | null => {
     const pdfRange = parsePdfLocatorRange(locator);
     if (pdfRange) {
@@ -88,7 +75,7 @@ export function AnnotationsList({ bookId }: { bookId: string }) {
   return (
     <ScrollArea className="h-full">
       <div className="space-y-1.5 p-2">
-        {sorted.map((a) => (
+        {list.map((a) => (
           <AnnoItem
             key={a.id}
             a={a}
