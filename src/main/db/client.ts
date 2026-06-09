@@ -4,7 +4,7 @@ import { drizzle, type BetterSQLite3Database } from "drizzle-orm/better-sqlite3"
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import * as schema from "@main/db/schema";
 
-export type DB = BetterSQLite3Database<typeof schema>;
+export type DB = BetterSQLite3Database<typeof schema> & { $client: InstanceType<typeof Database> };
 
 /** 打开（或新建）一个 SQLite 库，启用 WAL + 外键约束，返回 Drizzle 实例。filename 传 ":memory:" 用于测试。 */
 export function createDb(filename: string): DB {
