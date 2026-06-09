@@ -126,6 +126,15 @@ export function createApi(d: PreloadDeps) {
       readingState: inv(C.statsReadingState),
       get: inv(C.statsGet),
     },
+
+    backup: {
+      /** 导出备份（主进程开 saveDialog）；用户取消返回 null。 */
+      export: inv(C.backupExport),
+      /** 选包并检视（主进程开 openDialog）；取消返回 null，含兼容性结论供确认弹窗。 */
+      inspect: inv(C.backupInspect),
+      /** 整体替换还原；成功后主进程立即 relaunch（此调用不会正常 resolve）。 */
+      restore: inv(C.backupRestore),
+    },
   };
 }
 
