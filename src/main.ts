@@ -17,6 +17,7 @@ import { registerLogHandlers } from "@main/ipc/log-handlers";
 import { registerAnnotationHandlers } from "@main/ipc/annotations-handlers";
 import { registerPreferenceHandlers } from "@main/ipc/preferences-handlers";
 import { registerStatsHandlers } from "@main/ipc/stats-handlers";
+import { registerBackupHandlers } from "@main/ipc/backup-handlers";
 import { initReadingClock, bindWindowToClock } from "@main/stats/clock-wiring";
 import { registerCoverProtocol, registerCoverProtocolScheme } from "@main/library/cover-protocol";
 
@@ -145,6 +146,7 @@ app.on("ready", () => {
   registerAiHandlers();
   registerLogHandlers();
   registerStatsHandlers();
+  registerBackupHandlers();
   initReadingClock();
   createWindow();
 });
