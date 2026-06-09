@@ -52,8 +52,9 @@ export function AdvancedSettings() {
       if (!ok) return;
       await window.api.backup.restore({ path: ins.path });
       // 成功后主进程 relaunch，正常不会执行到这里。
-    } catch {
-      window.alert(t("settings.backup.restoreFailed", "还原失败"));
+    } catch (err) {
+      const msg = err instanceof Error && err.message ? err.message : "";
+      window.alert(msg || t("settings.backup.restoreFailed", "还原失败"));
     } finally {
       setBusy(false);
     }

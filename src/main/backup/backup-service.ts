@@ -100,14 +100,22 @@ export async function restoreBackup(opts: {
     }
 
     // 换库前关连接释放锁，再整体替换
+    const preRestoreTarget = path.join(opts.preRestoreDir, opts.stamp);
     opts.closeDb();
-    await applyRestore({
-      dataDir: opts.dataDir,
-      booksDir: opts.booksDir,
-      stagingDir,
-      preRestoreTarget: path.join(opts.preRestoreDir, opts.stamp),
-      dbFileName: opts.dbFileName,
-    });
+    try {
+      await applyRestore({
+        dataDir: opts.dataDir,
+        booksDir: opts.booksDir,
+        stagingDir,
+        preRestoreTarget,
+        dbFileName: opts.dbFileName,
+      });
+    } catch (err) {
+      log.error(`restore failed mid-swap; original data preserved at ${preRestoreTarget}`, err);
+      throw new Error(
+        `Restore failed while swapping files. Your original data is preserved at ${preRestoreTarget} — copy marginalia.db and the books folder from there back into the app data folder to recover.`,
+      );
+    }
   } finally {
     await rm(stagingDir, { recursive: true, force: true }).catch((e: NodeJS.ErrnoException) => {
       if (e.code !== "ENOENT") log.warn("restore staging cleanup failed", e);
