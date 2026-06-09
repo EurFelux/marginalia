@@ -16,6 +16,8 @@ import { registerAiHandlers } from "@main/ipc/ai-handlers";
 import { registerLogHandlers } from "@main/ipc/log-handlers";
 import { registerAnnotationHandlers } from "@main/ipc/annotations-handlers";
 import { registerPreferenceHandlers } from "@main/ipc/preferences-handlers";
+import { registerStatsHandlers } from "@main/ipc/stats-handlers";
+import { initReadingClock, bindWindowToClock } from "@main/stats/clock-wiring";
 import { registerCoverProtocol, registerCoverProtocolScheme } from "@main/library/cover-protocol";
 
 // dev 与 production 各用独立的 userData 目录（分库，避免两环境互相污染数据）。
@@ -105,6 +107,8 @@ const createWindow = () => {
     if (isExternalUrl(url)) void shell.openExternal(url);
   });
 
+  bindWindowToClock(mainWindow);
+
   // Open the DevTools.
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.webContents.openDevTools();
@@ -140,6 +144,8 @@ app.on("ready", () => {
   registerPreferenceHandlers();
   registerAiHandlers();
   registerLogHandlers();
+  registerStatsHandlers();
+  initReadingClock();
   createWindow();
 });
 
