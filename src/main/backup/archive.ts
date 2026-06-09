@@ -53,8 +53,14 @@ export function readZipEntryText(zipPath: string, entryName: string): Promise<st
           if (e || !stream) return reject(e ?? new Error("zip stream failed"));
           const chunks: Buffer[] = [];
           stream.on("data", (c: Buffer) => chunks.push(c));
-          stream.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
-          stream.on("error", reject);
+          stream.on("end", () => {
+            zip.close();
+            resolve(Buffer.concat(chunks).toString("utf8"));
+          });
+          stream.on("error", (e) => {
+            zip.close();
+            reject(e);
+          });
         });
       });
       zip.on("end", () => {
