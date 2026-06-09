@@ -1,5 +1,16 @@
 # marginalia
 
+## 0.9.0
+
+### Minor Changes
+
+- 9a3740e: Add reading-time tracking with a dedicated Stats tab: total / today / last-7-days, a daily reading chart, reading streaks, and per-book time ranking. Navigation now uses Apple Books-style top pill tabs (Library / Stats).
+
+### Patch Changes
+
+- Show a pending placeholder in the AI panel while a reply is being submitted, so it's clear your request was sent before the assistant starts streaming.
+- c0e2e48: Fix the AI assistant pretending to call reading tools in longer conversations. Past assistant turns now replay their real tool calls and results in history (instead of being flattened to text), so the model keeps actually reading the book instead of imitating a tool-free transcript.
+
 ## 0.8.0
 
 ### Minor Changes
