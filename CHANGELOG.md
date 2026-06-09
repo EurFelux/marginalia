@@ -1,5 +1,21 @@
 # marginalia
 
+## 0.8.0
+
+### Minor Changes
+
+- 4cbe610: Add a configurable step limit for AI replies (Advanced settings). The default agent step cap is raised from 5 to 10, and you can set any value from 1–99 or choose "Unlimited" — helpful for page-by-page PDF reading where the AI needs more tool-call steps to gather context.
+- c0f3eca: Keep long AI conversations focused. Once a conversation's recent history grows past a large budget, older turns are folded in the background into a rolling summary while recent turns stay verbatim, so the prompt sent to the model stays bounded instead of growing without limit. This curbs the cost, latency, and quality drift (the assistant losing focus or skipping tool calls) that long reading sessions used to cause. Existing conversations are unaffected until they cross the threshold, and the summary is derived state only — your message history is never altered.
+
+### Patch Changes
+
+- 3ac5f03: Auto-focus the AI panel input after triggering an AI action (ask/explain/translate/summarize, opening a conversation, or starting a new one), so you can type a follow-up immediately without an extra click.
+- 77f49f5: Surface previously-silent failures in the AI streaming pipeline. When the main process couldn't push a stream chunk to the renderer (for example a payload that fails structured clone), the error was swallowed with nothing written to the logs; the chat stream's client-side errors were likewise never recorded. Both paths now emit warnings, and each agent step's finish reason is logged in development. So when an AI reply stalls or a requested tool call doesn't fire, there's a diagnostic trail to follow instead of silence.
+- f73fe67: Mark books as finished in your library. Right-click a book and choose "Mark as finished" to flag it as read — a green check badge appears on its cover, and the book drops off the "Continue reading" shelf. Choose "Unmark as finished" to undo. The book's right-click menu now also shows an icon beside each action.
+- fd08446: Edit, resend, and regenerate AI chat messages. Hover a message in the AI panel to reveal actions: edit one of your earlier questions and resend it, resend it unchanged, or regenerate the assistant's reply. The conversation is truncated from that point and a fresh reply is streamed — useful for rephrasing, retrying a failed reply, or getting an alternative answer.
+- 837f323: Fix the provider connection test failing for reasoning models (such as Kimi K2.6) with a baffling "failed: HTTP 200" message. The connectivity probe only requested a single output token — far too little for a reasoning model to even begin its internal reasoning — so the provider returned an incomplete HTTP 200 response that surfaced as a self-contradictory failure (a success status code reported as an error). The probe now allows enough output budget for reasoning models, a 2xx response that still can't be parsed now reports an honest diagnostic instead of a bare status code, and the test failure — previously swallowed with nothing written to the logs — is now recorded as a warning.
+- 1fecb84: Add a copy button to AI chat messages. Hovering (or keyboard-focusing) any message in the AI panel reveals a small toolbar; the copy action places the message's markdown source on the clipboard, so you can paste a reply into notes or feed it back into another prompt. Works for both AI replies and your own messages.
+
 ## 0.7.0
 
 ### Minor Changes
