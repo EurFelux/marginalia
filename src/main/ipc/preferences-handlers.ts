@@ -16,6 +16,8 @@ export const preferencesBindings: Binding[] = [
         return setPreference(getDb(), input.key, input.value);
       case "autoSummarize":
         return setPreference(getDb(), input.key, input.value);
+      case "onboardingDismissed":
+        return setPreference(getDb(), input.key, input.value);
       case "colorMode":
         return setPreference(getDb(), input.key, input.value);
       case "language":

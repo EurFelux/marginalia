@@ -19,6 +19,8 @@ interface PrefsState {
   pdfZoom: number;
   /** AI 对话 agent 循环的多步上限；0 = 不限制。落盘记忆，重启恢复。 */
   stepLimit: number;
+  /** 首启 onboarding 卡片已跳过/已完成（持久化，不再唠叨）。 */
+  onboardingDismissed: boolean;
 }
 interface PrefsActions {
   setAutoSummarize: (v: boolean) => void;
@@ -28,6 +30,7 @@ interface PrefsActions {
   updateLayout: (patch: Partial<ReaderLayout>) => void;
   setPdfZoom: (v: number) => void;
   setStepLimit: (v: number) => void;
+  setOnboardingDismissed: (v: boolean) => void;
 }
 
 export const PREFS_INITIAL: PrefsState = {
@@ -38,6 +41,7 @@ export const PREFS_INITIAL: PrefsState = {
   layout: { sidebarOpen: true, panelOpen: false, headerOpen: true },
   pdfZoom: 1,
   stepLimit: DEFAULT_STEP_LIMIT,
+  onboardingDismissed: false,
 };
 
 /**
@@ -77,5 +81,9 @@ export const usePrefsStore = create<PrefsState & PrefsActions>()((set) => ({
   setStepLimit: (stepLimit) => {
     persistPreference({ key: "stepLimit", value: stepLimit });
     set({ stepLimit });
+  },
+  setOnboardingDismissed: (onboardingDismissed) => {
+    persistPreference({ key: "onboardingDismissed", value: onboardingDismissed });
+    set({ onboardingDismissed });
   },
 }));
