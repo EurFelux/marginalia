@@ -366,6 +366,32 @@ describe("assemblePrompt", () => {
     ).toBe(true);
     expect(out.some((m) => m.role === "tool")).toBe(false);
   });
+
+  it("replays a failed (output-error) tool call as a tool result without throwing", async () => {
+    const out = await assemblePrompt({
+      systemPrompt: null,
+      history: [
+        {
+          role: "assistant",
+          parts: [
+            { type: "text", text: "trying" },
+            {
+              type: "tool-readPage",
+              toolCallId: "e1",
+              state: "output-error",
+              input: { page: 99, mode: "text" },
+              errorText: "page 99 is out of range",
+            },
+          ] as PromptHistoryMessage["parts"],
+          metadata: null,
+        },
+      ],
+      current: { chips: [], userText: "next" },
+    });
+    const toolMsg = out.find((m) => m.role === "tool");
+    expect(toolMsg).toBeDefined();
+    expect(JSON.stringify(toolMsg!.content)).toContain("page 99 is out of range");
+  });
 });
 
 describe("pdfSystemNote", () => {
