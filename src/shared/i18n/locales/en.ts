@@ -215,16 +215,19 @@ export default {
   "settings.advanced.stepLimitUnlimited": "Unlimited",
   "settings.appearance": "Appearance",
   "settings.assistantModel": "Chat model",
+  "settings.backup.cancel": "Cancel",
   "settings.backup.confirmRestore_one":
-    "This will replace all current data with this backup ({{count}} book, exported {{when}}). Current data will be saved as a pre-restore copy and the app will relaunch. Continue?",
+    "This will replace all current data with this backup ({{count}} book, exported {{when}}). Current data will be saved as a pre-restore copy and the app will relaunch.",
   "settings.backup.confirmRestore_other":
-    "This will replace all current data with this backup ({{count}} books, exported {{when}}). Current data will be saved as a pre-restore copy and the app will relaunch. Continue?",
+    "This will replace all current data with this backup ({{count}} books, exported {{when}}). Current data will be saved as a pre-restore copy and the app will relaunch.",
   "settings.backup.export": "Export Backup",
   "settings.backup.exportDone": "Backup exported: {{path}}",
   "settings.backup.exportFailed": "Backup export failed",
   "settings.backup.incompatible": "Cannot restore: backup is from a newer app version ({{reason}})",
+  "settings.backup.readFailed": "Couldn't read this backup",
   "settings.backup.restore": "Restore Backup",
   "settings.backup.restoreFailed": "Restore failed",
+  "settings.backup.restoreTitle": "Restore backup?",
   "settings.backup.title": "Backup & Restore",
   "settings.backup.warning":
     "Backups include all books, annotations, reading progress, conversations, and settings. API keys are exported in plaintext — keep the file private.",
