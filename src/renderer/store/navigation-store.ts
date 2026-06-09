@@ -3,7 +3,7 @@ import type { ReadingContext } from "@shared/chat";
 import { useChatStore } from "@renderer/store/chat-store";
 
 interface NavigationState {
-  view: "library" | "reader";
+  view: "library" | "stats" | "reader";
   currentBookId: string | null;
   currentChapterId: string | null;
   readingContext: ReadingContext | null;
@@ -13,6 +13,8 @@ interface NavigationState {
 interface NavigationActions {
   openBook: (bookId: string, chapterId?: string | null) => void;
   backToLibrary: () => void;
+  showLibrary: () => void;
+  showStats: () => void;
   setCurrentChapter: (chapterId: string) => void;
   setReadingContext: (readingContext: ReadingContext | null) => void;
   setReadingPercent: (readingPercent: number | null) => void;
@@ -40,6 +42,8 @@ export const useNavigationStore = create<NavigationState & NavigationActions>((s
   },
   // 仅切回 library；currentBookId/currentChapterId 有意保留（App 按 view 守卫，library 下不读这些 id）
   backToLibrary: () => set({ view: "library" }),
+  showLibrary: () => set({ view: "library" }),
+  showStats: () => set({ view: "stats" }),
   setCurrentChapter: (currentChapterId) => set({ currentChapterId }),
   setReadingContext: (readingContext) => set({ readingContext }),
   setReadingPercent: (readingPercent) => set({ readingPercent }),
