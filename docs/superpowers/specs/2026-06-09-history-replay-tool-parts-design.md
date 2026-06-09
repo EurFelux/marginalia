@@ -111,3 +111,9 @@ issue 标题含「tool/**reasoning** parts」，本 spec 的结论是**评估后
 - 取证记忆：`ai-toolcall-failure-is-model-behavior`（本 bug 的直接动机）。
 - 设计哲学：`src/main/ai/prompt.ts` 头注「历史与当前同构、无隐藏注入通道」「ModelMessage 按需派生不持久化」。
 - 关键 API：`convertToModelMessages`（ai@6.0.193），选项 `{ tools?, ignoreIncompleteToolCalls?, convertDataPart? }`。
+
+## 10. 实现期修正（2026-06-09）
+
+`convertToModelMessages`（ai@6.0.193）实测为 **async**（`Promise<ModelMessage[]>`），与 §3/§7「`assemblePrompt` 保持同步」的假设冲突。**修正**：仍采用方案 A（SDK 转换——正确处理多步 `step-start` 边界，手工同步映射会重排语义），将 `assemblePrompt`、`runSend`/`runResend` 及两个 `ai:*` IPC bind 一并改为 async（IPC invoke 本就 async、`registry.bind` 已支持 `Promise<O>`、`register` 内 `await fn`）。「纯函数」语义收窄为「无 Electron/DB 依赖、headless 可测」，async 与之正交。实测确认：无 `tools` 选项即可把 `tool-${name}` part 还原为 `tool-call`/`tool-result`（含 `output-error` → `{type:"error-text"}`），`reasoning` 默认会带出故须转换前过滤，`ignoreIncompleteToolCalls:true` 丢孤儿不抛。
+
+**已知后续（code review 提出，不在本 spec 范围内修）**：`context-compaction.ts` 的 `planFold` 仍按 `estimateTokens(renderHistoryMessage(m))`（纯文本口径）估尾轮体量，但本改动后未折叠尾轮的**实际**回放已含结构化 tool-result（可能很大，如 `readChapterText` 逐字输出）。故 tool-heavy 长会话的压缩触发可能偏晚于真实 token footprint。属新开的缝、需单独跟踪（呼应 §6「compaction 留作后续小项」）。
