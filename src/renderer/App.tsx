@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useNavigationStore } from "@renderer/store/navigation-store";
 import { TooltipProvider } from "@renderer/components/ui/tooltip";
 import { hydratePreferences } from "@renderer/store/hydrate-preferences";
-import { LibraryView } from "@renderer/library/LibraryView";
+import { AppShell } from "@renderer/shell/AppShell";
 import { ReaderView } from "@renderer/reader/ReaderView";
 import { SettingsShell } from "@renderer/settings/SettingsShell";
 import { ThemeController } from "@renderer/theme/ThemeController";
@@ -17,7 +17,7 @@ export function App() {
   return (
     <TooltipProvider>
       <ThemeController />
-      {view === "reader" ? <ReaderView /> : <LibraryView />}
+      {view === "reader" ? <ReaderView /> : <AppShell />}
       <SettingsShell />
       <Toaster />
     </TooltipProvider>
