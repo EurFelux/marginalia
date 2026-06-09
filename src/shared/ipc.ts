@@ -48,6 +48,8 @@ import type { PreferencesSnapshot } from "@shared/preferences";
 import { setPreferenceInput } from "@shared/preferences";
 import type { ReadingStatsDto } from "@shared/stats";
 import { statsGetInput, statsReadingStateInput } from "@shared/stats";
+import type { BackupExportResult, BackupInspection } from "@shared/backup";
+import { backupRestoreInput } from "@shared/backup";
 
 /** ping —— 演示"带入参且经 Zod 校验"的往返 */
 export const pingInput = z.object({ msg: z.string().min(1) });
@@ -255,6 +257,11 @@ export const C = {
   // stats（阅读时长）
   statsReadingState: def("stats:reading-state", "invoke", statsReadingStateInput, out<void>()),
   statsGet: def("stats:get", "invoke", statsGetInput, out<ReadingStatsDto>()),
+
+  // backup
+  backupExport: def("backup:export", "invoke", z.void(), out<BackupExportResult | null>()),
+  backupInspect: def("backup:inspect", "invoke", z.void(), out<BackupInspection | null>()),
+  backupRestore: def("backup:restore", "invoke", backupRestoreInput, out<void>()),
 
   // logging
   logWrite: def("log:write", "invoke", logWriteInput, out<void>()),
