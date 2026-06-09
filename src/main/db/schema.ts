@@ -211,3 +211,22 @@ export const preferences = sqliteTable("preferences", {
     .notNull()
     .$defaultFn(() => Date.now()),
 });
+
+// 阅读时长按 (书 × 本地日期) 累计（spec 2026-06-09-reading-time-tracking §2）。
+// 删书 set null 保留时长历史：bookId 置空后该行仍计入 总时长/每日柱图/streak，仅各书排行不再列它。
+export const readingDaily = sqliteTable(
+  "reading_daily",
+  {
+    id: pkUuid(),
+    bookId: text("book_id").references(() => books.id, { onDelete: "set null" }),
+    day: text("day").notNull(), // 本地日期 'YYYY-MM-DD'
+    seconds: integer("seconds").notNull().default(0),
+  },
+  (t) => [
+    // upsert 只以**非空** bookId 命中 (bookId, day)；null 仅由删书 set null 产生（SQLite 视多个
+    // NULL 相异，故同一天可有多条 null 行——均计入每日合计求和，无碍）。勿用可空 bookId 做 upsert。
+    unique("reading_daily_book_day_unique").on(t.bookId, t.day),
+    index("reading_daily_day_idx").on(t.day),
+    index("reading_daily_book_id_idx").on(t.bookId),
+  ],
+);
