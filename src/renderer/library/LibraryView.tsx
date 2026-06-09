@@ -24,6 +24,7 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, arrayMove, rectSortingStrategy } from "@dnd-kit/sortable";
 import { SortableBook } from "./SortableBook";
+import { OnboardingCard } from "./OnboardingCard";
 
 interface ImportItem {
   filePath: string;
@@ -233,6 +234,7 @@ export function LibraryView() {
 
       <ScrollArea className="min-h-0 flex-1">
         <main className="p-6">
+          <OnboardingCard />
           <RecentlyReadShelf onOpen={openBook} />
           {books.isPending && (
             <p className="text-sm text-muted-foreground">{t("library.loading", "加载书库…")}</p>
