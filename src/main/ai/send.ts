@@ -35,11 +35,11 @@ export interface SendDeps {
 export type SendResult = OkSendResult | { ok: false; reason: string };
 
 /** 选区 → AI 发送编排（设计文档 §9）。 */
-export function runSend(
+export async function runSend(
   deps: SendDeps,
   input: SendInput,
   opts?: { abortSignal?: AbortSignal },
-): SendResult {
+): Promise<SendResult> {
   const { db, resolveModel } = deps;
 
   // 1. 先解析模型——未配置即返回错误，不落库
@@ -90,7 +90,7 @@ export function runSend(
     });
     systemPromptText = systemPromptText ? `${systemPromptText}\n\n${note}` : note;
   }
-  const allMessages: ModelMessage[] = assemblePrompt({
+  const allMessages: ModelMessage[] = await assemblePrompt({
     systemPrompt: systemPromptText,
     priorSummary: convo.contextSummary,
     history,
@@ -119,11 +119,11 @@ export function runSend(
 }
 
 /** 编辑重发 / 直接重发：设 user 文本 + 截断其后 + 从持久化消息重组 prompt + 流式。 */
-export function runResend(
+export async function runResend(
   deps: SendDeps,
   input: ResendInput,
   opts?: { abortSignal?: AbortSignal },
-): SendResult {
+): Promise<SendResult> {
   const { db, resolveModel } = deps;
 
   const resolved = resolveModel();
@@ -182,7 +182,7 @@ export function runResend(
     systemPromptText = systemPromptText ? `${systemPromptText}\n\n${note}` : note;
   }
 
-  const allMessages: ModelMessage[] = assemblePrompt({
+  const allMessages: ModelMessage[] = await assemblePrompt({
     systemPrompt: systemPromptText,
     priorSummary: c2?.contextSummary ?? null,
     history,

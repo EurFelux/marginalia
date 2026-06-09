@@ -145,7 +145,7 @@ describe("runSend conversation validation", () => {
   it("rejects unknown conversationId without writing anything", async () => {
     const db = freshDb();
     await seedBook(db);
-    const result = runSend(makeDeps(db), {
+    const result = await runSend(makeDeps(db), {
       bookId: "book-1",
       conversationId: "nope",
       chips: [],
@@ -162,7 +162,7 @@ describe("runSend conversation validation", () => {
       bytes: makeFixtureEpub({ identifier: "urn:uuid:other-book" }),
     });
     const other = createConversation(db, { bookId: book2.id });
-    const result = runSend(makeDeps(db), {
+    const result = await runSend(makeDeps(db), {
       bookId: book1.id,
       conversationId: other.id,
       chips: [],
@@ -178,7 +178,7 @@ describe("runSend", () => {
   it("returns an error and creates nothing when no model is configured", async () => {
     const { db, book, deps } = await setup({ ok: false, reason: "not configured" });
     const convo = createConversation(db, { bookId: book.id });
-    const r = runSend(deps, input(book.id, convo.id));
+    const r = await runSend(deps, input(book.id, convo.id));
     expect(r.ok).toBe(false);
     expect(listConversationsByBook(db, book.id)).toHaveLength(1); // conversation still there, just no messages
   });
@@ -190,7 +190,7 @@ describe("runSend", () => {
       modelId: "mock",
     });
     const convo = createConversation(db, { bookId: book.id });
-    const r = runSend(deps, input(book.id, convo.id));
+    const r = await runSend(deps, input(book.id, convo.id));
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     await r.finished;
@@ -217,7 +217,7 @@ describe("runSend", () => {
       modelId: "mock",
     });
     const convo = createConversation(db, { bookId: book.id });
-    const r = runSend(deps, input(book.id, convo.id));
+    const r = await runSend(deps, input(book.id, convo.id));
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     await r.finished;
@@ -237,7 +237,7 @@ describe("runSend", () => {
     });
     const { db, book, deps } = await setup({ ok: true, model: failModel, modelId: "mock" });
     const convo = createConversation(db, { bookId: book.id });
-    const r = runSend(deps, input(book.id, convo.id));
+    const r = await runSend(deps, input(book.id, convo.id));
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     await r.finished;
@@ -256,7 +256,7 @@ describe("runSend", () => {
       modelId: "mock",
     });
     const convo = createConversation(db, { bookId: book.id });
-    const r = runSend(deps, input(book.id, convo.id), { abortSignal: controller.signal });
+    const r = await runSend(deps, input(book.id, convo.id), { abortSignal: controller.signal });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     await r.finished;
@@ -282,10 +282,10 @@ describe("runSend", () => {
     });
     const { db, book, deps } = await setup({ ok: true, model: slowModel, modelId: "mock" });
     const convo = createConversation(db, { bookId: book.id });
-    const r = runSend(deps, input(book.id, convo.id), { abortSignal: controller.signal });
+    const r = await runSend(deps, input(book.id, convo.id), { abortSignal: controller.signal });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    controller.abort(); // runSend 同步返回后立即中止，分片仍在 50ms 延迟途中
+    controller.abort(); // runSend 返回后立即中止，分片仍在 50ms 延迟途中
     await r.finished;
     const assistant = listMessages(db, r.conversationId).find((m) => m.role === "assistant");
     expect(assistant?.status).toBe("aborted");
@@ -309,7 +309,7 @@ describe("runSend", () => {
     });
     const { db, book, deps } = await setup({ ok: true, model: slowModel, modelId: "mock" });
     const convo = createConversation(db, { bookId: book.id });
-    const r = runSend(deps, input(book.id, convo.id), { abortSignal: controller.signal });
+    const r = await runSend(deps, input(book.id, convo.id), { abortSignal: controller.signal });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     // 镜像 conversations:delete binding 的顺序：先 abort 在跑流，再删行
@@ -327,7 +327,7 @@ describe("runSend", () => {
       modelId: "mock",
     });
     const convo = createConversation(db, { bookId: book.id });
-    const first = runSend(
+    const first = await runSend(
       deps,
       input(book.id, convo.id, {
         chips: buildChips({ selection: "s1", paragraphCurrent: "dup para" }),
@@ -338,7 +338,7 @@ describe("runSend", () => {
     if (!first.ok) return;
     await first.finished;
 
-    const second = runSend(
+    const second = await runSend(
       deps,
       input(book.id, convo.id, {
         chips: buildChips({ selection: "s2", paragraphCurrent: "dup para" }),
@@ -360,7 +360,7 @@ describe("runSend", () => {
       { ok: true, model: namingOnlyModel("AI 标题"), modelId: "summary-model" },
     );
     const convo = createConversation(db, { bookId: book.id });
-    const r = runSend(deps, input(book.id, convo.id));
+    const r = await runSend(deps, input(book.id, convo.id));
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     await r.finished;
@@ -374,7 +374,7 @@ describe("runSend", () => {
     );
     const convo = createConversation(db, { bookId: book.id });
     setConversationTitle(db, convo.id, "既有名");
-    const r = runSend(deps, input(book.id, convo.id));
+    const r = await runSend(deps, input(book.id, convo.id));
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     await r.finished;
@@ -387,7 +387,7 @@ describe("runSend", () => {
       { ok: false, reason: "unset" },
     );
     const convo = createConversation(db, { bookId: book.id });
-    const r = runSend(deps, input(book.id, convo.id));
+    const r = await runSend(deps, input(book.id, convo.id));
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     await r.finished;
@@ -440,7 +440,7 @@ describe("pdf system prompt injection", () => {
       resolveSummaryModel: () => ({ ok: false, reason: "unset" }),
     };
     const convo = createConversation(db, { bookId: book.id });
-    const r = runSend(deps, {
+    const r = await runSend(deps, {
       bookId: book.id,
       conversationId: convo.id,
       userText: "hi",
@@ -461,7 +461,7 @@ describe("pdf system prompt injection", () => {
       modelId: "m",
     });
     const convo = createConversation(db, { bookId: book.id });
-    const r = runSend(deps, {
+    const r = await runSend(deps, {
       bookId: book.id,
       conversationId: convo.id,
       userText: "hi",
@@ -524,7 +524,7 @@ describe("runSend context summary injection", () => {
       .where(eq(conversations.id, convo.id))
       .run();
 
-    const r = runSend(deps, input(book.id, convo.id, { chips: [], userText: "now" }));
+    const r = await runSend(deps, input(book.id, convo.id, { chips: [], userText: "now" }));
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     await r.finished;
@@ -542,7 +542,7 @@ describe("runResend", () => {
 
   async function seedTurn(deps: SendDeps, db: ReturnType<typeof createDb>, bookId: string) {
     const convo = createConversation(db, { bookId });
-    const r = runSend(deps, input(bookId, convo.id, { userText: "first question" }));
+    const r = await runSend(deps, input(bookId, convo.id, { userText: "first question" }));
     if (!r.ok) throw new Error(r.reason);
     await r.finished;
     return convo;
@@ -556,7 +556,11 @@ describe("runResend", () => {
       role: "user",
       parts: [{ type: "text", text: "q" }],
     });
-    const r = runResend(deps, { conversationId: convo.id, userMessageId: u.id, userText: "q" });
+    const r = await runResend(deps, {
+      conversationId: convo.id,
+      userMessageId: u.id,
+      userText: "q",
+    });
     expect(r.ok).toBe(false);
     expect(listMessages(db, convo.id)).toHaveLength(1); // unchanged
   });
@@ -574,10 +578,11 @@ describe("runResend", () => {
       parts: [{ type: "text", text: "a" }],
     });
     expect(
-      runResend(deps, { conversationId: convo.id, userMessageId: "nope", userText: "x" }).ok,
+      (await runResend(deps, { conversationId: convo.id, userMessageId: "nope", userText: "x" }))
+        .ok,
     ).toBe(false);
     expect(
-      runResend(deps, { conversationId: convo.id, userMessageId: a.id, userText: "x" }).ok,
+      (await runResend(deps, { conversationId: convo.id, userMessageId: a.id, userText: "x" })).ok,
     ).toBe(false); // assistant
   });
 
@@ -590,7 +595,7 @@ describe("runResend", () => {
     const convo = await seedTurn(deps, db, book.id);
     const msgs = listMessages(db, convo.id);
     const user = msgs.find((m) => m.role === "user")!;
-    const r = runResend(deps, {
+    const r = await runResend(deps, {
       conversationId: convo.id,
       userMessageId: user.id,
       userText: "first question",
@@ -616,7 +621,7 @@ describe("runResend", () => {
     });
     const convo = await seedTurn(deps, db, book.id);
     const user = listMessages(db, convo.id).find((m) => m.role === "user")!;
-    const r = runResend(deps, {
+    const r = await runResend(deps, {
       conversationId: convo.id,
       userMessageId: user.id,
       userText: "EDITED QUESTION",

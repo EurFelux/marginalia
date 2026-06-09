@@ -1,6 +1,9 @@
 // src/main/ai/prompt.ts
-import type { ModelMessage, UIMessage } from "ai";
+import { convertToModelMessages, type ModelMessage, type UIMessage } from "ai";
 import type { Chip, MessageDto, ReadingContext } from "@shared/chat";
+import { createLogger } from "@main/logger";
+
+const log = createLogger("ai");
 
 export type PromptHistoryMessage = Pick<MessageDto, "role" | "parts" | "metadata">;
 
@@ -104,8 +107,49 @@ export function pdfSystemNote(p: {
   return lines.join(" ");
 }
 
-/** 组装分层上下文为 ModelMessage[]（设计文档 §10）。纯函数，无模型调用。 */
-export function assemblePrompt(params: AssemblePromptParams): ModelMessage[] {
+type AssistantPart = UIMessage["parts"][number];
+
+/**
+ * readPage 的 image 模式 tool-result 是整页 PNG 的 base64（tools.ts），逐轮回放成本极高。
+ * 历史回放时把它换成短文本占位——模型仍看到「真的调过 readPage」，只是不再重发大图
+ * （决策：保留调用、省略图像）。readPage 是唯一产图工具，故只需匹配 output.kind==="image"。
+ */
+function elideImageToolOutput(part: AssistantPart): AssistantPart {
+  const output = (part as { output?: unknown }).output;
+  if (output && typeof output === "object" && (output as { kind?: unknown }).kind === "image") {
+    const page = (output as { page?: unknown }).page;
+    return {
+      ...(part as object),
+      output: { note: `[page ${String(page)} image omitted from history]` },
+    } as AssistantPart;
+  }
+  return part;
+}
+
+/**
+ * 把一条历史 assistant 消息回放成原生结构化 ModelMessage：assistant(text + tool-call) + tool(result)
+ * （#42——让模型重新看到「真调工具 → 拿结果 → 再答」的范式，而非被抹成纯散文后误学出「假装调用」）。
+ * 跨轮 reasoning 砍掉（持久化 reasoning 跨 provider/model 回放有 API 不匹配风险；非 bug 成因）；
+ * readPage 图像 tool-result 占位省 token；孤儿/半截 tool-call 经 ignoreIncompleteToolCalls 丢弃。
+ * 转换失败 → 优雅降级为纯文本 assistant 消息 + warn（历史回放绝不搞崩发送）。
+ */
+async function assistantHistoryToModelMessages(h: PromptHistoryMessage): Promise<ModelMessage[]> {
+  try {
+    const parts = h.parts.filter((p) => p.type !== "reasoning").map(elideImageToolOutput);
+    const converted = await convertToModelMessages(
+      [{ role: "assistant", parts } as Omit<UIMessage, "id">],
+      { ignoreIncompleteToolCalls: true },
+    );
+    if (converted.length > 0) return converted;
+  } catch (err) {
+    log.warn("history convert fallback", err);
+  }
+  const text = textOfParts(h.parts);
+  return text ? [{ role: "assistant", content: text }] : [];
+}
+
+/** 组装分层上下文为 ModelMessage[]（设计文档 §10）。无 Electron/DB 依赖；因 convertToModelMessages 为 async 故本函数 async。 */
+export async function assemblePrompt(params: AssemblePromptParams): Promise<ModelMessage[]> {
   const out: ModelMessage[] = [];
 
   const summary = params.priorSummary?.trim() ? params.priorSummary.trim() : null;
@@ -118,7 +162,7 @@ export function assemblePrompt(params: AssemblePromptParams): ModelMessage[] {
     // 历史里的 system 消息丢弃：系统提示词由当前 Assistant 重新注入，避免重复/冲突
     if (h.role === "system") continue;
     if (h.role === "assistant") {
-      out.push({ role: "assistant", content: renderHistoryMessage(h) });
+      out.push(...(await assistantHistoryToModelMessages(h)));
       continue;
     }
     out.push({ role: "user", content: renderHistoryMessage(h) });

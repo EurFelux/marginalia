@@ -31,8 +31,8 @@ function userChips(selection: string, paragraph?: string): Chip[] {
 }
 
 describe("assemblePrompt", () => {
-  it("puts the assistant system prompt first when present", () => {
-    const out = assemblePrompt({
+  it("puts the assistant system prompt first when present", async () => {
+    const out = await assemblePrompt({
       systemPrompt: "You are helpful.",
       history: [],
       current: { chips: userChips("sel"), userText: "explain" },
@@ -40,8 +40,8 @@ describe("assemblePrompt", () => {
     expect(out[0]).toEqual({ role: "system", content: "You are helpful." });
   });
 
-  it("omits the system message when systemPrompt is null", () => {
-    const out = assemblePrompt({
+  it("omits the system message when systemPrompt is null", async () => {
+    const out = await assemblePrompt({
       systemPrompt: null,
       history: [],
       current: { chips: userChips("sel"), userText: "explain" },
@@ -49,8 +49,8 @@ describe("assemblePrompt", () => {
     expect(out.every((m) => m.role !== "system")).toBe(true);
   });
 
-  it("renders the current user turn with selection and paragraph chips", () => {
-    const out = assemblePrompt({
+  it("renders the current user turn with selection and paragraph chips", async () => {
+    const out = await assemblePrompt({
       systemPrompt: null,
       history: [],
       current: {
@@ -67,8 +67,8 @@ describe("assemblePrompt", () => {
     );
   });
 
-  it("omits the paragraph section when absent", () => {
-    const out = assemblePrompt({
+  it("omits the paragraph section when absent", async () => {
+    const out = await assemblePrompt({
       systemPrompt: null,
       history: [],
       current: { chips: userChips("only selection"), userText: "hi" },
@@ -76,7 +76,7 @@ describe("assemblePrompt", () => {
     expect(out[out.length - 1].content).toBe("## 选中文本\nonly selection\n\nhi");
   });
 
-  it("renders chapter-summary chip in current turn", () => {
+  it("renders chapter-summary chip in current turn", async () => {
     const chips: Chip[] = [
       {
         id: "chapter-summary",
@@ -87,7 +87,7 @@ describe("assemblePrompt", () => {
       },
       ...userChips("the cat"),
     ];
-    const out = assemblePrompt({
+    const out = await assemblePrompt({
       systemPrompt: null,
       history: [],
       current: { chips, userText: "explain" },
@@ -95,7 +95,7 @@ describe("assemblePrompt", () => {
     expect(out[out.length - 1].content).toContain("## 本章概要\n本章讲了 X");
   });
 
-  it("renders book-summary chip in current turn", () => {
+  it("renders book-summary chip in current turn", async () => {
     const chips: Chip[] = [
       {
         id: "book-summary",
@@ -106,7 +106,7 @@ describe("assemblePrompt", () => {
       },
       ...userChips("the cat"),
     ];
-    const out = assemblePrompt({
+    const out = await assemblePrompt({
       systemPrompt: null,
       history: [],
       current: { chips, userText: "explain" },
@@ -114,7 +114,7 @@ describe("assemblePrompt", () => {
     expect(out[out.length - 1].content).toContain("## 全书概要\n这本书讲了 Y");
   });
 
-  it("renders all four sections in fixed order: book-summary → chapter-summary → paragraph → selection → userText", () => {
+  it("renders all four sections in fixed order: book-summary → chapter-summary → paragraph → selection → userText", async () => {
     const chips: Chip[] = [
       {
         id: "book-summary",
@@ -145,7 +145,7 @@ describe("assemblePrompt", () => {
         state: "required",
       },
     ];
-    const out = assemblePrompt({
+    const out = await assemblePrompt({
       systemPrompt: null,
       history: [],
       current: { chips, userText: "Q" },
@@ -155,8 +155,8 @@ describe("assemblePrompt", () => {
     );
   });
 
-  it("renders current PDF page with direct readPage params", () => {
-    const out = assemblePrompt({
+  it("renders current PDF page with direct readPage params", async () => {
+    const out = await assemblePrompt({
       systemPrompt: null,
       history: [],
       current: {
@@ -175,8 +175,8 @@ describe("assemblePrompt", () => {
     expect(out[out.length - 1].content).toContain('readPage with {"page":42,"mode":"text"}');
   });
 
-  it("renders current ePub chapter with direct readChapterText params", () => {
-    const out = assemblePrompt({
+  it("renders current ePub chapter with direct readChapterText params", async () => {
+    const out = await assemblePrompt({
       systemPrompt: null,
       history: [],
       current: {
@@ -199,7 +199,54 @@ describe("assemblePrompt", () => {
     );
   });
 
-  it("re-expands each historical user turn from its own metadata chips (isomorphic with current turn)", () => {
+  it("replays an assistant tool-call/result turn as structured assistant + tool messages", async () => {
+    const history: PromptHistoryMessage[] = [
+      { role: "user", parts: [{ type: "text", text: "what's on page 3?" }], metadata: null },
+      {
+        role: "assistant",
+        parts: [
+          { type: "text", text: "Let me check." },
+          {
+            type: "tool-readChapterText",
+            toolCallId: "c1",
+            state: "output-available",
+            input: { chapterId: "ch-1" },
+            output: { text: "verbatim chapter text", hasMore: false },
+          },
+          { type: "text", text: "It discusses cats." },
+        ] as PromptHistoryMessage["parts"],
+        metadata: null,
+      },
+    ];
+    const out = await assemblePrompt({
+      systemPrompt: null,
+      history,
+      current: { chips: [], userText: "go on" },
+    });
+    const assistant = out.find((m) => m.role === "assistant");
+    const toolMsg = out.find((m) => m.role === "tool");
+    expect(assistant).toBeDefined();
+    expect(toolMsg).toBeDefined();
+    const aContent = assistant!.content as Array<{
+      type: string;
+      toolName?: string;
+      text?: string;
+    }>;
+    expect(aContent.some((p) => p.type === "text" && p.text === "Let me check.")).toBe(true);
+    expect(aContent.some((p) => p.type === "tool-call" && p.toolName === "readChapterText")).toBe(
+      true,
+    );
+    const tContent = toolMsg!.content as Array<{
+      type: string;
+      toolName?: string;
+      output?: unknown;
+    }>;
+    expect(tContent.some((p) => p.type === "tool-result" && p.toolName === "readChapterText")).toBe(
+      true,
+    );
+  });
+
+  it("re-expands each historical user turn from its own metadata chips (isomorphic with current turn)", async () => {
     const history: PromptHistoryMessage[] = [
       {
         role: "user",
@@ -218,7 +265,7 @@ describe("assemblePrompt", () => {
         metadata: null,
       },
     ];
-    const out = assemblePrompt({
+    const out = await assemblePrompt({
       systemPrompt: "sys",
       history,
       current: { chips: userChips("new sel"), userText: "follow up" },
@@ -230,7 +277,10 @@ describe("assemblePrompt", () => {
       content:
         "## 本章概要\n历史章节摘要\n\n## 周围上下文\nold para\n\n## 选中文本\nold sel\n\nearlier question",
     });
-    expect(out[2]).toEqual({ role: "assistant", content: "earlier answer" });
+    expect(out[2]).toEqual({
+      role: "assistant",
+      content: [{ type: "text", text: "earlier answer" }],
+    });
     // 当前轮
     expect(out[3].content).toBe("## 选中文本\nnew sel\n\nfollow up");
   });
@@ -282,8 +332,8 @@ describe("renderHistoryMessage", () => {
 });
 
 describe("assemblePrompt priorSummary", () => {
-  it("appends the summary to the system message when present", () => {
-    const msgs = assemblePrompt({
+  it("appends the summary to the system message when present", async () => {
+    const msgs = await assemblePrompt({
       systemPrompt: "BASE",
       priorSummary: "earlier we discussed X",
       history: [],
@@ -294,8 +344,8 @@ describe("assemblePrompt priorSummary", () => {
     expect(msgs[0]?.content).toContain("## Conversation summary so far\nearlier we discussed X");
   });
 
-  it("leaves the system message unchanged when priorSummary is null", () => {
-    const msgs = assemblePrompt({
+  it("leaves the system message unchanged when priorSummary is null", async () => {
+    const msgs = await assemblePrompt({
       systemPrompt: "BASE",
       priorSummary: null,
       history: [],
@@ -304,8 +354,8 @@ describe("assemblePrompt priorSummary", () => {
     expect(msgs[0]?.content).toBe("BASE");
   });
 
-  it("only renders the tail history it is given", () => {
-    const msgs = assemblePrompt({
+  it("only renders the tail history it is given", async () => {
+    const msgs = await assemblePrompt({
       systemPrompt: "BASE",
       priorSummary: "S",
       history: [{ role: "assistant", parts: [{ type: "text", text: "kept" }], metadata: null }],

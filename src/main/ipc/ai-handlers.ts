@@ -79,12 +79,12 @@ export function __resetStreams(): void {
 }
 
 export const aiBindings: Binding[] = [
-  bind(C.aiSend, (req, event: IpcMainInvokeEvent): SendAck => {
+  bind(C.aiSend, async (req, event: IpcMainInvokeEvent): Promise<SendAck> => {
     const { streamId, ...input } = req;
     const controller = new AbortController();
     activeStreams.set(streamId, { controller, conversationId: input.conversationId });
 
-    const result = runSend(makeSendDeps(), input, { abortSignal: controller.signal });
+    const result = await runSend(makeSendDeps(), input, { abortSignal: controller.signal });
     if (!result.ok) {
       activeStreams.delete(streamId);
       return { ok: false, reason: result.reason };
@@ -95,11 +95,11 @@ export const aiBindings: Binding[] = [
     return { ok: true, conversationId: result.conversationId };
   }),
 
-  bind(C.aiResend, (req, event: IpcMainInvokeEvent): SendAck => {
+  bind(C.aiResend, async (req, event: IpcMainInvokeEvent): Promise<SendAck> => {
     const { streamId, ...input } = req;
     const controller = new AbortController();
     activeStreams.set(streamId, { controller, conversationId: input.conversationId });
-    const result = runResend(makeSendDeps(), input, { abortSignal: controller.signal });
+    const result = await runResend(makeSendDeps(), input, { abortSignal: controller.signal });
     if (!result.ok) {
       activeStreams.delete(streamId);
       return { ok: false, reason: result.reason };
