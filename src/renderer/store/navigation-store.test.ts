@@ -29,6 +29,15 @@ describe("navigation-store", () => {
     useNavigationStore.getState().setCurrentChapter("c2");
     expect(useNavigationStore.getState().currentChapterId).toBe("c2");
   });
+  it("showStats sets view to stats", () => {
+    useNavigationStore.getState().showStats();
+    expect(useNavigationStore.getState().view).toBe("stats");
+  });
+  it("showLibrary sets view to library", () => {
+    useNavigationStore.setState({ view: "stats" });
+    useNavigationStore.getState().showLibrary();
+    expect(useNavigationStore.getState().view).toBe("library");
+  });
   it("openBook clears stale openCommand but keeps per-book memory", () => {
     useChatStore.setState({
       activeByBook: { b2: "conv-b2" },

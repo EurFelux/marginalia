@@ -27,10 +27,20 @@ export function ShellHeader() {
         <h1 className="font-serif text-xl font-semibold">{t("library.title", "Marginalia")}</h1>
       </div>
       <nav className="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted p-1">
-        <button type="button" onClick={showLibrary} className={pill(view === "library")}>
+        <button
+          type="button"
+          onClick={showLibrary}
+          aria-current={view === "library" ? "page" : undefined}
+          className={pill(view === "library")}
+        >
           {t("shell.tabLibrary", "书库")}
         </button>
-        <button type="button" onClick={showStats} className={pill(view === "stats")}>
+        <button
+          type="button"
+          onClick={showStats}
+          aria-current={view === "stats" ? "page" : undefined}
+          className={pill(view === "stats")}
+        >
           {t("shell.tabStats", "统计")}
         </button>
       </nav>

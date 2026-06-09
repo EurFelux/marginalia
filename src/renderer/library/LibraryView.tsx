@@ -218,10 +218,7 @@ export function LibraryView() {
   const { isDragging, isOverZone, rootHandlers, zoneHandlers } = useEpubDrop(onFiles);
 
   return (
-    <div
-      {...rootHandlers}
-      className="flex h-full flex-col bg-background font-sans text-foreground overflow-hidden"
-    >
+    <div {...rootHandlers} className="flex h-full flex-col overflow-hidden">
       <div className="flex h-12 shrink-0 items-center justify-between px-6">
         <span className="text-sm text-muted-foreground">
           {t("library.count", "共 {{count}} 本", { count: books.data?.length ?? 0 })}
