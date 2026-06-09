@@ -215,6 +215,18 @@ export default {
   "settings.advanced.stepLimitUnlimited": "Unlimited",
   "settings.appearance": "Appearance",
   "settings.assistantModel": "Chat model",
+  "settings.backup.confirmRestore_one":
+    "将用此备份整体替换当前全部数据（{{count}} 本书，导出于 {{when}}）。当前数据会先存入 pre-restore 副本，随后应用将重启。继续？",
+  "settings.backup.confirmRestore_other":
+    "将用此备份整体替换当前全部数据（{{count}} 本书，导出于 {{when}}）。当前数据会先存入 pre-restore 副本，随后应用将重启。继续？",
+  "settings.backup.export": "",
+  "settings.backup.exportDone": "",
+  "settings.backup.exportFailed": "",
+  "settings.backup.incompatible": "",
+  "settings.backup.restore": "",
+  "settings.backup.restoreFailed": "",
+  "settings.backup.title": "",
+  "settings.backup.warning": "",
   "settings.close": "Close settings",
   "settings.colorMode": "Color mode",
   "settings.dark": "Dark",

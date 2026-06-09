@@ -203,6 +203,17 @@ export default {
   "settings.advanced.stepLimitUnlimited": "不限制",
   "settings.appearance": "外观",
   "settings.assistantModel": "对话模型",
+  "settings.backup.confirmRestore":
+    "将用此备份整体替换当前全部数据（{{count}} 本书，导出于 {{when}}）。当前数据会先存入 pre-restore 副本，随后应用将重启。继续？",
+  "settings.backup.export": "导出备份",
+  "settings.backup.exportDone": "备份已导出：{{path}}",
+  "settings.backup.exportFailed": "备份导出失败",
+  "settings.backup.incompatible": "无法还原：备份来自更新版本（{{reason}}）",
+  "settings.backup.restore": "还原备份",
+  "settings.backup.restoreFailed": "还原失败",
+  "settings.backup.title": "备份与还原",
+  "settings.backup.warning":
+    "备份包含全部书籍、标注、进度、会话与设置；其中 API key 以明文随包导出，请妥善保管。",
   "settings.close": "关闭设置",
   "settings.colorMode": "颜色模式",
   "settings.dark": "深色",
