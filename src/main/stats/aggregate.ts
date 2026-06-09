@@ -47,6 +47,7 @@ export function aggregateStats(
   for (let cur = anchor; cur != null && qualifies(cur); cur = addDays(cur, -1)) currentStreak++;
 
   // longest streak：全历史达标日的最长连续段。
+  // 'YYYY-MM-DD' 字典序即时间序（ISO 8601），故 .sort() 无需比较器。
   const qualifyingDays = [...map.keys()].filter(qualifies).sort();
   let longestStreak = 0;
   let run = 0;

@@ -11,13 +11,6 @@ export interface ReadingClock {
   setAwake: (awake: boolean) => void;
   /** 周期 flush（结算并进位）。 */
   tick: () => void;
-  /** 仅供测试观察。 */
-  getState: () => {
-    currentBookId: string | null;
-    isFocused: boolean;
-    isAwake: boolean;
-    activeSince: number | null;
-  };
 }
 
 /** 阅读时钟纯状态机：active = 有书 && 聚焦 && 未休眠。 */
@@ -48,10 +41,15 @@ export function createReadingClock(deps: ReadingClockDeps): ReadingClock {
   }
 
   return {
-    setReadingBook: (bookId) => transition(() => (currentBookId = bookId)),
-    setFocused: (focused) => transition(() => (isFocused = focused)),
-    setAwake: (awake) => transition(() => (isAwake = awake)),
+    setReadingBook: (bookId) => {
+      if (currentBookId !== bookId) transition(() => (currentBookId = bookId));
+    },
+    setFocused: (focused) => {
+      if (isFocused !== focused) transition(() => (isFocused = focused));
+    },
+    setAwake: (awake) => {
+      if (isAwake !== awake) transition(() => (isAwake = awake));
+    },
     tick: () => settle(),
-    getState: () => ({ currentBookId, isFocused, isAwake, activeSince }),
   };
 }

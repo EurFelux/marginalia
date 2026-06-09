@@ -96,4 +96,29 @@ describe("createReadingClock", () => {
     clock.tick();
     expect(commits).toHaveLength(1);
   });
+
+  it("ignores idempotent same-value setters (no extra commit, no time lost)", () => {
+    const { clock, commits, advance } = setup();
+    clock.setAwake(true);
+    clock.setFocused(true);
+    clock.setReadingBook("b1");
+    advance(1_500);
+    clock.setFocused(true); // 同值：被忽略，不结算不丢余数
+    advance(1_500);
+    clock.tick(); // 累计 3000ms → 3s（若同值调用误结算会丢 500ms 变 2s）
+    expect(commits).toEqual([{ bookId: "b1", atMs: 3_000, seconds: 3 }]);
+  });
+
+  it("settles on system sleep (setAwake(false)) and stops counting", () => {
+    const { clock, commits, advance } = setup();
+    clock.setFocused(true);
+    clock.setAwake(true);
+    clock.setReadingBook("b1");
+    advance(30_000);
+    clock.setAwake(false); // 休眠/锁屏：结算
+    expect(commits).toEqual([{ bookId: "b1", atMs: 30_000, seconds: 30 }]);
+    advance(60_000);
+    clock.tick();
+    expect(commits).toHaveLength(1);
+  });
 });
