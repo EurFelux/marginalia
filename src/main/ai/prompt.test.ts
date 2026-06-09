@@ -284,6 +284,88 @@ describe("assemblePrompt", () => {
     // 当前轮
     expect(out[3].content).toBe("## 选中文本\nnew sel\n\nfollow up");
   });
+
+  it("elides a readPage image tool-result to a placeholder (no base64 replayed)", async () => {
+    const out = await assemblePrompt({
+      systemPrompt: null,
+      history: [
+        {
+          role: "assistant",
+          parts: [
+            { type: "text", text: "Here is the page." },
+            {
+              type: "tool-readPage",
+              toolCallId: "img1",
+              state: "output-available",
+              input: { page: 3, mode: "image" },
+              output: { kind: "image", page: 3, data: "BASE64BLOBSHOULDNOTAPPEAR" },
+            },
+          ] as PromptHistoryMessage["parts"],
+          metadata: null,
+        },
+      ],
+      current: { chips: [], userText: "next" },
+    });
+    const dump = JSON.stringify(out);
+    expect(dump).not.toContain("BASE64BLOBSHOULDNOTAPPEAR");
+    expect(dump).toContain("[page 3 image omitted from history]");
+  });
+
+  it("drops cross-turn reasoning parts from replayed history", async () => {
+    const out = await assemblePrompt({
+      systemPrompt: null,
+      history: [
+        {
+          role: "assistant",
+          parts: [
+            { type: "reasoning", text: "SECRET_CHAIN_OF_THOUGHT", state: "done" },
+            { type: "text", text: "answer" },
+          ] as PromptHistoryMessage["parts"],
+          metadata: null,
+        },
+      ],
+      current: { chips: [], userText: "next" },
+    });
+    expect(JSON.stringify(out)).not.toContain("SECRET_CHAIN_OF_THOUGHT");
+  });
+
+  it("drops an orphan tool-call (no result) without throwing", async () => {
+    const out = await assemblePrompt({
+      systemPrompt: null,
+      history: [
+        {
+          role: "assistant",
+          parts: [
+            { type: "text", text: "partial" },
+            {
+              type: "tool-readPage",
+              toolCallId: "orphan",
+              state: "input-available",
+              input: { page: 9, mode: "text" },
+            },
+          ] as PromptHistoryMessage["parts"],
+          metadata: null,
+        },
+      ],
+      current: { chips: [], userText: "next" },
+    });
+    expect(out.some((m) => m.role === "tool")).toBe(false);
+    expect(JSON.stringify(out)).toContain("partial");
+  });
+
+  it("keeps a plain text assistant turn equivalent (regression)", async () => {
+    const out = await assemblePrompt({
+      systemPrompt: null,
+      history: [
+        { role: "assistant", parts: [{ type: "text", text: "just text" }], metadata: null },
+      ],
+      current: { chips: [], userText: "next" },
+    });
+    expect(
+      out.some((m) => m.role === "assistant" && JSON.stringify(m.content).includes("just text")),
+    ).toBe(true);
+    expect(out.some((m) => m.role === "tool")).toBe(false);
+  });
 });
 
 describe("pdfSystemNote", () => {
