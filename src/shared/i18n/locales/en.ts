@@ -217,9 +217,9 @@ export default {
   "settings.assistantModel": "Chat model",
   "settings.backup.cancel": "Cancel",
   "settings.backup.confirmRestore_one":
-    "This will replace all current data with this backup ({{count}} book, exported {{when}}). Current data will be saved as a pre-restore copy and the app will relaunch.",
+    "This will replace all current data with this backup ({{count}} book, exported {{when}}). A backup of your current data is kept first, then the app relaunches.",
   "settings.backup.confirmRestore_other":
-    "This will replace all current data with this backup ({{count}} books, exported {{when}}). Current data will be saved as a pre-restore copy and the app will relaunch.",
+    "This will replace all current data with this backup ({{count}} books, exported {{when}}). A backup of your current data is kept first, then the app relaunches.",
   "settings.backup.export": "Export Backup",
   "settings.backup.exportDone": "Backup exported: {{path}}",
   "settings.backup.exportFailed": "Backup export failed",

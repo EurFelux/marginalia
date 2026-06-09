@@ -169,7 +169,7 @@ export function AdvancedSettings() {
             {pendingRestore
               ? t(
                   "settings.backup.confirmRestore",
-                  "将用此备份整体替换当前全部数据（{{count}} 本书，导出于 {{when}}）。当前数据会先存入 pre-restore 副本，随后应用将重启。",
+                  "将用此备份整体替换当前全部数据（{{count}} 本书，导出于 {{when}}）。替换前会自动保留一份当前数据的备份，随后应用将重启。",
                   {
                     count: pendingRestore.manifest.bookCount,
                     when: new Date(pendingRestore.manifest.createdAt).toLocaleString(),

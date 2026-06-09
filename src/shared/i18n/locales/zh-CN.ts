@@ -205,7 +205,7 @@ export default {
   "settings.assistantModel": "对话模型",
   "settings.backup.cancel": "取消",
   "settings.backup.confirmRestore":
-    "将用此备份整体替换当前全部数据（{{count}} 本书，导出于 {{when}}）。当前数据会先存入 pre-restore 副本，随后应用将重启。",
+    "将用此备份整体替换当前全部数据（{{count}} 本书，导出于 {{when}}）。替换前会自动保留一份当前数据的备份，随后应用将重启。",
   "settings.backup.export": "导出备份",
   "settings.backup.exportDone": "备份已导出：{{path}}",
   "settings.backup.exportFailed": "备份导出失败",
