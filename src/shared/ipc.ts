@@ -46,6 +46,8 @@ import {
 } from "@shared/annotations";
 import type { PreferencesSnapshot } from "@shared/preferences";
 import { setPreferenceInput } from "@shared/preferences";
+import type { ReadingStatsDto } from "@shared/stats";
+import { statsGetInput, statsReadingStateInput } from "@shared/stats";
 
 /** ping —— 演示"带入参且经 Zod 校验"的往返 */
 export const pingInput = z.object({ msg: z.string().min(1) });
@@ -249,6 +251,10 @@ export const C = {
     out<PreferencesSnapshot>(),
   ),
   preferencesSet: def("preferences:set", "invoke", setPreferenceInput, out<void>()),
+
+  // stats（阅读时长）
+  statsReadingState: def("stats:reading-state", "invoke", statsReadingStateInput, out<void>()),
+  statsGet: def("stats:get", "invoke", statsGetInput, out<ReadingStatsDto>()),
 
   // logging
   logWrite: def("log:write", "invoke", logWriteInput, out<void>()),

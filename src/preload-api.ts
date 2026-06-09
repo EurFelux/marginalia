@@ -121,6 +121,11 @@ export function createApi(d: PreloadDeps) {
           if (ev.streamId === streamId) cb(ev);
         }),
     },
+
+    stats: {
+      readingState: inv(C.statsReadingState),
+      get: inv(C.statsGet),
+    },
   };
 }
 
