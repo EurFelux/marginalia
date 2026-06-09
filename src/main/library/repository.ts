@@ -194,6 +194,8 @@ export function listBooks(db: DB) {
 /**
  * 「继续阅读」shelf 数据（#48）：JOIN progress 按最近阅读排序。未读过的书（无 progress 行）
  * 天然不出现；percent 为 null（老数据）由渲染层降级。不解析 locator——黑盒保持。
+ * 已读完的书（isFinished）从 shelf 排除（#70）——读完即不该再出现在「继续阅读」，
+ * 标记/取消标记后 renderer 失效 qk.recentlyRead 重拉即生效。
  */
 export function listRecentlyRead(db: DB, limit = RECENT_SHELF_LIMIT) {
   return db
@@ -211,6 +213,7 @@ export function listRecentlyRead(db: DB, limit = RECENT_SHELF_LIMIT) {
     })
     .from(books)
     .innerJoin(progress, eq(progress.bookId, books.id))
+    .where(eq(books.isFinished, false))
     .orderBy(desc(progress.updatedAt))
     .limit(limit)
     .all();

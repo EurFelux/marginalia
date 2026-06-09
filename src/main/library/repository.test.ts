@@ -239,12 +239,13 @@ describe("library repository", () => {
     expect(() => setBookFinished(db, "nope", true)).toThrow(/not found/);
   });
 
-  it("listRecentlyRead projects isFinished", async () => {
+  it("listRecentlyRead excludes finished books", async () => {
     const db = freshDb();
     const book = await importBook(db, { bytes: makeFixtureEpub() });
     saveProgress(db, book.id, "loc-1", 0.5);
+    expect(listRecentlyRead(db)).toHaveLength(1); // 未读完时出现在 shelf
     setBookFinished(db, book.id, true);
-    expect(listRecentlyRead(db)[0].isFinished).toBe(true);
+    expect(listRecentlyRead(db)).toHaveLength(0); // 标记已读完后从「继续阅读」移除
   });
 });
 
