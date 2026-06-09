@@ -53,7 +53,10 @@ export function OnboardingCard() {
   };
 
   return (
-    <section className="relative mb-5 rounded-xl border border-border bg-card p-4 shadow-sm">
+    <section
+      aria-labelledby="onboarding-title"
+      className="relative mb-5 rounded-xl border border-border bg-card p-4 shadow-sm"
+    >
       <Button
         variant="ghost"
         size="icon"
@@ -64,7 +67,7 @@ export function OnboardingCard() {
         <X className="size-4" />
       </Button>
 
-      <h2 className="mb-0.5 font-serif text-base text-foreground">
+      <h2 id="onboarding-title" className="mb-0.5 font-serif text-base text-foreground">
         {t("onboarding.title", "开启 AI 阅读伴侣")}
       </h2>
       <p className="mb-3 text-xs leading-relaxed text-muted-foreground">
@@ -129,14 +132,19 @@ export function OnboardingCard() {
           >
             {t("onboarding.step2.title", "开启自动章节摘要")}
           </div>
-          <div className="text-[11px] text-muted-foreground">
+          <div
+            className={cn(
+              "text-[11px]",
+              modelConnected ? "text-muted-foreground" : "text-muted-foreground/60",
+            )}
+          >
             {modelConnected
               ? t("onboarding.step2.hint", "打开时自动用对话模型作摘要模型")
               : t("onboarding.step2.locked", "先完成上一步")}
           </div>
         </div>
         <Checkbox
-          checked={false}
+          checked={autoSummarize}
           disabled={!modelConnected}
           onCheckedChange={(v) => {
             if (v) onEnableAutoSummary();
