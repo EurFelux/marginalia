@@ -21,6 +21,9 @@ describe("isModelConnected", () => {
   it("false when assistant undefined", () => {
     expect(isModelConnected(undefined, [provider()])).toBe(false);
   });
+  it("false when providers undefined (query loading)", () => {
+    expect(isModelConnected({ providerId: "p1", model: "m1" }, undefined)).toBe(false);
+  });
   it("false when assistant has no provider or model", () => {
     expect(isModelConnected({ providerId: null, model: null }, [provider()])).toBe(false);
     expect(isModelConnected({ providerId: "p1", model: null }, [provider()])).toBe(false);

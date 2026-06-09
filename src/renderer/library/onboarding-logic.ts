@@ -4,7 +4,10 @@ import type { ProviderDto } from "@shared/providers";
 /** 助手当前选中的 provider/model（从 AssistantDto 投影）。 */
 type AssistantSelection = { providerId: string | null; model: string | null };
 
-/** 步骤①完成：助手已选 provider+model，且该 provider 已配密钥（keyMask 非空）。 */
+/**
+ * 步骤①完成：助手已选 provider+model，且该 provider 已配密钥（keyMask 非空）。
+ * provider 列表为 undefined（query 加载中）或未找到对应 provider 均返回 false；消费侧须先 gate query 就绪（isPending）再据此判定。
+ */
 export function isModelConnected(
   assistant: AssistantSelection | undefined,
   providers: ProviderDto[] | undefined,
