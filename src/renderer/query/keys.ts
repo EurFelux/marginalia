@@ -15,4 +15,5 @@ export const qk = {
   assistantDefault: ["assistant", "default"] as const,
   conversations: (bookId: string) => ["conversations", bookId] as const,
   messages: (conversationId: string) => ["messages", conversationId] as const,
+  stats: (dailyDays: number) => ["stats", dailyDays] as const,
 };
