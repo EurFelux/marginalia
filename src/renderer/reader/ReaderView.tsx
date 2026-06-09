@@ -33,11 +33,13 @@ import { NoteHoverCard } from "@renderer/reader/NoteHoverCard";
 import { AIPanel } from "@renderer/ai/AIPanel";
 import { SummaryPill } from "@renderer/ai/SummaryPill";
 import { useRestoreConversation } from "@renderer/ai/use-restore-conversation";
+import { useReadingClock } from "@renderer/reader/use-reading-clock";
 import { openPanelAndFocusComposer } from "@renderer/ai/composer-focus";
 
 export function ReaderView() {
   const { t } = useTranslation();
   const bookId = useNavigationStore((s) => s.currentBookId);
+  useReadingClock(bookId);
   useRestoreConversation(bookId);
   const chapterId = useNavigationStore((s) => s.currentChapterId);
   const backToLibrary = useNavigationStore((s) => s.backToLibrary);
