@@ -109,6 +109,20 @@ describe("memories repository", () => {
     expect(listMemories(db)[0].sourceBookId).toBeNull();
   });
 
+  it("returns outgoing links in body appearance order", () => {
+    const db = freshDb();
+    createMemory(db, { slug: "zz", title: "t", description: "d", body: "b", sourceBookId: null });
+    createMemory(db, { slug: "aa", title: "t", description: "d", body: "b", sourceBookId: null });
+    createMemory(db, {
+      slug: "src",
+      title: "t",
+      description: "d",
+      body: "first [[zz]] then [[aa]]",
+      sourceBookId: null,
+    });
+    expect(getMemoryBySlug(db, "src")?.outgoing.map((o) => o.slug)).toEqual(["zz", "aa"]);
+  });
+
   it("lists memories with stable order (createdAt, id)", () => {
     const db = freshDb();
     createMemory(db, { slug: "m1", title: "t1", description: "d1", body: "b", sourceBookId: null });

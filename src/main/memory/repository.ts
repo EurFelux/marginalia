@@ -29,42 +29,46 @@ export interface CreateMemoryInput {
   sourceBookId: string | null;
 }
 
-function syncLinks(db: DB, fromId: string, body: string): void {
-  db.delete(memoryLinks).where(eq(memoryLinks.fromId, fromId)).run();
+function syncLinks(tx: Omit<DB, "$client">, fromId: string, body: string): void {
+  tx.delete(memoryLinks).where(eq(memoryLinks.fromId, fromId)).run();
   const slugs = extractLinks(body);
   if (slugs.length === 0) return;
-  const targets = db
+  const targets = tx
     .select({ id: memories.id })
     .from(memories)
     .where(inArray(memories.slug, slugs))
     .all();
   if (targets.length === 0) return;
-  db.insert(memoryLinks)
+  tx.insert(memoryLinks)
     .values(targets.map((t) => ({ fromId, toId: t.id })))
     .run();
 }
 
 export function createMemory(db: DB, input: CreateMemoryInput): MemoryRow {
-  const row = db.insert(memories).values(input).returning().get();
-  syncLinks(db, row.id, row.body);
-  return row;
+  return db.transaction((tx) => {
+    const row = tx.insert(memories).values(input).returning().get();
+    syncLinks(tx, row.id, row.body);
+    return row;
+  });
 }
 
 export function updateMemoryById(db: DB, patch: UpdateMemoryInput): MemoryRow | null {
-  const row = db
-    .update(memories)
-    .set({
-      ...(patch.title !== undefined ? { title: patch.title } : {}),
-      ...(patch.description !== undefined ? { description: patch.description } : {}),
-      ...(patch.body !== undefined ? { body: patch.body } : {}),
-      updatedAt: Date.now(),
-    })
-    .where(eq(memories.id, patch.id))
-    .returning()
-    .get();
-  if (!row) return null;
-  if (patch.body !== undefined) syncLinks(db, row.id, row.body);
-  return row;
+  return db.transaction((tx) => {
+    const row = tx
+      .update(memories)
+      .set({
+        ...(patch.title !== undefined ? { title: patch.title } : {}),
+        ...(patch.description !== undefined ? { description: patch.description } : {}),
+        ...(patch.body !== undefined ? { body: patch.body } : {}),
+        updatedAt: Date.now(),
+      })
+      .where(eq(memories.id, patch.id))
+      .returning()
+      .get();
+    if (!row) return null;
+    if (patch.body !== undefined) syncLinks(tx, row.id, row.body);
+    return row;
+  });
 }
 
 export function deleteMemoryById(db: DB, id: string): void {
@@ -87,6 +91,9 @@ export function getMemoryBySlug(db: DB, slug: string): MemoryDetail | null {
           .where(inArray(memories.slug, linked))
           .all()
       : [];
+  // 按 body 中 [[slug]] 出现序重建 outgoing，避免 inArray 查询的不确定顺序（LLM 按行文顺序消费）。
+  const slugToRow = new Map(outgoingRows.map((r) => [r.slug, r]));
+  const outgoing = linked.filter((s) => slugToRow.has(s)).map((s) => slugToRow.get(s)!);
   const existing = new Set(outgoingRows.map((o) => o.slug));
   const incoming = db
     .select({ slug: memories.slug, title: memories.title, description: memories.description })
@@ -96,7 +103,7 @@ export function getMemoryBySlug(db: DB, slug: string): MemoryDetail | null {
     .all();
   return {
     ...row,
-    outgoing: outgoingRows,
+    outgoing,
     incoming,
     danglingLinks: linked.filter((s) => !existing.has(s)),
   };
