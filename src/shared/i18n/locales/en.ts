@@ -232,7 +232,7 @@ export default {
   "settings.agent.namePlaceholder": "Enter assistant name",
   "settings.agent.persona": "Persona",
   "settings.agent.personaDesc":
-    "Describe the AI's character, tone, and style. Write freely in markdown; leave blank to use the default persona.",
+    "Describe the AI's personality and speaking style. Write freely in markdown.",
   "settings.agent.personaPlaceholder": "Describe the assistant's personality and style…",
   "settings.appearance": "Appearance",
   "settings.assistantModel": "Chat model",

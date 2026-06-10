@@ -68,10 +68,7 @@ export function AgentSettings() {
           {t("settings.agent.persona", "人设")}
         </label>
         <p className="text-[11px] leading-relaxed text-muted-foreground">
-          {t(
-            "settings.agent.personaDesc",
-            "描述 AI 的性格、语气与风格。用 markdown 自由书写，留空时 AI 使用默认人设。",
-          )}
+          {t("settings.agent.personaDesc", "描述 AI 的性格与说话风格。用 markdown 自由书写。")}
         </p>
         <Textarea
           id="agent-persona"

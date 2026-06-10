@@ -218,8 +218,7 @@ export default {
   "settings.agent.nameDesc": "AI 的称呼，显示在对话界面。不允许为空。",
   "settings.agent.namePlaceholder": "输入助手名字",
   "settings.agent.persona": "人设",
-  "settings.agent.personaDesc":
-    "描述 AI 的性格、语气与风格。用 markdown 自由书写，留空时 AI 使用默认人设。",
+  "settings.agent.personaDesc": "描述 AI 的性格与说话风格。用 markdown 自由书写。",
   "settings.agent.personaPlaceholder": "描述助手的性格与风格……",
   "settings.appearance": "外观",
   "settings.assistantModel": "对话模型",

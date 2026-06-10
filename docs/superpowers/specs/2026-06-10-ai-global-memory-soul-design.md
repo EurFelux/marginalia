@@ -1,7 +1,7 @@
 # AI 全局记忆 + SOUL 设计（issue #77）
 
 日期：2026-06-10
-状态：草案（待用户审阅）
+状态：已实现（feat/ai-memory-soul，2026-06-10）
 关联：#77（Add global persistent memory for the AI reading companion）
 
 ## §0 背景与目标
