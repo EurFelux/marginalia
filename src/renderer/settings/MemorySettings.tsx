@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Pencil, Trash2, ChevronDown, ChevronRight } from "lucide-react";
+import { toast } from "sonner";
 import { qk } from "@renderer/query/keys";
 import { usePrefsStore } from "@renderer/store/prefs-store";
 import { Button } from "@renderer/components/ui/button";
@@ -41,6 +42,9 @@ export function MemorySettings() {
       void qc.invalidateQueries({ queryKey: qk.memories });
       setEditingId(null);
     },
+    onError: () => {
+      toast.error(t("settings.memory.updateFailed", "记忆保存失败，请重试"));
+    },
   });
 
   const deleteMutation = useMutation({
@@ -48,6 +52,9 @@ export function MemorySettings() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: qk.memories });
       setDeleteTarget(null);
+    },
+    onError: () => {
+      toast.error(t("settings.memory.deleteFailed", "记忆删除失败，请重试"));
     },
   });
 
@@ -140,7 +147,12 @@ export function MemorySettings() {
                     <Button
                       size="sm"
                       onClick={saveEdit}
-                      disabled={updateMutation.isPending || !editTitle.trim()}
+                      disabled={
+                        updateMutation.isPending ||
+                        !editTitle.trim() ||
+                        !editDescription.trim() ||
+                        !editBody.trim()
+                      }
                     >
                       {t("settings.memory.save", "保存")}
                     </Button>

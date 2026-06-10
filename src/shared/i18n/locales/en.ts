@@ -264,6 +264,7 @@ export default {
   "settings.memory.delete": "Delete",
   "settings.memory.deleteDesc":
     "This action cannot be undone — the memory entry will be permanently deleted.",
+  "settings.memory.deleteFailed": "Failed to delete memory, please try again",
   "settings.memory.deleteTitle": "Delete memory?",
   "settings.memory.descPlaceholder": "Short description",
   "settings.memory.edit": "Edit",
@@ -275,6 +276,7 @@ export default {
   "settings.memory.list": "Stored memories",
   "settings.memory.save": "Save",
   "settings.memory.titlePlaceholder": "Title",
+  "settings.memory.updateFailed": "Failed to save memory, please try again",
   "settings.memory.updatedAt": "Updated {{when}}",
   "settings.model": "Model",
   "settings.model.select": "Select model",
