@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { createLogger } from "@renderer/logger";
 import { useTranslation } from "react-i18next";
@@ -16,7 +16,7 @@ import { makePdfLocator, parsePdfLocator, parsePdfLocatorRange } from "./pdf-loc
 import { pdfAnnosByPage, rangeFromOffsets, relativeRects } from "./pdf-annotations";
 import { buildPdfSelectionInfo, flatOffsetOf, pointInDomSelection } from "./pdf-selection";
 import { chapterIdAtPage } from "./pdf-chapter-at-page";
-import { clampPdfZoom } from "./pdf-zoom";
+import { clampPdfZoom, nextZoom } from "./pdf-zoom";
 import { pdfPercent } from "./percent";
 import { intraPageRatio, scrollTopFor, topPageAt } from "./pdf-scroll";
 import { findPdfTextLinks } from "./pdf-autolink";
@@ -60,6 +60,11 @@ export function PdfReader({ bookId, chapters }: Props) {
   const scrollerRef = useRef<HTMLElement | null>(null);
   // 防循环：记录最近一次「由滚动得出的章 id」；跳章 effect 只在目标 ≠ 它时滚动（对齐 EpubReader）。
   const topChapterIdRef = useRef<string | null>(null);
+
+  // 页 CSS 尺寸：适宽 × 档位。上移到 early-return 之前供缩放 hooks 使用；
+  // book 未就绪时 pageH=0，相关 effect 以此守卫。
+  const pageW = Math.max(200, (containerW - PAGE_GUTTER) * zoom);
+  const pageH = book ? pageW * (book.baseSize.height / book.baseSize.width) : 0;
 
   const setSelection = useAnnotationStore((s) => s.setSelection);
   const closeStyleBar = useAnnotationStore((s) => s.closeStyleBar);
@@ -234,6 +239,88 @@ export function PdfReader({ bookId, chapters }: Props) {
     }, SAVE_DEBOUNCE_MS);
   };
 
+  const setPdfZoom = usePrefsStore((s) => s.setPdfZoom);
+  // Ctrl+滚轮 / 触控板捏合缩放（捏合 wheel 事件 ctrlKey=true）：精确目标存 ref
+  // （不过 1% 取整，防慢速捏合被取整卡死），rAF 每帧最多提交一次（页面以新分辨率
+  // 重挂重渲，始终锐利）。锚点 = 光标处（页, 页内比例）+ 横向缩放到点输入。
+  const zoomTargetRef = useRef(zoom);
+  const zoomAnchorRef = useRef<{
+    page: number;
+    ratio: number;
+    cursorX: number;
+    cursorY: number;
+    scrollLeft: number;
+    oldPageH: number;
+  } | null>(null);
+  const zoomRafRef = useRef(0);
+
+  // 外部改缩放（PdfPrefs 按钮/输入框）→ 重新 seed 精确目标；自家提交（恒 = clamp(target)）
+  // 不触发，保留 1% 以下精度。
+  useEffect(() => {
+    if (Math.abs(zoom - clampPdfZoom(zoomTargetRef.current)) > 1e-6) {
+      zoomTargetRef.current = zoom;
+    }
+  }, [zoom]);
+
+  // React 合成 onWheel 是 passive 的（preventDefault 拦不住浏览器缩放）→ 原生监听。
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!book || pageH <= 0 || !container) return;
+    const pageCount = book.pageCount;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      const scroller = scrollerRef.current;
+      if (!scroller) return;
+      const rect = container.getBoundingClientRect();
+      const cursorY = e.clientY - rect.top;
+      const absY = scroller.scrollTop + cursorY;
+      const page = topPageAt(absY, pageH, pageCount);
+      zoomTargetRef.current = nextZoom(zoomTargetRef.current, e.deltaY);
+      zoomAnchorRef.current = {
+        page,
+        ratio: intraPageRatio(absY, page, pageH),
+        cursorX: e.clientX - rect.left,
+        cursorY,
+        scrollLeft: scroller.scrollLeft,
+        oldPageH: pageH,
+      };
+      if (!zoomRafRef.current) {
+        zoomRafRef.current = requestAnimationFrame(() => {
+          zoomRafRef.current = 0;
+          setPdfZoom(clampPdfZoom(zoomTargetRef.current));
+        });
+      }
+    };
+    container.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      container.removeEventListener("wheel", onWheel);
+      if (zoomRafRef.current) {
+        cancelAnimationFrame(zoomRafRef.current);
+        zoomRafRef.current = 0;
+      }
+    };
+  }, [book, pageH, setPdfZoom]);
+
+  // 缩放提交后复位滚动（光标锚点）：页盒高度走内联 style、commit 即同步生效 →
+  // useLayoutEffect 里复位不闪。竖向精确（页+页内比例反算）；横向尽力（缩放到点公式，
+  // 页居中↔溢出切换处略有近似）。缩放比从 pageH 实测（吸收 pageW 的 200px 下限折角）。
+  useLayoutEffect(() => {
+    const anchor = zoomAnchorRef.current;
+    const scroller = scrollerRef.current;
+    if (!anchor || !scroller || pageH <= 0 || pageH === anchor.oldPageH) return;
+    zoomAnchorRef.current = null;
+    const scale = pageH / anchor.oldPageH;
+    scroller.scrollTop = Math.max(
+      0,
+      scrollTopFor(anchor.page, anchor.ratio, pageH) - anchor.cursorY,
+    );
+    scroller.scrollLeft = Math.max(
+      0,
+      (anchor.scrollLeft + anchor.cursorX) * scale - anchor.cursorX,
+    );
+  }, [pageH]);
+
   if (bytes.isError) {
     return <p className="p-6 font-sans text-sm text-destructive">{t("reader.epub.loadError")}</p>;
   }
@@ -251,10 +338,6 @@ export function PdfReader({ bookId, chapters }: Props) {
       </div>
     );
   }
-
-  // 页 CSS 尺寸：适宽 × 档位。
-  const pageW = Math.max(200, (containerW - PAGE_GUTTER) * zoom);
-  const pageH = pageW * (book.baseSize.height / book.baseSize.width);
 
   // 标注按页分组（每渲染重算；可见页 × 条数级，开销可忽略——React Compiler 亦会缓存）。
   const annosByPage = pdfAnnosByPage(annotations.data ?? []);
