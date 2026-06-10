@@ -288,7 +288,13 @@ export function PdfReader({ bookId, chapters }: Props) {
       if (!zoomRafRef.current) {
         zoomRafRef.current = requestAnimationFrame(() => {
           zoomRafRef.current = 0;
-          setPdfZoom(clampPdfZoom(zoomTargetRef.current));
+          const target = clampPdfZoom(zoomTargetRef.current);
+          // no-op 提交（已顶在 MIN/MAX 等值处）不会改 pageH → layout effect 不跑，
+          // 必须主动丢锚点——否则滞留到下次无关的 pageH 变化（窗口 resize）才被消费，滚跳。
+          if (Math.abs(target - clampPdfZoom(usePrefsStore.getState().pdfZoom)) < 1e-6) {
+            zoomAnchorRef.current = null;
+          }
+          setPdfZoom(target);
         });
       }
     };
@@ -373,7 +379,9 @@ export function PdfReader({ bookId, chapters }: Props) {
           // rangeChanged 报告的是渲染范围——startIndex 含 increaseViewportBy 的 overscan
           // 预渲染页（CDP 实测视口顶页 125 时 startIndex 报 123），直接用会把当前章/进度
           // 偏到视口上方一页。从 scrollTop 推视口顶部页与页内比例（全书同尺寸前提，
-          // 几何换算见 pdf-scroll.ts）。
+          // 几何换算见 pdf-scroll.ts）。不变量：page/ratio 必须由「实时 scrollTop × 实时
+          // pageH」现算——缩放复位后才触发本回调（rAF 滞后于 layout effect），靠这一点
+          // 才不会把缩放中间帧的几何写进进度。
           const scrollTop = scrollerRef.current?.scrollTop;
           const page =
             scrollTop != null ? topPageAt(scrollTop, pageH, book.pageCount) : range.startIndex + 1;
