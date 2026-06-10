@@ -106,6 +106,21 @@ describe("preferences repository", () => {
     });
   });
 
+  it("stores and reads chatModel / memoryEnabled / soul / instructions", () => {
+    const db = freshDb();
+    setPreference(db, "chatModel", { providerId: "p1", model: "m1" });
+    expect(getPreference(db, "chatModel")).toEqual({ providerId: "p1", model: "m1" });
+
+    setPreference(db, "memoryEnabled", false);
+    expect(getPreference(db, "memoryEnabled")).toBe(false);
+
+    setPreference(db, "soul", { name: "Lia", persona: "warm companion" });
+    expect(getPreference(db, "soul")).toEqual({ name: "Lia", persona: "warm companion" });
+
+    setPreference(db, "instructions", "answer briefly");
+    expect(getPreference(db, "instructions")).toBe("answer briefly");
+  });
+
   it("refreshes updatedAt on overwrite", () => {
     const db = freshDb();
     setPreference(db, "autoSummarize", true);

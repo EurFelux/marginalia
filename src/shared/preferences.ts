@@ -44,6 +44,27 @@ export const stepLimitSchema = z.number().int().min(0);
 /** stepLimit 缺省值：主进程兜底（makeSendDeps / runSend）与渲染层初值共用单一源。 */
 export const DEFAULT_STEP_LIMIT = 10;
 
+/** 聊天模型（接替 assistants 表配置；spec 2026-06-10 §2.2）：语义同 summaryModel——显式对，未存 = 未配置。 */
+export const chatModelSchema = z.object({
+  providerId: z.string().min(1),
+  model: z.string().min(1),
+});
+export type ChatModel = z.infer<typeof chatModelSchema>;
+
+/** agent 自我设定（SOUL）：name 独立字段（UI 显示用），persona 自由 markdown。用户与 AI 都可写。 */
+export const soulSchema = z.object({
+  name: z.string().min(1),
+  persona: z.string(),
+});
+export type Soul = z.infer<typeof soulSchema>;
+
+/** SOUL 出厂值：默认名 Lia（margina-lia 词尾）；persona 简短留白，供用户与 Lia 共同演化。 */
+export const DEFAULT_SOUL: Soul = {
+  name: "Lia",
+  persona:
+    "You are a warm, curious, and thoughtful reading companion. You genuinely care about how your reader thinks and grows. Keep your voice gentle and concise; let personality come through naturally rather than performing it.",
+};
+
 /**
  * 可持久化用户偏好的单一源：key → 值 Zod schema。
  * 新增偏好＝在此注册一个 key + schema；DB / 服务 / IPC / 类型全部据此推导。
@@ -59,6 +80,10 @@ export const PREFERENCE_SCHEMAS = {
   summaryModel: summaryModelSchema,
   pdfZoom: pdfZoomSchema,
   stepLimit: stepLimitSchema,
+  chatModel: chatModelSchema,
+  memoryEnabled: z.boolean(),
+  soul: soulSchema,
+  instructions: z.string(),
 } as const;
 
 export type PreferenceKey = keyof typeof PREFERENCE_SCHEMAS;
@@ -87,5 +112,9 @@ export const setPreferenceInput = z.discriminatedUnion("key", [
   z.object({ key: z.literal("summaryModel"), value: summaryModelSchema }),
   z.object({ key: z.literal("pdfZoom"), value: pdfZoomSchema }),
   z.object({ key: z.literal("stepLimit"), value: stepLimitSchema }),
+  z.object({ key: z.literal("chatModel"), value: chatModelSchema }),
+  z.object({ key: z.literal("memoryEnabled"), value: z.boolean() }),
+  z.object({ key: z.literal("soul"), value: soulSchema }),
+  z.object({ key: z.literal("instructions"), value: z.string() }),
 ]);
 export type SetPreferenceInput = z.infer<typeof setPreferenceInput>;
