@@ -13,6 +13,8 @@ export default defineConfig({
     environment: "node",
     globals: true,
     include: ["src/**/*.test.ts", "packages/*/src/**/*.test.ts"],
-    setupFiles: ["./vitest.setup.ts"],
+    // 绝对路径：无自有 config 的子包（如 pdf-parser）单独跑 vitest 时会向上解析到本 config，
+    // 相对路径会按子包 cwd 解析而 miss（test:all 曾因此挂）；绝对路径让两种入口行为一致。
+    setupFiles: [path.resolve(__dirname, "vitest.setup.ts")],
   },
 });
