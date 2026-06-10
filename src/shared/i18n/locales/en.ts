@@ -23,7 +23,7 @@ export default {
   "ai.messageActions": "Message actions",
   "ai.newConversation": "New conversation",
   "ai.noBookToSend": "No book is open; cannot send.",
-  "ai.panelTitle": "AI Assistant",
+  "ai.panelTitle": "{{name}}",
   "ai.regenerate": "Regenerate",
   "ai.resend": "Resend",
   "ai.send": "Send",

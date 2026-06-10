@@ -23,7 +23,7 @@ export default {
   "ai.messageActions": "消息操作",
   "ai.newConversation": "新对话",
   "ai.noBookToSend": "没有正在阅读的书，无法发送。",
-  "ai.panelTitle": "AI 助手",
+  "ai.panelTitle": "{{name}}",
   "ai.regenerate": "重新生成",
   "ai.resend": "重新发送",
   "ai.send": "发送",

@@ -31,6 +31,7 @@ export function AIPanel() {
       onError: (err) => log.warn("chat stream error", err),
     });
   const updateLayout = usePrefsStore((s) => s.updateLayout);
+  const agentName = usePrefsStore((s) => s.soul.name);
   const openCommand = useChatStore((s) => s.openCommand);
   const activeConversationId = useActiveConversationId();
   const bookId = useNavigationStore((s) => s.currentBookId);
@@ -129,7 +130,9 @@ export function AIPanel() {
     <div className="flex h-full flex-col bg-muted/30 font-sans">
       <header className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
         <div className="flex min-w-0 flex-col">
-          <span className="truncate text-xs font-semibold">{t("ai.panelTitle", "AI 助手")}</span>
+          <span className="truncate text-xs font-semibold">
+            {t("ai.panelTitle", "{{name}}", { name: agentName })}
+          </span>
           {activeTitle && (
             <span className="truncate text-[11px] text-muted-foreground">{activeTitle}</span>
           )}
