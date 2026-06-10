@@ -59,6 +59,7 @@ describe("assistants → preferences data-carry migration", () => {
     expect(stmts).toHaveLength(2);
     expect(stmts[0]).toContain("'chatModel'");
     expect(stmts[1]).toContain("'instructions'");
+    expect(stmts[1]).toContain(DEFAULT_PROMPT);
   });
 
   it("carries provider+model into chatModel as a JSON object", () => {
