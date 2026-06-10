@@ -18,6 +18,7 @@ import { buildPdfSelectionInfo, flatOffsetOf, pointInDomSelection } from "./pdf-
 import { chapterIdAtPage } from "./pdf-chapter-at-page";
 import { clampPdfZoom } from "./pdf-zoom";
 import { pdfPercent } from "./percent";
+import { intraPageRatio, scrollTopFor, topPageAt } from "./pdf-scroll";
 import { findPdfTextLinks } from "./pdf-autolink";
 import { overlayClass } from "./highlight";
 import type { PdfPageAnno } from "./pdf-annotations";
@@ -220,10 +221,10 @@ export function PdfReader({ bookId, chapters }: Props) {
     return () => document.removeEventListener("scroll", onScroll, true);
   }, [closeStyleBar, setSelection, closeNoteHover]);
 
-  const saveAt = (page: number, percent: number) => {
+  const saveAt = (page: number, scrollRatio: number, percent: number) => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      const locator = makePdfLocator({ page, scrollRatio: 0 }); // 页级精度（页内比例留打磨期）
+      const locator = makePdfLocator({ page, scrollRatio });
       void window.api.progress
         .save({ bookId, locator, percent })
         .catch((err: unknown) => log.warn("save progress failed", err));
@@ -256,10 +257,14 @@ export function PdfReader({ bookId, chapters }: Props) {
   // 标注按页分组（每渲染重算；可见页 × 条数级，开销可忽略——React Compiler 亦会缓存）。
   const annosByPage = pdfAnnosByPage(annotations.data ?? []);
 
-  const initialPage = (() => {
+  // 恢复位置：页 + 页内比例 → 精确 scrollTop（全书同尺寸直接算，无挂载后跳动）。
+  // 首页页顶特判回 0：scrollTopFor(1, 0) = 8px（py-2 上缝），别让书首露半截缝。
+  const initialScrollTop = (() => {
     const loc = progress.data?.locator ? parsePdfLocator(progress.data.locator) : null;
     if (!loc) return 0;
-    return Math.min(Math.max(loc.page - 1, 0), book.pageCount - 1);
+    const page = Math.min(Math.max(loc.page, 1), book.pageCount);
+    const ratio = Math.min(Math.max(loc.scrollRatio, 0), 1);
+    return page === 1 && ratio === 0 ? 0 : scrollTopFor(page, ratio, pageH);
   })();
 
   return (
@@ -278,20 +283,16 @@ export function PdfReader({ bookId, chapters }: Props) {
         totalCount={book.pageCount}
         defaultItemHeight={pageH + 16}
         increaseViewportBy={{ top: pageH, bottom: pageH }}
-        initialTopMostItemIndex={{ index: initialPage, align: "start" }}
+        initialScrollTop={initialScrollTop}
         rangeChanged={(range) => {
           // rangeChanged 报告的是渲染范围——startIndex 含 increaseViewportBy 的 overscan
           // 预渲染页（CDP 实测视口顶页 125 时 startIndex 报 123），直接用会把当前章/进度
-          // 偏到视口上方一页。从 scrollTop 推视口顶部页：每项高 pageH+16 均匀（v1 全书
-          // 同尺寸前提）；+8px 把页间缝隙的归属切在缝隙中点，同时吸收跨页累计的亚像素误差。
+          // 偏到视口上方一页。从 scrollTop 推视口顶部页与页内比例（全书同尺寸前提，
+          // 几何换算见 pdf-scroll.ts）。
           const scrollTop = scrollerRef.current?.scrollTop;
           const page =
-            scrollTop != null
-              ? Math.min(
-                  book.pageCount,
-                  Math.max(1, Math.floor((scrollTop + 8) / (pageH + 16)) + 1),
-                )
-              : range.startIndex + 1;
+            scrollTop != null ? topPageAt(scrollTop, pageH, book.pageCount) : range.startIndex + 1;
+          const ratio = scrollTop != null ? intraPageRatio(scrollTop, page, pageH) : 0;
           // 当前章回写（含首发：开书恢复进度后侧栏即高亮正确章）。
           const chId = chapterIdAtPage(chapters, page);
           const ch = chId ? chapters.find((c) => c.id === chId) : null;
@@ -311,7 +312,7 @@ export function PdfReader({ bookId, chapters }: Props) {
             sawInitialRange.current = true;
             return; // 首发非用户滚动，不写进度
           }
-          saveAt(page, pdfPercent(page, book.pageCount));
+          saveAt(page, ratio, pdfPercent(page, book.pageCount));
         }}
         // 缩放换档时 key 变化 → 可视页整体重挂（拿到新 canvas，满足 pdf-book 同 canvas 约束）。
         // v1 接受全量重挂；离屏页经 cssWidth dep 自然重渲。
