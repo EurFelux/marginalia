@@ -21,6 +21,7 @@ import { registerBackupHandlers } from "@main/ipc/backup-handlers";
 import { initReadingClock, bindWindowToClock } from "@main/stats/clock-wiring";
 import { registerCoverProtocol, registerCoverProtocolScheme } from "@main/library/cover-protocol";
 import { maybeSeedSampleBook } from "@main/onboarding/seed-sample";
+import { appService } from "@main/app";
 
 // dev 与 production 各用独立的 userData 目录（分库，避免两环境互相污染数据）。
 // 必须在任何 app.getPath("userData") 调用前生效（instance.ts 在 app.ready 才首次读取）。
@@ -153,7 +154,7 @@ app.on("ready", async () => {
   registerBackupHandlers();
   initReadingClock();
   // 首启自动导入内置样书（幂等；建窗前完成，使首帧渲染时书已在库）
-  await maybeSeedSampleBook(getDb(), lang);
+  await maybeSeedSampleBook(getDb(), lang, appService.getPath("booksDir"));
   createWindow();
 });
 
