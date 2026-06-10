@@ -2,7 +2,7 @@ import { getDb } from "@main/db/instance";
 import { appService } from "@main/app";
 import { readBookFile } from "@main/library/book-files";
 import { getBook } from "@main/library/repository";
-import { resolveAssistantModel, resolveSummaryModel } from "@main/ai/assistant-model";
+import { resolveChatModel, resolveSummaryModel } from "@main/ai/assistant-model";
 import { getPreference } from "@main/preferences/repository";
 import { DEFAULT_STEP_LIMIT } from "@shared/preferences";
 import type { DB } from "@main/db/client";
@@ -25,7 +25,7 @@ export function createLoadBytes(booksDir: string, db: DB): LoadBytes {
 export function makeSendDeps(): SendDeps {
   const db = getDb();
   const loadBytes = createLoadBytes(appService.getPath("booksDir"), db);
-  const resolveModel = () => resolveAssistantModel(db);
+  const resolveModel = () => resolveChatModel(db);
   return {
     db,
     loadBytes,

@@ -70,6 +70,7 @@ export default {
   "errors.builtinLabelLocked": "内置$t(terms.provider)的名称不可修改",
   "errors.builtinTypeOutsideCompat": "内置$t(terms.provider)的类型只能在兼容 API 内切换",
   "errors.builtinUndeletable": "内置$t(terms.provider)不可删除",
+  "errors.chatModelNotConfigured": "未配置对话模型",
   "errors.configuredProviderNoApiKey": "$t(terms.provider)未设置密钥",
   "errors.configuredProviderNotFound": "未找到所配置的$t(terms.provider)",
   "errors.conversationNotFound": "会话不存在或不属于本书",

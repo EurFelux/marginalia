@@ -4,7 +4,11 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { createDb, runMigrations } from "@main/db/client";
 import { upsertProvider } from "@main/providers/repository";
 import { getDefaultAssistant, updateDefaultAssistant } from "@main/providers/assistant";
-import { resolveAssistantModel, resolveSummaryModel } from "@main/ai/assistant-model";
+import {
+  resolveAssistantModel,
+  resolveSummaryModel,
+  resolveChatModel,
+} from "@main/ai/assistant-model";
 import { initMainI18n } from "@main/i18n";
 import { setPreference } from "@main/preferences/repository";
 
@@ -75,6 +79,27 @@ describe("resolveAssistantModel", () => {
     updateDefaultAssistant(db, { providerId: provider.id, model: "gpt-4o-mini" });
     const r = resolveAssistantModel(db);
     expect(r).toMatchObject({ ok: false, reason: expect.stringContaining("API key") });
+  });
+});
+
+describe("resolveChatModel", () => {
+  it("returns structured error when chatModel preference missing", () => {
+    const db = freshDb();
+    const r = resolveChatModel(db);
+    expect(r.ok).toBe(false);
+  });
+
+  it("resolves model from chatModel preference", () => {
+    const db = freshDb();
+    const provider = upsertProvider(db, {
+      type: "anthropic",
+      baseUrl: "https://api.anthropic.com/v1",
+      apiKey: "k",
+    });
+    setPreference(db, "chatModel", { providerId: provider.id, model: "claude-x" });
+    const r = resolveChatModel(db);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.modelId).toBe("claude-x");
   });
 });
 

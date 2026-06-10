@@ -73,6 +73,7 @@ export default {
   "errors.builtinTypeOutsideCompat":
     "Built-in $t(terms.provider) type can only switch within its compatible APIs",
   "errors.builtinUndeletable": "Built-in $t(terms.provider)s cannot be deleted",
+  "errors.chatModelNotConfigured": "Chat model is not configured",
   "errors.configuredProviderNoApiKey": "$t(terms.provider) has no API key set",
   "errors.configuredProviderNotFound": "configured $t(terms.provider) not found",
   "errors.conversationNotFound": "Conversation not found or belongs to another book",

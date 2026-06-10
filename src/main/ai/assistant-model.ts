@@ -48,6 +48,44 @@ export function resolveAssistantModel(db: DB): ResolvedModel {
 }
 
 /**
+ * 把「聊天模型」偏好解析为可调用模型（spec 2026-06-10 §2.3：接替 assistants 表配置）。
+ * 未配置 / provider 已删 / 无密钥一律结构化错误——显式报错，不静默回退。
+ */
+export function resolveChatModel(db: DB): ResolvedModel {
+  const pref = getPreference(db, "chatModel");
+  if (!pref) {
+    return { ok: false, reason: t("errors.chatModelNotConfigured", "未配置对话模型") };
+  }
+  const provider = loadProvider(db, pref.providerId);
+  if (!provider) {
+    return {
+      ok: false,
+      reason: t("errors.configuredProviderNotFound", "未找到所配置的$t(terms.provider)"),
+    };
+  }
+  if (!provider.apiKey) {
+    return {
+      ok: false,
+      reason: t("errors.configuredProviderNoApiKey", "$t(terms.provider)未设置密钥"),
+    };
+  }
+  try {
+    const model = resolveLanguageModel({
+      type: provider.type,
+      baseUrl: provider.baseUrl,
+      apiKey: provider.apiKey,
+      model: pref.model,
+    });
+    return { ok: true, model, modelId: pref.model, providerType: provider.type };
+  } catch (err) {
+    return {
+      ok: false,
+      reason: err instanceof Error ? err.message : t("errors.failedToBuildModel", "构建模型失败"),
+    };
+  }
+}
+
+/**
  * 把「摘要模型」偏好解析为可调用模型（章节/全书摘要 + auto naming 共用；spec §4）。
  * 未配置 / provider 已删 / 无密钥一律返回结构化错误——显式报错，绝不回退聊天模型。
  */
