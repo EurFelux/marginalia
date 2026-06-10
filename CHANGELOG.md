@@ -1,5 +1,17 @@
 # marginalia
 
+## 0.11.0
+
+### Minor Changes
+
+- ab3d830: Your reading companion now has a name (Lia by default), an editable persona, and a global long-term memory: it remembers your preferences, viewpoints, and recurring concepts across books and conversations, with full review/edit/delete control in Settings → Memory. Custom instructions replace the old assistant system prompt, and your existing chat model configuration is migrated automatically.
+- 9cbd370: Add a gentle first-run onboarding card to the library that guides you to connect an AI model and turn on automatic chapter summaries. Skippable anytime, and it disappears once you're set up.
+- bee788c: Seed a built-in localized sample book into the library on first launch, so new readers have something to open, annotate, and try AI on right away. It is a normal, deletable book and won't come back once removed.
+
+### Patch Changes
+
+- 3594ad3: PDF reading polish: reopening a book now restores your exact in-page scroll position (not just the page), highlights with notes show a dotted bottom edge so you can spot them at a glance, and you can zoom smoothly with Ctrl+wheel or trackpad pinch — anchored at your cursor.
+
 ## 0.10.0
 
 ### Minor Changes
