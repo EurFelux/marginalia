@@ -3,6 +3,7 @@ import {
   check,
   index,
   integer,
+  primaryKey,
   real,
   sqliteTable,
   text,
@@ -201,6 +202,41 @@ export const messages = sqliteTable(
     unique("messages_conversation_seq_unique").on(t.conversationId, t.seq),
     index("messages_conversation_id_idx").on(t.conversationId),
   ],
+);
+
+// AI 全局记忆（spec 2026-06-10-ai-global-memory-soul-design §2.1）。
+// slug 是 AI 侧统一标识符（工具入参 / [[互链]] / 索引展示），创建后不可改；uuid 主键仅内部用。
+export const memories = sqliteTable(
+  "memories",
+  {
+    id: pkUuid(),
+    slug: text("slug").notNull().unique(),
+    title: text("title").notNull(),
+    description: text("description").notNull(), // 一行摘要：常驻注入 system prompt 的就是它
+    body: text("body").notNull(), // 详细正文：readMemory 按需取；可含 [[slug]] 互链
+    // 「在哪记下的」溯源标签（非归属）；删书 SET NULL，记忆保留（全局事实不随书消失）。
+    sourceBookId: text("source_book_id").references(() => books.id, { onDelete: "set null" }),
+    createdAt: nowMs(),
+    updatedAt: integer("updated_at")
+      .notNull()
+      .$defaultFn(() => Date.now()),
+  },
+  (t) => [index("memories_source_book_id_idx").on(t.sourceBookId)],
+);
+
+// 互链边表（派生索引；真相源是 memories.body 里的 [[slug]]，坏了可全量重建）。
+// 悬空链接不入表；删除记忆 CASCADE 清边（入链方 body 文本不动，自然转悬空）。
+export const memoryLinks = sqliteTable(
+  "memory_links",
+  {
+    fromId: text("from_id")
+      .notNull()
+      .references(() => memories.id, { onDelete: "cascade" }),
+    toId: text("to_id")
+      .notNull()
+      .references(() => memories.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.fromId, t.toId] }), index("memory_links_to_id_idx").on(t.toId)],
 );
 
 // 用户偏好持久化：key → 任意 JSON value（按 @shared/preferences 的 Zod schema 在服务层校验）。
