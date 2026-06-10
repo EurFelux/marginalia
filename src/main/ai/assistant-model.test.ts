@@ -101,6 +101,24 @@ describe("resolveChatModel", () => {
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.modelId).toBe("claude-x");
   });
+
+  it("fails when the preference points at a non-existent provider", () => {
+    const db = freshDb();
+    setPreference(db, "chatModel", { providerId: "ghost", model: "m" });
+    const r = resolveChatModel(db);
+    expect(r).toMatchObject({ ok: false, reason: expect.stringContaining("not found") });
+  });
+
+  it("fails when the provider has no API key", () => {
+    const db = freshDb();
+    const provider = upsertProvider(db, {
+      type: "anthropic",
+      baseUrl: "https://api.anthropic.com/v1",
+    });
+    setPreference(db, "chatModel", { providerId: provider.id, model: "m" });
+    const r = resolveChatModel(db);
+    expect(r).toMatchObject({ ok: false, reason: expect.stringContaining("API key") });
+  });
 });
 
 describe("resolveSummaryModel", () => {
