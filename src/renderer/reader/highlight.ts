@@ -46,7 +46,7 @@ export function hasNote(note: string): boolean {
 
 /**
  * PDF overlay 矩形类（含笔记记号）：有笔记 → 底边点状线，与 ePub `.anno-noted`
- * 的 dotted text-decoration 同一约定（见上 ANNO_IFRAME_CSS——改一侧必改另一侧）；
+ * 的 dotted text-decoration 同一约定（见下 ANNO_IFRAME_CSS——改一侧必改另一侧）；
  * underline 样式则把实线底边换成点状（不叠两条线）。border-foreground 明暗自适应。
  */
 export function overlayClass(style: AnnotationStyle, noted: boolean): string {
