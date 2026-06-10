@@ -61,6 +61,7 @@
     "drizzle-orm": "1.0.0-rc.3",
     "electron-squirrel-startup": "^1.0.1",
     "epubjs": "^0.3.93",
+    "fflate": "^0.8.3",
     "i18next": "^26.3.0",
     "lucide-react": "^1.17.0",
     "lxgw-wenkai-webfont": "^1.7.0",
