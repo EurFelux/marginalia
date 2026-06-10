@@ -55,9 +55,14 @@ export function streamAssistantReply(
   const { db, loadBytes, resolveSummaryModel, stepLimit } = deps;
   const { conversationId, bookId, resolved } = ctx;
   const imageToolResults = supportsImageToolResults(resolved.providerType);
+  const memoryTools = createMemoryTools({ db, bookId });
   const tools = {
     ...createReadingTools({ db, bookId, loadBytes, imageToolResults }),
-    ...createMemoryTools({ db, bookId }),
+    ...Object.fromEntries(
+      Object.entries(memoryTools).filter(
+        (entry): entry is [string, NonNullable<(typeof entry)[1]>] => entry[1] != null,
+      ),
+    ),
   };
 
   let capturedUsage: LanguageModelUsage | undefined;

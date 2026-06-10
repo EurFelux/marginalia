@@ -1,6 +1,6 @@
 // src/main/ai/memory-tools.ts —— Lia 的记忆/SOUL 写工具（spec 2026-06-10 §4）。
 // 失败一律转结构化工具结果（模型自纠），不抛 IPC 错误；软失败留 log.warn。
-import { tool, type Tool } from "ai";
+import { tool } from "ai";
 import { z } from "zod";
 import type { DB } from "@main/db/client";
 import { createLogger } from "@main/logger";
@@ -23,16 +23,7 @@ export interface MemoryToolsDeps {
   bookId: string | null;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type MemoryTools = {
-  updateSoul: Tool<any, any>;
-  readMemory?: Tool<any, any>;
-  saveMemory?: Tool<any, any>;
-  updateMemory?: Tool<any, any>;
-  deleteMemory?: Tool<any, any>;
-};
-
-export function createMemoryTools(deps: MemoryToolsDeps): MemoryTools {
+export function createMemoryTools(deps: MemoryToolsDeps) {
   const { db, bookId } = deps;
 
   const updateSoul = tool({
@@ -63,7 +54,7 @@ export function createMemoryTools(deps: MemoryToolsDeps): MemoryTools {
     updateSoul,
     readMemory: tool({
       description:
-        "Read the full body of one memory from your global memory (the index above only has title + description). Returns linked memories both ways.",
+        "Read the full body of one memory by its slug (the memory index in the system prompt only shows title + description). Returns linked memories in both directions.",
       inputSchema: z.object({ slug: memorySlug }),
       execute: async ({ slug }) => {
         const m = getMemoryBySlug(db, slug);
