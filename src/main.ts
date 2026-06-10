@@ -20,6 +20,7 @@ import { registerStatsHandlers } from "@main/ipc/stats-handlers";
 import { registerBackupHandlers } from "@main/ipc/backup-handlers";
 import { initReadingClock, bindWindowToClock } from "@main/stats/clock-wiring";
 import { registerCoverProtocol, registerCoverProtocolScheme } from "@main/library/cover-protocol";
+import { maybeSeedSampleBook } from "@main/onboarding/seed-sample";
 
 // dev 与 production 各用独立的 userData 目录（分库，避免两环境互相污染数据）。
 // 必须在任何 app.getPath("userData") 调用前生效（instance.ts 在 app.ready 才首次读取）。
@@ -119,7 +120,7 @@ const createWindow = () => {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.on("ready", () => {
+app.on("ready", async () => {
   // 会话开始标记：每次启动在日志里留一条锚点（排障时定位「这次启动」的边界）
   appLog.info(`marginalia ${app.getVersion()} started`);
   try {
@@ -130,9 +131,12 @@ app.on("ready", () => {
     return;
   }
   // 主进程 i18n：读已存语言偏好（null → undefined 退系统 locale 匹配）
-  initMainI18n(
-    resolveInitialLanguage(getPreference(getDb(), "language") ?? undefined, app.getLocale()),
+  // 首启语言解析一次，i18n 与样书播种共用（书与界面语言一致）
+  const lang = resolveInitialLanguage(
+    getPreference(getDb(), "language") ?? undefined,
+    app.getLocale(),
   );
+  initMainI18n(lang);
   // AI 出站请求默认走系统代理：Electron net.fetch 经 Chromium 网络栈，默认采用系统代理设置。
   // （部分地区直连 api.anthropic.com 会被 403「Request not allowed」按区域拦截，须经系统代理出网。）
   setModelFetch((input, init) => net.fetch(input instanceof URL ? input.toString() : input, init));
@@ -148,6 +152,8 @@ app.on("ready", () => {
   registerStatsHandlers();
   registerBackupHandlers();
   initReadingClock();
+  // 首启自动导入内置样书（幂等；建窗前完成，使首帧渲染时书已在库）
+  await maybeSeedSampleBook(getDb(), lang);
   createWindow();
 });
 
