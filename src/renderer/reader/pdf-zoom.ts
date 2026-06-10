@@ -12,3 +12,15 @@ export function clampPdfZoom(scale: number): number {
   const clamped = Math.min(PDF_ZOOM_MAX, Math.max(PDF_ZOOM_MIN, scale));
   return Math.round(clamped * 100) / 100;
 }
+
+/** 滚轮缩放灵敏度：一档鼠标滚轮（|deltaY|≈100）≈ ±10%（exp(0.1)≈1.105），与按钮步进感受对齐。 */
+export const PDF_WHEEL_ZOOM_SENSITIVITY = 0.001;
+
+/**
+ * 滚轮/捏合的下一缩放值（乘性，向上滚 deltaY<0 = 放大）。返回精确值**不取整**——
+ * 调用方把它存 ref 累积、提交时才过 clampPdfZoom，防慢速捏合被 1% 取整卡死。
+ */
+export function nextZoom(current: number, deltaY: number): number {
+  const next = current * Math.exp(-deltaY * PDF_WHEEL_ZOOM_SENSITIVITY);
+  return Math.min(PDF_ZOOM_MAX, Math.max(PDF_ZOOM_MIN, next));
+}
