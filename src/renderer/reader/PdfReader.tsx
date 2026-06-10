@@ -48,6 +48,8 @@ export function PdfReader({ bookId, chapters }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Virtuoso 挂载即触发一次 rangeChanged（含进度恢复时）——首发不是用户滚动，跳过免得无谓写库。
+  // initialScrollTop 非 0 时 Virtuoso 先按 scrollTop=0 渲染、再 rAF 滚到目标 → 初始会触发两次：
+  // 首发被本守卫拦下，第二次会把刚加载的 locator 幂等回写一次（同值，已知取舍、可接受）。
   const sawInitialRange = useRef(false);
   const currentChapterId = useNavigationStore((s) => s.currentChapterId);
   const setCurrentChapter = useNavigationStore((s) => s.setCurrentChapter);
