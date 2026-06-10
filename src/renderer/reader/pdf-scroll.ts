@@ -7,7 +7,8 @@
 export const PAGE_PADDING_Y = 8;
 export const PAGE_GAP = 16;
 
-/** 内容 Y（scrollTop / 光标绝对 Y）所在页：+8 把页缝归属切在缝中点附近，吸收跨页累计的亚像素误差。 */
+/** 内容 Y（scrollTop / 光标绝对 Y）所在页：+PAGE_PADDING_Y 使翻页界落在上页内容底（缝起点），
+ *  内容像素恒归正确页、整条页缝归下一页（页内比例由 intraPageRatio 再 clamp 到边界）。 */
 export function topPageAt(y: number, pageH: number, pageCount: number): number {
   const page = Math.floor((y + PAGE_PADDING_Y) / (pageH + PAGE_GAP)) + 1;
   return Math.min(pageCount, Math.max(1, page));

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { intraPageRatio, scrollTopFor, topPageAt } from "./pdf-scroll";
+import { intraPageRatio, PAGE_GAP, scrollTopFor, topPageAt } from "./pdf-scroll";
 
 const pageH = 1000; // 每项总高 1016
 
@@ -38,11 +38,12 @@ describe("intraPageRatio ↔ scrollTopFor 往返", () => {
     expect(page).toBe(2);
     expect(scrollTopFor(page, intraPageRatio(y, page, pageH), pageH)).toBeCloseTo(y, 10);
   });
-  it("页缝里的 scrollTop 还原误差不超过半缝（clamp 行为）", () => {
-    for (const y of [0, 8, 1018]) {
+  it("页缝里的 scrollTop 还原误差不超过一整缝（clamp 行为）", () => {
+    // 整条页缝 [内容底, 下页内容顶) 全归下一页；最大误差 = PAGE_GAP（y=1008 是最坏点）
+    for (const y of [0, 8, 1008, 1018]) {
       const page = topPageAt(y, pageH, 10);
       const back = scrollTopFor(page, intraPageRatio(y, page, pageH), pageH);
-      expect(Math.abs(back - y)).toBeLessThanOrEqual(8);
+      expect(Math.abs(back - y)).toBeLessThanOrEqual(PAGE_GAP);
     }
   });
 });
