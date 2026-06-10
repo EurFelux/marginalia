@@ -31,6 +31,8 @@ Marginalia 的 AI 目前每个会话从零开始：不知道读者读过什么�
 | instructions | 用户给 agent 的行为指令（接替原 `systemPrompt`），独立于 SOUL；**仅用户可写**        |
 | 默认名字     | **Lia**（margina-**lia** 词尾）                                                      |
 | 缓存稳定性   | instructions + SOUL + 记忆索引按会话快照冻结；SOUL/instructions 写入时主动失效快照   |
+| 记忆互链     | body 内 `[[slug]]` 为真相源，`memory_links` 边表派生；悬空链接合法（「待写」占位）   |
+| 标识符       | AI 侧统一用 `slug`（kebab-case 唯一短名，AI 起名、不可改）；uuid 主键完全内部化      |
 
 ## §2 数据模型
 
@@ -41,9 +43,10 @@ Marginalia 的 AI 目前每个会话从零开始：不知道读者读过什么�
 ```
 memories
 ├─ id            text PK (uuidv7)
+├─ slug          text NOT NULL UNIQUE -- kebab-case 短名；AI 侧的统一标识符（工具入参、[[链接]]、索引展示）
 ├─ title         text NOT NULL        -- 短标题，如「用经济学框架理解社会问题」
 ├─ description   text NOT NULL        -- 一行摘要；常驻注入 system prompt 的就是它
-├─ body          text NOT NULL        -- 详细正文；readMemory 按需取
+├─ body          text NOT NULL        -- 详细正文；readMemory 按需取；可含 [[slug]] 互链
 ├─ sourceBookId  text NULL → books.id (ON DELETE SET NULL)  -- 「在哪记下的」溯源
 ├─ createdAt     integer NOT NULL
 └─ updatedAt     integer NOT NULL
@@ -54,6 +57,21 @@ memories
 - **不做 type 分类**（preference/insight/concept…）：title + description 已足够表达，分类徒增 AI 写入负担。阶段二需要筛选时再加列。
 - **`sourceBookId` 由主进程自动填**（从会话 bookId 取），不作为工具入参。它只是溯源标签，不表示记忆归属于某本书——记忆是全局事实。
 - **硬删除**，无软删。
+- **`slug` 由 AI 在 `saveMemory` 时起名、创建后不可改**（title 可改）：改 slug 意味着全库 body 文本替换，不值。uuid 主键对 AI 完全不可见——36 字符又贵又易抄错。
+
+### 2.1.1 互链与边表 `memory_links`
+
+```
+memory_links
+├─ fromId  text NOT NULL → memories.id (ON DELETE CASCADE)
+├─ toId    text NOT NULL → memories.id (ON DELETE CASCADE)
+└─ PRIMARY KEY (fromId, toId)
+```
+
+- **真相源是 body 文本里的 `[[slug]]`**；边表是派生索引（坏了可全量重建），符合「派生状态不另立真相」哲学。
+- `saveMemory`/`updateMemory`/设置页编辑 body 时，纯函数 `extractLinks(body)` 解析 `[[slug]]` 并同步边表。
+- **悬空链接合法**：`[[slug]]` 查无此记忆 → 不入边表、不报错——它是「值得写但还没写」的占位标记，可激发 Lia 未来补写（与 Claude Code 机制一致）。
+- 不做 `linkMemories` 独立工具：链接应自然长在叙述里（「用户偏好 X（见 [[y-framework]]）」），独立建链工具徒增模型负担。
 
 ### 2.2 preferences 新增
 
@@ -87,7 +105,7 @@ SOUL 与 instructions 存 preferences 而非单独表：单行单实体，用户
 ③ SOUL（preferences.soul，用户与 AI 都可写）
    —— "你叫 {name}。{persona}"
 ④ 记忆索引（memories 表派生，会话快照冻结，见 §5）
-   —— 每条一行：[id] title — description；空库时整段不注入
+   —— 每条一行：[slug] title — description；空库时整段不注入
 ⑤ 既有动态层：PDF 页粒度注记、会话滚动概要（compaction）
 ```
 
@@ -102,8 +120,9 @@ SOUL 与 instructions 存 preferences 而非单独表：单行单实体，用户
 - **该记**：用户表达持久偏好、独到观点、反复关注的概念、理解问题的框架、对 agent 行为的纠正。
 - **不该记**：书的内容本身（摘要机制已覆盖）、一次性的事务性问题。
 - **防重复**：索引常驻可见——相近主题用 `updateMemory` 合并，不堆相似条目。
+- **互链**：body 中用 `[[slug]]` 引用相关记忆（索引里有全部 slug）；相关概念已有记忆就链上，悬空链接可作「待写」占位。
 - **与会话概要的分工**：compaction 概要是本会话的工作记忆；值得跨会话长期记住的才进 `saveMemory`。
-- **记忆语言**：用用户使用的语言书写记忆内容。
+- **记忆语言**：用用户使用的语言书写记忆内容（slug 恒为英文 kebab-case）。
 
 ### 3.2 默认 persona（出厂值，实现时打磨）
 
@@ -113,13 +132,13 @@ SOUL 与 instructions 存 preferences 而非单独表：单行单实体，用户
 
 加在现有 `tools.ts`（`getToc`/`readChapterText`/`readPage`…）旁：
 
-| 工具           | 入参                                  | 说明                                                                               |
-| -------------- | ------------------------------------- | ---------------------------------------------------------------------------------- |
-| `readMemory`   | `{ id }`                              | 取记忆正文（索引只有 title+description）                                           |
-| `saveMemory`   | `{ title, description, body }`        | `sourceBookId` 主进程自动填；返回新 id                                             |
-| `updateMemory` | `{ id, title?, description?, body? }` | 修正、合并、丰富                                                                   |
-| `deleteMemory` | `{ id }`                              | 用户要求遗忘或记忆过时                                                             |
-| `updateSoul`   | `{ name?, persona? }`                 | 自我演化：「以后你叫…」「说话简洁点」；只触及 SOUL，碰不到 instructions（§3 分界） |
+| 工具           | 入参                                    | 说明                                                                                                                                   |
+| -------------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `readMemory`   | `{ slug }`                              | 取记忆正文 + **出链**（body 引用的记忆，含 title/description，悬空的标注「未创建」）+ **入链**（哪些记忆提到它）——「双向」在读取端兑现 |
+| `saveMemory`   | `{ slug, title, description, body }`    | slug 由 AI 起名；`sourceBookId` 主进程自动填；slug 冲突报错自纠                                                                        |
+| `updateMemory` | `{ slug, title?, description?, body? }` | 修正、合并、丰富；body 变更时重新解析互链同步边表                                                                                      |
+| `deleteMemory` | `{ slug }`                              | 用户要求遗忘或记忆过时；边表 CASCADE 清边，入链方文本中的 `[[slug]]` 变悬空（合法）                                                    |
+| `updateSoul`   | `{ name?, persona? }`                   | 自我演化：「以后你叫…」「说话简洁点」；只触及 SOUL，碰不到 instructions（§3 分界）                                                     |
 
 **开关语义**：`memoryEnabled = off` → 4 个记忆工具不注册 + ③层索引不注入（模型不知道记忆系统存在）。**SOUL 与 `updateSoul` 不受此开关控制**——SOUL 不是关于用户的数据，它是 agent 本身。
 
@@ -170,7 +189,8 @@ SOUL 与 instructions 存 preferences 而非单独表：单行单实体，用户
 ## §7 错误处理与边界
 
 - **写工具失败**：工具结果返回真实错误文本给模型、由它告知用户（透传真实 message，不编造）；同时 `log.warn` 落盘。
-- **模型自纠**：`readMemory`/`updateMemory`/`deleteMemory` 收到不存在的 id → 返回「该记忆不存在」的工具结果（不抛 IPC 错误），模型对照索引自纠。
+- **模型自纠**：`readMemory`/`updateMemory`/`deleteMemory` 收到不存在的 slug → 返回「该记忆不存在」的工具结果（不抛 IPC 错误），模型对照索引自纠；`saveMemory` 撞 slug 同理（返回冲突提示，索引在眼前正常不会撞）。
+- **互链一致性**：边表纯派生，任何 body 写入路径（工具或设置页）都过同一个 `extractLinks` 同步；删除记忆 CASCADE 清边，入链方文本不动（`[[slug]]` 转为合法悬空）。
 - **记忆库空**：③层整段不注入。
 - **编辑重发**：历史 tool parts 只回放不重执行（现有机制），无重复写入风险。
 - **删书**：`sourceBookId` SET NULL，记忆保留——全局事实不随书消失。
@@ -181,7 +201,8 @@ SOUL 与 instructions 存 preferences 而非单独表：单行单实体，用户
 
 全部无头 vitest + `:memory:` DB，纯函数注入风格：
 
-- memories repository CRUD + 删书 SET NULL。
+- memories repository CRUD + 删书 SET NULL + slug 唯一约束。
+- 互链：`extractLinks(body)` 解析（含边缘格式）、边表同步、悬空链接不入表、删除 CASCADE 清边、readMemory 出链/入链/悬空标注。
 - 索引渲染：确定性排序、空库不注入。
 - 五层 system prompt 组装（模板 + instructions + SOUL + 索引 + 动态层；instructions 空时不注入空段）。
 - 工具 handler：自动填 `sourceBookId`、不存在 id 的自纠返回、`memoryEnabled=off` 不注册、`updateSoul` 不能触碰 instructions。
@@ -190,14 +211,15 @@ SOUL 与 instructions 存 preferences 而非单独表：单行单实体，用户
 
 ## §9 分期
 
-- **本期**：`memories` 表 + 5 个工具 + SOUL + instructions + 删 assistants + 设置页两版块 + 会话快照冻结。
-- **阶段二**（铺路已留）：跨书主动联想、`searchMemories`（SQLite FTS5）、记忆数量治理、首次见面起名仪式（onboarding 轨）。
+- **本期**：`memories` 表 + 互链（slug / `[[slug]]` 解析 / `memory_links` 边表 / readMemory 双向返回）+ 5 个工具 + SOUL + instructions + 删 assistants + 设置页两版块 + 会话快照冻结。管理面板中 `[[slug]]` 仅纯文本展示（可点跳转 + 入链列表留给后续 polish）。
+- **阶段二**（铺路已留）：跨书主动联想（可顺 `memory_links` 图游走）、`searchMemories`（SQLite FTS5）、记忆数量治理、首次见面起名仪式（onboarding 轨）。
 
 ## §10 开放问题（候选缺口，待用户定夺）
 
 以下能力本设计**未**覆盖，列出供判断是否为「还差的那块」：
 
 1. **Lia 的主动性**：当前设计中 AI 完全被动（用户先发言才有一切）。「沉浸的伴侣感」很大程度来自主动性——例如打开书时 Lia 主动开场（「上次读到第三章，我们聊过 X」）。这需要触发时机、频控、打扰边界的独立设计。
-2. **记忆互链**：Claude Code 记忆机制中的 `[[name]]` 互链未对应——记忆之间的概念网络对阶段二「跨书联想」可能很重要（顺着链找到相关思考）。
-3. **记忆的时间衰减/置信度**：读者的观点会变化，旧记忆可能过时。当前仅靠 Lia 主动 `updateMemory`/`deleteMemory` 维护，没有系统性的「陈旧标记」。
-4. **对话外的记忆入口**：记忆只在对话中生效与生长。标注/笔记（本期已排除的信号源）之外，是否需要「读完一本书时的回顾仪式」之类的记忆沉淀时机。
+2. **记忆的时间衰减/置信度**：读者的观点会变化，旧记忆可能过时。当前仅靠 Lia 主动 `updateMemory`/`deleteMemory` 维护，没有系统性的「陈旧标记」。
+3. **对话外的记忆入口**：记忆只在对话中生效与生长。标注/笔记（本期已排除的信号源）之外，是否需要「读完一本书时的回顾仪式」之类的记忆沉淀时机。
+
+（原「记忆互链」项已于 2026-06-10 讨论后纳入本期设计，见 §2.1.1。）
