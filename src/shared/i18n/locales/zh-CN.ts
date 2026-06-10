@@ -258,6 +258,7 @@ export default {
   "settings.memory.enabledDesc":
     "AI 会在对话中自动记录重要信息（偏好、阅读习惯、个人背景等），供后续对话参考。关闭后 AI 将不再写入新记忆，已有记忆仍保留。",
   "settings.memory.list": "已记忆的内容",
+  "settings.memory.loadFailed": "记忆加载失败",
   "settings.memory.save": "保存",
   "settings.memory.titlePlaceholder": "标题",
   "settings.memory.updateFailed": "记忆保存失败，请重试",

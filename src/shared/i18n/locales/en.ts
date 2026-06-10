@@ -274,6 +274,7 @@ export default {
   "settings.memory.enabledDesc":
     "The AI will automatically record important information during conversations (preferences, reading habits, personal context, etc.) for use in future conversations. When disabled, no new memories are written; existing ones are kept.",
   "settings.memory.list": "Stored memories",
+  "settings.memory.loadFailed": "Failed to load memories",
   "settings.memory.save": "Save",
   "settings.memory.titlePlaceholder": "Title",
   "settings.memory.updateFailed": "Failed to save memory, please try again",

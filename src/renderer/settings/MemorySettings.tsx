@@ -70,14 +70,15 @@ export function MemorySettings() {
     if (!editingId) return;
     updateMutation.mutate({
       id: editingId,
-      title: editTitle,
-      description: editDescription,
-      body: editBody,
+      title: editTitle.trim(),
+      description: editDescription.trim(),
+      body: editBody.trim(),
     });
   };
 
   const cancelEdit = () => {
     setEditingId(null);
+    setExpandedId(null);
   };
 
   return (
@@ -109,6 +110,12 @@ export function MemorySettings() {
         {/* 记忆列表 */}
         <div className="space-y-1">
           <h3 className="text-sm font-semibold">{t("settings.memory.list", "已记忆的内容")}</h3>
+
+          {memories.isError && (
+            <p className="text-sm text-destructive">
+              {t("settings.memory.loadFailed", "记忆加载失败")}
+            </p>
+          )}
 
           {memories.data?.length === 0 && (
             <p className="py-4 text-center text-sm text-muted-foreground">
