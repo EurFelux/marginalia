@@ -1,6 +1,12 @@
 import { create } from "zustand";
 import type { AnnotationStyle } from "@shared/annotations";
-import { DEFAULT_STEP_LIMIT, type ChatModel, type SummaryModel } from "@shared/preferences";
+import {
+  DEFAULT_SOUL,
+  DEFAULT_STEP_LIMIT,
+  type ChatModel,
+  type Soul,
+  type SummaryModel,
+} from "@shared/preferences";
 import type { ReaderLayout, ReaderPrefs } from "@renderer/types";
 import { persistPreference } from "@renderer/store/persist-preference";
 
@@ -23,6 +29,12 @@ interface PrefsState {
   stepLimit: number;
   /** 首启 onboarding 卡片已跳过/已完成（持久化，不再唠叨）。 */
   onboardingDismissed: boolean;
+  /** AI 记忆功能总开关（默认开）。 */
+  memoryEnabled: boolean;
+  /** agent 自我设定（SOUL）：name + persona。 */
+  soul: Soul;
+  /** 用户自定义全局指令（叠加在 SOUL persona 之上）。 */
+  instructions: string;
 }
 interface PrefsActions {
   setAutoSummarize: (v: boolean) => void;
@@ -34,6 +46,9 @@ interface PrefsActions {
   setPdfZoom: (v: number) => void;
   setStepLimit: (v: number) => void;
   setOnboardingDismissed: (v: boolean) => void;
+  setMemoryEnabled: (v: boolean) => void;
+  setSoul: (v: Soul) => void;
+  setInstructions: (v: string) => void;
 }
 
 export const PREFS_INITIAL: PrefsState = {
@@ -46,6 +61,9 @@ export const PREFS_INITIAL: PrefsState = {
   pdfZoom: 1,
   stepLimit: DEFAULT_STEP_LIMIT,
   onboardingDismissed: false,
+  memoryEnabled: true,
+  soul: DEFAULT_SOUL,
+  instructions: "",
 };
 
 /**
@@ -93,5 +111,17 @@ export const usePrefsStore = create<PrefsState & PrefsActions>()((set) => ({
   setOnboardingDismissed: (onboardingDismissed) => {
     persistPreference({ key: "onboardingDismissed", value: onboardingDismissed });
     set({ onboardingDismissed });
+  },
+  setMemoryEnabled: (memoryEnabled) => {
+    persistPreference({ key: "memoryEnabled", value: memoryEnabled });
+    set({ memoryEnabled });
+  },
+  setSoul: (soul) => {
+    persistPreference({ key: "soul", value: soul });
+    set({ soul });
+  },
+  setInstructions: (instructions) => {
+    persistPreference({ key: "instructions", value: instructions });
+    set({ instructions });
   },
 }));

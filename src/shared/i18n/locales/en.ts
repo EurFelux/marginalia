@@ -222,6 +222,18 @@ export default {
   "settings.advanced.stepLimitDesc":
     'Cap on how many consecutive tool-call steps the AI takes in a single reply — raise it for page-by-page PDF reading. With "Unlimited", only the model stopping on its own or you stopping it ends the turn; a model stuck in a loop keeps spending tokens.',
   "settings.advanced.stepLimitUnlimited": "Unlimited",
+  "settings.agent": "Assistant",
+  "settings.agent.instructions": "Global instructions",
+  "settings.agent.instructionsDesc":
+    'Extra behavioural requirements layered on top of the persona — for example: "always quote the original text", "prefer English". Applied to every conversation.',
+  "settings.agent.instructionsPlaceholder": "Enter global instructions…",
+  "settings.agent.name": "Assistant name",
+  "settings.agent.nameDesc": "The name shown in the chat UI. Cannot be blank.",
+  "settings.agent.namePlaceholder": "Enter assistant name",
+  "settings.agent.persona": "Persona",
+  "settings.agent.personaDesc":
+    "Describe the AI's character, tone, and style. Write freely in markdown; leave blank to use the default persona.",
+  "settings.agent.personaPlaceholder": "Describe the assistant's personality and style…",
   "settings.appearance": "Appearance",
   "settings.assistantModel": "Chat model",
   "settings.backup.cancel": "Cancel",
@@ -246,6 +258,24 @@ export default {
   "settings.language": "Language",
   "settings.light": "Light",
   "settings.logs": "Logs",
+  "settings.memory": "Memory",
+  "settings.memory.bodyPlaceholder": "Memory body",
+  "settings.memory.cancel": "Cancel",
+  "settings.memory.delete": "Delete",
+  "settings.memory.deleteDesc":
+    "This action cannot be undone — the memory entry will be permanently deleted.",
+  "settings.memory.deleteTitle": "Delete memory?",
+  "settings.memory.descPlaceholder": "Short description",
+  "settings.memory.edit": "Edit",
+  "settings.memory.empty":
+    "No memories yet. Memories accumulate naturally during your AI conversations — just chat normally and the AI will record useful information.",
+  "settings.memory.enabled": "Enable AI memory",
+  "settings.memory.enabledDesc":
+    "The AI will automatically record important information during conversations (preferences, reading habits, personal context, etc.) for use in future conversations. When disabled, no new memories are written; existing ones are kept.",
+  "settings.memory.list": "Stored memories",
+  "settings.memory.save": "Save",
+  "settings.memory.titlePlaceholder": "Title",
+  "settings.memory.updatedAt": "Updated {{when}}",
   "settings.model": "Model",
   "settings.model.select": "Select model",
   "settings.modelEditor.addSelected": "Add selected ({{n}})",

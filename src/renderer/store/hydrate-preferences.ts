@@ -24,4 +24,9 @@ export function hydratePreferences(): void {
   if (snap.onboardingDismissed !== undefined) {
     usePrefsStore.setState({ onboardingDismissed: snap.onboardingDismissed });
   }
+  if (snap.memoryEnabled !== undefined) {
+    usePrefsStore.setState({ memoryEnabled: snap.memoryEnabled });
+  }
+  if (snap.soul) usePrefsStore.setState({ soul: snap.soul });
+  if (snap.instructions !== undefined) usePrefsStore.setState({ instructions: snap.instructions });
 }

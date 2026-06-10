@@ -9,6 +9,8 @@ import { ModelsSettings } from "./ModelsSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { ReadingSettings } from "./ReadingSettings";
 import { AdvancedSettings } from "./AdvancedSettings";
+import { AgentSettings } from "./AgentSettings";
+import { MemorySettings } from "./MemorySettings";
 
 export function SettingsShell() {
   const { t } = useTranslation();
@@ -21,6 +23,8 @@ export function SettingsShell() {
     { key: "models", label: t("settings.models", "模型") },
     { key: "appearance", label: t("settings.appearance", "外观") },
     { key: "reading", label: t("settings.reading", "阅读") },
+    { key: "agent", label: t("settings.agent", "助手") },
+    { key: "memory", label: t("settings.memory", "记忆") },
     { key: "advanced", label: t("settings.advanced", "高级") },
   ];
 
@@ -74,6 +78,8 @@ export function SettingsShell() {
             {active === "models" && <ModelsSettings />}
             {active === "appearance" && <AppearanceSettings />}
             {active === "reading" && <ReadingSettings />}
+            {active === "agent" && <AgentSettings />}
+            {active === "memory" && <MemorySettings />}
             {active === "advanced" && <AdvancedSettings />}
           </div>
         </ScrollArea>
