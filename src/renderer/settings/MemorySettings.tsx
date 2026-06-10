@@ -26,6 +26,10 @@ export function MemorySettings() {
   const memories = useQuery({
     queryKey: qk.memories,
     queryFn: () => window.api.memories.list(),
+    // 记忆由 AI 工具在主进程后台写入（不经渲染层 mutation），全局 staleTime=∞ 会让
+    // 面板停留在「上次打开时」的快照——例如开过设置后再聊天写入记忆，重开设置仍空。
+    // staleTime:0 使每次打开记忆面板都重新拉取最新列表（参照 conversation-queries 同型处理）。
+    staleTime: 0,
   });
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
