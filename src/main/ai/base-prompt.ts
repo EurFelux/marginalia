@@ -1,5 +1,5 @@
 // src/main/ai/base-prompt.ts —— system prompt ①层内置模板 + 五层组装（spec 2026-06-10 §3）。
-// 模板代码内维护（随版本进化）；吸收原 DEFAULT_SYSTEM_PROMPT 行为要点 + 记忆指引。
+// 模板代码内维护（随版本进化）；吸收原默认助手系统提示词的行为要点 + 记忆指引。
 import type { DB } from "@main/db/client";
 import { getAgentContext } from "@main/ai/agent-context";
 import { getPreference } from "@main/preferences/repository";

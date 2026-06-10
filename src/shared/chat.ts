@@ -62,11 +62,10 @@ export type ConversationIdInput = z.infer<typeof conversationIdInput>;
 export const messagesByConversationInput = z.object({ conversationId: z.string().min(1) });
 export type MessagesByConversationInput = z.infer<typeof messagesByConversationInput>;
 
-/** 会话视图。bookId/assistantId 恒非空（列已 NOT NULL）；isNaming 为主进程内存瞬态合成（spec §5）。 */
+/** 会话视图。bookId 恒非空（列已 NOT NULL）；isNaming 为主进程内存瞬态合成（spec §5）。 */
 export interface ConversationDto {
   id: string;
   bookId: string;
-  assistantId: string;
   title: string | null;
   /** auto naming 进行中（下一任务接线真状态前恒 false）。 */
   isNaming: boolean;

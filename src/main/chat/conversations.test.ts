@@ -37,12 +37,11 @@ function seedBookWithChapters(db: ReturnType<typeof freshDb>) {
 }
 
 describe("createConversation / getConversation / listConversationsByBook", () => {
-  it("creates a conversation bound to the default assistant", () => {
+  it("creates a conversation bound to a book", () => {
     const db = freshDb();
     seedBookWithChapters(db);
     const convo = createConversation(db, { bookId: "book-1" });
     expect(convo.bookId).toBe("book-1");
-    expect(convo.assistantId).not.toBeNull();
     expect(convo.isNaming).toBe(false);
     expect(getConversation(db, convo.id)?.id).toBe(convo.id);
   });

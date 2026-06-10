@@ -26,8 +26,6 @@ import {
   testProviderInput,
   upsertProviderInput,
 } from "@shared/providers";
-import type { AssistantDto } from "@shared/assistant";
-import { updateAssistantInput } from "@shared/assistant";
 import type { AiStreamEvent, Chip, ConversationDto, MessageDto, SendAck } from "@shared/chat";
 import {
   abortInput,
@@ -196,7 +194,7 @@ export const C = {
   ),
   annotationsDelete: def("annotations:delete", "invoke", annotationIdInput, out<void>()),
 
-  // settings: providers + assistant
+  // settings: providers
   providersList: def("providers:list", "invoke", z.void(), out<ProviderDto[]>()),
   providersUpsert: def("providers:upsert", "invoke", upsertProviderInput, out<ProviderDto>()),
   providersReveal: def("providers:reveal", "invoke", providerIdInput, out<RevealResult>()),
@@ -208,8 +206,6 @@ export const C = {
     listModelsInput,
     out<ListModelsResult>(),
   ),
-  assistantGetDefault: def("assistant:get-default", "invoke", z.void(), out<AssistantDto>()),
-  assistantUpdate: def("assistant:update", "invoke", updateAssistantInput, out<AssistantDto>()),
 
   // chat（conversationsGet 为 main-only：有 handler、preload 不暴露）
   conversationsListByBook: def(

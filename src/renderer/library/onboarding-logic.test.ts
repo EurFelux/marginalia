@@ -18,15 +18,11 @@ function provider(over: Partial<ProviderDto> = {}): ProviderDto {
 }
 
 describe("isModelConnected", () => {
-  it("false when assistant undefined", () => {
-    expect(isModelConnected(undefined, [provider()])).toBe(false);
+  it("false when chatModel null", () => {
+    expect(isModelConnected(null, [provider()])).toBe(false);
   });
   it("false when providers undefined (query loading)", () => {
     expect(isModelConnected({ providerId: "p1", model: "m1" }, undefined)).toBe(false);
-  });
-  it("false when assistant has no provider or model", () => {
-    expect(isModelConnected({ providerId: null, model: null }, [provider()])).toBe(false);
-    expect(isModelConnected({ providerId: "p1", model: null }, [provider()])).toBe(false);
   });
   it("false when the chosen provider has no key", () => {
     expect(isModelConnected({ providerId: "p1", model: "m1" }, [provider({ keyMask: null })])).toBe(
@@ -56,14 +52,13 @@ describe("summaryModelBackfill", () => {
       summaryModelBackfill({ providerId: "x", model: "y" }, { providerId: "p1", model: "m1" }),
     ).toBeNull();
   });
-  it("returns the assistant model when summaryModel unset", () => {
+  it("returns the chat model when summaryModel unset", () => {
     expect(summaryModelBackfill(null, { providerId: "p1", model: "m1" })).toEqual({
       providerId: "p1",
       model: "m1",
     });
   });
-  it("returns null when assistant model incomplete", () => {
-    expect(summaryModelBackfill(null, { providerId: "p1", model: null })).toBeNull();
-    expect(summaryModelBackfill(null, undefined)).toBeNull();
+  it("returns null when chat model not configured", () => {
+    expect(summaryModelBackfill(null, null)).toBeNull();
   });
 });

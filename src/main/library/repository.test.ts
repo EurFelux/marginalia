@@ -4,15 +4,7 @@ import { tmpdir } from "node:os";
 import { describe, expect, it, vi } from "vitest";
 import { asc, eq } from "drizzle-orm";
 import { createDb, runMigrations } from "@main/db/client";
-import {
-  annotations,
-  assistants,
-  books,
-  chapters,
-  conversations,
-  messages,
-  progress,
-} from "@main/db/schema";
+import { annotations, books, chapters, conversations, messages, progress } from "@main/db/schema";
 import {
   deleteBook,
   getBook,
@@ -124,16 +116,11 @@ describe("library repository", () => {
   it("ON DELETE CASCADE removes all book-owned dependents", async () => {
     const db = freshDb();
     const book = await importBook(db, { bytes: makeFixtureEpub() });
-    const assistantId = db.insert(assistants).values({ name: "A" }).returning().get().id;
     db.insert(progress).values({ bookId: book.id, locator: "epubcfi(/6/2)" }).run();
     db.insert(annotations)
       .values({ bookId: book.id, style: "yellow", selectedText: "x", locatorRange: "r" })
       .run();
-    const conv = db
-      .insert(conversations)
-      .values({ bookId: book.id, assistantId })
-      .returning()
-      .get();
+    const conv = db.insert(conversations).values({ bookId: book.id }).returning().get();
     db.insert(messages).values({ conversationId: conv.id, role: "user", parts: [], seq: 0 }).run();
 
     db.delete(books).where(eq(books.id, book.id)).run();
@@ -144,8 +131,6 @@ describe("library repository", () => {
     expect(db.select().from(annotations).all()).toHaveLength(0);
     expect(db.select().from(conversations).all()).toHaveLength(0);
     expect(db.select().from(messages).all()).toHaveLength(0);
-    // assistant 是共享资源，不随书删
-    expect(db.select().from(assistants).all()).toHaveLength(1);
   });
 
   it("deleteBook removes the book (cascading dependents) and unlinks the owned file", async () => {

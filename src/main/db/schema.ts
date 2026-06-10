@@ -50,15 +50,6 @@ export const providers = sqliteTable(
   ],
 );
 
-export const assistants = sqliteTable("assistants", {
-  id: pkUuid(),
-  name: text("name").notNull(),
-  systemPrompt: text("system_prompt"),
-  providerId: text("provider_id").references(() => providers.id),
-  model: text("model"),
-  createdAt: nowMs(),
-});
-
 export const books = sqliteTable(
   "books",
   {
@@ -164,9 +155,6 @@ export const conversations = sqliteTable(
     bookId: text("book_id")
       .notNull()
       .references(() => books.id, { onDelete: "cascade" }),
-    assistantId: text("assistant_id")
-      .notNull()
-      .references(() => assistants.id),
     title: text("title"),
     // 上下文管理（spec 2026-06-08）：滚动概要 + 已折叠到的消息 seq。
     // null = 尚未折叠（全量逐字，等价旧行为）。

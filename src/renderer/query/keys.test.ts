@@ -5,7 +5,6 @@ describe("qk", () => {
   it("static keys", () => {
     expect(qk.library).toEqual(["library"]);
     expect(qk.providers).toEqual(["providers"]);
-    expect(qk.assistantDefault).toEqual(["assistant", "default"]);
   });
   it("parametric keys", () => {
     expect(qk.toc("b1")).toEqual(["toc", "b1"]);

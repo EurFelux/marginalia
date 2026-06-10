@@ -62,8 +62,6 @@ export default {
   "common.remove": "移除",
   "common.save": "保存",
   "common.saving": "保存中…",
-  "errors.assistantNoModel": "助手未配置模型",
-  "errors.assistantNoProvider": "助手未配置$t(terms.provider)",
   "errors.baseUrlRequiredCustom": "自建$t(terms.provider)必须填写 baseUrl",
   "errors.baseUrlRequiredForProvider": "该$t(terms.provider)需要 baseUrl",
   "errors.builtinBaseUrlLocked": "内置$t(terms.provider)的 baseUrl 不可修改",

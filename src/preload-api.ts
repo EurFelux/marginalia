@@ -92,10 +92,6 @@ export function createApi(d: PreloadDeps) {
         remove: inv(C.providersRemove),
         listModels: inv(C.providersListModels),
       },
-      assistant: {
-        getDefault: inv(C.assistantGetDefault),
-        update: inv(C.assistantUpdate),
-      },
     },
 
     chat: {

@@ -4,7 +4,7 @@ import path from "node:path";
 import { eq, sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { createDb, runMigrations } from "@main/db/client";
-import { assistants, books, chapters, providers } from "@main/db/schema";
+import { books, chapters, conversations, providers } from "@main/db/schema";
 
 const MIGRATIONS = path.resolve(__dirname, "migrations");
 
@@ -36,9 +36,9 @@ describe("db client", () => {
   it("enforces foreign key constraints", () => {
     const db = createDb(":memory:");
     runMigrations(db, MIGRATIONS);
-    expect(() =>
-      db.insert(assistants).values({ name: "x", providerId: "nonexistent-id" }).run(),
-    ).toThrow();
+    expect(() => db.insert(conversations).values({ bookId: "nonexistent-id" }).run()).toThrow(
+      /FOREIGN KEY/i,
+    );
   });
 
   it("rejects an invalid enum value via CHECK constraint", () => {

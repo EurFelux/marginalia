@@ -2,7 +2,6 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
 import type { DB } from "@main/db/client";
 import { conversations, messages } from "@main/db/schema";
-import { getDefaultAssistant } from "@main/providers/assistant";
 import { isNamingConversation } from "@main/chat/conversation-title";
 import type { ConversationDto, CreateConversationInput } from "@shared/chat";
 import { dropAgentContext } from "@main/ai/agent-context";
@@ -13,7 +12,6 @@ function toDto(row: ConversationRow): ConversationDto {
   return {
     id: row.id,
     bookId: row.bookId,
-    assistantId: row.assistantId,
     title: row.title ?? null,
     isNaming: isNamingConversation(row.id),
     createdAt: row.createdAt,
@@ -22,7 +20,7 @@ function toDto(row: ConversationRow): ConversationDto {
 }
 
 /**
- * 创建会话；assistantId 取默认 Assistant（按需惰性播种）。
+ * 创建会话（绑定到书；单一全局 agent，无 assistant 概念）。
  * 防堆积（spec §5）：该书已存在零消息会话 → 返回最新的那个而不新建。
  */
 export function createConversation(db: DB, input: CreateConversationInput): ConversationDto {
@@ -36,12 +34,7 @@ export function createConversation(db: DB, input: CreateConversationInput): Conv
     .get();
   if (empty) return toDto(empty.row);
 
-  const assistant = getDefaultAssistant(db);
-  const row = db
-    .insert(conversations)
-    .values({ bookId: input.bookId, assistantId: assistant.id })
-    .returning()
-    .get();
+  const row = db.insert(conversations).values({ bookId: input.bookId }).returning().get();
   return toDto(row);
 }
 

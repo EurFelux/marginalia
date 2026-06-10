@@ -1,6 +1,6 @@
 import { asc, eq } from "drizzle-orm";
 import type { DB } from "@main/db/client";
-import { assistants, providers } from "@main/db/schema";
+import { providers } from "@main/db/schema";
 import type { ProviderTester } from "@main/secrets/tester";
 import { maskKey } from "@main/providers/mask";
 import { createProvider, type Provider } from "@main/providers/provider-factory";
@@ -134,11 +134,9 @@ export function removeProvider(db: DB, id: string): void {
     throw new Error(t("errors.providerNotFound", "未找到$t(terms.provider) {{id}}", { id }));
   if (row.isBuiltin)
     throw new Error(t("errors.builtinUndeletable", "内置$t(terms.provider)不可删除"));
-  db.transaction((tx) => {
-    // 先解除默认 Assistant 对该 provider 的引用，避免外键约束失败。
-    tx.update(assistants).set({ providerId: null }).where(eq(assistants.providerId, id)).run();
-    tx.delete(providers).where(eq(providers.id, id)).run();
-  });
+  // chatModel / summaryModel 偏好按 providerId 引用（无 FK，存 JSON）：删 provider 后留作悬空引用，
+  // 由 resolveChatModel / resolveSummaryModel 在解析时报「未找到 provider」优雅降级，无需在此清理。
+  db.delete(providers).where(eq(providers.id, id)).run();
 }
 
 export function revealProviderKey(db: DB, id: string): string {

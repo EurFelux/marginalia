@@ -3,7 +3,7 @@ import path from "node:path";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { createDb, runMigrations } from "@main/db/client";
-import { assistants, books, conversations } from "@main/db/schema";
+import { books, conversations } from "@main/db/schema";
 import {
   appendMessage,
   getMessage,
@@ -26,17 +26,9 @@ function freshDb() {
   return db;
 }
 
-function seedAssistant(db: ReturnType<typeof freshDb>): string {
-  return db.insert(assistants).values({ name: "Test" }).returning().get().id;
-}
-
 function seedConversation(db: ReturnType<typeof freshDb>): string {
   db.insert(books).values({ id: "book-1" }).run();
-  const row = db
-    .insert(conversations)
-    .values({ bookId: "book-1", assistantId: seedAssistant(db) })
-    .returning()
-    .get();
+  const row = db.insert(conversations).values({ bookId: "book-1" }).returning().get();
   return row.id;
 }
 
@@ -97,9 +89,8 @@ describe("appendMessage / listMessages", () => {
   it("keeps seq independent per conversation", () => {
     const db = freshDb();
     db.insert(books).values({ id: "book-1" }).run();
-    const assistantId = seedAssistant(db);
-    const a = db.insert(conversations).values({ bookId: "book-1", assistantId }).returning().get();
-    const b = db.insert(conversations).values({ bookId: "book-1", assistantId }).returning().get();
+    const a = db.insert(conversations).values({ bookId: "book-1" }).returning().get();
+    const b = db.insert(conversations).values({ bookId: "book-1" }).returning().get();
     appendMessage(db, {
       conversationId: a.id,
       role: "user",

@@ -10,7 +10,6 @@ import {
   testProvider,
   upsertProvider,
 } from "@main/providers/repository";
-import { getDefaultAssistant, updateDefaultAssistant } from "@main/providers/assistant";
 import { aiSdkTester } from "@main/secrets/ai-sdk-tester";
 import { bind, register, type Binding } from "@main/ipc/registry";
 import type { ListModelsResult } from "@shared/providers";
@@ -47,10 +46,6 @@ export const settingsBindings: Binding[] = [
       return { ok: false, ...mapModelsError(err, undefined) };
     }
   }),
-
-  bind(C.assistantGetDefault, () => getDefaultAssistant(getDb())),
-
-  bind(C.assistantUpdate, (input) => updateDefaultAssistant(getDb(), input)),
 ];
 
 export function registerSettingsHandlers(): void {

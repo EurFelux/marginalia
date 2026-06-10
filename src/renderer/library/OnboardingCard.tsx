@@ -16,12 +16,9 @@ export function OnboardingCard() {
     queryKey: qk.providers,
     queryFn: () => window.api.settings.providers.list(),
   });
-  const assistant = useQuery({
-    queryKey: qk.assistantDefault,
-    queryFn: () => window.api.settings.assistant.getDefault(),
-  });
 
   const autoSummarize = usePrefsStore((s) => s.autoSummarize);
+  const chatModel = usePrefsStore((s) => s.chatModel);
   const summaryModel = usePrefsStore((s) => s.summaryModel);
   const dismissed = usePrefsStore((s) => s.onboardingDismissed);
   const setAutoSummarize = usePrefsStore((s) => s.setAutoSummarize);
@@ -31,12 +28,12 @@ export function OnboardingCard() {
   const openSettings = useSettingsStore((s) => s.setOpen);
   const setCategory = useSettingsStore((s) => s.setActiveCategory);
 
-  const modelConnected = isModelConnected(assistant.data, providers.data);
+  const modelConnected = isModelConnected(chatModel, providers.data);
   const complete = isOnboardingComplete(modelConnected, autoSummarize);
 
   // 已跳过/已完成不显示；query 未就绪先不渲染，避免「未连接→已连接」闪烁。
   if (dismissed) return null;
-  if (providers.isPending || assistant.isPending) return null;
+  if (providers.isPending) return null;
   if (complete) return null;
 
   const onConfigureModel = () => {
@@ -46,7 +43,7 @@ export function OnboardingCard() {
 
   // 开启自动摘要：命令式一次性完成（非 effect 模拟）。顺手兜底 summaryModel，并持久化 dismissed。
   const onEnableAutoSummary = () => {
-    const backfill = summaryModelBackfill(summaryModel, assistant.data);
+    const backfill = summaryModelBackfill(summaryModel, chatModel);
     if (backfill) setSummaryModel(backfill);
     setAutoSummarize(true);
     setOnboardingDismissed(true);

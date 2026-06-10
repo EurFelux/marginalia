@@ -11,11 +11,8 @@ import {
   testProvider,
   upsertProvider,
 } from "@main/providers/repository";
-import {
-  DEFAULT_ASSISTANT_NAME,
-  getDefaultAssistant,
-  updateDefaultAssistant,
-} from "@main/providers/assistant";
+import { getPreference, setPreference } from "@main/preferences/repository";
+import { resolveChatModel } from "@main/ai/assistant-model";
 import { initMainI18n } from "@main/i18n";
 
 beforeAll(() => initMainI18n("en"));
@@ -143,19 +140,22 @@ describe("provider repository", () => {
     expect(() => revealProviderKey(db, noKey.id)).toThrow(/no API key/i);
   });
 
-  it("removeProvider deletes it and clears assistant references", () => {
+  it("removeProvider deletes it; a chatModel preference pointing at it degrades gracefully", () => {
     const db = freshDb();
     const prov = upsertProvider(db, {
       type: "openai-responses",
       baseUrl: "https://api.openai.com/v1",
       apiKey: "sk-abcdefghij",
     });
-    getDefaultAssistant(db);
-    updateDefaultAssistant(db, { providerId: prov.id });
+    setPreference(db, "chatModel", { providerId: prov.id, model: "gpt-4o-mini" });
     removeProvider(db, prov.id);
     expect(getProviderRow(db, prov.id)).toBeUndefined();
-    expect(getDefaultAssistant(db).providerId).toBeNull();
-    expect(getDefaultAssistant(db).name).toBe(DEFAULT_ASSISTANT_NAME);
+    // 偏好按 providerId 引用（无 FK）：保留为悬空引用，resolveChatModel 报「未找到 provider」而非崩溃。
+    expect(getPreference(db, "chatModel")).toEqual({ providerId: prov.id, model: "gpt-4o-mini" });
+    expect(resolveChatModel(db)).toMatchObject({
+      ok: false,
+      reason: expect.stringContaining("not found"),
+    });
   });
 
   it("removeProvider throws for a non-existent provider", () => {
@@ -163,7 +163,7 @@ describe("provider repository", () => {
     expect(() => removeProvider(db, "nope")).toThrow(/not found/i);
   });
 
-  it("removeProvider only clears assistant refs to the removed provider", () => {
+  it("removeProvider only deletes the targeted provider", () => {
     const db = freshDb();
     const provA = upsertProvider(db, {
       type: "openai-responses",
@@ -175,10 +175,8 @@ describe("provider repository", () => {
       baseUrl: "https://api.anthropic.com/v1",
       apiKey: "sk-bbbbbbbb22",
     });
-    getDefaultAssistant(db);
-    updateDefaultAssistant(db, { providerId: provA.id });
     removeProvider(db, provB.id);
-    expect(getDefaultAssistant(db).providerId).toBe(provA.id); // A 的绑定不受影响
+    expect(getProviderRow(db, provA.id)).toBeDefined(); // A 不受影响
     expect(getProviderRow(db, provB.id)).toBeUndefined();
   });
 

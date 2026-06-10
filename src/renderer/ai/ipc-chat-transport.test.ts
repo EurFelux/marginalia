@@ -107,7 +107,6 @@ function makeApi(overrides?: {
             overrides?.createResult ?? {
               id: "new-conv-id",
               bookId: "book-1",
-              assistantId: "a1",
               title: null,
               isNaming: false,
               createdAt: 0,
@@ -246,7 +245,6 @@ describe("createIpcChatTransport sendMessages", () => {
           create: vi.fn(async () => ({
             id: "new-conv-id",
             bookId: "book-1",
-            assistantId: "a1",
             title: null,
             isNaming: false,
             createdAt: 0,

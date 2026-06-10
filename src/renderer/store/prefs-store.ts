@@ -1,12 +1,14 @@
 import { create } from "zustand";
 import type { AnnotationStyle } from "@shared/annotations";
-import { DEFAULT_STEP_LIMIT, type SummaryModel } from "@shared/preferences";
+import { DEFAULT_STEP_LIMIT, type ChatModel, type SummaryModel } from "@shared/preferences";
 import type { ReaderLayout, ReaderPrefs } from "@renderer/types";
 import { persistPreference } from "@renderer/store/persist-preference";
 
 interface PrefsState {
   /** 开章时自动生成本章摘要（默认关——控成本；landing/onboarding 时引导用户开启）。 */
   autoSummarize: boolean;
+  /** 对话模型（接替 assistants 表配置）；null = 未配置（发送报错，无回退）。 */
+  chatModel: ChatModel | null;
   /** 摘要模型（章节/全书摘要 + 会话自动命名）；null = 未配置（生成报错/命名跳过，无回退）。 */
   summaryModel: SummaryModel | null;
   /** 阅读排版偏好（字号/行高/版心宽）。 */
@@ -24,6 +26,7 @@ interface PrefsState {
 }
 interface PrefsActions {
   setAutoSummarize: (v: boolean) => void;
+  setChatModel: (v: ChatModel) => void;
   setSummaryModel: (v: SummaryModel) => void;
   updatePrefs: (patch: Partial<ReaderPrefs>) => void;
   setLastHighlightStyle: (style: AnnotationStyle) => void;
@@ -35,6 +38,7 @@ interface PrefsActions {
 
 export const PREFS_INITIAL: PrefsState = {
   autoSummarize: false,
+  chatModel: null,
   summaryModel: null,
   prefs: { fontScale: 1, lineHeight: 1.9, maxWidth: 640, fontFamily: "default" },
   lastHighlightStyle: "yellow",
@@ -53,6 +57,10 @@ export const usePrefsStore = create<PrefsState & PrefsActions>()((set) => ({
   setAutoSummarize: (autoSummarize) => {
     persistPreference({ key: "autoSummarize", value: autoSummarize });
     set({ autoSummarize });
+  },
+  setChatModel: (chatModel) => {
+    persistPreference({ key: "chatModel", value: chatModel });
+    set({ chatModel });
   },
   setSummaryModel: (summaryModel) => {
     persistPreference({ key: "summaryModel", value: summaryModel });

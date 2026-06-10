@@ -63,8 +63,6 @@ export default {
   "common.remove": "Remove",
   "common.save": "Save",
   "common.saving": "Saving…",
-  "errors.assistantNoModel": "assistant has no model configured",
-  "errors.assistantNoProvider": "assistant has no $t(terms.provider) configured",
   "errors.baseUrlRequiredCustom":
     "baseUrl is required for custom (non-builtin) $t(terms.provider)s",
   "errors.baseUrlRequiredForProvider": "baseUrl is required for this $t(terms.provider)",
