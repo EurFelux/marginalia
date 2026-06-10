@@ -212,6 +212,15 @@ export const preferences = sqliteTable("preferences", {
     .$defaultFn(() => Date.now()),
 });
 
+/** 应用内部状态 KV（非用户偏好；渲染层不可见）。与 preferences 表分离，故不进任何渲染层契约。 */
+export const appMeta = sqliteTable("app_meta", {
+  key: text("key").primaryKey(),
+  value: text("value", { mode: "json" }).$type<unknown>().notNull(),
+  updatedAt: integer("updated_at")
+    .notNull()
+    .$defaultFn(() => Date.now()),
+});
+
 // 阅读时长按 (书 × 本地日期) 累计（spec 2026-06-09-reading-time-tracking §2）。
 // 删书 set null 保留时长历史：bookId 置空后该行仍计入 总时长/每日柱图/streak，仅各书排行不再列它。
 export const readingDaily = sqliteTable(
