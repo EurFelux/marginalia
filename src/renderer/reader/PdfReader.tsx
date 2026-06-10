@@ -263,6 +263,8 @@ export function PdfReader({ bookId, chapters }: Props) {
   }, [zoom]);
 
   // React 合成 onWheel 是 passive 的（preventDefault 拦不住浏览器缩放）→ 原生监听。
+  // 挂 containerRef 而非 Virtuoso scrollerRef：容器跨 loading→loaded 稳定存在，
+  // 滚轮事件自 scroller 冒泡可达，且 scroller h-full 占满容器、坐标系一致。
   useEffect(() => {
     const container = containerRef.current;
     if (!book || pageH <= 0 || !container) return;
