@@ -76,4 +76,13 @@ describe("session snapshot freeze", () => {
     createMemory(db, { slug: "late", title: "L", description: "D", body: "b", sourceBookId: null });
     expect(getAgentContext(db, "conv-1")).toContain("[late]");
   });
+
+  it("memory index disappears after memoryEnabled flips off and contexts invalidated", () => {
+    const db = freshDb();
+    createMemory(db, { slug: "m", title: "T", description: "D", body: "b", sourceBookId: null });
+    expect(getAgentContext(db, "conv-1")).toContain("[m]");
+    setPreference(db, "memoryEnabled", false);
+    invalidateAllAgentContexts();
+    expect(getAgentContext(db, "conv-1")).not.toContain("[m]");
+  });
 });

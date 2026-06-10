@@ -34,8 +34,10 @@ export const preferencesBindings: Binding[] = [
         return setPreference(getDb(), input.key, input.value);
       case "chatModel":
         return setPreference(getDb(), input.key, input.value);
-      case "memoryEnabled":
+      case "memoryEnabled": {
+        invalidateAllAgentContexts();
         return setPreference(getDb(), input.key, input.value);
+      }
       case "soul": {
         invalidateAllAgentContexts();
         return setPreference(getDb(), input.key, input.value);
