@@ -21,13 +21,17 @@ describe("preferences schemas", () => {
   it("registers exactly the keys with current consumers", () => {
     expect(Object.keys(PREFERENCE_SCHEMAS).sort()).toEqual([
       "autoSummarize",
+      "chatModel",
       "colorMode",
+      "instructions",
       "language",
       "lastHighlightStyle",
+      "memoryEnabled",
       "onboardingDismissed",
       "pdfZoom",
       "readerLayout",
       "readerPrefs",
+      "soul",
       "stepLimit",
       "summaryModel",
     ]);
