@@ -5,6 +5,7 @@ import { conversations, messages } from "@main/db/schema";
 import { getDefaultAssistant } from "@main/providers/assistant";
 import { isNamingConversation } from "@main/chat/conversation-title";
 import type { ConversationDto, CreateConversationInput } from "@shared/chat";
+import { dropAgentContext } from "@main/ai/agent-context";
 
 type ConversationRow = typeof conversations.$inferSelect;
 
@@ -57,6 +58,7 @@ export function setConversationTitle(db: DB, id: string, title: string): void {
 /** 删除会话（messages 由 FK 级联删）；幂等——未知 id 为 0-row delete。 */
 export function deleteConversation(db: DB, id: string): void {
   db.delete(conversations).where(eq(conversations.id, id)).run();
+  dropAgentContext(id);
 }
 
 /** 列出某书的会话，最近更新在前。 */

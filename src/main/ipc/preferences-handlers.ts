@@ -4,6 +4,7 @@ import { getDb } from "@main/db/instance";
 import { getAllPreferences, setPreference } from "@main/preferences/repository";
 import { bind, register, type Binding } from "@main/ipc/registry";
 import { setMainLanguage } from "@main/i18n";
+import { invalidateAllAgentContexts } from "@main/ai/agent-context";
 
 export const preferencesBindings: Binding[] = [
   // 写：运行时变更落盘（异步 invoke，fire-and-forget）。
@@ -35,10 +36,14 @@ export const preferencesBindings: Binding[] = [
         return setPreference(getDb(), input.key, input.value);
       case "memoryEnabled":
         return setPreference(getDb(), input.key, input.value);
-      case "soul":
+      case "soul": {
+        invalidateAllAgentContexts();
         return setPreference(getDb(), input.key, input.value);
-      case "instructions":
+      }
+      case "instructions": {
+        invalidateAllAgentContexts();
         return setPreference(getDb(), input.key, input.value);
+      }
       default: {
         // 穷尽性守卫：注册新 preference key 后漏补本 switch 的 case 会在此编译报错。
         // （曾静默吞写：readerLayout/summaryModel 缺 case 时 IPC 返回成功但什么都没落盘。）
