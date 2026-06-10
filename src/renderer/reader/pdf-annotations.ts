@@ -1,5 +1,6 @@
 import type { AnnotationDto, AnnotationStyle } from "@shared/annotations";
 import { parsePdfLocatorRange } from "./pdf-locator";
+import { hasNote } from "./highlight";
 
 /** 单页标注（绘制输入）：locatorRange 解析后的页内偏移 + 视觉属性。 */
 export interface PdfPageAnno {
@@ -55,7 +56,7 @@ export function pdfAnnosByPage(annos: AnnotationDto[]): Map<number, PdfPageAnno[
     arr.push({
       id: a.id,
       style: a.style,
-      hasNote: a.note.trim().length > 0,
+      hasNote: hasNote(a.note),
       start: r.start,
       end: r.end,
     });

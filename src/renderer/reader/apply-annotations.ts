@@ -1,5 +1,6 @@
 import type { AnnotationDto } from "@shared/annotations";
 import type { EpubBook } from "./epub-book";
+import { hasNote } from "./highlight";
 
 /** 移除文档内全部高亮 mark（用其文本内容替换 mark，再合并相邻文本节点）。 */
 export function clearAnnoMarks(doc: Document): void {
@@ -64,7 +65,7 @@ export function applyAnnotations(
     if (book.indexOfCfi(a.locatorRange) !== index) continue;
     const range = book.rangeFromCfi(a.locatorRange, doc);
     if (!range) continue;
-    const noted = a.note.trim().length > 0 ? " anno-noted" : "";
+    const noted = hasNote(a.note) ? " anno-noted" : "";
     wrapRange(range, doc, `anno anno-${a.style}${noted}`, a.id);
   }
 }

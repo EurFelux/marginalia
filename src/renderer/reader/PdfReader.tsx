@@ -19,7 +19,7 @@ import { chapterIdAtPage } from "./pdf-chapter-at-page";
 import { clampPdfZoom } from "./pdf-zoom";
 import { pdfPercent } from "./percent";
 import { findPdfTextLinks } from "./pdf-autolink";
-import { OVERLAY_FILL } from "./highlight";
+import { overlayClass } from "./highlight";
 import type { PdfPageAnno } from "./pdf-annotations";
 import { hitHighlight, usePdfHighlights } from "./use-pdf-highlights";
 import { useNoteHoverStore } from "@renderer/store/note-hover-store";
@@ -479,7 +479,7 @@ function PdfPage(props: {
             {highlights.map((h) => (
               <div
                 key={`${h.annoId}-${Math.round(h.rect.left)}-${Math.round(h.rect.top)}`}
-                className={cn("absolute", OVERLAY_FILL[h.style])}
+                className={cn("absolute", overlayClass(h.style, h.hasNote))}
                 // 运行时计算的矩形几何
                 style={{
                   left: h.rect.left,

@@ -37,9 +37,28 @@ export const OVERLAY_FILL: Record<AnnotationStyle, string> = {
 };
 
 /**
+ * 「有笔记」判定：ePub 的 `.anno-noted`（apply-annotations.ts）与 PDF overlay 的
+ * 点状底边（overlayClass）共用此谓词——语义改这里一处。
+ */
+export function hasNote(note: string): boolean {
+  return note.trim().length > 0;
+}
+
+/**
+ * PDF overlay 矩形类（含笔记记号）：有笔记 → 底边点状线，与 ePub `.anno-noted`
+ * 的 dotted text-decoration 同一约定（见上 ANNO_IFRAME_CSS——改一侧必改另一侧）；
+ * underline 样式则把实线底边换成点状（不叠两条线）。border-foreground 明暗自适应。
+ */
+export function overlayClass(style: AnnotationStyle, noted: boolean): string {
+  if (!noted) return OVERLAY_FILL[style];
+  if (style === "underline") return "border-b-2 border-dotted border-foreground/60";
+  return `${OVERLAY_FILL[style]} border-b-2 border-dotted border-foreground/70`;
+}
+
+/**
  * 注入每个 section iframe 的高亮 CSS（iframe 是 sandboxed srcdoc，主应用 Tailwind 不生效，
  * 故用具体 CSS）。`.anno` 可点击；5 色背景填充；underline 走 text-decoration；
- * `.anno-noted` 叠虚线下划表示有笔记。
+ * `.anno-noted` 叠虚线下划表示有笔记（与 PDF 侧 overlayClass 同一约定，改一侧必改另一侧）。
  */
 export const ANNO_IFRAME_CSS = [
   "mark.anno { background: transparent; cursor: pointer; }",
