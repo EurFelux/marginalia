@@ -48,6 +48,8 @@ import type { ReadingStatsDto } from "@shared/stats";
 import { statsGetInput, statsReadingStateInput } from "@shared/stats";
 import type { BackupExportResult, BackupInspection } from "@shared/backup";
 import { backupRestoreInput } from "@shared/backup";
+import type { MemoryDto } from "@shared/memory";
+import { deleteMemoryInput, updateMemoryInput } from "@shared/memory";
 
 /** ping —— 演示"带入参且经 Zod 校验"的往返 */
 export const pingInput = z.object({ msg: z.string().min(1) });
@@ -258,6 +260,11 @@ export const C = {
   backupExport: def("backup:export", "invoke", z.void(), out<BackupExportResult | null>()),
   backupInspect: def("backup:inspect", "invoke", z.void(), out<BackupInspection | null>()),
   backupRestore: def("backup:restore", "invoke", backupRestoreInput, out<void>()),
+
+  // memories
+  memoriesList: def("memories:list", "invoke", z.void(), out<MemoryDto[]>()),
+  memoriesUpdate: def("memories:update", "invoke", updateMemoryInput, out<MemoryDto | null>()),
+  memoriesDelete: def("memories:delete", "invoke", deleteMemoryInput, out<void>()),
 
   // logging
   logWrite: def("log:write", "invoke", logWriteInput, out<void>()),

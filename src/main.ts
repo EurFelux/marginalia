@@ -18,6 +18,7 @@ import { registerAnnotationHandlers } from "@main/ipc/annotations-handlers";
 import { registerPreferenceHandlers } from "@main/ipc/preferences-handlers";
 import { registerStatsHandlers } from "@main/ipc/stats-handlers";
 import { registerBackupHandlers } from "@main/ipc/backup-handlers";
+import { registerMemoryHandlers } from "@main/ipc/memory-handlers";
 import { initReadingClock, bindWindowToClock } from "@main/stats/clock-wiring";
 import { registerCoverProtocol, registerCoverProtocolScheme } from "@main/library/cover-protocol";
 import { maybeSeedSampleBook } from "@main/onboarding/seed-sample";
@@ -152,6 +153,7 @@ app.on("ready", async () => {
   registerLogHandlers();
   registerStatsHandlers();
   registerBackupHandlers();
+  registerMemoryHandlers();
   initReadingClock();
   // 首启自动导入内置样书（幂等；建窗前完成，使首帧渲染时书已在库）
   await maybeSeedSampleBook(getDb(), lang, appService.getPath("booksDir"));

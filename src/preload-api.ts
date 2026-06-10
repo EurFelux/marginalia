@@ -131,6 +131,12 @@ export function createApi(d: PreloadDeps) {
       /** 整体替换还原；成功后主进程立即 relaunch（此调用不会正常 resolve）。 */
       restore: inv(C.backupRestore),
     },
+
+    memories: {
+      list: inv(C.memoriesList),
+      update: inv(C.memoriesUpdate),
+      delete: inv(C.memoriesDelete),
+    },
   };
 }
 

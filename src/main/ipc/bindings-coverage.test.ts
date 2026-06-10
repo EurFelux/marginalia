@@ -10,6 +10,7 @@ import { aiBindings } from "@main/ipc/ai-handlers";
 import { logBindings } from "@main/ipc/log-handlers";
 import { statsBindings } from "@main/ipc/stats-handlers";
 import { backupBindings } from "@main/ipc/backup-handlers";
+import { memoryBindings } from "@main/ipc/memory-handlers";
 
 const allBindings = [
   ...appBindings,
@@ -22,6 +23,7 @@ const allBindings = [
   ...logBindings,
   ...statsBindings,
   ...backupBindings,
+  ...memoryBindings,
 ];
 
 describe("ipc bindings coverage", () => {
