@@ -9,6 +9,7 @@ import {
 import { eq } from "drizzle-orm";
 import { conversations } from "@main/db/schema";
 import { createReadingTools } from "@main/ai/tools";
+import { createMemoryTools } from "@main/ai/memory-tools";
 import { supportsImageToolResults } from "@main/ai/model-factory";
 import { maybeCompactConversation } from "@main/ai/context-compaction";
 import { nameConversation } from "@main/chat/conversation-title";
@@ -54,7 +55,10 @@ export function streamAssistantReply(
   const { db, loadBytes, resolveSummaryModel, stepLimit } = deps;
   const { conversationId, bookId, resolved } = ctx;
   const imageToolResults = supportsImageToolResults(resolved.providerType);
-  const tools = createReadingTools({ db, bookId, loadBytes, imageToolResults });
+  const tools = {
+    ...createReadingTools({ db, bookId, loadBytes, imageToolResults }),
+    ...createMemoryTools({ db, bookId }),
+  };
 
   let capturedUsage: LanguageModelUsage | undefined;
   const limit = stepLimit ?? DEFAULT_STEP_LIMIT;
