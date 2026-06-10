@@ -3,8 +3,8 @@ import { type ModelMessage } from "ai";
 import { eq } from "drizzle-orm";
 import type { DB } from "@main/db/client";
 import { conversations } from "@main/db/schema";
-import { getDefaultAssistant } from "@main/providers/assistant";
 import { assemblePrompt, pdfSystemNote, textOfParts } from "@main/ai/prompt";
+import { buildSystemPrompt } from "@main/ai/base-prompt";
 import { dedupeParagraph, toContextChips } from "@main/ai/chips";
 import { type LoadBytes } from "@main/ai/tools";
 import { supportsImageToolResults } from "@main/ai/model-factory";
@@ -76,19 +76,17 @@ export async function runSend(
     metadata: { contextChips: toContextChips(deduped), model: resolved.modelId },
   });
 
-  // 5. 组装 prompt（system 来自默认 Assistant；摘要不再隐式注入——随 chips 同构进入，spec §6）
-  const assistant = getDefaultAssistant(db);
+  // 5. 组装 prompt：①内置模板+②instructions+③SOUL+④记忆索引（会话快照冻结）+⑤PDF 注记
   const book = getBook(db, input.bookId);
   const imageToolResults = supportsImageToolResults(resolved.providerType);
-  // PDF 书附加页粒度工具提示（spec §7）；epub 完全不变。
-  let systemPromptText = assistant.systemPrompt;
+  let systemPromptText = buildSystemPrompt(db, conversationId);
   if (book?.format === "pdf") {
     const note = pdfSystemNote({
       pageCount: book.pageCount,
       hasTextLayer: Boolean(book.hasTextLayer),
       imageMode: imageToolResults,
     });
-    systemPromptText = systemPromptText ? `${systemPromptText}\n\n${note}` : note;
+    systemPromptText = `${systemPromptText}\n\n${note}`;
   }
   const allMessages: ModelMessage[] = await assemblePrompt({
     systemPrompt: systemPromptText,
@@ -168,18 +166,17 @@ export async function runResend(
   }
   const history = window.slice(0, -1);
 
-  // system（同 runSend：默认 Assistant + PDF 注记）
-  const assistant = getDefaultAssistant(db);
+  // system（同 runSend：五层组装 + PDF 注记）
   const book = getBook(db, convo.bookId);
   const imageToolResults = supportsImageToolResults(resolved.providerType);
-  let systemPromptText = assistant.systemPrompt;
+  let systemPromptText = buildSystemPrompt(db, input.conversationId);
   if (book?.format === "pdf") {
     const note = pdfSystemNote({
       pageCount: book.pageCount,
       hasTextLayer: Boolean(book.hasTextLayer),
       imageMode: imageToolResults,
     });
-    systemPromptText = systemPromptText ? `${systemPromptText}\n\n${note}` : note;
+    systemPromptText = `${systemPromptText}\n\n${note}`;
   }
 
   const allMessages: ModelMessage[] = await assemblePrompt({
