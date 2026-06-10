@@ -13,7 +13,10 @@ export function clampPdfZoom(scale: number): number {
   return Math.round(clamped * 100) / 100;
 }
 
-/** 滚轮缩放灵敏度：一档鼠标滚轮（|deltaY|≈100）≈ ±10%（exp(0.1)≈1.105），与按钮步进感受对齐。 */
+/**
+ * 滚轮缩放灵敏度：一档鼠标滚轮（|deltaY|≈100）≈ ±10%（exp(0.1)≈1.105），
+ * 在 100% 附近与按钮步进（+0.1 加法）感受接近；高倍率时乘性步进更大。
+ */
 export const PDF_WHEEL_ZOOM_SENSITIVITY = 0.001;
 
 /**
