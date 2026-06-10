@@ -1,7 +1,10 @@
-import { strToU8, zipSync } from "fflate";
+import { type Zippable, strToU8, zipSync } from "fflate";
 import type { UILanguage } from "@shared/i18n/language";
 
-/** 一种语言的整本样书内容（书名 + dc:language + 3 章）。 */
+/**
+ * 一种语言的整本样书内容（书名 + dc:language + 3 章）。
+ * 注意：以下字段直接插入 XML（OPF/nav/xhtml）不做转义——值必须为纯静态、不含 XML 特殊字符（< > & "）。
+ */
 interface SampleContent {
   identifier: string;
   bookTitle: string;
@@ -143,18 +146,19 @@ export function buildSampleEpub(language: UILanguage): Uint8Array {
     `  <body><nav epub:type="toc"><ol>\n    ${navList}\n  </ol></nav></body>\n` +
     "</html>";
 
-  const files: Record<string, Uint8Array | [Uint8Array, { level: 0 }]> = {
-    mimetype: [strToU8("application/epub+zip"), { level: 0 }],
-    "META-INF/container.xml": strToU8(container),
-    "OEBPS/content.opf": strToU8(opf),
-    "OEBPS/nav.xhtml": strToU8(nav),
-  };
+  const chapterFiles: Zippable = {};
   for (const ch of c.chapters) {
     const xhtml =
       '<?xml version="1.0" encoding="utf-8"?>\n' +
       `<html xmlns="http://www.w3.org/1999/xhtml"><head><title>${ch.title}</title></head><body>${ch.bodyHtml}</body></html>`;
-    files[`OEBPS/${ch.id}.xhtml`] = strToU8(xhtml);
+    chapterFiles[`OEBPS/${ch.id}.xhtml`] = strToU8(xhtml);
   }
 
-  return zipSync(files as Parameters<typeof zipSync>[0]);
+  return zipSync({
+    mimetype: [strToU8("application/epub+zip"), { level: 0 }],
+    "META-INF/container.xml": strToU8(container),
+    "OEBPS/content.opf": strToU8(opf),
+    "OEBPS/nav.xhtml": strToU8(nav),
+    ...chapterFiles,
+  });
 }
