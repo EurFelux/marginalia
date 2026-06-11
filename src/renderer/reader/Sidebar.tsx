@@ -27,6 +27,7 @@ export function Sidebar({ bookId }: { bookId: string }) {
                 {t("reader.toc", "目录")}
               </span>
             </TabsTrigger>
+            {/* value="notes" 是历史遗留：此 tab 是「标注」；真正的书籍笔记 tab 是 book-notes。 */}
             <TabsTrigger
               value="notes"
               className="group/tab"
