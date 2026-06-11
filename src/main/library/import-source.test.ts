@@ -5,7 +5,7 @@ import { unzipSync } from "fflate";
 import { makeFixtureEpub, parseEpub } from "@marginalia/epub-parser";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { detectFormat } from "@main/library/repository";
-import { packEpubDir } from "@main/library/import-source";
+import { packEpubDir, readBookBytes } from "@main/library/import-source";
 
 /** 把一份合法 epub zip 摊成「未打包 EPUB 目录」落到 destDir。 */
 async function explodeEpubToDir(zip: Uint8Array, destDir: string): Promise<void> {
@@ -66,5 +66,40 @@ describe("packEpubDir", () => {
     await symlink(path.join(dir, "nonexistent-target"), path.join(src, "OEBPS", "ghost.xhtml"));
 
     expect(() => packEpubDir(src)).toThrow(/Cannot read EPUB directory contents/);
+  });
+});
+
+describe("readBookBytes", () => {
+  let dir: string;
+  beforeEach(async () => {
+    dir = await mkdtemp(path.join(tmpdir(), "marginalia-readbytes-"));
+  });
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("returns raw bytes for a regular .epub file", async () => {
+    const file = path.join(dir, "real.epub");
+    await writeFile(file, makeFixtureEpub({ title: "File Path Book" }));
+
+    const bytes = await readBookBytes(file);
+
+    expect(parseEpub(bytes).title).toBe("File Path Book");
+  });
+
+  it("packs a directory via packEpubDir", async () => {
+    const src = path.join(dir, "dir.epub");
+    await explodeEpubToDir(makeFixtureEpub({ title: "Dir Book" }), src);
+
+    const bytes = await readBookBytes(src);
+
+    expect(detectFormat(bytes)).toBe("epub");
+    expect(parseEpub(bytes).title).toBe("Dir Book");
+  });
+
+  it("throws a readable error for a missing path", async () => {
+    await expect(readBookBytes(path.join(dir, "nope.epub"))).rejects.toThrow(
+      /Cannot read book file/,
+    );
   });
 });

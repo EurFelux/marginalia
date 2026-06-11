@@ -1,4 +1,5 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { zipSync, type Zippable } from "fflate";
 
@@ -48,4 +49,23 @@ export function packEpubDir(dirPath: string): Uint8Array {
     entries[rel] = rel === "mimetype" ? [bytes, { level: 0 }] : bytes;
   }
   return zipSync(entries);
+}
+
+/** 导入入口取字节：普通文件→readFile；目录→当未打包 EPUB 打包；其它→报错。 */
+export async function readBookBytes(filePath: string): Promise<Uint8Array> {
+  let st;
+  try {
+    st = await stat(filePath);
+  } catch (err) {
+    const e = err as NodeJS.ErrnoException;
+    throw new Error(`Cannot read book file at "${filePath}": ${e.code ?? e.message}`);
+  }
+  if (st.isDirectory()) return packEpubDir(filePath);
+  if (st.isFile()) {
+    const buf = await readFile(filePath).catch((err: NodeJS.ErrnoException) => {
+      throw new Error(`Cannot read book file at "${filePath}": ${err.code ?? err.message}`);
+    });
+    return new Uint8Array(buf);
+  }
+  throw new Error(`Cannot read book file at "${filePath}": not a regular file or directory`);
 }
