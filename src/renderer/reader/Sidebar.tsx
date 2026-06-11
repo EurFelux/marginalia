@@ -1,10 +1,11 @@
 import { useTranslation } from "react-i18next";
-import { List, Highlighter, MessagesSquare } from "lucide-react";
+import { List, Highlighter, MessagesSquare, NotebookPen } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@renderer/components/ui/tabs";
 import { BookCard } from "./BookCard";
 import { ChapterList } from "./ChapterList";
 import { AnnotationsList } from "./AnnotationsList";
 import { ConversationsTab } from "./ConversationsTab";
+import { BookNotesPanel } from "@renderer/book-notes/BookNotesPanel";
 
 export function Sidebar({ bookId }: { bookId: string }) {
   const { t } = useTranslation();
@@ -46,6 +47,16 @@ export function Sidebar({ bookId }: { bookId: string }) {
                 {t("reader.conversations", "会话")}
               </span>
             </TabsTrigger>
+            <TabsTrigger
+              value="book-notes"
+              className="group/tab"
+              aria-label={t("reader.bookNotes", "笔记")}
+            >
+              <NotebookPen />
+              <span className="hidden group-data-[active]/tab:inline">
+                {t("reader.bookNotes", "笔记")}
+              </span>
+            </TabsTrigger>
           </TabsList>
         </div>
         <TabsContent value="toc" className="min-h-0 overflow-hidden">
@@ -56,6 +67,9 @@ export function Sidebar({ bookId }: { bookId: string }) {
         </TabsContent>
         <TabsContent value="conversations" className="min-h-0 overflow-hidden">
           <ConversationsTab bookId={bookId} />
+        </TabsContent>
+        <TabsContent value="book-notes" className="min-h-0 overflow-hidden">
+          <BookNotesPanel bookId={bookId} />
         </TabsContent>
       </Tabs>
     </div>
