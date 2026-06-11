@@ -75,6 +75,13 @@ export function createApi(d: PreloadDeps) {
       delete: inv(C.annotationsDelete),
     },
 
+    bookNotes: {
+      listByBook: inv(C.bookNotesListByBook),
+      create: inv(C.bookNotesCreate),
+      update: inv(C.bookNotesUpdate),
+      delete: inv(C.bookNotesDelete),
+    },
+
     preferences: {
       // 读同步（boot 时已取一次缓存于 prefsSnapshot）；写仍异步 fire-and-forget——非对称是有意的。
       // 注意：返回的是**启动快照**，不反映运行时 set() 的写入（仅启动 hydrate / theme-store 初始化各调一次；

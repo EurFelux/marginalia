@@ -5,6 +5,7 @@ import { libraryBindings } from "@main/ipc/library-handlers";
 import { settingsBindings } from "@main/ipc/settings-handlers";
 import { chatBindings } from "@main/ipc/chat-handlers";
 import { annotationsBindings } from "@main/ipc/annotations-handlers";
+import { bookNotesBindings } from "@main/ipc/book-notes-handlers";
 import { preferencesBindings } from "@main/ipc/preferences-handlers";
 import { aiBindings } from "@main/ipc/ai-handlers";
 import { logBindings } from "@main/ipc/log-handlers";
@@ -18,6 +19,7 @@ const allBindings = [
   ...settingsBindings,
   ...chatBindings,
   ...annotationsBindings,
+  ...bookNotesBindings,
   ...preferencesBindings,
   ...aiBindings,
   ...logBindings,

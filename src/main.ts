@@ -15,6 +15,7 @@ import { registerChatHandlers } from "@main/ipc/chat-handlers";
 import { registerAiHandlers } from "@main/ipc/ai-handlers";
 import { registerLogHandlers } from "@main/ipc/log-handlers";
 import { registerAnnotationHandlers } from "@main/ipc/annotations-handlers";
+import { registerBookNotesHandlers } from "@main/ipc/book-notes-handlers";
 import { registerPreferenceHandlers } from "@main/ipc/preferences-handlers";
 import { registerStatsHandlers } from "@main/ipc/stats-handlers";
 import { registerBackupHandlers } from "@main/ipc/backup-handlers";
@@ -148,6 +149,7 @@ app.on("ready", async () => {
   registerSettingsHandlers();
   registerChatHandlers();
   registerAnnotationHandlers();
+  registerBookNotesHandlers();
   registerPreferenceHandlers();
   registerAiHandlers();
   registerLogHandlers();
