@@ -148,6 +148,23 @@ export const annotations = sqliteTable(
   ],
 );
 
+export const bookNotes = sqliteTable(
+  "book_notes",
+  {
+    id: pkUuid(),
+    bookId: text("book_id")
+      .notNull()
+      .references(() => books.id, { onDelete: "cascade" }),
+    // Markdown 源码；trim 后非空由 Zod 入口校验（shared/book-notes.ts）
+    content: text("content").notNull(),
+    createdAt: nowMs(),
+    updatedAt: integer("updated_at")
+      .notNull()
+      .$defaultFn(() => Date.now()),
+  },
+  (t) => [index("book_notes_book_id_idx").on(t.bookId)],
+);
+
 export const conversations = sqliteTable(
   "conversations",
   {
