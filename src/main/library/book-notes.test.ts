@@ -70,7 +70,7 @@ describe("book notes repository", () => {
   it("throws for unknown book on create", () => {
     const db = freshDb();
     expect(() => createBookNote(db, { bookId: "no-such", content: "x" })).toThrow(
-      /book .* not found/,
+      /: book no-such not found/,
     );
   });
 

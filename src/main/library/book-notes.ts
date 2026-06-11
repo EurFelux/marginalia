@@ -50,7 +50,7 @@ export function updateBookNote(db: DB, input: UpdateBookNoteInput): BookNoteDto 
   return toDto(row);
 }
 
-/** 删笔记；缺行抛可读错误。 */
+/** 删笔记；缺行抛可读错误（有意区别于 deleteAnnotation 的幂等语义，勿向任一侧「修齐」）。 */
 export function deleteBookNote(db: DB, id: string): void {
   const res = db.delete(bookNotes).where(eq(bookNotes.id, id)).run();
   if (res.changes === 0) throw new Error(`deleteBookNote: book note ${id} not found`);
