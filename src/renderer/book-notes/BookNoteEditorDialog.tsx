@@ -37,7 +37,6 @@ export function BookNoteEditorDialog({
     if (!state) return;
     setText(state.mode === "edit" ? state.initialContent : "");
     taRef.current?.focus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
   if (!state) return null;

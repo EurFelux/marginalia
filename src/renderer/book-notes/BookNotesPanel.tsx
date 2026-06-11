@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import type { BookNoteDto } from "@shared/book-notes";
 import { Button } from "@renderer/components/ui/button";
 import { ScrollArea } from "@renderer/components/ui/scroll-area";
@@ -20,21 +21,59 @@ import { BookNoteEditorDialog, type BookNoteEditorState } from "./BookNoteEditor
 
 /** 书籍级独立笔记面板：侧栏「笔记」tab 与书库「查看笔记」Dialog 渲染同一实例形态。 */
 export function BookNotesPanel({ bookId }: { bookId: string }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const qc = useQueryClient();
   const notes = useQuery(bookNotesQuery(bookId));
   const [editor, setEditor] = useState<BookNoteEditorState | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const invalidate = () => qc.invalidateQueries({ queryKey: qk.bookNotes(bookId) });
-  const createM = useMutation({ mutationFn: window.api.bookNotes.create, onSuccess: invalidate });
-  const updateM = useMutation({ mutationFn: window.api.bookNotes.update, onSuccess: invalidate });
-  const deleteM = useMutation({ mutationFn: window.api.bookNotes.delete, onSuccess: invalidate });
+  const createM = useMutation({
+    mutationFn: window.api.bookNotes.create,
+    onSuccess: invalidate,
+    onError: (e) => {
+      // 透传主进程真实错误（honest-error），不自动消失。
+      toast.error(
+        t("bookNotes.createError", "笔记保存失败：{{error}}", {
+          error: (e as Error).message,
+        }),
+        { closeButton: true, duration: Infinity },
+      );
+    },
+  });
+  const updateM = useMutation({
+    mutationFn: window.api.bookNotes.update,
+    onSuccess: invalidate,
+    onError: (e) => {
+      // 透传主进程真实错误（honest-error），不自动消失。
+      toast.error(
+        t("bookNotes.updateError", "笔记更新失败：{{error}}", {
+          error: (e as Error).message,
+        }),
+        { closeButton: true, duration: Infinity },
+      );
+    },
+  });
+  const deleteM = useMutation({
+    mutationFn: window.api.bookNotes.delete,
+    onSuccess: invalidate,
+    onError: (e) => {
+      // 透传主进程真实错误（honest-error），不自动消失。
+      toast.error(
+        t("bookNotes.deleteError", "笔记删除失败：{{error}}", {
+          error: (e as Error).message,
+        }),
+        { closeButton: true, duration: Infinity },
+      );
+    },
+  });
 
   const save = (content: string) => {
     if (editor?.mode === "edit") updateM.mutate({ id: editor.noteId, patch: { content } });
     else createM.mutate({ bookId, content });
   };
+
+  const now = Date.now();
 
   return (
     <div className="flex h-full flex-col">
@@ -61,10 +100,11 @@ export function BookNotesPanel({ bookId }: { bookId: string }) {
         ) : (
           <ScrollArea className="h-full">
             <div className="space-y-1.5 p-2">
-              {notes.data!.map((n) => (
+              {(notes.data ?? []).map((n) => (
                 <NoteItem
                   key={n.id}
                   note={n}
+                  time={relativeTime(n.createdAt, now, i18n.language)}
                   onEdit={() =>
                     setEditor({ mode: "edit", noteId: n.id, initialContent: n.content })
                   }
@@ -113,23 +153,23 @@ export function BookNotesPanel({ bookId }: { bookId: string }) {
 
 function NoteItem({
   note,
+  time,
   onEdit,
   onDelete,
 }: {
   note: BookNoteDto;
+  time: string;
   onEdit: () => void;
   onDelete: () => void;
 }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   return (
     <div className="group rounded-lg border border-border bg-background/60 p-2.5">
       <div className="text-xs leading-relaxed">
         <LocalizedStreamdown>{note.content}</LocalizedStreamdown>
       </div>
       <div className="mt-1.5 flex items-center justify-between">
-        <span className="text-[10px] text-muted-foreground/70">
-          {relativeTime(note.createdAt, Date.now(), i18n.language)}
-        </span>
+        <span className="text-[10px] text-muted-foreground/70">{time}</span>
         <span className="flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
           <Button
             variant="ghost"
