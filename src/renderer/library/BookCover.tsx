@@ -1,6 +1,6 @@
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { CircleCheck, CircleDashed, Pencil, Trash2 } from "lucide-react";
+import { CircleCheck, CircleDashed, NotebookPen, Pencil, Trash2 } from "lucide-react";
 import type { BookSummaryDto } from "@shared/library";
 import { Button } from "@renderer/components/ui/button";
 import {
@@ -26,6 +26,7 @@ import {
 import { Input } from "@renderer/components/ui/input";
 import { Label } from "@renderer/components/ui/label";
 import { CoverImage } from "./CoverImage";
+import { BookNotesPanel } from "@renderer/book-notes/BookNotesPanel";
 
 export function BookCover({
   book,
@@ -45,6 +46,7 @@ export function BookCover({
   const [editOpen, setEditOpen] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editAuthor, setEditAuthor] = useState("");
+  const [notesOpen, setNotesOpen] = useState(false);
   const fieldId = useId();
 
   // 打开时从 book 快照初始化（不预填 id 哈希——哈希是 title=null 的显示回退，不是数据）。
@@ -90,6 +92,10 @@ export function BookCover({
             <Pencil />
             {t("library.menu.edit", "编辑信息")}
           </ContextMenuItem>
+          <ContextMenuItem onClick={() => setNotesOpen(true)}>
+            <NotebookPen />
+            {t("library.menu.notes", "查看笔记")}
+          </ContextMenuItem>
           <ContextMenuItem variant="destructive" onClick={() => setConfirmOpen(true)}>
             <Trash2 />
             {t("library.menu.delete", "删除")}
@@ -124,6 +130,19 @@ export function BookCover({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={notesOpen} onOpenChange={setNotesOpen}>
+        <DialogContent className="font-sans sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {t("library.notesDialog.title", "笔记 · {{title}}", { title })}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="h-[60vh]">
+            <BookNotesPanel bookId={book.id} />
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="font-sans sm:max-w-md">
