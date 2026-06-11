@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { zipSync, type Zippable } from "fflate";
 
@@ -19,6 +19,17 @@ function listFilesRel(root: string): string[] {
 
 /** 把未打包的 EPUB 目录（OCF 解包形态）打包成标准 EPUB zip 字节；mimetype 居首且不压缩。 */
 export function packEpubDir(dirPath: string): Uint8Array {
+  const hasContainer = (() => {
+    try {
+      return statSync(path.join(dirPath, "META-INF", "container.xml")).isFile();
+    } catch {
+      return false;
+    }
+  })();
+  if (!hasContainer) {
+    throw new Error(`Not a valid EPUB directory (missing META-INF/container.xml): "${dirPath}"`);
+  }
+
   const rels = listFilesRel(dirPath);
   const ordered = rels.includes("mimetype")
     ? ["mimetype", ...rels.filter((r) => r !== "mimetype")]

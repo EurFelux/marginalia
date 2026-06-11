@@ -48,4 +48,14 @@ describe("packEpubDir", () => {
     expect(zip[9]).toBe(0);
     expect(new TextDecoder().decode(zip.subarray(30, 38))).toBe("mimetype");
   });
+
+  it("rejects a directory that is not a valid EPUB (no META-INF/container.xml)", async () => {
+    const src = path.join(dir, "not-epub.epub");
+    await mkdir(path.join(src, "OEBPS"), { recursive: true });
+    await writeFile(path.join(src, "mimetype"), "application/epub+zip");
+    await writeFile(path.join(src, "OEBPS", "x.xhtml"), "<html></html>");
+    // 故意不写 META-INF/container.xml
+
+    expect(() => packEpubDir(src)).toThrow(/Not a valid EPUB directory/);
+  });
 });
