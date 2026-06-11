@@ -1,5 +1,4 @@
 import path from "node:path";
-import { readFile } from "node:fs/promises";
 import { BrowserWindow, dialog } from "electron";
 import { C } from "@shared/ipc";
 import type { BookSummaryDto } from "@shared/library";
@@ -18,6 +17,7 @@ import {
   CURRENT_PARSER_VERSION,
 } from "@main/library/repository";
 import { readBookFile, writeBookFile } from "@main/library/book-files";
+import { readBookBytes } from "@main/library/import-source";
 import { getProgress, saveProgress } from "@main/library/progress";
 import { assertTextLayer, getToc, listChapters, readChapterText } from "@main/library/content";
 import {
@@ -69,10 +69,7 @@ const toDto = (b: {
 
 export const libraryBindings: Binding[] = [
   bind(C.libraryImport, async (input) => {
-    const buf = await readFile(input.filePath).catch((err: NodeJS.ErrnoException) => {
-      throw new Error(`Cannot read book file at "${input.filePath}": ${err.code ?? err.message}`);
-    });
-    const bytes = new Uint8Array(buf);
+    const bytes = await readBookBytes(input.filePath);
     const book = await importBook(getDb(), { bytes, fileName: path.basename(input.filePath) });
     await writeBookFile(appService.getPath("booksDir"), book.id, book.format, bytes); // 复制进 app 自有位置（relink/重导即覆盖）
     log.info(`book imported: ${book.id} (${book.format}, ${Math.round(bytes.length / 1024)}KB)`);
