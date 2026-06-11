@@ -37,7 +37,14 @@ export function packEpubDir(dirPath: string): Uint8Array {
 
   const entries: Zippable = {};
   for (const rel of ordered) {
-    const bytes = new Uint8Array(readFileSync(path.join(dirPath, rel)));
+    let bytes: Uint8Array;
+    try {
+      bytes = new Uint8Array(readFileSync(path.join(dirPath, rel)));
+    } catch {
+      throw new Error(
+        `Cannot read EPUB directory contents (a file may be a non-materialized iCloud/Apple Books placeholder; download it locally and retry): "${path.join(dirPath, rel)}"`,
+      );
+    }
     entries[rel] = rel === "mimetype" ? [bytes, { level: 0 }] : bytes;
   }
   return zipSync(entries);
