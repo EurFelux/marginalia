@@ -42,6 +42,8 @@ import {
   createAnnotationInput,
   updateAnnotationInput,
 } from "@shared/annotations";
+import type { BookNoteDto } from "@shared/book-notes";
+import { bookNoteIdInput, createBookNoteInput, updateBookNoteInput } from "@shared/book-notes";
 import type { PreferencesSnapshot } from "@shared/preferences";
 import { setPreferenceInput } from "@shared/preferences";
 import type { ReadingStatsDto } from "@shared/stats";
@@ -195,6 +197,12 @@ export const C = {
     out<AnnotationDto>(),
   ),
   annotationsDelete: def("annotations:delete", "invoke", annotationIdInput, out<void>()),
+
+  // book notes（书籍级独立笔记，独立于选区标注）
+  bookNotesListByBook: def("book-notes:list-by-book", "invoke", bookIdInput, out<BookNoteDto[]>()),
+  bookNotesCreate: def("book-notes:create", "invoke", createBookNoteInput, out<BookNoteDto>()),
+  bookNotesUpdate: def("book-notes:update", "invoke", updateBookNoteInput, out<BookNoteDto>()),
+  bookNotesDelete: def("book-notes:delete", "invoke", bookNoteIdInput, out<void>()),
 
   // settings: providers
   providersList: def("providers:list", "invoke", z.void(), out<ProviderDto[]>()),
