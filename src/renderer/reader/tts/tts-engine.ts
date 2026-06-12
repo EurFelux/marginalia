@@ -47,6 +47,7 @@ export function createTtsEngine(port: SpeechPort, events: TtsEngineEvents) {
   let texts: string[] = [];
   let current = 0;
   let opts: PlayOptions = { rate: 1, pickVoiceFor: () => null };
+  let rateDirty = false;
 
   const setState = (s: TtsState) => {
     if (s === state) return;
@@ -60,7 +61,12 @@ export function createTtsEngine(port: SpeechPort, events: TtsEngineEvents) {
     port.cancel();
   };
 
-  const speakChunks = (chunks: string[], ci: number, myGen: number) => {
+  const speakChunks = (
+    chunks: string[],
+    ci: number,
+    myGen: number,
+    voice: SpeechSynthesisVoice | null,
+  ) => {
     if (myGen !== gen) return;
     if (ci >= chunks.length) {
       playParagraph(current + 1, myGen);
@@ -68,13 +74,13 @@ export function createTtsEngine(port: SpeechPort, events: TtsEngineEvents) {
     }
     const text = chunks[ci]!;
     const u = port.createUtterance(text);
-    u.voice = opts.pickVoiceFor(text);
+    u.voice = voice;
     u.rate = opts.rate;
-    u.onend = () => speakChunks(chunks, ci + 1, myGen);
+    u.onend = () => speakChunks(chunks, ci + 1, myGen, voice);
     u.onerror = (err) => {
       if (myGen !== gen) return;
       events.onUtteranceError(text, err);
-      speakChunks(chunks, ci + 1, myGen);
+      speakChunks(chunks, ci + 1, myGen, voice);
     };
     port.speak(u);
   };
@@ -88,7 +94,9 @@ export function createTtsEngine(port: SpeechPort, events: TtsEngineEvents) {
     }
     current = i;
     events.onParagraphChange(i);
-    speakChunks(splitForUtterance(texts[i]!), 0, myGen);
+    // 同段共享 voice，避免同段多 chunk 因语言检测结果不同而切换声音
+    const voice = opts.pickVoiceFor(texts[i]!);
+    speakChunks(splitForUtterance(texts[i]!), 0, myGen, voice);
   };
 
   return {
@@ -97,6 +105,7 @@ export function createTtsEngine(port: SpeechPort, events: TtsEngineEvents) {
       hardCancel();
       texts = newTexts;
       opts = o;
+      rateDirty = false;
       setState("playing");
       playParagraph(startIndex, gen);
     },
@@ -107,19 +116,34 @@ export function createTtsEngine(port: SpeechPort, events: TtsEngineEvents) {
     },
     resume() {
       if (state !== "paused") return;
-      port.resume();
-      setState("playing");
+      if (rateDirty) {
+        // 暂停中调速不得擅自开播；新速率在继续时从当前段头生效
+        rateDirty = false;
+        gen++;
+        hardCancel();
+        setState("playing");
+        playParagraph(current, gen);
+      } else {
+        port.resume();
+        setState("playing");
+      }
     },
     stop() {
       if (state === "idle") return;
       gen++;
       hardCancel();
+      rateDirty = false;
       setState("idle");
     },
     setRate(rate: number) {
       opts = { ...opts, rate };
       if (state === "idle") return;
-      // 从当前段头以新 rate 重读（spec §4.3）
+      if (state === "paused") {
+        // 暂停中调速不得擅自开播；新速率在继续时从当前段头生效
+        rateDirty = true;
+        return;
+      }
+      // playing：从当前段头以新 rate 重读（spec §4.3）
       gen++;
       hardCancel();
       setState("playing");

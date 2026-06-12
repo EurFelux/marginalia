@@ -16,6 +16,7 @@ export function browserSpeechPort(): SpeechPort {
   };
 }
 
+// 缓存不随运行期新装系统语音刷新（需重启 app）
 let voicesCache: SpeechSynthesisVoice[] | null = null;
 
 /**

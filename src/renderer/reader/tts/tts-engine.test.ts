@@ -106,4 +106,25 @@ describe("tts-engine", () => {
     e.play(["A.", "B.", "C."], 1, OPTS);
     expect(m.last().text).toBe("B.");
   });
+
+  it("setRate while paused stays paused", () => {
+    const e = createTtsEngine(m.port, ev);
+    e.play(["One.", "Two."], 0, OPTS);
+    e.pause();
+    e.setRate(2);
+    expect(e.state()).toBe("paused");
+    expect(m.spoken.length).toBe(1); // 未重新 speak
+  });
+
+  it("resume after paused setRate restarts current paragraph at new rate", () => {
+    const e = createTtsEngine(m.port, ev);
+    e.play(["One.", "Two."], 0, OPTS);
+    m.last().onend?.(); // 进入段 1
+    e.pause();
+    e.setRate(2);
+    e.resume();
+    expect(e.state()).toBe("playing");
+    expect(m.last().text).toBe("Two."); // 从当前段头重读
+    expect(m.last().rate).toBe(2);
+  });
 });
