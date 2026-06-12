@@ -20,6 +20,12 @@ export function splitForUtterance(text: string, max = MAX_UTTERANCE_CHARS): stri
     if (s.length > max) {
       flush();
       for (const piece of s.split(/(?<=[,;，；、])/)) {
+        if (piece.length > max) {
+          // 无标点超长片段：字符级硬切兜底（引擎截断防御不可绕过）
+          flush();
+          for (let i = 0; i < piece.length; i += max) out.push(piece.slice(i, i + max));
+          continue;
+        }
         if (buf.length + piece.length > max) flush();
         buf += piece;
       }

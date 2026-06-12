@@ -16,6 +16,8 @@ const SKIP_CLOSEST = "script,style,template,noscript,[hidden],[aria-hidden='true
 /**
  * 把 section 文档切成有序朗读段（spec §4.1）：取**最内层**块级元素（含块级后代的容器
  * 被滤掉，防嵌套重复），规范化空白，跳过空段/纯标点段/隐藏子树。
+ * 已知限制：直接置于同时含块级子元素的容器内的文本节点（如 `<div>导语<p>…</p></div>` 中
+ * 的"导语"）不会被朗读——此为最内层块策略的设计权衡，不改行为。
  */
 export function segmentParagraphs(root: ParentNode): TtsParagraph[] {
   const out: TtsParagraph[] = [];

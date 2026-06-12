@@ -21,4 +21,11 @@ describe("splitForUtterance", () => {
   it("never returns empty chunks", () => {
     for (const c of splitForUtterance("a。".repeat(500), 50)) expect(c.trim()).not.toBe("");
   });
+  it("hard-slices a punctuation-less overlong sentence", () => {
+    const long = "字".repeat(250) + "。";
+    const chunks = splitForUtterance(long, 100);
+    expect(chunks.length).toBeGreaterThan(1);
+    for (const c of chunks) expect(c.length).toBeLessThanOrEqual(100);
+    expect(chunks.join("")).toBe(long);
+  });
 });
