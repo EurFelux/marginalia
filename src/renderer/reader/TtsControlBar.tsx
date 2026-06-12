@@ -45,6 +45,7 @@ export function TtsControlBar() {
       <Select
         value={String(rate)}
         onValueChange={(val) => {
+          if (val == null) return;
           const r = Number(val);
           updateTtsPrefs({ rate: r });
           ttsController.setRate(r);

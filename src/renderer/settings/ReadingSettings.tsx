@@ -14,6 +14,7 @@ import { usePrefsStore } from "@renderer/store/prefs-store";
 import type { TtsLang } from "@renderer/reader/tts/detect-lang";
 import { NOVELTY_BLOCKLIST } from "@renderer/reader/tts/pick-voice";
 import { getVoicesReady } from "@renderer/reader/tts/voices";
+import { ttsController } from "@renderer/reader/tts/tts-controller";
 
 const RATE_OPTIONS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 const AUTO_VALUE = "__auto__";
@@ -41,6 +42,8 @@ function VoiceRow({ lang, label }: { lang: TtsLang; label: string }) {
   );
   const selected = ttsPrefs.voiceByLang[lang] ?? AUTO_VALUE;
   const preview = () => {
+    // 试听前停掉朗读会话——直接 cancel 会让引擎误推进
+    ttsController.stop();
     const u = new SpeechSynthesisUtterance(PREVIEW_TEXT[lang]);
     const v = options.find((o) => o.name === ttsPrefs.voiceByLang[lang]);
     if (v) u.voice = v;
@@ -123,7 +126,10 @@ export function ReadingSettings() {
           <span className="text-sm">{t("settings.tts.rate", "语速")}</span>
           <Select
             value={String(ttsPrefs.rate)}
-            onValueChange={(val) => updateTtsPrefs({ rate: Number(val) })}
+            onValueChange={(val) => {
+              if (val == null) return;
+              updateTtsPrefs({ rate: Number(val) });
+            }}
           >
             <SelectTrigger className="w-44" aria-label={t("settings.tts.rate", "语速")}>
               <SelectValue />
