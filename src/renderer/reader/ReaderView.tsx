@@ -20,6 +20,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@renderer/components/ui
 import { useNavigationStore } from "@renderer/store/navigation-store";
 import { useSettingsStore } from "@renderer/store/settings-store";
 import { usePrefsStore } from "@renderer/store/prefs-store";
+import { usePaneSizeStore } from "@renderer/store/pane-size-store";
 import { CollapsiblePane } from "@renderer/reader/CollapsiblePane";
 import { Sidebar } from "@renderer/reader/Sidebar";
 import { EpubReader } from "@renderer/reader/EpubReader";
@@ -49,6 +50,8 @@ export function ReaderView() {
   const autoSummarize = usePrefsStore((s) => s.autoSummarize);
   const layout = usePrefsStore((s) => s.layout);
   const updateLayout = usePrefsStore((s) => s.updateLayout);
+  const sidebarWidth = usePaneSizeStore((s) => s.sidebarWidth);
+  const setSidebarWidth = usePaneSizeStore((s) => s.setSidebarWidth);
   const qc = useQueryClient();
 
   const chapters = useQuery({
@@ -214,7 +217,8 @@ export function ReaderView() {
         <CollapsiblePane
           side="left"
           open={layout.sidebarOpen}
-          sizeClass="w-64"
+          width={sidebarWidth}
+          onWidthChange={setSidebarWidth}
           label={t("reader.expandSidebar", "展开侧栏")}
         >
           <Sidebar bookId={bookId} />

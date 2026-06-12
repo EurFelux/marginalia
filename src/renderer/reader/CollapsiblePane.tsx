@@ -9,6 +9,7 @@ const PEEK = {
     handle: "inset-y-0 left-0 w-1",
     drawer: "inset-y-0 left-0 border-r",
     closed: "-translate-x-full",
+    resizer: "right-0",
   },
   right: {
     pinned: "border-l",
@@ -16,6 +17,7 @@ const PEEK = {
     handle: "inset-y-0 right-0 w-1",
     drawer: "inset-y-0 right-0 border-l",
     closed: "translate-x-full",
+    resizer: "left-0",
   },
   top: {
     pinned: "border-b",
@@ -23,6 +25,7 @@ const PEEK = {
     handle: "inset-x-0 top-0 h-1",
     drawer: "inset-x-0 top-0 border-b",
     closed: "-translate-y-full",
+    resizer: "",
   },
 } as const;
 
@@ -30,8 +33,15 @@ interface CollapsiblePaneProps {
   side: "left" | "right" | "top";
   /** 钉住（true=文档流占位；false=收起为边缘 peek 抽屉）。 */
   open: boolean;
-  /** 面板尺寸类（如 "w-64" / "w-96" / "h-12"）。 */
-  sizeClass: string;
+  /** 面板尺寸类（如 "w-64" / "w-96" / "h-12"）；传了 width 时省略。 */
+  sizeClass?: string;
+  /**
+   * 受控宽度（px，运行时连续值故走 inline style）；钉住与抽屉两种模式共用。
+   * 与 onWidthChange 同时提供时，钉住态在内缘渲染拖拽 handle（仅 left/right）。
+   */
+  width?: number;
+  /** 拖拽回调（原始 px，clamp 由调用方/store 负责）。 */
+  onWidthChange?: (width: number) => void;
   /** 收起态边缘热区的 aria-label。 */
   label: string;
   /**
@@ -53,11 +63,15 @@ export function CollapsiblePane({
   side,
   open,
   sizeClass,
+  width,
+  onWidthChange,
   label,
   className,
   children,
 }: CollapsiblePaneProps) {
   const [peekOpen, setPeekOpen] = useState(false);
+  const [resizing, setResizing] = useState(false);
+  const panelRef = useRef<HTMLDivElement | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const c = PEEK[side];
 
@@ -77,6 +91,28 @@ export function CollapsiblePane({
     if (open) setPeekOpen(false);
     return cancelClose;
   }, [open]);
+
+  // 拖拽改宽（事件驱动命令式：mousedown 起监听、mouseup 收）。锚定拖拽起始时的对缘
+  // （left 面板左缘 / right 面板右缘在拖拽中不动），用指针位置与对缘的差作新宽度。
+  const startResize = (e: React.MouseEvent) => {
+    if (!onWidthChange || side === "top") return;
+    e.preventDefault();
+    const rect = panelRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setResizing(true);
+    const onMove = (ev: MouseEvent) => {
+      onWidthChange(side === "left" ? ev.clientX - rect.left : rect.right - ev.clientX);
+    };
+    const onUp = () => {
+      setResizing(false);
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  };
+
+  const resizable = open && width != null && onWidthChange != null && side !== "top";
 
   return (
     <>
@@ -101,13 +137,14 @@ export function CollapsiblePane({
 
       {/* 面板本体：单挂载点，仅切 className（钉住=文档流；收起=贴边抽屉浮层） */}
       <div
+        ref={panelRef}
         inert={!open && !peekOpen}
         onMouseEnter={open ? undefined : cancelClose}
         onMouseLeave={open ? undefined : scheduleClose}
         className={cn(
           "border-border",
           open
-            ? cn("shrink-0", c.pinned)
+            ? cn("relative shrink-0", c.pinned)
             : cn(
                 "absolute z-40 bg-background shadow-xl transition-transform duration-200 ease-out",
                 c.drawer,
@@ -116,9 +153,28 @@ export function CollapsiblePane({
           sizeClass,
           className,
         )}
+        // 受控宽度是用户拖拽的运行时连续值，无法用静态类表达
+        style={width != null ? { width } : undefined}
       >
         {children}
+        {/* 钉住态内缘拖拽 handle：宽 1px、hover/拖拽中高亮（镜像收起态把手观感） */}
+        {resizable && (
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label={label}
+            onMouseDown={startResize}
+            className={cn(
+              "absolute inset-y-0 z-10 w-1 cursor-col-resize bg-transparent transition-colors hover:bg-primary/40",
+              c.resizer,
+              resizing && "bg-primary/40",
+            )}
+          />
+        )}
       </div>
+
+      {/* 拖拽期间的全屏遮罩：iframe（ePub 阅读器）会吞 mousemove，盖住统一接管指针与光标 */}
+      {resizing && <div className="fixed inset-0 z-50 cursor-col-resize select-none" />}
     </>
   );
 }
