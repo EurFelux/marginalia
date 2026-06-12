@@ -12,8 +12,8 @@ import {
 } from "@renderer/components/ui/select";
 import { usePrefsStore } from "@renderer/store/prefs-store";
 import type { TtsLang } from "@renderer/reader/tts/detect-lang";
-import { NOVELTY_BLOCKLIST } from "@renderer/reader/tts/pick-voice";
-import { getVoicesReady } from "@renderer/reader/tts/voices";
+import { NOVELTY_BLOCKLIST, pickVoice } from "@renderer/reader/tts/pick-voice";
+import { currentPlatform, getVoicesReady } from "@renderer/reader/tts/voices";
 import { ttsController } from "@renderer/reader/tts/tts-controller";
 
 const RATE_OPTIONS = [0.5, 0.75, 1, 1.25, 1.5, 2];
@@ -45,7 +45,9 @@ function VoiceRow({ lang, label }: { lang: TtsLang; label: string }) {
     // 试听前停掉朗读会话——直接 cancel 会让引擎误推进
     ttsController.stop();
     const u = new SpeechSynthesisUtterance(PREVIEW_TEXT[lang]);
-    const v = options.find((o) => o.name === ttsPrefs.voiceByLang[lang]);
+    // 与正文朗读同一条选声链（用户偏好→推荐表→兜底）——「自动」档若不显式设 voice，
+    // utterance 会继承 <html lang>（UI 语言）、用中文 voice 读英文（spike 点名的坑）。
+    const v = pickVoice(lang, voices, ttsPrefs, currentPlatform());
     if (v) u.voice = v;
     u.rate = ttsPrefs.rate;
     window.speechSynthesis.cancel();
