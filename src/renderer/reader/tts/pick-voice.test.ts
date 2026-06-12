@@ -52,4 +52,10 @@ describe("pickVoice", () => {
     expect(NOVELTY_BLOCKLIST).toContain("Albert");
     expect(NOVELTY_BLOCKLIST).toContain("Bad News");
   });
+  it("matches localized zh voice names on Chinese-language macOS", () => {
+    // 中文系统下 Tingting 显示为「婷婷」；Eddy 排名靠前但不在推荐表，
+    // 修复前通用兜底会选 Eddy，修复后推荐表命中「婷婷」。
+    const voices = [v("Eddy (中文（中国大陆）)", "zh-CN"), v("婷婷", "zh-CN")];
+    expect(pickVoice("zh", voices, { voiceByLang: {} }, "macos")?.name).toBe("婷婷");
+  });
 });

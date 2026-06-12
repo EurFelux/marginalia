@@ -29,8 +29,10 @@ export const NOVELTY_BLOCKLIST: readonly string[] = [
 export const RECOMMENDED_VOICES: Record<TtsPlatform, Partial<Record<TtsLang, string[]>>> = {
   macos: {
     en: ["Samantha", "Alex", "Karen", "Daniel"],
-    zh: ["Tingting", "Meijia", "Sinji"],
-    ja: ["Kyoko"],
+    // macOS 按系统语言本地化中日 voice 名（中文系统显示「婷婷」、英文系统显示 Tingting），
+    // 推荐表两种名都列（实测 2026-06-13 冒烟校准）
+    zh: ["Tingting", "婷婷", "Meijia", "美佳", "Sinji", "善怡"],
+    ja: ["Kyoko", "京子"],
   },
   windows: {},
   linux: {},
