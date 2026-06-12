@@ -29,4 +29,5 @@ export function hydratePreferences(): void {
   }
   if (snap.soul) usePrefsStore.setState({ soul: snap.soul });
   if (snap.instructions !== undefined) usePrefsStore.setState({ instructions: snap.instructions });
+  if (snap.ttsPrefs) usePrefsStore.setState({ ttsPrefs: snap.ttsPrefs });
 }

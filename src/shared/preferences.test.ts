@@ -34,6 +34,7 @@ describe("preferences schemas", () => {
       "soul",
       "stepLimit",
       "summaryModel",
+      "ttsPrefs",
     ]);
   });
 
@@ -141,5 +142,15 @@ describe("language preference", () => {
     expect(setPreferenceInput.safeParse({ key: "language", value: "en" }).success).toBe(true);
     expect(setPreferenceInput.safeParse({ key: "language", value: "zh-CN" }).success).toBe(true);
     expect(setPreferenceInput.safeParse({ key: "language", value: "fr" }).success).toBe(false);
+  });
+});
+
+describe("ttsPrefs preference", () => {
+  it("ttsPrefs accepts rate + voiceByLang and rejects out-of-range rate", () => {
+    const schema = PREFERENCE_SCHEMAS.ttsPrefs;
+    expect(schema.safeParse({ rate: 1, voiceByLang: {} }).success).toBe(true);
+    expect(schema.safeParse({ rate: 1.5, voiceByLang: { zh: "Tingting" } }).success).toBe(true);
+    expect(schema.safeParse({ rate: 3, voiceByLang: {} }).success).toBe(false);
+    expect(schema.safeParse({ rate: 0.1, voiceByLang: {} }).success).toBe(false);
   });
 });

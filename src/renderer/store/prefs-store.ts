@@ -3,9 +3,11 @@ import type { AnnotationStyle } from "@shared/annotations";
 import {
   DEFAULT_SOUL,
   DEFAULT_STEP_LIMIT,
+  DEFAULT_TTS_PREFS,
   type ChatModel,
   type Soul,
   type SummaryModel,
+  type TtsPrefs,
 } from "@shared/preferences";
 import type { ReaderLayout, ReaderPrefs } from "@renderer/types";
 import { persistPreference } from "@renderer/store/persist-preference";
@@ -35,6 +37,8 @@ interface PrefsState {
   soul: Soul;
   /** 用户自定义全局指令（叠加在 SOUL persona 之上）。 */
   instructions: string;
+  /** 朗读（TTS）偏好：语速 + 语种→voice 名映射。 */
+  ttsPrefs: TtsPrefs;
 }
 interface PrefsActions {
   setAutoSummarize: (v: boolean) => void;
@@ -49,6 +53,7 @@ interface PrefsActions {
   setMemoryEnabled: (v: boolean) => void;
   setSoul: (v: Soul) => void;
   setInstructions: (v: string) => void;
+  updateTtsPrefs: (patch: Partial<TtsPrefs>) => void;
 }
 
 export const PREFS_INITIAL: PrefsState = {
@@ -64,6 +69,7 @@ export const PREFS_INITIAL: PrefsState = {
   memoryEnabled: true,
   soul: DEFAULT_SOUL,
   instructions: "",
+  ttsPrefs: DEFAULT_TTS_PREFS,
 };
 
 /**
@@ -124,4 +130,10 @@ export const usePrefsStore = create<PrefsState & PrefsActions>()((set) => ({
     persistPreference({ key: "instructions", value: instructions });
     set({ instructions });
   },
+  updateTtsPrefs: (patch) =>
+    set((s) => {
+      const ttsPrefs = { ...s.ttsPrefs, ...patch };
+      persistPreference({ key: "ttsPrefs", value: ttsPrefs });
+      return { ttsPrefs };
+    }),
 }));

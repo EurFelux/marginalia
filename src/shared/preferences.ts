@@ -65,6 +65,16 @@ export const DEFAULT_SOUL: Soul = {
     "You are a warm, curious, and thoughtful reading companion. You genuinely care about how your reader thinks and grows. Keep your voice gentle and concise; let personality come through naturally rather than performing it.",
 };
 
+/** 朗读（TTS）偏好：语速 + 语种→voice.name 映射（失配走 pick-voice 降级链，不报错不重置）。 */
+export const ttsPrefsSchema = z.object({
+  rate: z.number().min(0.5).max(2),
+  voiceByLang: z.record(z.string(), z.string()),
+});
+export type TtsPrefs = z.infer<typeof ttsPrefsSchema>;
+
+/** ttsPrefs 出厂值：渲染层初值与重置共用单一源。 */
+export const DEFAULT_TTS_PREFS: TtsPrefs = { rate: 1, voiceByLang: {} };
+
 /**
  * 可持久化用户偏好的单一源：key → 值 Zod schema。
  * 新增偏好＝在此注册一个 key + schema；DB / 服务 / IPC / 类型全部据此推导。
@@ -84,6 +94,7 @@ export const PREFERENCE_SCHEMAS = {
   memoryEnabled: z.boolean(),
   soul: soulSchema,
   instructions: z.string(),
+  ttsPrefs: ttsPrefsSchema,
 } as const;
 
 export type PreferenceKey = keyof typeof PREFERENCE_SCHEMAS;
@@ -116,5 +127,6 @@ export const setPreferenceInput = z.discriminatedUnion("key", [
   z.object({ key: z.literal("memoryEnabled"), value: z.boolean() }),
   z.object({ key: z.literal("soul"), value: soulSchema }),
   z.object({ key: z.literal("instructions"), value: z.string() }),
+  z.object({ key: z.literal("ttsPrefs"), value: ttsPrefsSchema }),
 ]);
 export type SetPreferenceInput = z.infer<typeof setPreferenceInput>;
