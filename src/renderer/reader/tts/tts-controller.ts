@@ -160,6 +160,7 @@ class TtsController {
     if (!ctx) return;
     let next = this.sectionIndex + 1;
     this.crossing = true;
+    this.clearHighlight(); // 在 sectionIndex 指向旧章节时清除残留高亮
     try {
       while (next < ctx.sectionCount) {
         this.ignoreScrollUntil = performance.now() + AUTO_SCROLL_IGNORE_MS + SECTION_DOC_TIMEOUT_MS;

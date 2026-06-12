@@ -88,8 +88,10 @@ export function createTtsEngine(port: SpeechPort, events: TtsEngineEvents) {
   const playParagraph = (i: number, myGen: number) => {
     if (myGen !== gen) return;
     if (i >= texts.length) {
-      setState("idle");
+      // 先发 onQueueEnd 再收口 idle：集成层在回调里同步置 crossing/重启播放，
+      // 颠倒顺序会让瞬时 idle 泄漏到 UI（跨章控制条闪退）。
       events.onQueueEnd();
+      if (myGen === gen) setState("idle"); // 回调内未启动新播放（gen 未变）才收口
       return;
     }
     current = i;

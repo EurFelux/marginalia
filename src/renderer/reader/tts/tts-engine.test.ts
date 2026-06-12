@@ -127,4 +127,35 @@ describe("tts-engine", () => {
     expect(m.last().text).toBe("Two."); // 从当前段头重读
     expect(m.last().rate).toBe(2);
   });
+
+  it("fires onQueueEnd before publishing idle", () => {
+    const order: string[] = [];
+    const events = {
+      onParagraphChange: vi.fn(),
+      onStateChange: (s: string) => void order.push(`state:${s}`),
+      onQueueEnd: () => void order.push("queueEnd"),
+      onUtteranceError: vi.fn(),
+    };
+    const e = createTtsEngine(m.port, events);
+    e.play(["One."], 0, OPTS);
+    m.last().onend?.();
+    expect(order).toEqual(["state:playing", "queueEnd", "state:idle"]);
+  });
+
+  it("suppresses idle when onQueueEnd synchronously restarts playback", () => {
+    const states: string[] = [];
+    let engine!: ReturnType<typeof createTtsEngine>;
+    const events = {
+      onParagraphChange: vi.fn(),
+      onStateChange: (s: string) => void states.push(s),
+      onQueueEnd: () => engine.play(["Next."], 0, OPTS),
+      onUtteranceError: vi.fn(),
+    };
+    engine = createTtsEngine(m.port, events);
+    engine.play(["One."], 0, OPTS);
+    m.last().onend?.();
+    expect(states).not.toContain("idle");
+    expect(engine.state()).toBe("playing");
+    expect(m.last().text).toBe("Next.");
+  });
 });
