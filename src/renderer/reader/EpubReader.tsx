@@ -24,6 +24,8 @@ import { applyAnnotations } from "./apply-annotations";
 import { ANNO_IFRAME_CSS } from "./highlight";
 import { fontFaceCss } from "./reader-fonts";
 import { useThemeStore } from "../store/theme-store";
+import { ttsController } from "./tts/tts-controller";
+import { TTS_IFRAME_CSS } from "./tts/tts-css";
 
 const log = createLogger("epub");
 
@@ -70,6 +72,8 @@ export function EpubReader({ bookId, chapters }: Props) {
 
   // 防循环：记录最近一次「由滚动得出的顶部章 id」；跳章 effect 只在目标≠它时滚动。
   const topChapterIdRef = useRef<string | null>(null);
+  // TTS 起读用：最近一次滚动得出的顶部 section 索引。
+  const topSectionIndexRef = useRef(0);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 进度精确恢复只做一次（每次开书/换书重置）；防 progress 缓存更新触发的重复恢复。
   const restoredRef = useRef(false);
@@ -149,6 +153,7 @@ export function EpubReader({ bookId, chapters }: Props) {
   useEffect(() => {
     if (!book || currentChapterId == null) return;
     if (currentChapterId === topChapterIdRef.current) return; // 由滚动引起的同步，不回滚
+    ttsController.notifyUserNavigation();
     const ch = chapters.find((c) => c.id === currentChapterId);
     if (!ch) return;
     const idx = book.indexOfHref(ch.href);
@@ -177,6 +182,17 @@ export function EpubReader({ bookId, chapters }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [book, progress.isLoading]);
 
+  // TTS：book 就绪即挂接上下文；卸载/换书 detach（内部停止朗读并清高亮）。
+  useEffect(() => {
+    if (!book) return;
+    ttsController.attach({
+      sectionCount: book.count,
+      getTopSectionIndex: () => topSectionIndexRef.current,
+      scrollToSection: (i) => vRef.current?.scrollToIndex(i),
+    });
+    return () => ttsController.detach();
+  }, [book]);
+
   const onSelect = (e: SectionSelectEvent) => {
     const cfiRange = book ? book.cfiFromRange(e.index, e.range) : null;
     setSelection(sectionSelectToSelectionInfo(e, cfiRange));
@@ -203,6 +219,7 @@ export function EpubReader({ bookId, chapters }: Props) {
 
   const onTopSectionChange = (index: number, meta: { scrollRatio: number }) => {
     if (!book) return;
+    topSectionIndexRef.current = index;
     const percent = epubPercent(index, meta.scrollRatio, book.count);
     setReadingPercent(percent);
     // 当前章高亮（锚点级）
@@ -358,6 +375,7 @@ export function EpubReader({ bookId, chapters }: Props) {
   // 侧栏列表点击 → 精确滚到该标注（锚点级：CFI 解析回元素，不再只到 section 顶）。
   useEffect(() => {
     if (!book || !scrollCommand) return;
+    ttsController.notifyUserNavigation();
     scrollToCfi(scrollCommand.locator);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [book, scrollCommand]);
@@ -405,7 +423,9 @@ export function EpubReader({ bookId, chapters }: Props) {
           "\n" +
           ANNO_IFRAME_CSS +
           "\n" +
-          readerThemeCss(resolvedTheme === "dark")
+          readerThemeCss(resolvedTheme === "dark") +
+          "\n" +
+          TTS_IFRAME_CSS
         }
         initialIndex={initialIndex}
         onTopSectionChange={onTopSectionChange}
