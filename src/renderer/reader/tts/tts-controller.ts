@@ -85,6 +85,8 @@ class TtsController {
     const ctx = this.ctx;
     if (!ctx) return;
     this.voices = await getVoicesReady();
+    // await 期间换书/卸载则放弃本次起播
+    if (this.ctx !== ctx) return;
     const index = ctx.getTopSectionIndex();
     const doc = sectionDoc(index);
     const frame = sectionFrame(index);
@@ -167,7 +169,8 @@ class TtsController {
         ctx.scrollToSection(next);
         const doc = await this.waitForSectionDoc(next);
         if (!doc) {
-          log.warn(`section ${next} iframe not ready in time, stopping`);
+          // crossing 已被 stop() 清除 → 用户主动停止，静默退出；否则真超时才 warn
+          if (this.crossing) log.warn(`section ${next} iframe not ready in time, stopping`);
           break;
         }
         const paras = segmentParagraphs(doc.body);
@@ -236,5 +239,7 @@ class TtsController {
   }
 }
 
-/** 模块单例：顶栏/控制条直接调方法（命令式），状态经 useTtsStore 发布。 */
+/** 模块单例：顶栏/控制条直接调方法（命令式），状态经 useTtsStore 发布。
+ *  单例跨书复位依赖 detach 链：换书时 EpubReader 先 detach（→ stop → ctx=null）再 attach 新 ctx。
+ */
 export const ttsController = new TtsController();
