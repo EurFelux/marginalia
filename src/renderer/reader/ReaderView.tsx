@@ -13,6 +13,7 @@ import {
   PanelTopClose,
   PanelTopOpen,
   Settings,
+  Volume2,
 } from "lucide-react";
 import { qk } from "@renderer/query/keys";
 import { Button } from "@renderer/components/ui/button";
@@ -36,6 +37,9 @@ import { SummaryPill } from "@renderer/ai/SummaryPill";
 import { useRestoreConversation } from "@renderer/ai/use-restore-conversation";
 import { useReadingClock } from "@renderer/reader/use-reading-clock";
 import { openPanelAndFocusComposer } from "@renderer/ai/composer-focus";
+import { TtsControlBar } from "@renderer/reader/TtsControlBar";
+import { ttsController } from "@renderer/reader/tts/tts-controller";
+import { useTtsStore } from "@renderer/store/tts-store";
 
 export function ReaderView() {
   const { t } = useTranslation();
@@ -55,6 +59,7 @@ export function ReaderView() {
   const panelWidth = usePaneSizeStore((s) => s.panelWidth);
   const setPanelWidth = usePaneSizeStore((s) => s.setPanelWidth);
   const qc = useQueryClient();
+  const ttsStatus = useTtsStore((s) => s.status);
 
   const chapters = useQuery({
     queryKey: qk.chapters(bookId ?? ""),
@@ -159,6 +164,36 @@ export function ReaderView() {
           </div>
           <div className="flex shrink-0 items-center gap-1">
             {!book.isPending && (book.data?.format === "pdf" ? <PdfPrefs /> : <ReaderPrefs />)}
+            {!book.isPending && book.data?.format !== "pdf" && (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() =>
+                        ttsStatus === "idle"
+                          ? void ttsController.playFromViewport()
+                          : ttsController.stop()
+                      }
+                      aria-label={
+                        ttsStatus === "idle"
+                          ? t("reader.tts.start", "朗读")
+                          : t("reader.tts.stop", "停止")
+                      }
+                      className="text-muted-foreground"
+                    />
+                  }
+                >
+                  <Volume2 className={ttsStatus !== "idle" ? "text-primary" : undefined} />
+                </TooltipTrigger>
+                <TooltipContent>
+                  {ttsStatus === "idle"
+                    ? t("reader.tts.start", "朗读")
+                    : t("reader.tts.stop", "停止")}
+                </TooltipContent>
+              </Tooltip>
+            )}
             <Tooltip>
               <TooltipTrigger
                 render={
@@ -225,7 +260,7 @@ export function ReaderView() {
         >
           <Sidebar bookId={bookId} />
         </CollapsiblePane>
-        <main className="min-w-0 flex-1">
+        <main className="relative min-w-0 flex-1">
           {/* 按格式分发：book 查询就绪前不渲染（避免 PDF 书闪挂 EpubReader）。
               EpubReader 自管载入/错误态，并据 CFI 进度恢复初始位置。 */}
           {book.isPending ? null : book.data?.format === "pdf" ? (
@@ -233,6 +268,7 @@ export function ReaderView() {
           ) : (
             <EpubReader bookId={bookId} chapters={chapters.data ?? []} />
           )}
+          <TtsControlBar />
         </main>
         <CollapsiblePane
           side="right"
