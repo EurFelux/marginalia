@@ -1,6 +1,6 @@
 {
   "name": "marginalia",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "private": true,
   "description": "Desktop ePub and PDF AI reader — select a passage and chat with a context-aware assistant in the margins.",
   "keywords": [],

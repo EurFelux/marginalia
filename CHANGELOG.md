@@ -1,5 +1,17 @@
 # marginalia
 
+## 0.12.0
+
+### Minor Changes
+
+- 72f7925: Add standalone book-level notes: write multiple Markdown notes per book from the reader sidebar's new Notes tab, or review them from the library via right-click → View notes — no text selection required.
+- d2ee886: Book note editing now uses a syntax-highlighted Markdown editor (CodeMirror): headings render larger, bold/italic/code/quotes show their real styling as you type, markers are dimmed, and lists auto-continue on Enter.
+- 768751f: Make the reader's sidebar and AI panel resizable: drag the inner edge of either pane to adjust its width. Widths are remembered across restarts, and the collapsed peek drawers follow the chosen width.
+
+### Patch Changes
+
+- c357b76: Import EPUB books that are unpacked directories instead of zip files (for example, books exported from Apple Books, or epubs unzipped by Calibre/Sigil). These previously failed to import with an `EISDIR` error; they are now packed into a standard EPUB on import. Directories that aren't valid EPUBs, or whose contents can't be read (e.g. not-yet-downloaded iCloud placeholders), now report a clear, actionable error.
+
 ## 0.11.0
 
 ### Minor Changes
