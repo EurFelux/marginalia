@@ -52,6 +52,8 @@ export function ReaderView() {
   const updateLayout = usePrefsStore((s) => s.updateLayout);
   const sidebarWidth = usePaneSizeStore((s) => s.sidebarWidth);
   const setSidebarWidth = usePaneSizeStore((s) => s.setSidebarWidth);
+  const panelWidth = usePaneSizeStore((s) => s.panelWidth);
+  const setPanelWidth = usePaneSizeStore((s) => s.setPanelWidth);
   const qc = useQueryClient();
 
   const chapters = useQuery({
@@ -235,7 +237,8 @@ export function ReaderView() {
         <CollapsiblePane
           side="right"
           open={layout.panelOpen}
-          sizeClass="w-96"
+          width={panelWidth}
+          onWidthChange={setPanelWidth}
           label={t("reader.expandAiPanel", "展开 AI 面板")}
         >
           <AIPanel />
