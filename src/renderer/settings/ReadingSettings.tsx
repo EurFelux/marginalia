@@ -68,7 +68,12 @@ function VoiceRow({ lang, label }: { lang: TtsLang; label: string }) {
           }}
         >
           <SelectTrigger className="w-44" aria-label={label}>
-            <SelectValue />
+            {/* value 是 voice.name 或 __auto__ 哨兵；用函数 child 把哨兵映射回显示名。 */}
+            <SelectValue>
+              {(v) =>
+                v === AUTO_VALUE ? t("settings.tts.autoVoice", "自动（推荐）") : (v as string)
+              }
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={AUTO_VALUE}>
@@ -134,7 +139,8 @@ export function ReadingSettings() {
             }}
           >
             <SelectTrigger className="w-44" aria-label={t("settings.tts.rate", "语速")}>
-              <SelectValue />
+              {/* value 是倍率裸值（"1.25"）；显示带 × 后缀与选项一致。 */}
+              <SelectValue>{(v) => `${v as string}×`}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {RATE_OPTIONS.map((r) => (

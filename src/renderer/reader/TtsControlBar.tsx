@@ -55,7 +55,8 @@ export function TtsControlBar() {
           className="h-8 w-20 border-none shadow-none"
           aria-label={t("reader.tts.rate", "语速")}
         >
-          <SelectValue />
+          {/* value 是倍率裸值（"1.25"）；显示带 × 后缀与选项一致。 */}
+          <SelectValue>{(v) => `${v as string}×`}</SelectValue>
         </SelectTrigger>
         <SelectContent>
           {RATE_OPTIONS.map((r) => (
