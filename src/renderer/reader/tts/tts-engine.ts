@@ -152,7 +152,6 @@ export function createTtsEngine(port: SpeechPort, events: TtsEngineEvents) {
       playParagraph(current, gen);
     },
     state: () => state,
-    currentIndex: () => current,
   };
 }
 
