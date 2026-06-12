@@ -17,7 +17,7 @@ import { LocalizedStreamdown } from "@renderer/components/LocalizedStreamdown";
 import { qk } from "@renderer/query/keys";
 import { bookNotesQuery } from "@renderer/query/book-note-queries";
 import { relativeTime } from "@renderer/lib/relative-time";
-import { BookNoteEditorDialog, type BookNoteEditorState } from "./BookNoteEditorDialog";
+import { BookNoteEditor, type BookNoteEditorState } from "./BookNoteEditor";
 
 /** 书籍级独立笔记面板：侧栏「笔记」tab 与书库「查看笔记」Dialog 渲染同一实例形态。 */
 export function BookNotesPanel({ bookId }: { bookId: string }) {
@@ -75,6 +75,11 @@ export function BookNotesPanel({ bookId }: { bookId: string }) {
 
   const now = Date.now();
 
+  // 编辑态整区切换为全高编辑器（非 Dialog）：与 AI 面板同级并存，写笔记时可同时查看/复制对话内容。
+  if (editor) {
+    return <BookNoteEditor state={editor} onSave={save} onClose={() => setEditor(null)} />;
+  }
+
   return (
     <div className="flex h-full flex-col">
       <div className="shrink-0 p-2 pb-0">
@@ -115,8 +120,6 @@ export function BookNotesPanel({ bookId }: { bookId: string }) {
           </ScrollArea>
         )}
       </div>
-
-      <BookNoteEditorDialog state={editor} onSave={save} onClose={() => setEditor(null)} />
 
       <AlertDialog
         open={confirmDeleteId != null}
