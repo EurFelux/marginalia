@@ -1,5 +1,16 @@
 # marginalia
 
+## 0.13.0
+
+### Minor Changes
+
+- 9101f4a: Add read-aloud (TTS) for ePub books: play from the current position with automatic chapter continuation, paragraph highlight that follows the speech, a floating control bar (pause/resume/stop/speed), and per-language voice selection with preview in Settings. Voices are matched to the content language of each paragraph, not the UI language.
+
+### Patch Changes
+
+- 7f6b774: Reduce blank flashes when scrolling quickly through ePub books. Sections above and below the viewport now pre-mount and load further ahead, so their content is ready by the time it scrolls into view instead of briefly showing an empty placeholder.
+- a33c870: Fix large position jumps when scrolling up in ePub books. Section iframes now keep their estimated height from the moment they mount (previously they collapsed to the browser default for a few frames while reloading, forcing the reader to compensate mid-scroll), unmeasured sections are estimated from chapter text length instead of a fixed placeholder, and sections above the viewport pre-mount earlier so height corrections happen off-screen.
+
 ## 0.12.0
 
 ### Minor Changes
