@@ -416,6 +416,7 @@ export function EpubReader({ bookId, chapters }: Props) {
         className="no-scrollbar"
         count={book.count}
         loadSection={book.loadSection}
+        sectionWeight={book.textLengthAtIndex}
         styleCss={
           fontFaceCss(prefs.fontFamily) +
           "\n" +

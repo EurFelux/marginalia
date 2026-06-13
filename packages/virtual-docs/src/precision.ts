@@ -8,6 +8,34 @@ export function estimateHeight(
 }
 
 /**
+ * 带校准的估高：缓存命中直接用；未测量时用「已测 section 的 px/权重比」乘以目标权重外推
+ * （权重 = 消费方提供的相对体量，如章节字符数）。无权重函数 / 无有效样本 / 目标权重为 0
+ * 时退回 defaultEstimate。校准样本须排除权重 0 的 section（封面图等会污染比率）。
+ */
+export function calibratedEstimate(
+  cache: ReadonlyMap<number, number>,
+  weightOf: ((index: number) => number) | undefined,
+  index: number,
+  defaultEstimate: number,
+): number {
+  const cached = cache.get(index);
+  if (cached != null) return cached;
+  if (!weightOf) return defaultEstimate;
+  const targetWeight = weightOf(index);
+  if (targetWeight <= 0) return defaultEstimate;
+  let sumHeight = 0;
+  let sumWeight = 0;
+  for (const [i, h] of cache) {
+    const w = weightOf(i);
+    if (w <= 0) continue;
+    sumHeight += h;
+    sumWeight += w;
+  }
+  if (sumWeight <= 0) return defaultEstimate;
+  return targetWeight * (sumHeight / sumWeight);
+}
+
+/**
  * 距 active range 超过 keepDistance 的 section 索引（应 unload 的集合）。
  * 保留区间 = [startIndex - keepDistance, endIndex + keepDistance]，区间外全部淘汰。
  */

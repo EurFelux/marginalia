@@ -293,7 +293,11 @@ export function SectionFrame({
       sandbox="allow-same-origin"
       title={`section-${index}`}
       scrolling="no"
-      style={{ width: "100%", border: 0, display: "block" }}
+      // height 初值必须随首次渲染就位：iframe 从挂载到 load 事件之间若无 height，会以 Chromium
+      // 默认 150px 参与布局——视口上方的 section 重挂时高度瞬时塌缩再恢复，virtuoso 的 scrollTop
+      // 补偿与用户滚动竞争，正是「向上翻大跳」的主根因。load 后由 measure 手写真高接管（React
+      // 仅在 estimatedHeight 值变化时重写该属性，且届时缓存值已等于真高，不会回退）。
+      style={{ width: "100%", border: 0, display: "block", height: estimatedHeight ?? 0 }}
     />
   );
 }

@@ -3,7 +3,7 @@ import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { SectionFrame, type SectionSelectEvent } from "./SectionFrame";
 import type { ViewportRect } from "./geometry";
 import {
-  estimateHeight,
+  calibratedEstimate,
   sectionScrollRatio,
   sectionsToUnload,
   topVisibleSection,
@@ -13,6 +13,11 @@ import {
 const DEFAULT_ESTIMATE = 600;
 /** active range 两侧各保留的 section 数；超出即 unload。 */
 const KEEP_DISTANCE = 5;
+/**
+ * 视口外预挂载缓冲（px）。top 给大：向上滚动时让上方 section 在进入视口前就完成挂载与测量，
+ * 高度修正发生在可视区外、无需大幅 scrollTop 补偿（向下滚不补偿，bottom 小即可）。
+ */
+const OVERSCAN_PX = { top: 1500, bottom: 300 };
 
 export interface VirtualDocsHandle {
   scrollToIndex: (index: number) => void;
@@ -37,6 +42,12 @@ export interface VirtualDocsProps {
   loadSection: (index: number) => Promise<string>;
   styleCss?: string;
   initialIndex?: number;
+  /**
+   * section 的相对体量（如字符数），供未测量 section 按「已测 px/权重比」外推估高。
+   * 不传则未测量 section 一律用固定默认估高（600px）——与真实高度差距大时，
+   * 向上滚动的首次测量修正会引发可感知跳变。**须引用稳定**（同 loadSection）。
+   */
+  sectionWeight?: (index: number) => number;
   /**
    * 真实视口顶 section 索引变化时回调。优先用 IntersectionObserver 精确计算；
    * IntersectionObserver 不可用时 fallback 到 virtuoso rangeChanged.startIndex（近似，含 overscan）。
@@ -65,6 +76,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
     loadSection,
     styleCss,
     initialIndex,
+    sectionWeight,
     onTopSectionChange,
     onSelect,
     onSelectionCleared,
@@ -239,7 +251,12 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
         onContentMouseDown={onContentMouseDown}
         onInternalLink={onInternalLink}
         onExternalLink={onExternalLink}
-        estimatedHeight={estimateHeight(heightCache.current, index, DEFAULT_ESTIMATE)}
+        estimatedHeight={calibratedEstimate(
+          heightCache.current,
+          sectionWeight,
+          index,
+          DEFAULT_ESTIMATE,
+        )}
         onMeasured={onMeasured}
         registerSection={registerSection}
         unregisterSection={unregisterSection}
@@ -248,6 +265,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
     [
       loadSection,
       styleCss,
+      sectionWeight,
       onSelect,
       onSelectionCleared,
       decorate,
@@ -271,6 +289,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
       style={{ height: "100%" }}
       totalCount={count}
       initialTopMostItemIndex={initialIndex ?? 0}
+      increaseViewportBy={OVERSCAN_PX}
       itemContent={itemContent}
       scrollerRef={handleScrollerRef}
       rangeChanged={(range) => {

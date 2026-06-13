@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { estimateHeight, sectionScrollRatio, sectionsToUnload, topVisibleIndex } from "./precision";
+import {
+  calibratedEstimate,
+  estimateHeight,
+  sectionScrollRatio,
+  sectionsToUnload,
+  topVisibleIndex,
+} from "./precision";
 
 describe("estimateHeight", () => {
   it("returns cached height when present", () => {
@@ -8,6 +14,63 @@ describe("estimateHeight", () => {
   });
   it("falls back to the default estimate when uncached", () => {
     expect(estimateHeight(new Map(), 3, 600)).toBe(600);
+  });
+});
+
+describe("calibratedEstimate", () => {
+  it("returns cached height when present (weight ignored)", () => {
+    const cache = new Map([[3, 742]]);
+    expect(calibratedEstimate(cache, () => 9999, 3, 600)).toBe(742);
+  });
+  it("falls back to default when no weight function is given", () => {
+    const cache = new Map([[0, 5000]]);
+    expect(calibratedEstimate(cache, undefined, 3, 600)).toBe(600);
+  });
+  it("falls back to default when nothing has been measured yet", () => {
+    expect(calibratedEstimate(new Map(), () => 1000, 3, 600)).toBe(600);
+  });
+  it("scales the estimate by measured px-per-weight", () => {
+    // section 0 measured 5000px at weight 1000 → 5 px/unit; target weight 2000 → 10000px
+    const cache = new Map([[0, 5000]]);
+    const weights = new Map([
+      [0, 1000],
+      [5, 2000],
+    ]);
+    expect(calibratedEstimate(cache, (i) => weights.get(i) ?? 0, 5, 600)).toBe(10000);
+  });
+  it("falls back to default for zero-weight targets (image-only sections)", () => {
+    const cache = new Map([[0, 5000]]);
+    const weights = new Map([
+      [0, 1000],
+      [5, 0],
+    ]);
+    expect(calibratedEstimate(cache, (i) => weights.get(i) ?? 0, 5, 600)).toBe(600);
+  });
+  it("excludes zero-weight sections from calibration", () => {
+    // idx0 is a 400px cover (weight 0) — must not poison the ratio; idx1: 6000px @ 1000 → 6 px/unit
+    const cache = new Map([
+      [0, 400],
+      [1, 6000],
+    ]);
+    const weights = new Map([
+      [0, 0],
+      [1, 1000],
+      [2, 500],
+    ]);
+    expect(calibratedEstimate(cache, (i) => weights.get(i) ?? 0, 2, 600)).toBe(3000);
+  });
+  it("pools all measured sections into one ratio", () => {
+    // (4000+8000)px / (1000+3000)w = 3 px/unit; target weight 2000 → 6000
+    const cache = new Map([
+      [0, 4000],
+      [1, 8000],
+    ]);
+    const weights = new Map([
+      [0, 1000],
+      [1, 3000],
+      [7, 2000],
+    ]);
+    expect(calibratedEstimate(cache, (i) => weights.get(i) ?? 0, 7, 600)).toBe(6000);
   });
 });
 
