@@ -14,10 +14,12 @@ const DEFAULT_ESTIMATE = 600;
 /** active range 两侧各保留的 section 数；超出即 unload。 */
 const KEEP_DISTANCE = 5;
 /**
- * 视口外预挂载缓冲（px）。top 给大：向上滚动时让上方 section 在进入视口前就完成挂载与测量，
- * 高度修正发生在可视区外、无需大幅 scrollTop 补偿（向下滚不补偿，bottom 小即可）。
+ * 视口外预挂载缓冲（px），两侧对称给足。作用有二：① 向上滚动时上方 section 在进入视口前完成
+ * 挂载与测量，高度修正发生在可视区外、无需大幅 scrollTop 补偿；② 快速滚动时进入方向的 section
+ * 提前挂载、加载（loadSection 异步解析 ePub HTML 有延迟），抵达视口时内容已就绪——消除「内容
+ * 未就绪」的空白占位帧。给到 2400 是实测停手就绪（settling）中位 ~8ms 的拐点；过大徒增同挂 iframe 数。
  */
-const OVERSCAN_PX = { top: 1500, bottom: 300 };
+const OVERSCAN_PX = { top: 2400, bottom: 2400 };
 
 export interface VirtualDocsHandle {
   scrollToIndex: (index: number) => void;
