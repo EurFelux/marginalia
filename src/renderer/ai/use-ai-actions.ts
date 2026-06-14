@@ -2,9 +2,10 @@ import { useCallback } from "react";
 import { useAnnotationStore } from "@renderer/store/annotation-store";
 import { useChatStore } from "@renderer/store/chat-store";
 import { openPanelAndFocusComposer } from "@renderer/ai/composer-focus";
+import { presetDraftText, type PresetId } from "@renderer/ai/ai-action-draft";
 import i18n from "@renderer/i18n";
 
-export type PresetId = "explain" | "translate" | "summarize";
+export type { PresetId };
 
 /** 按 preset 取本地化的预设提示语（调用时求值，跟随 UI 语言）。 */
 function resolvePresetPrompt(preset: PresetId): string {
@@ -30,7 +31,9 @@ export function useAiActions() {
       paragraphAfter: selection.paragraphAfter,
     });
     setDraftChips(chips);
-    setDraftText(preset ? resolvePresetPrompt(preset) : "");
+    // 有 preset → 用预设提示语覆盖草稿；「AI 问」（无 preset）→ 保留用户已输入的文字，不清空
+    const next = presetDraftText(preset, resolvePresetPrompt);
+    if (next !== null) setDraftText(next);
     openPanelAndFocusComposer();
     setSelection(null); // 收起工具栏
   }, []);
