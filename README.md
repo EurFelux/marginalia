@@ -16,7 +16,7 @@ English · [简体中文](README.zh-CN.md)
 
 ## What is Marginalia
 
-Marginalia puts AI right in the margins of your reading. Open an ePub or PDF, hit a sentence you want to dig into, **select it**, and an assistant joins you in the side panel — already holding the context of the book. Explain an allusion, translate a passage, summarize the thread, or just ask. No breaking your flow, no copy-pasting into another window.
+Marginalia puts AI right in the margins of your reading. Open an ePub or PDF, hit a sentence you want to dig into, **select it**, and an assistant joins you in the side panel — already holding the context of the book. Explain an allusion, translate a passage, summarize the thread, or just ask — and when you'd rather listen, it reads the page aloud. No breaking your flow, no copy-pasting into another window.
 
 It's local-first, bring-your-own-key, and tied to no single model provider — your books and notes stay quietly on your own machine.
 
@@ -26,13 +26,21 @@ It's local-first, bring-your-own-key, and tied to no single model provider — y
 
 Select text in an ePub or text-layer PDF and a floating toolbar appears: **Explain / Translate / Summarize** in one click, or hit "Ask AI" for an open question. Answers **stream** into the side panel, so you can read and ask in the same breath.
 
+### 🔊 Or let it read to you
+
+Press play and Marginalia reads the book aloud, paragraph by paragraph — highlighting the line it's on and scrolling to keep pace, straight through chapter breaks. Choose a voice per language and set the speed; it speaks with the voices already on your machine, so nothing leaves it.
+
 ### 🧩 Transparent context
 
 Every question ships its context as visible, toggleable **chips**: your exact selection, its surrounding paragraph, the chapter summary, the whole-book summary — each labeled, each switchable. **You always know what the AI sees.**
 
-### 🖍️ Highlights & notes
+### 🧠 A companion, not a chatbot
 
-Five highlight colors plus underline, with sticky notes on any passage. Every annotation collects into a side-panel list in reading order — one click jumps you back to the spot.
+Give the assistant a name, a **persona**, and standing instructions, and it shows up that way in every conversation. It can **remember** what matters across chats — and every memory is yours to read, edit, or delete, or to switch off entirely. Each book keeps its own saved conversations, so you can return to an old thread or start a fresh one.
+
+### 🖍️ Highlights, notes & a notebook
+
+Five highlight colors plus underline, with sticky notes on any passage — all gathered into a side-panel list in reading order, one click back to the spot. Each book also gets its own free-form **Markdown notebook** for the thoughts that don't belong to a single line.
 
 ### 📖 Immersive reading
 
@@ -80,6 +88,7 @@ Grab the latest `.dmg` from [Releases](https://github.com/EurFelux/marginalia/re
 1. **Drop in a book** — drag an ePub or PDF into the library and start reading.
 2. **Select text, hit "Ask AI"** — the side panel picks up the passage's context automatically.
 3. **Watch the answer stream in** — read, annotate, follow up, and summarize, all in one window.
+4. **Make it yours** — give the assistant a name and persona, and let it remember what matters from chat to chat.
 
 ## 🧭 Principles
 
