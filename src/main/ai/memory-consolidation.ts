@@ -1,7 +1,9 @@
 // src/main/ai/memory-consolidation.ts —— 后台记忆整理 pass（spec 2026-06-16）。
-// 结构化单发 + 确定性落库；镜像 context-compaction.ts 的 fire-and-forget 形态。
+// generateText 单发 + 自管 JSON 解析（parseMemoryOps）+ 确定性落库；镜像 context-compaction.ts 的 fire-and-forget。
+// 不用 generateObject/response_format——OpenAI 兼容 provider 对 json_object 支持参差、tool 模式亦不可靠；
+// 自己解析对任何文本模型都通用，且解析逻辑可单测。
 import { z } from "zod";
-import { generateObject } from "ai";
+import { generateText } from "ai";
 import { eq } from "drizzle-orm";
 import {
   createMemory,
@@ -133,10 +135,48 @@ export function renderMemoryPassInput(
   return combined.length > maxChars ? combined.slice(combined.length - maxChars) : combined;
 }
 
-// 末句必须出现 "json" 字样：OpenAI 兼容 provider（DeepSeek / zenmux 等）在 generateObject 的
-// json_object 响应格式下，要求 prompt 中含 "json" 一词，否则 API 直接拒
-// （AI_APICallError: "Prompt must contain the word 'json' ... to use 'response_format' of type 'json_object'"）。
-// 导出供回归测试断言该词存在——删除会让所有 OpenAI 兼容 provider 上的整理 pass 每轮必挂。
+/** 剥 markdown 代码围栏并扫出最外层平衡的 {…}（容忍模型在 JSON 前后夹带 prose）；找不到返回 null。 */
+function extractJsonObject(text: string): string | null {
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const body = fenced?.[1] ?? text;
+  const start = body.indexOf("{");
+  if (start < 0) return null;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = start; i < body.length; i++) {
+    const ch = body[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === "{") depth++;
+    else if (ch === "}" && --depth === 0) return body.slice(start, i + 1);
+  }
+  return null;
+}
+
+/**
+ * 从模型文本健壮地抽取并校验 ops 清单（provider 无关，不依赖 response_format）：
+ * 剥围栏 → 平衡括号扫出最外层对象 → JSON.parse → Zod 校验。任何失败返回 null（调用方跳过本轮重试）。
+ */
+export function parseMemoryOps(text: string): z.infer<typeof memoryPassOutput> | null {
+  const json = extractJsonObject(text);
+  if (json == null) return null;
+  let raw: unknown;
+  try {
+    raw = JSON.parse(json);
+  } catch {
+    return null;
+  }
+  const parsed = memoryPassOutput.safeParse(raw);
+  return parsed.success ? parsed.data : null;
+}
+
+// prompt 把输出格式说清楚并给范例，让模型直接吐可被 parseMemoryOps 解析的 JSON（无 response_format 依赖）。
 export const CONSOLIDATION_SYSTEM =
   "You are the memory librarian for a reading assistant named Lia. You are given Lia's existing " +
   "long-term memories about the reader and the most recent exchanges of one conversation. Keep the " +
@@ -152,8 +192,13 @@ export const CONSOLIDATION_SYSTEM =
   "Write memory content in the reader's language; slugs are always English kebab-case. Link related " +
   "memories inside body text with [[slug]]. Be conservative: if nothing is clearly worth changing, return " +
   "an empty ops array. Give a one-sentence reason for each operation.\n\n" +
-  'Respond with a single JSON object of the form {"ops": [...]} matching the required schema; ' +
-  "output JSON only, with no surrounding prose.";
+  "Output ONLY a JSON object — no markdown fences, no prose before or after. Shape:\n" +
+  '{"ops": [\n' +
+  '  {"op": "save", "slug": "kebab-case-slug", "title": "...", "description": "...", "body": "...", "reason": "..."},\n' +
+  '  {"op": "update", "slug": "existing-slug", "title": "...", "description": "...", "body": "...", "reason": "..."},\n' +
+  '  {"op": "delete", "slug": "redundant-slug", "reason": "..."}\n' +
+  "]}\n" +
+  'For "update", include only the fields you are changing. If nothing should change, output {"ops": []}.';
 
 export interface ConsolidationDeps {
   db: DB;
@@ -222,16 +267,22 @@ export async function maybeConsolidateMemory(
     log.debug(
       `consolidation start conv=${conversationId} turns=${assistantTurns} memories=${memories.length} inputChars=${input.length}`,
     );
-    const { object } = await runBackground(() =>
-      generateObject({
+    const { text } = await runBackground(() =>
+      generateText({
         model: resolved.model,
-        schema: memoryPassOutput,
         system: CONSOLIDATION_SYSTEM,
         prompt: input,
         maxOutputTokens: MEMORY_PASS_MAX_TOKENS,
         maxRetries: 1,
       }),
     );
+    const parsed = parseMemoryOps(text);
+    if (!parsed) {
+      log.warn(
+        `conversation ${conversationId} consolidation: unparseable model output; skip (retry next turn)`,
+      );
+      return; // 不推进水位线，下轮重试
+    }
 
     // 写回前复查会话仍在（整理中途被删 → 丢弃；better-sqlite3 同步驱动，check-then-act 安全）
     const still = db
@@ -244,7 +295,7 @@ export async function maybeConsolidateMemory(
       return;
     }
 
-    const applied = applyMemoryOps(db, object.ops, { sourceBookId: bookId });
+    const applied = applyMemoryOps(db, parsed.ops, { sourceBookId: bookId });
     const latestSeq = tail.at(-1)?.seq ?? through ?? 0;
     db.update(conversations)
       .set({ memoryThroughSeq: latestSeq })
