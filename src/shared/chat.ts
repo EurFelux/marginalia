@@ -122,6 +122,14 @@ export type AiStreamEvent =
   | { streamId: string; type: "finish" }
   | { streamId: string; type: "error"; message: string };
 
+/** main→renderer 通知载荷（判别联合，按 kind 扩展）。renderer 据此本地化成 toast。 */
+export type AppNotification = {
+  kind: "memoryConsolidated";
+  saved: number;
+  updated: number;
+  deleted: number;
+};
+
 /** ai:resend 业务入参（不含传输层 streamId）。 */
 export const resendInputSchema = z.object({
   conversationId: z.string().min(1),

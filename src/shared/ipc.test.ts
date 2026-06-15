@@ -49,3 +49,10 @@ describe("ipc contract map C", () => {
     expect(C.preferencesGetAllSync.kind).toBe("sync");
   });
 });
+
+describe("app:notify channel", () => {
+  it("is declared as an event channel", () => {
+    expect(C.appNotify.channel).toBe("app:notify");
+    expect(C.appNotify.kind).toBe("event");
+  });
+});
