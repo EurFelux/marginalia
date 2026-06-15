@@ -6,6 +6,9 @@ import { useNavigationStore, NAVIGATION_INITIAL } from "@renderer/store/navigati
 import { useChatStore, CHAT_INITIAL, getActiveConversationId } from "@renderer/store/chat-store";
 import type { ChatUIMessage } from "@renderer/ai/types";
 
+const BOOK_CTX = { kind: "book" as const, bookId: "book-1" };
+const LIB_CTX = { kind: "library" as const };
+
 /** 假订阅器：捕获回调，返回受控的 emit + 退订标志。 */
 function fakeOnChunk() {
   let cb: ((ev: AiStreamEvent) => void) | null = null;
@@ -156,7 +159,7 @@ describe("createIpcChatTransport sendMessages", () => {
       },
     });
 
-    const transport = createIpcChatTransport();
+    const transport = createIpcChatTransport(BOOK_CTX);
     const stream = await transport.sendMessages({
       messages: [makeMessage("hello")],
       abortSignal: undefined,
@@ -189,7 +192,7 @@ describe("createIpcChatTransport sendMessages", () => {
     const { api, sentPayloads, createdPayloads } = makeApi({ createResult: { id: "lazy-conv" } });
     vi.stubGlobal("window", { api });
 
-    const transport = createIpcChatTransport();
+    const transport = createIpcChatTransport(BOOK_CTX);
     const stream = await transport.sendMessages({
       messages: [makeMessage("hello")],
       abortSignal: undefined,
@@ -205,24 +208,7 @@ describe("createIpcChatTransport sendMessages", () => {
     const payload = sentPayloads[0] as Record<string, unknown>;
     expect(payload).toHaveProperty("conversationId", "lazy-conv");
     // store should be updated
-    expect(getActiveConversationId()).toBe("lazy-conv");
-  });
-
-  it("throws when bookId is missing", async () => {
-    useNavigationStore.setState({ ...NAVIGATION_INITIAL, currentBookId: null });
-    const { api } = makeApi();
-    vi.stubGlobal("window", { api });
-
-    const transport = createIpcChatTransport();
-    await expect(
-      transport.sendMessages({
-        messages: [makeMessage("hello")],
-        abortSignal: undefined,
-        trigger: "submit-message",
-        chatId: "chat-1",
-        messageId: undefined,
-      }),
-    ).rejects.toThrow();
+    expect(getActiveConversationId(BOOK_CTX)).toBe("lazy-conv");
   });
 
   it("rejects with ack reason and unsubscribes onChunk when ack returns ok:false", async () => {
@@ -255,7 +241,7 @@ describe("createIpcChatTransport sendMessages", () => {
     };
     vi.stubGlobal("window", { api });
 
-    const transport = createIpcChatTransport();
+    const transport = createIpcChatTransport(BOOK_CTX);
     await expect(
       transport.sendMessages({
         messages: [makeMessage("hello")],
@@ -274,7 +260,7 @@ describe("createIpcChatTransport sendMessages", () => {
     const { api } = makeApi();
     vi.stubGlobal("window", { api });
 
-    const transport = createIpcChatTransport();
+    const transport = createIpcChatTransport(BOOK_CTX);
     const stream = await transport.sendMessages({
       messages: [makeMessage("edit this", "u1")],
       abortSignal: undefined,
@@ -297,5 +283,54 @@ describe("createIpcChatTransport sendMessages", () => {
 
     // ai.send must NOT have been called
     expect(api.ai.send).not.toHaveBeenCalled();
+  });
+
+  it("library context sends with null bookId and lazily creates a library conversation", async () => {
+    useNavigationStore.setState({ view: "library", currentBookId: null, readingContext: null });
+    useChatStore.setState({ ...CHAT_INITIAL, activeLibraryConversation: null });
+    let sentBookId: unknown = "UNSET";
+    const onChunkCbs: ((ev: AiStreamEvent) => void)[] = [];
+    const api = {
+      ai: {
+        send: vi.fn(async (req: { bookId: unknown; streamId: string }) => {
+          sentBookId = req.bookId;
+          setTimeout(
+            () => onChunkCbs.forEach((cb) => cb({ streamId: req.streamId, type: "finish" })),
+            0,
+          );
+          return { ok: true as const, conversationId: "c-lib" };
+        }),
+        resend: vi.fn(),
+        abort: vi.fn(),
+        onChunk: (_streamId: string, cb: (ev: AiStreamEvent) => void) => {
+          onChunkCbs.push(cb);
+          return () => {};
+        },
+      },
+      chat: {
+        conversations: {
+          create: vi.fn(async () => ({
+            id: "c-lib",
+            bookId: null,
+            title: null,
+            isNaming: false,
+            createdAt: 0,
+            updatedAt: 0,
+          })),
+        },
+      },
+    };
+    vi.stubGlobal("window", { api });
+
+    const transport = createIpcChatTransport(LIB_CTX);
+    const stream = await transport.sendMessages({
+      messages: [{ id: "u1", role: "user", parts: [{ type: "text", text: "hi" }], metadata: {} }],
+      trigger: "submit-message",
+    } as never);
+    const reader = stream.getReader();
+    await reader.read();
+
+    expect(sentBookId).toBeNull();
+    expect(getActiveConversationId(LIB_CTX)).toBe("c-lib");
   });
 });
