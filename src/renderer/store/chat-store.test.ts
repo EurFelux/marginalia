@@ -2,39 +2,40 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useChatStore, CHAT_INITIAL, getActiveConversationId } from "@renderer/store/chat-store";
 import { useNavigationStore, NAVIGATION_INITIAL } from "@renderer/store/navigation-store";
 import { usePrefsStore, PREFS_INITIAL } from "@renderer/store/prefs-store";
+import { contextKey } from "@renderer/ai/chat-context";
 import type { Chip } from "@shared/chat";
 
 const BOOK = "book-1";
+const BOOK_CTX = { kind: "book" as const, bookId: BOOK };
+const LIB_CTX = { kind: "library" as const };
 
 beforeEach(() => {
   useChatStore.setState(CHAT_INITIAL);
   usePrefsStore.setState(PREFS_INITIAL);
-  // active 派生 + rememberSlot 依赖 currentBookId，测试默认置于某本书的 reader 态
+  // active 派生 + 记忆槽依赖 currentBookId，测试默认置于某本书的 reader 态
   useNavigationStore.setState({ ...NAVIGATION_INITIAL, view: "reader", currentBookId: BOOK });
 });
 
 describe("chat-store: active = activeByBook 派生", () => {
   it("setActiveConversation writes the current book's slot", () => {
-    useChatStore.getState().setActiveConversation("conv1");
+    useChatStore.getState().setActiveConversation(BOOK_CTX, "conv1");
     expect(useChatStore.getState().activeByBook[BOOK]).toBe("conv1");
-    expect(getActiveConversationId()).toBe("conv1");
+    expect(getActiveConversationId(BOOK_CTX)).toBe("conv1");
   });
   it("setActiveConversation(null) clears slot and openCommand", () => {
-    useChatStore.getState().openConversation("c1"); // 设 openCommand + 槽
-    useChatStore.getState().setActiveConversation(null);
+    useChatStore.getState().openConversation(BOOK_CTX, "c1"); // 设 openCommand + 槽
+    useChatStore.getState().setActiveConversation(BOOK_CTX, null);
     expect(useChatStore.getState().activeByBook[BOOK]).toBeNull();
     expect(useChatStore.getState().openCommand).toBeNull();
-    expect(getActiveConversationId()).toBeNull();
+    expect(getActiveConversationId(BOOK_CTX)).toBeNull();
   });
-  it("getActiveConversationId is null in library (no current book)", () => {
-    useChatStore.getState().setActiveConversation("conv1");
-    useNavigationStore.setState({ ...NAVIGATION_INITIAL }); // currentBookId=null
-    expect(getActiveConversationId()).toBeNull();
+  it("getActiveConversationId is null when book not in activeByBook", () => {
+    // A book context with no entry → null
+    expect(getActiveConversationId({ kind: "book", bookId: "no-such-book" })).toBeNull();
   });
-  it("setActiveConversation is a no-op on the slot when no current book", () => {
-    useNavigationStore.setState({ ...NAVIGATION_INITIAL }); // currentBookId=null
-    useChatStore.getState().setActiveConversation("conv1");
-    expect(useChatStore.getState().activeByBook).toEqual({});
+  it("library context returns activeLibraryConversation", () => {
+    useChatStore.getState().setActiveConversation(LIB_CTX, "lib-conv");
+    expect(getActiveConversationId(LIB_CTX)).toBe("lib-conv");
   });
   it("setDraftText / setDraftChips update drafts", () => {
     useChatStore.getState().setDraftText("hi");
@@ -53,24 +54,24 @@ describe("chat-store: active = activeByBook 派生", () => {
 
 describe("openConversation", () => {
   it("writes slot + opens panel + bumps openCommand nonce", () => {
-    useChatStore.getState().openConversation("conv-1");
-    expect(getActiveConversationId()).toBe("conv-1");
+    useChatStore.getState().openConversation(BOOK_CTX, "conv-1");
+    expect(getActiveConversationId(BOOK_CTX)).toBe("conv-1");
     expect(usePrefsStore.getState().layout.panelOpen).toBe(true);
     expect(useChatStore.getState().openCommand).toEqual({ conversationId: "conv-1", nonce: 1 });
-    useChatStore.getState().openConversation("conv-1");
+    useChatStore.getState().openConversation(BOOK_CTX, "conv-1");
     expect(useChatStore.getState().openCommand?.nonce).toBe(2); // 同会话重开也递增 → 触发重载
   });
   it("resets summaryChips to off when opening existing conversation", () => {
     useChatStore.getState().setSummaryChipsPreset();
-    useChatStore.getState().openConversation("conv-1");
+    useChatStore.getState().openConversation(BOOK_CTX, "conv-1");
     expect(useChatStore.getState().summaryChips).toEqual({ chapter: false, book: false });
   });
 });
 
 describe("restoreConversation", () => {
   it("writes slot + bumps openCommand nonce + does NOT open panel", () => {
-    useChatStore.getState().restoreConversation("conv-restore");
-    expect(getActiveConversationId()).toBe("conv-restore");
+    useChatStore.getState().restoreConversation(BOOK_CTX, "conv-restore");
+    expect(getActiveConversationId(BOOK_CTX)).toBe("conv-restore");
     expect(useChatStore.getState().openCommand).toEqual({
       conversationId: "conv-restore",
       nonce: 1,
@@ -78,15 +79,15 @@ describe("restoreConversation", () => {
     expect(usePrefsStore.getState().layout.panelOpen).toBe(false);
   });
   it("bumps nonce on repeated restoreConversation", () => {
-    useChatStore.getState().restoreConversation("conv-restore");
-    useChatStore.getState().restoreConversation("conv-restore");
+    useChatStore.getState().restoreConversation(BOOK_CTX, "conv-restore");
+    useChatStore.getState().restoreConversation(BOOK_CTX, "conv-restore");
     expect(useChatStore.getState().openCommand?.nonce).toBe(2);
   });
 });
 
 describe("resetForBookSwitch", () => {
   it("clears openCommand but keeps activeByBook and drafts", () => {
-    useChatStore.getState().openConversation("conv-a"); // 设 openCommand + 槽
+    useChatStore.getState().openConversation(BOOK_CTX, "conv-a"); // 设 openCommand + 槽
     useChatStore.getState().setDraftText("draft kept");
     useChatStore.getState().resetForBookSwitch();
     const s = useChatStore.getState();
@@ -112,10 +113,14 @@ describe("summaryChips state machine", () => {
 });
 
 describe("persist", () => {
-  it("partialize persists only activeByBook", () => {
-    useChatStore.setState({ activeByBook: { b: "c" }, draftText: "x" });
+  it("partialize persists activeByBook and activeLibraryConversation", () => {
+    useChatStore.setState({
+      activeByBook: { b: "c" },
+      activeLibraryConversation: "lib-c",
+      draftText: "x",
+    });
     const partial = useChatStore.persist.getOptions().partialize?.(useChatStore.getState());
-    expect(partial).toEqual({ activeByBook: { b: "c" } });
+    expect(partial).toEqual({ activeByBook: { b: "c" }, activeLibraryConversation: "lib-c" });
   });
   it("rehydrates activeByBook from storage", () => {
     const store: Record<string, string> = {
@@ -133,5 +138,23 @@ describe("persist", () => {
     void useChatStore.persist.rehydrate();
     expect(useChatStore.getState().activeByBook).toEqual({ b9: "c9" });
     vi.unstubAllGlobals();
+  });
+});
+
+describe("chat-store context-aware active conversation", () => {
+  it("book context writes activeByBook; library writes activeLibraryConversation", () => {
+    const s = useChatStore.getState();
+    s.setActiveConversation({ kind: "book", bookId: "b1" }, "c-book");
+    s.setActiveConversation({ kind: "library" }, "c-lib");
+    const st = useChatStore.getState();
+    expect(st.activeByBook["b1"]).toBe("c-book");
+    expect(st.activeLibraryConversation).toBe("c-lib");
+    expect(getActiveConversationId({ kind: "book", bookId: "b1" })).toBe("c-book");
+    expect(getActiveConversationId({ kind: "library" })).toBe("c-lib");
+  });
+
+  it("contextKey produces stable namespaced keys", () => {
+    expect(contextKey({ kind: "book", bookId: "b1" })).toBe("book:b1");
+    expect(contextKey({ kind: "library" })).toBe("library");
   });
 });

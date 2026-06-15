@@ -2,8 +2,8 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Chip } from "@shared/chat";
 import { openPanelAndFocusComposer } from "@renderer/ai/composer-focus";
-import { useNavigationStore } from "@renderer/store/navigation-store";
 import { safeStorage } from "@renderer/store/lazy-storage";
+import type { ChatContext } from "@renderer/ai/chat-context";
 
 interface ChatState {
   draftText: string;
@@ -17,21 +17,25 @@ interface ChatState {
   /** 常驻摘要 toggle（spec §6）：true=on 随下条消息发送。 */
   summaryChips: { chapter: boolean; book: boolean };
   /**
-   * 每本书上次 active 的会话（视图记忆，唯一真相 + persist 持久化的唯一字段）。
+   * 每本书上次 active 的会话（视图记忆，唯一真相 + persist 持久化字段之一）。
    * 值 = 会话 id；null = 上次停在「将开新会话」空态；缺键 = 该书从无记忆（回落最新）。
    * 「当前 active 会话」由此派生（见 useActiveConversationId / getActiveConversationId），不独立存储。
    */
   activeByBook: Record<string, string | null>;
+  /**
+   * 书库伴侣（library 上下文）的 active 会话（持久化）。
+   */
+  activeLibraryConversation: string | null;
 }
 interface ChatActions {
-  /** 设当前书的 active（写记忆槽）；id=null 同时清 openCommand（其载入命令失效）。 */
-  setActiveConversation: (id: string | null) => void;
+  /** 设指定上下文的 active（写记忆槽）；id=null 同时清 openCommand（其载入命令失效）。 */
+  setActiveConversation: (ctx: ChatContext, id: string | null) => void;
   setDraftText: (text: string) => void;
   setDraftChips: (chips: Chip[]) => void;
   /** 重开会话：发命令信号（触发载历史）+ 写记忆槽 + 开面板（经 prefs-store 布局）。 */
-  openConversation: (id: string) => void;
+  openConversation: (ctx: ChatContext, id: string) => void;
   /** 开书恢复会话：同 openConversation 但不强制开面板（spec §7）。 */
-  restoreConversation: (id: string) => void;
+  restoreConversation: (ctx: ChatContext, id: string) => void;
   setSummaryChip: (kind: "chapter" | "book", on: boolean) => void;
   /** 「将开启新会话」预亮（spec §6）：新对话按钮 / 开书无会话。 */
   setSummaryChipsPreset: () => void;
@@ -47,41 +51,44 @@ export const CHAT_INITIAL: ChatState = {
   openCommand: null,
   summaryChips: { chapter: false, book: false },
   activeByBook: {},
+  activeLibraryConversation: null,
 };
-
-/** 写当前书的记忆槽；无当前书（library 态）则原样返回。 */
-function rememberSlot(
-  map: Record<string, string | null>,
-  id: string | null,
-): Record<string, string | null> {
-  const bookId = useNavigationStore.getState().currentBookId;
-  return bookId ? { ...map, [bookId]: id } : map;
-}
 
 export const useChatStore = create<ChatState & ChatActions>()(
   persist(
     (set) => ({
       ...CHAT_INITIAL,
-      setActiveConversation: (id) =>
-        set((s) => ({
-          activeByBook: rememberSlot(s.activeByBook, id),
-          ...(id === null ? { openCommand: null } : {}),
-        })),
+      setActiveConversation: (ctx, id) =>
+        set((s) =>
+          ctx.kind === "book"
+            ? {
+                activeByBook: { ...s.activeByBook, [ctx.bookId]: id },
+                ...(id === null ? { openCommand: null } : {}),
+              }
+            : {
+                activeLibraryConversation: id,
+                ...(id === null ? { openCommand: null } : {}),
+              },
+        ),
       setDraftText: (draftText) => set({ draftText }),
       setDraftChips: (draftChips) => set({ draftChips }),
-      openConversation: (id) => {
+      openConversation: (ctx, id) => {
         openPanelAndFocusComposer();
         return set((s) => ({
           openCommand: { conversationId: id, nonce: (s.openCommand?.nonce ?? 0) + 1 },
           summaryChips: { chapter: false, book: false },
-          activeByBook: rememberSlot(s.activeByBook, id),
+          ...(ctx.kind === "book"
+            ? { activeByBook: { ...s.activeByBook, [ctx.bookId]: id } }
+            : { activeLibraryConversation: id }),
         }));
       },
-      restoreConversation: (id) =>
+      restoreConversation: (ctx, id) =>
         set((s) => ({
           openCommand: { conversationId: id, nonce: (s.openCommand?.nonce ?? 0) + 1 },
           summaryChips: { chapter: false, book: false },
-          activeByBook: rememberSlot(s.activeByBook, id),
+          ...(ctx.kind === "book"
+            ? { activeByBook: { ...s.activeByBook, [ctx.bookId]: id } }
+            : { activeLibraryConversation: id }),
         })),
       setSummaryChip: (kind, on) =>
         set((s) => ({ summaryChips: { ...s.summaryChips, [kind]: on } })),
@@ -92,19 +99,27 @@ export const useChatStore = create<ChatState & ChatActions>()(
     {
       name: "marginalia-chat",
       storage: safeStorage,
-      partialize: (s) => ({ activeByBook: s.activeByBook }),
+      partialize: (s) => ({
+        activeByBook: s.activeByBook,
+        activeLibraryConversation: s.activeLibraryConversation,
+      }),
     },
   ),
 );
 
-/** 组件用：当前 active 会话 = activeByBook[currentBookId]（派生）。 */
-export function useActiveConversationId(): string | null {
-  const bookId = useNavigationStore((s) => s.currentBookId);
-  return useChatStore((s) => (bookId != null ? (s.activeByBook[bookId] ?? null) : null));
+/** 组件用：当前上下文的 active 会话（派生）。 */
+export function useActiveConversationId(ctx: ChatContext): string | null {
+  return useChatStore((s) =>
+    ctx.kind === "book"
+      ? (s.activeByBook[ctx.bookId] ?? null)
+      : (s.activeLibraryConversation ?? null),
+  );
 }
 
 /** action / transport 等非响应式语境用。 */
-export function getActiveConversationId(): string | null {
-  const bookId = useNavigationStore.getState().currentBookId;
-  return bookId != null ? (useChatStore.getState().activeByBook[bookId] ?? null) : null;
+export function getActiveConversationId(ctx: ChatContext): string | null {
+  const s = useChatStore.getState();
+  return ctx.kind === "book"
+    ? (s.activeByBook[ctx.bookId] ?? null)
+    : (s.activeLibraryConversation ?? null);
 }
