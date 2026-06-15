@@ -33,4 +33,10 @@ export function hydratePreferences(): void {
   if (snap.soul) usePrefsStore.setState({ soul: snap.soul });
   if (snap.instructions !== undefined) usePrefsStore.setState({ instructions: snap.instructions });
   if (snap.ttsPrefs) usePrefsStore.setState({ ttsPrefs: snap.ttsPrefs });
+  if (snap.showAgentAvatar !== undefined) {
+    usePrefsStore.setState({ showAgentAvatar: snap.showAgentAvatar });
+  }
+  if (snap.avatarBlobId !== undefined) {
+    usePrefsStore.setState({ avatarBlobId: snap.avatarBlobId });
+  }
 }

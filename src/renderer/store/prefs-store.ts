@@ -42,6 +42,10 @@ interface PrefsState {
   instructions: string;
   /** 朗读（TTS）偏好：语速 + 语种→voice 名映射。 */
   ttsPrefs: TtsPrefs;
+  /** 对话中显示头像总开关（默认开）。 */
+  showAgentAvatar: boolean;
+  /** 当前头像 blob 引用；null = 用默认头像。由主进程 agent IPC 落盘，渲染层只镜像。 */
+  avatarBlobId: string | null;
 }
 interface PrefsActions {
   setAutoSummarize: (v: boolean) => void;
@@ -58,6 +62,8 @@ interface PrefsActions {
   setSoul: (v: Soul) => void;
   setInstructions: (v: string) => void;
   updateTtsPrefs: (patch: Partial<TtsPrefs>) => void;
+  setShowAgentAvatar: (v: boolean) => void;
+  setAvatarBlobId: (v: string | null) => void;
 }
 
 export const PREFS_INITIAL: PrefsState = {
@@ -75,6 +81,8 @@ export const PREFS_INITIAL: PrefsState = {
   soul: DEFAULT_SOUL,
   instructions: "",
   ttsPrefs: DEFAULT_TTS_PREFS,
+  showAgentAvatar: true,
+  avatarBlobId: null,
 };
 
 /**
@@ -145,4 +153,9 @@ export const usePrefsStore = create<PrefsState & PrefsActions>()((set) => ({
       persistPreference({ key: "ttsPrefs", value: ttsPrefs });
       return { ttsPrefs };
     }),
+  setShowAgentAvatar: (showAgentAvatar) => {
+    persistPreference({ key: "showAgentAvatar", value: showAgentAvatar });
+    set({ showAgentAvatar });
+  },
+  setAvatarBlobId: (avatarBlobId) => set({ avatarBlobId }),
 }));
