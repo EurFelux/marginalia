@@ -37,6 +37,8 @@ interface PrefsState {
   onboardingDismissed: boolean;
   /** AI 记忆功能总开关（默认开）。 */
   memoryEnabled: boolean;
+  /** 后台每 N 轮自动整理记忆（默认关——控成本；受 memoryEnabled 总闸约束）。 */
+  memoryAutoConsolidate: boolean;
   /** agent 自我设定（SOUL）：name + persona。 */
   soul: Soul;
   /** 用户自定义全局指令（叠加在 SOUL persona 之上）。 */
@@ -64,6 +66,7 @@ interface PrefsActions {
   setBackgroundConcurrency: (v: number) => void;
   setOnboardingDismissed: (v: boolean) => void;
   setMemoryEnabled: (v: boolean) => void;
+  setMemoryAutoConsolidate: (v: boolean) => void;
   setSoul: (v: Soul) => void;
   setInstructions: (v: string) => void;
   updateTtsPrefs: (patch: Partial<TtsPrefs>) => void;
@@ -85,6 +88,7 @@ export const PREFS_INITIAL: PrefsState = {
   backgroundConcurrency: DEFAULT_BACKGROUND_CONCURRENCY,
   onboardingDismissed: false,
   memoryEnabled: true,
+  memoryAutoConsolidate: false,
   soul: DEFAULT_SOUL,
   instructions: "",
   ttsPrefs: DEFAULT_TTS_PREFS,
@@ -147,6 +151,10 @@ export const usePrefsStore = create<PrefsState & PrefsActions>()((set) => ({
   setMemoryEnabled: (memoryEnabled) => {
     persistPreference({ key: "memoryEnabled", value: memoryEnabled });
     set({ memoryEnabled });
+  },
+  setMemoryAutoConsolidate: (memoryAutoConsolidate) => {
+    persistPreference({ key: "memoryAutoConsolidate", value: memoryAutoConsolidate });
+    set({ memoryAutoConsolidate });
   },
   setSoul: (soul) => {
     persistPreference({ key: "soul", value: soul });

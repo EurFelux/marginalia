@@ -31,6 +31,9 @@ export function hydratePreferences(): void {
   if (snap.memoryEnabled !== undefined) {
     usePrefsStore.setState({ memoryEnabled: snap.memoryEnabled });
   }
+  if (snap.memoryAutoConsolidate !== undefined) {
+    usePrefsStore.setState({ memoryAutoConsolidate: snap.memoryAutoConsolidate });
+  }
   if (snap.soul) usePrefsStore.setState({ soul: snap.soul });
   if (snap.instructions !== undefined) usePrefsStore.setState({ instructions: snap.instructions });
   if (snap.ttsPrefs) usePrefsStore.setState({ ttsPrefs: snap.ttsPrefs });

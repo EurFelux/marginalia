@@ -149,6 +149,7 @@ export default {
   "library.unknownAuthor": "Unknown author",
   "library.untitled": "Untitled",
   "library.updateFailed": "{{title}} failed to save: {{error}}",
+  "notify.memoryConsolidated": "Lia tidied your memories · +{{saved}} · ~{{updated}}",
   "onboarding.skip": "Maybe later",
   "onboarding.step1.action": "Set up",
   "onboarding.step1.hint": "Add a model provider key and pick a chat model",
@@ -320,6 +321,9 @@ export default {
   "settings.light": "Light",
   "settings.logs": "Logs",
   "settings.memory": "Memory",
+  "settings.memory.autoConsolidate": "Auto-consolidate memory in the background",
+  "settings.memory.autoConsolidateDesc":
+    "Every few turns, Lia catches up on points it missed and tidies existing memories in the background. This makes extra model calls and is off by default.",
   "settings.memory.bodyPlaceholder": "Memory body",
   "settings.memory.cancel": "Cancel",
   "settings.memory.delete": "Delete",
