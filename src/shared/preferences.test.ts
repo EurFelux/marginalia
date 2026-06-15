@@ -28,6 +28,7 @@ describe("preferences schemas", () => {
       "instructions",
       "language",
       "lastHighlightStyle",
+      "memoryAutoConsolidate",
       "memoryEnabled",
       "onboardingDismissed",
       "pdfZoom",

@@ -40,6 +40,8 @@ export const preferencesBindings: Binding[] = [
         invalidateAllAgentContexts();
         return setPreference(getDb(), input.key, input.value);
       }
+      case "memoryAutoConsolidate":
+        return setPreference(getDb(), input.key, input.value);
       case "soul": {
         invalidateAllAgentContexts();
         return setPreference(getDb(), input.key, input.value);

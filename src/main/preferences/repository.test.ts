@@ -140,3 +140,13 @@ describe("preferences repository", () => {
     expect(getPreference(db, "avatarBlobId")).toBeNull();
   });
 });
+
+describe("memoryAutoConsolidate preference", () => {
+  it("round-trips a boolean and defaults to null when unset", () => {
+    const db = createDb(":memory:");
+    runMigrations(db, MIGRATIONS);
+    expect(getPreference(db, "memoryAutoConsolidate")).toBeNull();
+    setPreference(db, "memoryAutoConsolidate", true);
+    expect(getPreference(db, "memoryAutoConsolidate")).toBe(true);
+  });
+});
