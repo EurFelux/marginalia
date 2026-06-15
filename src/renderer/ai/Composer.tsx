@@ -29,7 +29,9 @@ export function Composer({ status, onSend, onStop }: Props) {
   const summaryChips = useChatStore((s) => s.summaryChips);
   const webSearchEnabled = useChatStore((s) => s.webSearchEnabled);
   const setWebSearchEnabled = useChatStore((s) => s.setWebSearchEnabled);
-  const webSearchConfigured = usePrefsStore((s) => s.webSearch?.enabled ?? false);
+  const webSearchConfigured = usePrefsStore((s) =>
+    Boolean(s.webSearch?.enabled && s.webSearch.backends.length),
+  );
   const bookId = useNavigationStore((s) => s.currentBookId);
   const chapterId = useNavigationStore((s) => s.currentChapterId);
   const ref = useRef<HTMLTextAreaElement | null>(null);
