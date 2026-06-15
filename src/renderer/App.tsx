@@ -8,6 +8,7 @@ import { SettingsShell } from "@renderer/settings/SettingsShell";
 import { ThemeController } from "@renderer/theme/ThemeController";
 import { Toaster } from "@renderer/components/ui/sonner";
 import { useStartupUpdateCheck } from "@renderer/update/useStartupUpdateCheck";
+import { useAppNotifications } from "@renderer/notifications/app-notifications";
 
 export function App() {
   const view = useNavigationStore((s) => s.view);
@@ -16,6 +17,7 @@ export function App() {
     hydratePreferences();
   }, []);
   useStartupUpdateCheck();
+  useAppNotifications();
   return (
     <TooltipProvider>
       <ThemeController />
