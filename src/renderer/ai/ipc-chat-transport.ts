@@ -5,6 +5,7 @@ import { useNavigationStore } from "@renderer/store/navigation-store";
 import { useChatStore, getActiveConversationId } from "@renderer/store/chat-store";
 import { usePrefsStore } from "@renderer/store/prefs-store";
 import type { ChatUIMessage } from "@renderer/ai/types";
+import { type ChatContext } from "@renderer/ai/chat-context";
 
 /** onChunk 订阅器签名（与 window.api.ai.onChunk 一致；测试可注入假实现）。 */
 type OnChunk = (streamId: string, cb: (ev: AiStreamEvent) => void) => () => void;
@@ -51,17 +52,15 @@ function lastUserText(messages: ChatUIMessage[]): string {
  * - userText + chips 取自「刚发出的那条用户消息」（chips 在 metadata.contextChips），
  *   而非读 store.draftChips——避免与 Composer 发送后同步清空 draftChips 的竞态
  *   （仍满足 §4.1「userText + chips 同行」）。
- * - bookId 读 store；conversationId 发送前懒建保证存在（spec §7）。
+ * - bookId 由 context 决定（book→bookId；library→null）；conversationId 发送前懒建保证存在（spec §7）。
  * - 先订阅 ai:chunk 再 invoke ai:send（spec §4.4：订阅必早于推送，无竞态）。
  */
-export function createIpcChatTransport(): ChatTransport<ChatUIMessage> {
+export function createIpcChatTransport(context: ChatContext): ChatTransport<ChatUIMessage> {
+  const bookId = context.kind === "book" ? context.bookId : null;
   return {
     async sendMessages({ messages, abortSignal, trigger }) {
-      const { currentBookId, readingContext } = useNavigationStore.getState();
-      if (!currentBookId) {
-        const { default: i18n } = await import("@renderer/i18n");
-        throw new Error(i18n.t("ai.noBookToSend", "没有正在阅读的书，无法发送。"));
-      }
+      const readingContext =
+        context.kind === "book" ? useNavigationStore.getState().readingContext : null;
       const last = messages.at(-1);
       const userText = lastUserText(messages);
       const streamId = uuidv7();
@@ -70,7 +69,7 @@ export function createIpcChatTransport(): ChatTransport<ChatUIMessage> {
 
       if (trigger === "regenerate-message") {
         // 重发/编辑/再生成：目标 user 轮 = messages.at(-1)（regenerate 已移除其后 assistant）
-        const conversationId = getActiveConversationId();
+        const conversationId = getActiveConversationId(context);
         if (!conversationId || !last) {
           void stream.cancel();
           const { default: i18n } = await import("@renderer/i18n");
@@ -92,17 +91,17 @@ export function createIpcChatTransport(): ChatTransport<ChatUIMessage> {
       }
 
       // 新发：保证会话存在（无 active → 懒建）
-      let conversationId = getActiveConversationId();
+      let conversationId = getActiveConversationId(context);
       if (!conversationId) {
-        const convo = await window.api.chat.conversations.create({ bookId: currentBookId });
-        useChatStore.getState().setActiveConversation(convo.id);
+        const convo = await window.api.chat.conversations.create({ bookId });
+        useChatStore.getState().setActiveConversation(context, convo.id);
         conversationId = convo.id;
       }
       const chips = (last?.metadata?.contextChips ?? []).filter((c) => c.state !== "off");
       const webSearch = usePrefsStore.getState().webSearchEnabled;
       const ack = await window.api.ai.send({
         streamId,
-        bookId: currentBookId,
+        bookId,
         conversationId,
         chips,
         userText,
