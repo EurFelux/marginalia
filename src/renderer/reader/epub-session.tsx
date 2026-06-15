@@ -1,7 +1,11 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { EpubCFI } from "epubjs";
 import { createLogger } from "@renderer/logger";
 import { qk } from "@renderer/query/keys";
+import type { ChapterRefDto } from "@shared/library";
+import { type AnchorBoundary } from "./chapter-id-at-cfi";
+import { basename } from "./chapter-id-by-href";
 import { createEpubBook, type EpubBook } from "./epub-book";
 
 const log = createLogger("epub");
@@ -10,6 +14,7 @@ export interface EpubSession {
   book: EpubBook | null;
   /** spine 物理顺序的 href（book 就绪后派生）；book 未就绪 / 非 epub 时为空数组。 */
   spineHrefs: string[];
+  anchorBoundaries: AnchorBoundary[];
   parseError: string | null;
   bytesError: boolean;
 }
@@ -37,6 +42,13 @@ export function EpubSessionProvider({
 }) {
   const [book, setBook] = useState<EpubBook | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
+  const [anchorBoundaries, setAnchorBoundaries] = useState<AnchorBoundary[]>([]);
+  const chapters = useQuery({
+    queryKey: qk.chapters(bookId),
+    queryFn: () => window.api.content.chapters({ bookId }),
+    staleTime: Infinity,
+    enabled,
+  });
 
   const bytes = useQuery({
     queryKey: qk.bookBytes(bookId),
@@ -73,13 +85,56 @@ export function EpubSessionProvider({
     };
   }, [bytes.data]);
 
+  // 共享 href（锚点切章）的章节需 anchor 级边界 CFI 才能归属标注。开书后异步预计算：
+  // 渲染相关 section、为每个锚点章生成起点 CFI，按 CFI 升序存。未就绪时侧栏退化 href 级。
+  useEffect(() => {
+    if (!book || !chapters.data) {
+      setAnchorBoundaries([]);
+      return;
+    }
+    const chs = chapters.data;
+    let alive = true;
+    void (async () => {
+      try {
+        const byBase = new Map<string, ChapterRefDto[]>();
+        for (const c of chs) {
+          const base = basename(c.href);
+          const list = byBase.get(base) ?? [];
+          list.push(c);
+          byBase.set(base, list);
+        }
+        const out: AnchorBoundary[] = [];
+        for (const group of byBase.values()) {
+          if (group.length <= 1) continue;
+          const withAnchor = group.filter((c) => c.anchor);
+          if (withAnchor.length === 0) continue;
+          const index = book.indexOfHref(group[0]!.href);
+          if (index < 0) continue;
+          for (const c of withAnchor) {
+            const cfi = await book.anchorCfi(index, c.anchor!);
+            if (cfi) out.push({ chapterId: c.id, cfi });
+          }
+        }
+        const epub = new EpubCFI();
+        out.sort((a, b) => epub.compare(a.cfi, b.cfi));
+        if (alive) setAnchorBoundaries(out);
+      } catch (err) {
+        log.warn("anchor boundary precompute failed", err);
+        if (alive) setAnchorBoundaries([]);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [book, chapters.data]);
+
   const spineHrefs = book
     ? Array.from({ length: book.count }, (_, i) => book.hrefAtIndex(i) ?? "")
     : [];
 
   return (
     <EpubSessionContext.Provider
-      value={{ book, spineHrefs, parseError, bytesError: bytes.isError }}
+      value={{ book, spineHrefs, anchorBoundaries, parseError, bytesError: bytes.isError }}
     >
       {children}
     </EpubSessionContext.Provider>
