@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { AvatarCropDialog } from "@renderer/ai/AvatarCropDialog";
 import { AssistantAvatar } from "@renderer/ai/AssistantAvatar";
 import { Button } from "@renderer/components/ui/button";
 import { Checkbox } from "@renderer/components/ui/checkbox";
@@ -22,8 +23,23 @@ export function AgentSettings() {
   const setShowAgentAvatar = usePrefsStore((s) => s.setShowAgentAvatar);
   const setAvatarBlobId = usePrefsStore((s) => s.setAvatarBlobId);
 
-  const onPickAvatar = async () => {
-    const r = await window.api.agent.pickAvatar();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
+
+  const onUploadClick = () => fileInputRef.current?.click();
+
+  const onFilePicked = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // 允许再次选同一文件
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setCropSrc(typeof reader.result === "string" ? reader.result : null);
+    reader.onerror = () => toast.error(t("settings.agent.avatarReadFailed", "无法读取图片"));
+    reader.readAsDataURL(file);
+  };
+
+  const onCropConfirm = async (bytes: Uint8Array<ArrayBuffer>) => {
+    const r = await window.api.agent.setAvatar(bytes);
     if (r.status === "set") setAvatarBlobId(r.blobId);
     else if (r.status === "too-large")
       toast.error(t("settings.agent.avatarTooLarge", "图片太大，请选择 2 MB 以内的图片"));
@@ -77,13 +93,28 @@ export function AgentSettings() {
         <div className="flex items-center gap-3">
           <AssistantAvatar className="size-14" />
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={onPickAvatar}>
+            <Button variant="outline" size="sm" onClick={onUploadClick}>
               {t("settings.agent.avatarUpload", "上传头像")}
             </Button>
             <Button variant="ghost" size="sm" onClick={onResetAvatar}>
               {t("settings.agent.avatarReset", "恢复默认")}
             </Button>
           </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={onFilePicked}
+          />
+          <AvatarCropDialog
+            open={cropSrc !== null}
+            imageSrc={cropSrc}
+            onConfirm={onCropConfirm}
+            onOpenChange={(o) => {
+              if (!o) setCropSrc(null);
+            }}
+          />
         </div>
         <label className="mt-1 flex items-center gap-2 text-sm">
           <Checkbox

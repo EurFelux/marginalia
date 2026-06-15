@@ -23,7 +23,7 @@ export function AvatarCropDialog({
 }: {
   open: boolean;
   imageSrc: string | null;
-  onConfirm: (bytes: Uint8Array) => Promise<void> | void;
+  onConfirm: (bytes: Uint8Array<ArrayBuffer>) => Promise<void> | void;
   onOpenChange: (open: boolean) => void;
 }) {
   const { t } = useTranslation();
