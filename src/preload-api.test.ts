@@ -14,6 +14,28 @@ function collectChannels(node: unknown, acc: Set<string>): void {
   }
 }
 
+describe("app.onNotify", () => {
+  it("subscribes to the app:notify channel and forwards payloads", () => {
+    const handlers = new Map<string, (payload: unknown) => void>();
+    const api = createApi({
+      invoke: async () => undefined,
+      on: (channel, cb) => {
+        handlers.set(channel, cb);
+        return () => handlers.delete(channel);
+      },
+      getPathForFile: () => "",
+      prefsSnapshot: {},
+      appLocale: "en",
+    });
+    const received: unknown[] = [];
+    const unsub = api.app.onNotify((n) => received.push(n));
+    handlers.get("app:notify")?.({ kind: "memoryConsolidated", saved: 1, updated: 0, deleted: 0 });
+    expect(received).toEqual([{ kind: "memoryConsolidated", saved: 1, updated: 0, deleted: 0 }]);
+    unsub();
+    expect(handlers.has("app:notify")).toBe(false);
+  });
+});
+
 describe("preload api coverage", () => {
   const api = createApi({
     invoke: vi.fn(() => Promise.resolve()),

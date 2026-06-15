@@ -1,6 +1,6 @@
 import type { z } from "zod";
 import { C, type Contract } from "@shared/ipc";
-import type { AiStreamEvent } from "@shared/chat";
+import type { AiStreamEvent, AppNotification } from "@shared/chat";
 import type { PreferencesSnapshot } from "@shared/preferences";
 
 /** 由注入的 invoke 生成类型化调用函数；类型从 contract 流出，零手写标注。__channel 供漂移测试走树收集。 */
@@ -33,6 +33,9 @@ export function createApi(d: PreloadDeps) {
       openLogsDir: inv(C.appOpenLogsDir),
       openExternal: inv(C.appOpenExternal),
       checkUpdate: inv(C.appCheckUpdate),
+      /** 订阅 main→renderer 通知；返回退订函数。 */
+      onNotify: (cb: (n: AppNotification) => void): (() => void) =>
+        d.on(C.appNotify.channel, (payload) => cb(payload as AppNotification)),
     },
     log: {
       write: inv(C.logWrite),
