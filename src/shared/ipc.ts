@@ -28,7 +28,14 @@ import {
   testProviderInput,
   upsertProviderInput,
 } from "@shared/providers";
-import type { AiStreamEvent, Chip, ConversationDto, MessageDto, SendAck } from "@shared/chat";
+import type {
+  AiStreamEvent,
+  AppNotification,
+  Chip,
+  ConversationDto,
+  MessageDto,
+  SendAck,
+} from "@shared/chat";
 import {
   abortInput,
   buildChipsInput,
@@ -282,6 +289,7 @@ export const C = {
   aiResend: def("ai:resend", "invoke", resendRequest, out<SendAck>()),
   aiAbort: def("ai:abort", "invoke", abortInput, out<void>()),
   aiChunk: def("ai:chunk", "event", z.void(), out<AiStreamEvent>()),
+  appNotify: def("app:notify", "event", z.void(), out<AppNotification>()),
 
   // preferences
   preferencesGetAllSync: def(
