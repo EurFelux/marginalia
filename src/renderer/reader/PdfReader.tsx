@@ -93,6 +93,10 @@ export function PdfReader({ bookId, chapters }: Props) {
   const scrollCommand = useAnnotationStore((s) => s.scrollCommand);
 
   // 容器宽度（适宽缩放的输入）：ResizeObserver 跟踪。
+  // 依赖 bytes.data?.ok：缺失态会先 early-return 出 BookFileMissingPanel（containerRef 容器未挂载），
+  // 若只在 mount observe 一次会拿到 null 而永久放弃观察；relink 恢复（ok:false→true）后容器才挂载，
+  // 故随 ok 变化重跑、重新 observe 当前容器，避免 containerW 永久为 0 卡死「加载中」。
+  // （loading↔loaded 间容器复用同一 DOM——见下方 onWheel effect 注释——故不必每次都重挂。）
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -100,7 +104,7 @@ export function PdfReader({ bookId, chapters }: Props) {
     ro.observe(el);
     setContainerW(el.clientWidth);
     return () => ro.disconnect();
-  }, []);
+  }, [bytes.data?.ok]);
 
   useEffect(() => {
     if (!bytes.data?.ok) return;
