@@ -402,6 +402,58 @@ describe("runSend", () => {
   });
 });
 
+function providerOptionsCapturingModel(captured: { providerOptions?: unknown }) {
+  return new MockLanguageModelV3({
+    doStream: async ({ providerOptions }) => {
+      captured.providerOptions = providerOptions;
+      return {
+        stream: simulateReadableStream({
+          chunks: [
+            { type: "text-start", id: "t1" },
+            { type: "text-delta", id: "t1", delta: "ok" },
+            { type: "text-end", id: "t1" },
+            finishChunk("stop"),
+          ],
+        }),
+      };
+    },
+  });
+}
+
+describe("openai-responses store handling", () => {
+  it("forces store:false for openai-responses providers (无状态网关：reasoning item 不可被 id 引用回传)", async () => {
+    const captured: { providerOptions?: unknown } = {};
+    const { db, book, deps } = await setup({
+      ok: true,
+      model: providerOptionsCapturingModel(captured),
+      modelId: "gpt-5",
+      providerType: "openai-responses",
+    });
+    const convo = createConversation(db, { bookId: book.id });
+    const r = await runSend(deps, input(book.id, convo.id));
+    if (!r.ok) throw new Error(r.reason);
+    await r.finished;
+    expect(captured.providerOptions).toEqual({ openai: { store: false } });
+  });
+
+  it("does not impose openai store on non-responses providers (anthropic)", async () => {
+    const captured: { providerOptions?: unknown } = {};
+    const { db, book, deps } = await setup({
+      ok: true,
+      model: providerOptionsCapturingModel(captured),
+      modelId: "claude",
+      providerType: "anthropic",
+    });
+    const convo = createConversation(db, { bookId: book.id });
+    const r = await runSend(deps, input(book.id, convo.id));
+    if (!r.ok) throw new Error(r.reason);
+    await r.finished;
+    expect(
+      (captured.providerOptions as { openai?: { store?: unknown } } | undefined)?.openai?.store,
+    ).toBeUndefined();
+  });
+});
+
 function systemCapturingModel(captured: { system?: string }) {
   return new MockLanguageModelV3({
     doStream: async ({ prompt }) => {

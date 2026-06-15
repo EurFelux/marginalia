@@ -28,8 +28,7 @@ export default {
   "ai.resend": "Resend",
   "ai.send": "Send",
   "ai.sendFailed": "Send failed: {{message}}",
-  "ai.sendFailedHint":
-    "(Make sure you have configured an Anthropic API Key and model in Settings.)",
+  "ai.sendFailedHint": "(Make sure you have configured an API Key and model in Settings.)",
   "ai.stop": "Stop",
   "ai.summary.generate": "Generate summary",
   "ai.summary.generateFailed": "Failed to generate summary: {{error}}",

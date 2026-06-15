@@ -2,7 +2,7 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import type { LanguageModelV3 } from "@ai-sdk/provider";
+import type { LanguageModelV3, SharedV3ProviderOptions } from "@ai-sdk/provider";
 import type { AiProviderApiType } from "@shared/providers";
 
 /**
@@ -40,6 +40,22 @@ export function setModelFetch(fetchImpl: typeof globalThis.fetch | undefined): v
  */
 export function supportsImageToolResults(type?: AiProviderApiType): boolean {
   return type === "anthropic" || type === "google-generate-content" || type === "openai-responses";
+}
+
+/**
+ * 某 provider 在每次 streamText/generateText 调用时应附带的 providerOptions（无则 undefined）。
+ *
+ * openai-responses → 强制 `store: false`。第三方中转/网关多为无状态、不持久化 Responses API 的
+ * reasoning item（`rs_…`）。AI SDK 默认 `store: true`（@ai-sdk/openai dist:4871），多步工具循环里
+ * 会把上一步 reasoning 以 `{ type: "item_reference", id: "rs_…" }` 回传（dist:2841/2890），在无状态
+ * 端点上引用失效 → 「Item with id 'rs_…' not found. Items are not persisted when store is set to
+ * false」。设 `store: false` 后 AI SDK 改走 encrypted_content 内联回传（reasoning 模型自动 include
+ * `reasoning.encrypted_content`，dist:4906；端点未返回 encrypted_content 的裸 reasoning 会被过滤而非
+ * 崩溃，dist:3331），故无状态端点也能跑完工具循环。官方 OpenAI 同样支持该路径。
+ */
+export function providerCallOptions(type?: AiProviderApiType): SharedV3ProviderOptions | undefined {
+  if (type === "openai-responses") return { openai: { store: false } };
+  return undefined;
 }
 
 /** 把 (provider 配置 + 模型名) 解析为 AI SDK 语言模型。MA3 测连接与 MA4 对话共用此工厂。 */
