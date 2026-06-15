@@ -6,7 +6,9 @@ import type {
   ChapterRefDto,
   ChapterSummaryDto,
   ChapterTextSlice,
+  ReadBookBytesResult,
   RecentlyReadDto,
+  RelinkResult,
 } from "@shared/library";
 import {
   bookIdInput,
@@ -150,7 +152,13 @@ export const C = {
   libraryList: def("library:list", "invoke", z.void(), out<BookSummaryDto[]>()),
   libraryGet: def("library:get", "invoke", bookIdInput, out<BookSummaryDto | null>()),
   libraryPickBook: def("library:pick-book", "invoke", z.void(), out<string | null>()),
-  libraryReadBookBytes: def("library:read-book-bytes", "invoke", bookIdInput, out<Uint8Array>()),
+  libraryReadBookBytes: def(
+    "library:read-book-bytes",
+    "invoke",
+    bookIdInput,
+    out<ReadBookBytesResult>(),
+  ),
+  libraryRelink: def("library:relink", "invoke", bookIdInput, out<RelinkResult>()),
   libraryDelete: def("library:delete", "invoke", bookIdInput, out<void>()),
   libraryUpdate: def("library:update", "invoke", updateBookInput, out<BookSummaryDto>()),
   librarySetFinished: def(

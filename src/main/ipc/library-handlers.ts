@@ -16,7 +16,12 @@ import {
   updateBook,
   CURRENT_PARSER_VERSION,
 } from "@main/library/repository";
-import { readBookFile, writeBookFile } from "@main/library/book-files";
+import {
+  readBookFile,
+  readBookFileResult,
+  relinkBookFile,
+  writeBookFile,
+} from "@main/library/book-files";
 import { readBookBytes } from "@main/library/import-source";
 import { getProgress, saveProgress } from "@main/library/progress";
 import { assertTextLayer, getToc, listChapters, readChapterText } from "@main/library/content";
@@ -98,12 +103,35 @@ export const libraryBindings: Binding[] = [
     const book = getBook(db, input.bookId);
     if (!book) throw new Error(`library: book ${input.bookId} not found`);
     await ensureEpubIndexed(input.bookId);
-    return readBookFile(appService.getPath("booksDir"), input.bookId, book.format);
+    return readBookFileResult(appService.getPath("booksDir"), input.bookId, book.format);
   }),
 
   bind(C.libraryDelete, (input) =>
     deleteBook(getDb(), appService.getPath("booksDir"), input.bookId),
   ),
+
+  bind(C.libraryRelink, async (input) => {
+    const db = getDb();
+    const book = getBook(db, input.bookId);
+    if (!book) throw new Error(`library: book ${input.bookId} not found`);
+    const win = BrowserWindow.getFocusedWindow();
+    const opts = {
+      properties: ["openFile" as const],
+      filters: [{ name: "Books", extensions: ["epub", "pdf"] }],
+    };
+    const r = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts);
+    if (r.canceled || r.filePaths.length === 0) return { status: "canceled" as const };
+    const bytes = await readBookBytes(r.filePaths[0]!);
+    const result = await relinkBookFile(
+      appService.getPath("booksDir"),
+      input.bookId,
+      book.format,
+      bytes,
+    );
+    if (result === "ok") log.info(`book relinked: ${input.bookId}`);
+    else log.warn(`relink rejected (content mismatch) for book ${input.bookId}`);
+    return { status: result };
+  }),
 
   bind(C.libraryUpdate, (input) => {
     const book = updateBook(getDb(), input);

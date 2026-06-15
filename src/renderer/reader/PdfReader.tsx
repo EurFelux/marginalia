@@ -102,11 +102,12 @@ export function PdfReader({ bookId, chapters }: Props) {
   }, []);
 
   useEffect(() => {
-    if (!bytes.data) return;
+    if (!bytes.data?.ok) return;
+    const fileBytes = bytes.data.data;
     let alive = true;
     let created: PdfBook | null = null;
     setParseError(null);
-    createPdfBook(bytes.data)
+    createPdfBook(fileBytes)
       .then((b) => {
         if (!alive) {
           b.destroy();

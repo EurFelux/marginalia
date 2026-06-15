@@ -116,3 +116,6 @@ export interface BookSummaryContentDto {
 export type ReadBookBytesResult =
   | { ok: true; data: Uint8Array }
   | { ok: false; error: { reason: "missing" } };
+
+/** library:relink 返回：ok=写回成功；canceled=用户取消选择；mismatch=选错文件（内容不一致）。 */
+export type RelinkResult = { status: "ok" | "canceled" | "mismatch" };

@@ -58,11 +58,12 @@ export function EpubSessionProvider({
   });
 
   useEffect(() => {
-    if (!bytes.data) return;
+    if (!bytes.data?.ok) return;
+    const fileBytes = bytes.data.data;
     let alive = true;
     let created: EpubBook | null = null;
     setParseError(null);
-    createEpubBook(bytes.data)
+    createEpubBook(fileBytes)
       .then((b) => {
         if (!alive) {
           b.destroy();

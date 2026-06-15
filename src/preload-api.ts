@@ -45,6 +45,7 @@ export function createApi(d: PreloadDeps) {
       list: inv(C.libraryList),
       get: inv(C.libraryGet),
       readBookBytes: inv(C.libraryReadBookBytes),
+      relink: inv(C.libraryRelink),
       delete: inv(C.libraryDelete),
       update: inv(C.libraryUpdate),
       setFinished: inv(C.librarySetFinished),
