@@ -19,7 +19,13 @@ import { buildPdfSelectionInfo, flatOffsetOf, pointInDomSelection } from "./pdf-
 import { chapterIdAtPage } from "./pdf-chapter-at-page";
 import { clampPdfZoom, nextZoom } from "./pdf-zoom";
 import { pdfPercent } from "./percent";
-import { intraPageRatio, scrollTopFor, topPageAt } from "./pdf-scroll";
+import {
+  intraPageRatio,
+  scrollTopFor,
+  topPageAt,
+  zoomScrollLeft,
+  zoomScrollOffset,
+} from "./pdf-scroll";
 import { findPdfTextLinks } from "./pdf-autolink";
 import { overlayClass } from "./highlight";
 import type { PdfPageAnno } from "./pdf-annotations";
@@ -36,6 +42,10 @@ interface Props {
 const SAVE_DEBOUNCE_MS = 1000; // 对齐 EpubReader
 /** 页列表左右留白（px）。 */
 const PAGE_GUTTER = 48;
+/** 相邻两次缩放提交间隔 ≤ 此值视为「同一手势」（捏合连续 wheel/快速连点）——锚点不重捕获。 */
+const ZOOM_GESTURE_GAP_MS = 250;
+/** 同页缩放重渲的 debounce：停止缩放此毫秒后才渲到新分辨率；过程中 CSS 拉伸旧画面（不闪不卡）。 */
+const RENDER_DEBOUNCE_MS = 140;
 
 export function PdfReader({ bookId, chapters }: Props) {
   const { t } = useTranslation();
@@ -225,7 +235,13 @@ export function PdfReader({ bookId, chapters }: Props) {
   // 滚动即放弃（对齐 EpubReader）：工具栏/样式栏锚定视口坐标，滚动后位置失真。
   // 捕获阶段监听 document——scroll 不冒泡，但能捕获到 Virtuoso 滚动容器的滚动。
   useEffect(() => {
-    const onScroll = () => {
+    const onScroll = (e: Event) => {
+      const scroller = scrollerRef.current;
+      if (scroller && e.target === scroller) {
+        // 缩放复位用的「缩放前 scrollTop」快照（用户主动滚动时持续刷新）。
+        lastScrollTopRef.current = scroller.scrollTop;
+        lastScrollLeftRef.current = scroller.scrollLeft;
+      }
       closeStyleBar();
       setSelection(null);
       closeNoteHover();
@@ -247,18 +263,32 @@ export function PdfReader({ bookId, chapters }: Props) {
 
   const setPdfZoom = usePrefsStore((s) => s.setPdfZoom);
   // Ctrl+滚轮 / 触控板捏合缩放（捏合 wheel 事件 ctrlKey=true）：精确目标存 ref
-  // （不过 1% 取整，防慢速捏合被取整卡死），rAF 每帧最多提交一次（页面以新分辨率
-  // 重挂重渲，始终锐利）。锚点 = 光标处（页, 页内比例）+ 横向缩放到点输入。
+  // （不过 1% 取整，防慢速捏合被取整卡死），rAF 每帧最多提交一次。缩放后由下方
+  // useLayoutEffect 统一复位滚动；wheel 只记录锚点 = 光标在视口内的 (x, y)。
   const zoomTargetRef = useRef(zoom);
-  const zoomAnchorRef = useRef<{
+  // wheel/捏合的光标视口像素（仅 x/y）。page/ratio 不在事件里算——见下方「手势锚点」。
+  const zoomAnchorRef = useRef<{ anchorX: number; anchorY: number } | null>(null);
+  const zoomRafRef = useRef(0);
+  // 复位用「缩放前」几何：仅当 zoom 真正变化（非窗口 resize）才以锚点复位。
+  const prevPageHRef = useRef(pageH);
+  const prevZoomRef = useRef(zoom);
+  // 缩放「手势」锚点：连续缩放（相邻提交间隔 < 阈值）视为同一手势，锚点（内容点 + 视口像素 + 起始
+  // 几何）只在手势第一帧锁定一次、之后固定不变；每帧纯 scrollToIndex 复位到它。绝不每帧重读 live
+  // scrollTop / pageH——连续捏合时 scrollToIndex 异步生效、pageH 经 React state 逐帧推进，两者错位
+  // 才是「连续缩放页号漂移」的真根因（与 Virtuoso 改 scrollTop 无关）。
+  const zoomGestureRef = useRef<{
     page: number;
     ratio: number;
-    cursorX: number;
-    cursorY: number;
-    scrollLeft: number;
-    oldPageH: number;
+    anchorX: number;
+    anchorY: number;
+    baseScrollLeft: number;
+    basePageH: number;
   } | null>(null);
-  const zoomRafRef = useRef(0);
+  const lastZoomAtRef = useRef(0);
+  // 滚动快照（缩放手势开始前最后的稳定 scrollTop/Left）：手势第一帧据此 + oldPageH 锁定锚点内容点，
+  // 不读 layout effect 时刻可能已滞后于 pageH 的 live scrollTop。由 scroll 事件与 rangeChanged 维护。
+  const lastScrollTopRef = useRef(0);
+  const lastScrollLeftRef = useRef(0);
 
   // 外部改缩放（PdfPrefs 按钮/输入框）→ 重新 seed 精确目标；自家提交（恒 = clamp(target)）
   // 不触发，保留 1% 以下精度。
@@ -271,38 +301,20 @@ export function PdfReader({ bookId, chapters }: Props) {
   // React 合成 onWheel 是 passive 的（preventDefault 拦不住浏览器缩放）→ 原生监听。
   // 挂 containerRef 而非 Virtuoso scrollerRef：容器跨 loading→loaded 稳定存在，
   // 滚轮事件自 scroller 冒泡可达，且 scroller h-full 占满容器、坐标系一致。
+  // 只记录光标视口像素 + 提交目标缩放；锚点内容点的锁定与复位交给下方手势 useLayoutEffect。
   useEffect(() => {
     const container = containerRef.current;
-    if (!book || pageH <= 0 || !container) return;
-    const pageCount = book.pageCount;
+    if (!book || !container) return;
     const onWheel = (e: WheelEvent) => {
       if (!e.ctrlKey) return;
       e.preventDefault();
-      const scroller = scrollerRef.current;
-      if (!scroller) return;
       const rect = container.getBoundingClientRect();
-      const cursorY = e.clientY - rect.top;
-      const absY = scroller.scrollTop + cursorY;
-      const page = topPageAt(absY, pageH, pageCount);
       zoomTargetRef.current = nextZoom(zoomTargetRef.current, e.deltaY);
-      zoomAnchorRef.current = {
-        page,
-        ratio: intraPageRatio(absY, page, pageH),
-        cursorX: e.clientX - rect.left,
-        cursorY,
-        scrollLeft: scroller.scrollLeft,
-        oldPageH: pageH,
-      };
+      zoomAnchorRef.current = { anchorX: e.clientX - rect.left, anchorY: e.clientY - rect.top };
       if (!zoomRafRef.current) {
         zoomRafRef.current = requestAnimationFrame(() => {
           zoomRafRef.current = 0;
-          const target = clampPdfZoom(zoomTargetRef.current);
-          // no-op 提交（已顶在 MIN/MAX 等值处）不会改 pageH → layout effect 不跑，
-          // 必须主动丢锚点——否则滞留到下次无关的 pageH 变化（窗口 resize）才被消费，滚跳。
-          if (Math.abs(target - clampPdfZoom(usePrefsStore.getState().pdfZoom)) < 1e-6) {
-            zoomAnchorRef.current = null;
-          }
-          setPdfZoom(target);
+          setPdfZoom(clampPdfZoom(zoomTargetRef.current));
         });
       }
     };
@@ -314,26 +326,57 @@ export function PdfReader({ bookId, chapters }: Props) {
         zoomRafRef.current = 0;
       }
     };
-  }, [book, pageH, setPdfZoom]);
+  }, [book, setPdfZoom]);
 
-  // 缩放提交后复位滚动（光标锚点）：页盒高度走内联 style、commit 即同步生效 →
-  // useLayoutEffect 里复位不闪。竖向精确（页+页内比例反算）；横向尽力（缩放到点公式，
-  // 页居中↔溢出切换处略有近似）。缩放比从 pageH 实测（吸收 pageW 的 200px 下限折角）。
+  // 缩放提交后统一复位滚动（锚点 = 光标处 / 视口中心），覆盖三条路径（滚轮·捏合·按钮·输入框）。
+  // 关键：竖向用 Virtuoso 自身 scrollToIndex 命令复位，而非裸 scroller.scrollTop——后者会被
+  // Virtuoso 的 resize 重新落位（auto-resizing）随后冲掉（旧实现三路全跳的根因）。横向不归
+  // Virtuoso 管，直接设 scrollLeft。仅在 zoom 真正变化时复位：窗口 resize（pageH 变但 zoom 不变）
+  // 交给 Virtuoso 默认顶部锚定。scroller.scrollTop 在本 layout effect 时仍是缩放前值（Virtuoso
+  // 的 resize 回调晚于此），据此 + oldPageH 反推锚点所在页/页内比例。
   useLayoutEffect(() => {
-    const anchor = zoomAnchorRef.current;
-    const scroller = scrollerRef.current;
-    if (!anchor || !scroller || pageH <= 0 || pageH === anchor.oldPageH) return;
+    const oldPageH = prevPageHRef.current;
+    const zoomChanged = Math.abs(zoom - prevZoomRef.current) > 1e-9;
+    prevPageHRef.current = pageH;
+    prevZoomRef.current = zoom;
+    const wheelPx = zoomAnchorRef.current;
     zoomAnchorRef.current = null;
-    const scale = pageH / anchor.oldPageH;
-    scroller.scrollTop = Math.max(
-      0,
-      scrollTopFor(anchor.page, anchor.ratio, pageH) - anchor.cursorY,
-    );
-    scroller.scrollLeft = Math.max(
-      0,
-      (anchor.scrollLeft + anchor.cursorX) * scale - anchor.cursorX,
-    );
-  }, [pageH]);
+
+    if (!book || !zoomChanged || pageH <= 0 || oldPageH <= 0 || pageH === oldPageH) return;
+    const scroller = scrollerRef.current;
+    const virtuoso = virtuosoRef.current;
+    if (!scroller || !virtuoso) return;
+
+    const now = performance.now();
+    const newGesture = now - lastZoomAtRef.current > ZOOM_GESTURE_GAP_MS || !zoomGestureRef.current;
+    lastZoomAtRef.current = now;
+    if (newGesture) {
+      // 手势第一帧：用「缩放前」几何（oldPageH + 滚动快照）把锚点内容点 (page, ratio) 与视口像素锁定。
+      // 锚点 = 光标处（wheel/捏合）或视口中心（按钮/输入框）。
+      const anchorX = wheelPx?.anchorX ?? scroller.clientWidth / 2;
+      const anchorY = wheelPx?.anchorY ?? scroller.clientHeight / 2;
+      const absY = lastScrollTopRef.current + anchorY;
+      const page = topPageAt(absY, oldPageH, book.pageCount);
+      zoomGestureRef.current = {
+        page,
+        ratio: intraPageRatio(absY, page, oldPageH),
+        anchorX,
+        anchorY,
+        baseScrollLeft: lastScrollLeftRef.current,
+        basePageH: oldPageH,
+      };
+    }
+    const g = zoomGestureRef.current;
+    if (!g) return;
+    // 每帧把同一锚点内容点钉回同一视口像素：竖向走 Virtuoso 自身命令、横向直接设 scrollLeft。
+    // 不读 live scrollTop → 免疫连续缩放的 scrollToIndex 异步 / pageH 逐帧推进错位。
+    virtuoso.scrollToIndex({
+      index: g.page - 1,
+      align: "start",
+      offset: zoomScrollOffset(g.ratio, pageH, g.anchorY),
+    });
+    scroller.scrollLeft = zoomScrollLeft(g.baseScrollLeft, g.anchorX, pageH / g.basePageH);
+  }, [pageH, zoom, book]);
 
   if (bytes.data?.ok === false) return <BookFileMissingPanel bookId={bookId} />;
   if (bytes.isError) {
@@ -392,6 +435,12 @@ export function PdfReader({ bookId, chapters }: Props) {
           // pageH」现算——缩放复位后才触发本回调（rAF 滞后于 layout effect），靠这一点
           // 才不会把缩放中间帧的几何写进进度。
           const scrollTop = scrollerRef.current?.scrollTop;
+          if (scrollTop != null) {
+            // 维护缩放复位用的滚动快照（含首发初始化到 initialScrollTop）；缩放复位触发的本回调
+            // 滞后于 layout effect，故写入的是缩放后稳定值 = 下次缩放的正确基线。
+            lastScrollTopRef.current = scrollTop;
+            lastScrollLeftRef.current = scrollerRef.current?.scrollLeft ?? 0;
+          }
           const page =
             scrollTop != null ? topPageAt(scrollTop, pageH, book.pageCount) : range.startIndex + 1;
           const ratio = scrollTop != null ? intraPageRatio(scrollTop, page, pageH) : 0;
@@ -416,9 +465,10 @@ export function PdfReader({ bookId, chapters }: Props) {
           }
           saveAt(page, ratio, pdfPercent(page, book.pageCount));
         }}
-        // 缩放换档时 key 变化 → 可视页整体重挂（拿到新 canvas，满足 pdf-book 同 canvas 约束）。
-        // v1 接受全量重挂；离屏页经 cssWidth dep 自然重渲。
-        computeItemKey={(index) => `${index}-${Math.round(pageW)}`}
+        // key 只用 index（默认），不掺 pageW：缩放只改页盒尺寸，canvas 经 PdfPage 的 cssWidth
+        // effect 原地重渲到新分辨率（pdf-book 的「同 canvas 约束」由该 effect 的 cancel-then-
+        // rerender 满足）。不再整列 remount——避免 Virtuoso 全量重挂后重新落位，把缩放复位的
+        // scrollToIndex 冲掉（旧实现三路全跳的共因之一）。
         itemContent={(index) => (
           <PdfPage
             book={book}
@@ -462,35 +512,55 @@ function PdfPage(props: {
   const highlights = usePdfHighlights(annos, textLayerRef.current, textReady);
   const [autoLinks, setAutoLinks] = useState<PdfAutoLink[]>([]);
 
+  // 渲染策略：首次/滚动到新页 → 立即渲染；同页缩放（cssWidth 变）→ debounce 重渲，过程中可见
+  // canvas 保持旧 bitmap、靠 CSS 拉伸到新页盒尺寸（短暂模糊但不闪、不卡）。重渲走离屏 canvas +
+  // 完成后同步 drawImage swap：绕开 `canvas.width=` 赋值清空可见画布造成的空白帧（闪白根因）。
+  const renderedWidthRef = useRef<number | null>(null);
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    setRenderError(false);
-    setTextReady(false);
-    // stale 守卫：cancel 时 done 也 resolve（pdf-book 契约）——effect 重跑后旧 task 的
-    // then 绝不能再碰 state，否则会在新渲染完成前把 textReady 抢先置 true 且永不纠正。
+    if (!canvasRef.current) return;
+    // stale 守卫：cancel 时 done 也 resolve（pdf-book 契约）——effect 重跑/卸载后旧 task 的 then
+    // 绝不能再碰 state 或 swap，否则会在新渲染完成前把 textReady 抢先置 true 且永不纠正。
     let stale = false;
-    const task = book.renderPage(
-      index,
-      canvas,
-      cssWidth,
-      textLayerRef.current ?? undefined,
-      annotationLayerRef.current ?? undefined,
-      onLinkPage,
-    );
-    task.done
-      .then(() => {
-        if (!stale) {
+    let task: { done: Promise<void>; cancel: () => void } | null = null;
+    const doRender = () => {
+      if (stale) return;
+      setRenderError(false);
+      setTextReady(false);
+      const offscreen = document.createElement("canvas");
+      task = book.renderPage(
+        index,
+        offscreen,
+        cssWidth,
+        textLayerRef.current ?? undefined,
+        annotationLayerRef.current ?? undefined,
+        onLinkPage,
+      );
+      task.done
+        .then(() => {
+          if (stale) return;
+          const vis = canvasRef.current;
+          if (vis && offscreen.width > 0) {
+            // 设尺寸（清空）+ drawImage 在同一同步块内完成 → 浏览器下次 paint 直接见新画面、无空白帧。
+            vis.width = offscreen.width;
+            vis.height = offscreen.height;
+            vis.getContext("2d")?.drawImage(offscreen, 0, 0);
+          }
+          renderedWidthRef.current = cssWidth;
           setAutoLinks(buildPdfAutoLinks(textLayerRef.current, autoLinkLayerRef.current));
           setTextReady(true);
-        }
-      })
-      .catch(() => {
-        if (!stale) setRenderError(true);
-      });
+        })
+        .catch(() => {
+          if (!stale) setRenderError(true);
+        });
+    };
+    // 已成功渲染过本页 → 缩放重渲走 debounce（过程中拉伸旧画面）；未渲染过 → 立即（开页/翻页不延迟）。
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    if (renderedWidthRef.current == null) doRender();
+    else timer = setTimeout(doRender, RENDER_DEBOUNCE_MS);
     return () => {
       stale = true;
-      task.cancel();
+      if (timer) clearTimeout(timer);
+      task?.cancel();
     };
   }, [book, index, cssWidth]);
 

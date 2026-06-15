@@ -32,8 +32,8 @@ describe("clampPdfZoom", () => {
 });
 
 describe("nextZoom", () => {
-  it("一档滚轮（deltaY=-100）放大约 10%", () => {
-    expect(nextZoom(1, -100)).toBeCloseTo(1.105, 2);
+  it("一档滚轮（deltaY=-100）放大约 28%", () => {
+    expect(nextZoom(1, -100)).toBeCloseTo(1.284, 2);
   });
   it("放大缩小互逆（乘性缩放）", () => {
     expect(nextZoom(nextZoom(1.3, -100), 100)).toBeCloseTo(1.3, 10);

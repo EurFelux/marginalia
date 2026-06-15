@@ -24,3 +24,23 @@ export function intraPageRatio(y: number, page: number, pageH: number): number {
 export function scrollTopFor(page: number, ratio: number, pageH: number): number {
   return (page - 1) * (pageH + PAGE_GAP) + PAGE_PADDING_Y + ratio * pageH;
 }
+
+/**
+ * 缩放竖向复位的 Virtuoso `scrollToIndex({ align: "start", offset })` offset：
+ * align:'start' 把该页（itemHeight = pageH + PAGE_GAP）顶对齐视口顶，落点
+ * scrollTop = (page-1)*(pageH+PAGE_GAP) + offset；要让页内比例 ratio 处的内容点钉在视口
+ * anchorY（光标 Y / 视口中心），即 scrollTop = scrollTopFor(page, ratio, pageH) - anchorY，
+ * 解得 offset = PAGE_PADDING_Y + ratio*pageH - anchorY（与页号无关）。
+ * 用 Virtuoso 自身命令复位（非裸 scroller.scrollTop），避免被其 resize 重新落位冲掉。
+ */
+export function zoomScrollOffset(ratio: number, pageH: number, anchorY: number): number {
+  return PAGE_PADDING_Y + ratio * pageH - anchorY;
+}
+
+/**
+ * 缩放横向复位（缩放到点，scale = 新/旧 pageH）：锚点 X 处内容点缩放后仍钉回视口 anchorX。
+ * 横向滚动不归 Virtuoso 管，直接设 scroller.scrollLeft。页居中↔溢出切换处略有近似。
+ */
+export function zoomScrollLeft(oldScrollLeft: number, anchorX: number, scale: number): number {
+  return Math.max(0, (oldScrollLeft + anchorX) * scale - anchorX);
+}

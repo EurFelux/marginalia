@@ -14,10 +14,10 @@ export function clampPdfZoom(scale: number): number {
 }
 
 /**
- * 滚轮缩放灵敏度：一档鼠标滚轮（|deltaY|≈100）≈ ±10%（exp(0.1)≈1.105），
- * 在 100% 附近与按钮步进（+0.1 加法）感受接近；高倍率时乘性步进更大。
+ * 滚轮/捏合缩放灵敏度：一档鼠标滚轮（|deltaY|≈100）≈ ±28%（exp(0.25)≈1.284）。
+ * 触控板捏合每帧 deltaY 较小、需累积，故灵敏度偏大才有「跟手」的力度；高倍率时乘性步进更大。
  */
-export const PDF_WHEEL_ZOOM_SENSITIVITY = 0.001;
+export const PDF_WHEEL_ZOOM_SENSITIVITY = 0.0025;
 
 /**
  * 滚轮/捏合的下一缩放值（乘性，向上滚 deltaY<0 = 放大）。返回精确值**不取整**——
