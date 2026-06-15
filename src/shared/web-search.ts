@@ -5,7 +5,7 @@ export const webSearchBackend = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("exa-mcp"),
     label: z.string().optional(),
-    apiKey: z.string(),
+    apiKey: z.string().optional(),
     enabled: z.boolean().optional(),
   }),
   z.object({
@@ -27,5 +27,8 @@ export const webSearchConfig = z.object({
 });
 export type WebSearchConfig = z.infer<typeof webSearchConfig>;
 
-/** 出厂默认：不启用，无后端。 */
-export const DEFAULT_WEB_SEARCH: WebSearchConfig = { enabled: false, backends: [] };
+/** 出厂默认：启用，Exa 免费层（无 key 即可用）。 */
+export const DEFAULT_WEB_SEARCH: WebSearchConfig = {
+  enabled: true,
+  backends: [{ kind: "exa-mcp" }],
+};

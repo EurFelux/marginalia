@@ -26,50 +26,71 @@ export interface McpBackendOpts {
   mapResult: (raw: unknown) => SearchHit[];
 }
 
-// NOTE: EXA_CONTENT shape (callTool 返回 { content: [{ type:"text", text: JSON }] }) 和
-// 入参名（query / numResults）来自 Exa MCP 文档推断，将在后续 smoke 任务中对真实调用校验。
 const EXA_MCP_URL = "https://mcp.exa.ai/mcp?tools=web_search_exa";
 
 const exaResultSchema = z.object({
   content: z.array(z.object({ type: z.literal("text"), text: z.string() })).min(1),
 });
 
-const exaPayloadSchema = z.object({
-  results: z.array(
-    z.object({
-      title: z.string().default(""),
-      url: z.string(),
-      text: z.string().default(""),
-      snippet: z.string().optional(),
-      publishedDate: z.string().optional(),
-    }),
-  ),
-});
-
 /**
  * 将 MCP callTool 返回值映射为 SearchHit[]。
- * 解析通用 "MCP text-content → JSON results[]" 格式——Exa 及 Exa 兼容后端均适用：
- *   { content: [{ type:"text", text: JSON }] }，JSON 内含 { results: [{title, url, text/snippet?, publishedDate?}] }。
- * 格式假设来自 Exa 文档，将在 smoke 阶段对真实响应校验。
+ *
+ * 实测 Exa MCP (web_search_exa) 返回格式（structuredContent: NONE）：
+ *   { content: [{ type:"text", text: <formatted plain text> }] }
+ *
+ * 每个结果块的文本格式（块间以 --- 分隔）：
+ *   Title: <title>
+ *   URL: <url>
+ *   Published: <ISO 日期 | N/A>
+ *   Author: <name | N/A>
+ *   Highlights:
+ *   <多行 highlight 文本>
  */
 export function mapExaResult(raw: unknown): SearchHit[] {
+  // envelope 格式校验：失败时抛出（让 SearchService 走回退路径）
   const { content } = exaResultSchema.parse(raw);
-  const payload = exaPayloadSchema.parse(JSON.parse(content[0]!.text));
-  return payload.results.map((r) => ({
-    title: r.title,
-    url: r.url,
-    snippet: r.snippet ?? r.text,
-    ...(r.publishedDate ? { publishedDate: r.publishedDate } : {}),
-  }));
+  const text = content[0]!.text;
+
+  // 块间分隔：--- 独占一行（允许前后空白）
+  const blocks = text.split(/\n[ \t]*-{3,}[ \t]*\n/);
+
+  const hits: SearchHit[] = [];
+  for (const block of blocks) {
+    try {
+      const titleMatch = /^Title:\s*(.+)$/m.exec(block);
+      const urlMatch = /^URL:\s*(.+)$/m.exec(block);
+      const publishedMatch = /^Published:\s*(.+)$/m.exec(block);
+      const highlightsMatch = /^Highlights:\s*\n([\s\S]*)$/m.exec(block);
+
+      const url = urlMatch?.[1]?.trim();
+      if (!url) continue; // 无 URL，跳过此块
+
+      const title = titleMatch?.[1]?.trim() || url;
+      const publishedRaw = publishedMatch?.[1]?.trim();
+      const publishedDate = publishedRaw && publishedRaw !== "N/A" ? publishedRaw : undefined;
+
+      // highlight 文本：折叠多余空行，去首尾空白，限 600 字符
+      const highlightText = highlightsMatch?.[1] ?? "";
+      const snippet = highlightText
+        .replace(/\n{3,}/g, "\n\n")
+        .trim()
+        .slice(0, 600);
+
+      hits.push({ title, url, snippet, ...(publishedDate ? { publishedDate } : {}) });
+    } catch {
+      // 单块解析失败不影响其他块
+    }
+  }
+  return hits;
 }
 
-/** 构造 Exa MCP 预设后端配置。 */
-export function exaBackendOpts(apiKey: string): McpBackendOpts {
+/** 构造 Exa MCP 预设后端配置。apiKey 可选——Exa 免费层无 key 可用。 */
+export function exaBackendOpts(apiKey?: string): McpBackendOpts {
   return {
     id: "exa-mcp",
     url: EXA_MCP_URL,
     toolName: "web_search_exa",
-    headers: { "x-api-key": apiKey },
+    headers: apiKey ? { "x-api-key": apiKey } : {},
     mapResult: mapExaResult,
   };
 }
@@ -77,8 +98,8 @@ export function exaBackendOpts(apiKey: string): McpBackendOpts {
 /**
  * 构造通用 MCP 后端配置（支持自定义请求头与工具名）。
  *
- * 备用 `kind:"mcp"` server 复用 `mapExaResult`，即假设其 MCP tool 返回 Exa 兼容格式
- * （`content[].text` 内 JSON `{ results:[{title,url,text/snippet?,publishedDate?}] }`）；
+ * 备用 `kind:"mcp"` server 复用 `mapExaResult`，即假设其 MCP tool 返回 Exa 兼容的
+ * 格式化文本（块间 ---，每块含 Title/URL/Published/Highlights 行）；
  * 返回异形结构的后端属未来扩展（spec 非目标），届时再为其特化 `mapResult`。
  */
 export function genericBackendOpts(
