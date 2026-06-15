@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ChapterRefDto } from "@shared/library";
-import { chapterIdByHref } from "./chapter-id-by-href";
+import { chapterIdByHref, chaptersMatchingHref } from "./chapter-id-by-href";
 
 const chapters: ChapterRefDto[] = [
   {
@@ -74,5 +74,54 @@ describe("chapterIdByHref", () => {
     ];
     // 前缀不一致触发 basename 兜底；intro.xhtml 同时命中两卷 → 歧义 → null（宁可不高亮也不错章）。
     expect(chapterIdByHref(multiPart, "OEBPS/part1/intro.xhtml")).toBeNull();
+  });
+});
+
+describe("chaptersMatchingHref", () => {
+  it("returns the single exact match", () => {
+    expect(chaptersMatchingHref(chapters, "text/chap1.xhtml").map((c) => c.id)).toEqual(["id-c1"]);
+  });
+  it("returns ALL chapters sharing one href (anchor chapters)", () => {
+    const shared: ChapterRefDto[] = [
+      {
+        id: "a",
+        title: "A",
+        href: "text/all.html",
+        anchor: "p1",
+        orderIndex: 0,
+        level: 0,
+        startPage: null,
+        endPage: null,
+      },
+      {
+        id: "b",
+        title: "B",
+        href: "text/all.html",
+        anchor: "p2",
+        orderIndex: 1,
+        level: 0,
+        startPage: null,
+        endPage: null,
+      },
+      {
+        id: "c",
+        title: "C",
+        href: "text/all.html",
+        anchor: "p3",
+        orderIndex: 2,
+        level: 0,
+        startPage: null,
+        endPage: null,
+      },
+    ];
+    expect(chaptersMatchingHref(shared, "text/all.html").map((c) => c.id)).toEqual(["a", "b", "c"]);
+  });
+  it("falls back to basename matches", () => {
+    expect(chaptersMatchingHref(chapters, "OEBPS/text/chap1.xhtml").map((c) => c.id)).toEqual([
+      "id-c1",
+    ]);
+  });
+  it("returns empty when nothing matches", () => {
+    expect(chaptersMatchingHref(chapters, "missing.xhtml")).toEqual([]);
   });
 });
