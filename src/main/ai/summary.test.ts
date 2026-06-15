@@ -9,6 +9,8 @@ import { books, chapters } from "@main/db/schema";
 import { importBook, resolveChapterByHref } from "@main/library/repository";
 import type { ResolvedModel } from "@main/ai/assistant-model";
 import type { LoadBytes } from "@main/ai/tools";
+import type { RunBackground } from "@main/ai/background-limiter";
+import { Limiter } from "@main/ai/background-limiter";
 import {
   __resetBookSummaryRuntime,
   __resetChapterSummaryRuntime,
@@ -19,6 +21,9 @@ import {
   getChapterSummaryView,
   type SummaryDeps,
 } from "@main/ai/summary";
+
+/** 透传 runBackground：直接执行 fn()，不限流；现有测试用此保持行为不变。 */
+const passThrough: RunBackground = (fn) => fn();
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
 
@@ -71,7 +76,12 @@ async function setup(model: ResolvedModel) {
   const book = await importBook(db, { bytes });
   const ch1 = resolveChapterByHref(db, book.id, "OEBPS/ch1.xhtml")!;
   const loadBytes: LoadBytes = async () => bytes;
-  const deps: SummaryDeps = { db, loadBytes, resolveModel: () => model };
+  const deps: SummaryDeps = {
+    db,
+    loadBytes,
+    resolveModel: () => model,
+    runBackground: passThrough,
+  };
   return { db, book, ch1, deps };
 }
 
@@ -303,6 +313,113 @@ describe("ensureBookSummary / getBookSummaryView (derived status)", () => {
     const { db, book } = await setup({ ok: false, reason: "x" });
     db.update(books).set({ summary: "" }).where(eq(books.id, book.id)).run();
     expect(getBookSummaryView(db, book.id)).toEqual({ status: "pending", summary: null });
+  });
+});
+
+describe("background concurrency cap (Limiter integration)", () => {
+  beforeEach(() => {
+    __resetChapterSummaryRuntime();
+    __resetBookSummaryRuntime();
+  });
+
+  it("with cap=1, the second background model call does not start until the first finishes", async () => {
+    // 用同一 Limiter(()=>1) 注入 ensureChapterSummary + ensureBookSummary：
+    // 两个都走 runBackground 路径，上限 1 时第二个必须等第一个完成才能进槽。
+    let firstCallStarted = false;
+    let secondCallStarted = false;
+
+    // 第一个 model call（章节，generateText）：阻塞在 gate 上，等外部 resolve 才完成。
+    let releaseGate!: () => void;
+    const gate = new Promise<void>((res) => {
+      releaseGate = res;
+    });
+
+    const blockedGenModel = new MockLanguageModelV3({
+      doGenerate: async () => {
+        firstCallStarted = true;
+        await gate; // 阻塞直到外部 releaseGate()
+        return {
+          content: [{ type: "text" as const, text: "chapter summary" }],
+          finishReason: { unified: "stop" as const, raw: undefined },
+          usage: {
+            inputTokens: {
+              total: 1,
+              noCache: undefined,
+              cacheRead: undefined,
+              cacheWrite: undefined,
+            },
+            outputTokens: { total: 1, text: undefined, reasoning: undefined },
+          },
+          warnings: [],
+        };
+      },
+    });
+
+    const blockedStreamModel = new MockLanguageModelV3({
+      doStream: async () => {
+        secondCallStarted = true;
+        return {
+          stream: simulateReadableStream({
+            chunks: [
+              { type: "text-start", id: "t1" },
+              { type: "text-delta", id: "t1", delta: "book summary" },
+              { type: "text-end", id: "t1" },
+              {
+                type: "finish",
+                finishReason: { unified: "stop", raw: undefined },
+                usage: STREAM_USAGE,
+              },
+            ],
+          }),
+        };
+      },
+    });
+
+    const sharedLimiter = new Limiter(() => 1);
+
+    // 从同一个 setup 拿到 db/book/ch1/loadBytes（同一内存库，book 和 chapter 都在）
+    const {
+      db,
+      book,
+      ch1,
+      deps: baseDeps,
+    } = await setup({
+      ok: true,
+      model: blockedGenModel,
+      modelId: "mock",
+    });
+
+    const chapterDeps: SummaryDeps = {
+      ...baseDeps,
+      resolveModel: () => ({ ok: true, model: blockedGenModel, modelId: "mock" }),
+      runBackground: sharedLimiter.run,
+    };
+    const bookDeps: SummaryDeps = {
+      ...baseDeps,
+      resolveModel: () => ({ ok: true, model: blockedStreamModel, modelId: "mock" }),
+      runBackground: sharedLimiter.run,
+    };
+
+    // 同时发起两个后台任务（不 await）——两者共享同一 db，book/ch1 均存在
+    const p1 = ensureChapterSummary(chapterDeps, book.id, ch1.id);
+    const p2 = ensureBookSummary(bookDeps, book.id);
+
+    // 让 microtask queue 跑一下，让两个 ensure* 的同步前缀和第一个 runBackground 进槽
+    await new Promise<void>((r) => setTimeout(r, 0));
+
+    // 此时：第一个（章节）应已进槽、firstCallStarted=true；第二个（全书）在队列中、secondCallStarted=false
+    expect(firstCallStarted).toBe(true);
+    expect(secondCallStarted).toBe(false);
+
+    // 释放门控：第一个完成 → limiter 放行第二个
+    releaseGate();
+    await p1;
+    await p2;
+
+    // 两个都应跑完，结果落库
+    expect(secondCallStarted).toBe(true);
+    expect(getChapterSummaryView(db, book.id, ch1.id).status).toBe("ready");
+    expect(getBookSummaryView(db, book.id).status).toBe("ready");
   });
 });
 

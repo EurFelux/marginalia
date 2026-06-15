@@ -4,11 +4,17 @@ import { readBookFile } from "@main/library/book-files";
 import { getBook } from "@main/library/repository";
 import { resolveChatModel, resolveSummaryModel } from "@main/ai/assistant-model";
 import { getPreference } from "@main/preferences/repository";
-import { DEFAULT_STEP_LIMIT } from "@shared/preferences";
+import { Limiter } from "@main/ai/background-limiter";
+import { DEFAULT_BACKGROUND_CONCURRENCY, DEFAULT_STEP_LIMIT } from "@shared/preferences";
 import type { DB } from "@main/db/client";
 import type { SummaryDeps } from "@main/ai/summary";
 import type { LoadBytes } from "@main/ai/tools";
 import type { SendDeps } from "@main/ai/send";
+
+/** 进程级后台并发限流器。getLimit 惰性实时读 preference——改设置即时生效，模块加载期不碰 getDb。 */
+const backgroundLimiter = new Limiter(
+  () => getPreference(getDb(), "backgroundConcurrency") ?? DEFAULT_BACKGROUND_CONCURRENCY,
+);
 
 /** (bookId) => 该书 app 自有副本字节；缺失抛 BookFileMissingError。注入 db/booksDir 以便单测。 */
 export function createLoadBytes(booksDir: string, db: DB): LoadBytes {
@@ -43,5 +49,6 @@ export function makeSummaryDeps(): SummaryDeps {
     db,
     loadBytes: createLoadBytes(appService.getPath("booksDir"), db),
     resolveModel: () => resolveSummaryModel(db),
+    runBackground: backgroundLimiter.run,
   };
 }

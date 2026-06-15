@@ -6,6 +6,7 @@ import { books, chapters } from "@main/db/schema";
 import { readBookText, readChapterText } from "@main/library/content";
 import type { SummaryStatus } from "@shared/library";
 import type { ResolvedModel } from "@main/ai/assistant-model";
+import type { RunBackground } from "@main/ai/background-limiter";
 import type { LoadBytes } from "@main/ai/tools";
 import { createLogger } from "@main/logger";
 
@@ -20,6 +21,8 @@ export interface SummaryDeps {
   db: DB;
   loadBytes: LoadBytes;
   resolveModel: () => ResolvedModel;
+  /** 后台并发限流端口：包住「加载 + 模型调用」，受全局上限约束。 */
+  runBackground: RunBackground;
 }
 
 /**
@@ -85,7 +88,7 @@ export async function ensureChapterSummary(
   chapterId: string,
   force = false,
 ): Promise<void> {
-  const { db, loadBytes, resolveModel } = deps;
+  const { db, loadBytes, resolveModel, runBackground } = deps;
   let claimed = false;
   try {
     if (inFlightChapters.has(chapterId)) return; // 并发去重
@@ -102,16 +105,19 @@ export async function ensureChapterSummary(
     failedChapters.delete(chapterId); // 清前次失败标记 → 可重试
     inFlightChapters.add(chapterId); // 同步前缀：使 generate handler 即时派生 generating
     claimed = true;
-    const bytes = await loadBytes(bookId);
-    const slice = await readChapterText(db, bytes, bookId, chapterId, {
-      maxChars: SUMMARY_INPUT_MAX_CHARS,
-    });
-    const { text } = await generateText({
-      model: resolved.model,
-      system: SUMMARY_SYSTEM,
-      prompt: slice.text,
-      maxOutputTokens: 512,
-      maxRetries: 1,
+    const text = await runBackground(async () => {
+      const bytes = await loadBytes(bookId);
+      const slice = await readChapterText(db, bytes, bookId, chapterId, {
+        maxChars: SUMMARY_INPUT_MAX_CHARS,
+      });
+      const generated = await generateText({
+        model: resolved.model,
+        system: SUMMARY_SYSTEM,
+        prompt: slice.text,
+        maxOutputTokens: 512,
+        maxRetries: 1,
+      });
+      return generated.text;
     });
     if (!hasText(text)) {
       // provider 不抛错但产出空文本 → 视为失败：不落库（否则派生 ready 永不重试），标 unavailable 可重试
@@ -175,7 +181,7 @@ export async function ensureBookSummary(
   bookId: string,
   force = false,
 ): Promise<void> {
-  const { db, loadBytes, resolveModel } = deps;
+  const { db, loadBytes, resolveModel, runBackground } = deps;
   let claimed = false;
   try {
     if (inFlightBooks.has(bookId)) return; // 并发去重
@@ -192,33 +198,36 @@ export async function ensureBookSummary(
     streamingBookSummaries.delete(bookId);
     inFlightBooks.add(bookId); // 同步前缀：使 generate handler 即时派生出 generating
     claimed = true;
-    const bytes = await loadBytes(bookId);
-    const { text } = await readBookText(db, bytes, bookId, {
-      maxChars: BOOK_SUMMARY_INPUT_MAX_CHARS,
+    const produced = await runBackground(async () => {
+      const bytes = await loadBytes(bookId);
+      const { text } = await readBookText(db, bytes, bookId, {
+        maxChars: BOOK_SUMMARY_INPUT_MAX_CHARS,
+      });
+      // streamText 遇错发 error chunk 并正常关流（textStream 不 throw），故用 onError 标志兜——否则会把半截落库。
+      let hadError = false;
+      const result = streamText({
+        model: resolved.model,
+        system: BOOK_SUMMARY_SYSTEM,
+        prompt: text,
+        maxOutputTokens: 4096, // 全书摘要（主题/人物/结构、多段）比单章长，给足额度避免输出截断
+        maxRetries: 1,
+        onError: ({ error }) => {
+          hadError = true;
+          log.warn(`book ${bookId} stream error`, error);
+        },
+      });
+      let acc = "";
+      for await (const delta of result.textStream) {
+        acc += delta;
+        streamingBookSummaries.set(bookId, acc); // partial 供 getBookSummaryView 轮询读取
+      }
+      return { acc, hadError };
     });
-    // streamText 遇错发 error chunk 并正常关流（textStream 不 throw），故用 onError 标志兜——否则会把半截落库。
-    let hadError = false;
-    const result = streamText({
-      model: resolved.model,
-      system: BOOK_SUMMARY_SYSTEM,
-      prompt: text,
-      maxOutputTokens: 4096, // 全书摘要（主题/人物/结构、多段）比单章长，给足额度避免输出截断
-      maxRetries: 1,
-      onError: ({ error }) => {
-        hadError = true;
-        log.warn(`book ${bookId} stream error`, error);
-      },
-    });
-    let acc = "";
-    for await (const delta of result.textStream) {
-      acc += delta;
-      streamingBookSummaries.set(bookId, acc); // partial 供 getBookSummaryView 轮询读取
-    }
-    if (hadError || !hasText(acc)) {
+    if (produced.hadError || !hasText(produced.acc)) {
       // 流错误或空产出（provider 不报错但 0 字符）均不落库（保留旧 summary 不变），标 failed 可重试
-      if (!hadError) log.warn(`book ${bookId} generated empty text, treated as failure`);
+      if (!produced.hadError) log.warn(`book ${bookId} generated empty text, treated as failure`);
       failedBooks.add(bookId);
-    } else db.update(books).set({ summary: acc }).where(eq(books.id, bookId)).run();
+    } else db.update(books).set({ summary: produced.acc }).where(eq(books.id, bookId)).run();
   } catch (err) {
     log.warn(`book ${bookId} ensure failed`, err);
     if (claimed) failedBooks.add(bookId);
