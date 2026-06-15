@@ -22,6 +22,8 @@ export function MemorySettings() {
   const qc = useQueryClient();
   const memoryEnabled = usePrefsStore((s) => s.memoryEnabled);
   const setMemoryEnabled = usePrefsStore((s) => s.setMemoryEnabled);
+  const memoryAutoConsolidate = usePrefsStore((s) => s.memoryAutoConsolidate);
+  const setMemoryAutoConsolidate = usePrefsStore((s) => s.setMemoryAutoConsolidate);
 
   const memories = useQuery({
     queryKey: qk.memories,
@@ -107,6 +109,28 @@ export function MemorySettings() {
             id="memory-enabled"
             checked={memoryEnabled}
             onCheckedChange={setMemoryEnabled}
+            className="mt-0.5"
+          />
+        </div>
+
+        {/* 后台自动整理开关（受总开关约束） */}
+        <div className="flex items-start justify-between gap-3">
+          <label htmlFor="memory-auto-consolidate" className="min-w-0 cursor-pointer">
+            <span className="block text-sm font-medium">
+              {t("settings.memory.autoConsolidate", "后台自动整理记忆")}
+            </span>
+            <span className="mt-0.5 block text-[11px] leading-relaxed text-muted-foreground">
+              {t(
+                "settings.memory.autoConsolidateDesc",
+                "每隔几轮对话，Lia 会在后台补记漏掉的要点并整理已有记忆。会产生额外的模型调用，默认关闭。",
+              )}
+            </span>
+          </label>
+          <Checkbox
+            id="memory-auto-consolidate"
+            checked={memoryAutoConsolidate}
+            onCheckedChange={setMemoryAutoConsolidate}
+            disabled={!memoryEnabled}
             className="mt-0.5"
           />
         </div>

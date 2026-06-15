@@ -142,6 +142,7 @@ export default {
   "library.unknownAuthor": "未知作者",
   "library.untitled": "未命名",
   "library.updateFailed": "{{title}} 保存失败：{{error}}",
+  "notify.memoryConsolidated": "Lia 整理了记忆 · 新增 {{saved}} · 更新 {{updated}}",
   "onboarding.skip": "以后再说",
   "onboarding.step1.action": "去配置",
   "onboarding.step1.hint": "填一个模型服务的密钥并选择对话模型",
@@ -304,6 +305,9 @@ export default {
   "settings.light": "浅色",
   "settings.logs": "日志",
   "settings.memory": "记忆",
+  "settings.memory.autoConsolidate": "后台自动整理记忆",
+  "settings.memory.autoConsolidateDesc":
+    "每隔几轮对话，Lia 会在后台补记漏掉的要点并整理已有记忆。会产生额外的模型调用，默认关闭。",
   "settings.memory.bodyPlaceholder": "记忆正文",
   "settings.memory.cancel": "取消",
   "settings.memory.delete": "删除",
