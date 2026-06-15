@@ -123,6 +123,19 @@ describe("toolStepLabel", () => {
     const dyn = part("dynamic-tool", { toolName: "webSearch", input: {} });
     expect(toolStepLabel(dyn, chapters, t)).toBe("webSearch");
   });
+
+  it("labels web_search with the query", () => {
+    const p = part("tool-web_search", {
+      input: { query: "weather" },
+      state: "input-available",
+    }) as any;
+    expect(toolStepLabel(p, [], t)).toMatch(/weather/);
+  });
+
+  it("falls back when web_search query missing", () => {
+    const p = part("tool-web_search", { input: {}, state: "input-streaming" }) as any;
+    expect(toolStepLabel(p, [], t)).toBeTruthy();
+  });
 });
 
 describe("isErrorShape", () => {

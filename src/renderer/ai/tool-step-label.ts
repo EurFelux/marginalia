@@ -74,6 +74,12 @@ export function toolStepLabel(part: ToolPart, chapters: ChapterRefDto[], t: TFun
     }
     case "getToc":
       return t("ai.toolStep.getToc", "读取目录");
+    case "web_search": {
+      const query = input?.query;
+      return typeof query === "string"
+        ? t("ai.toolStep.webSearch", "联网搜索：{{query}}", { query })
+        : t("ai.toolStep.webSearchFallback", "联网搜索");
+    }
     default:
       return name;
   }
