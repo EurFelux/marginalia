@@ -3,7 +3,7 @@ import { type ModelMessage } from "ai";
 import { eq } from "drizzle-orm";
 import type { DB } from "@main/db/client";
 import { conversations } from "@main/db/schema";
-import { assemblePrompt, pdfSystemNote, textOfParts } from "@main/ai/prompt";
+import { assemblePrompt, formatCurrentDateTime, pdfSystemNote, textOfParts } from "@main/ai/prompt";
 import { buildSystemPrompt } from "@main/ai/base-prompt";
 import { dedupeParagraph, toContextChips } from "@main/ai/chips";
 import { type LoadBytes } from "@main/ai/tools";
@@ -95,7 +95,12 @@ export async function runSend(
     systemPrompt: systemPromptText,
     priorSummary: convo.contextSummary,
     history,
-    current: { chips: deduped, userText: input.userText, readingContext: input.readingContext },
+    current: {
+      chips: deduped,
+      userText: input.userText,
+      readingContext: input.readingContext,
+      currentDateTime: formatCurrentDateTime(Temporal.Now.zonedDateTimeISO()),
+    },
   });
 
   // 将首个 system 消息提取出来，通过 system: 参数传给 streamText（避免 allowSystemInMessages 警告）
@@ -190,6 +195,7 @@ export async function runResend(
       chips: current.metadata?.contextChips ?? [],
       userText: textOfParts(current.parts),
       readingContext: null,
+      currentDateTime: formatCurrentDateTime(Temporal.Now.zonedDateTimeISO()),
     },
   });
 

@@ -124,6 +124,13 @@ Drizzle ORM over better-sqlite3，Schema 定义在 `src/main/db/schema.ts`。
 
 - **渲染层启用 React Compiler**（`vite.renderer.config.ts` 的 `reactCompilerPreset`）：**别手写 `useCallback` / `useMemo`**——编译器自动记忆化。审查时「缺 memo / 陈旧闭包」多为误判，按此驳回；命令式 `useEffect` 清理仍需手写。
 
+## 代码规范（日期时间）
+
+- **新代码一律用 `Temporal` 而非 `Date`**：`Temporal.Now.zonedDateTimeISO()` / `Temporal.Instant` / `Temporal.PlainDate` 等。`Date` 的可变性、月份 0-based、时区暗坑一概规避。
+- **可用性前提**：Temporal 是 Electron 41 的 V8（14.6）内置 API；**独立 Node 24 的 V8（13.6）尚无**（`typeof Temporal === "undefined"`）。本仓库主进程与 vitest **均跑 Electron 运行时**（见上「better-sqlite3 单一 ABI」坑），故 Temporal 始终可用；TS 6 内置 lib 已含其类型，无需 polyfill 或 `@types`。**勿在脱离 Electron 运行时的独立 Node 脚本里用 Temporal**（会 `ReferenceError`）。
+- **可测性**：把 `Temporal.Now.*()`（读系统时钟）留在胶水层，纯函数收注入的 `Temporal.ZonedDateTime` 等做投影——测试用 `Temporal.ZonedDateTime.from("…[Asia/Shanghai]")` 显式构造，断言不依赖跑测机器的时区（范例见 `src/main/ai/prompt.ts` 的 `formatCurrentDateTime`）。
+- 旧 `Date` 用法的存量迁移 + lint 守卫见对应 issue（渐进迁移，勿一次性大改）。
+
 ## 技术栈
 
 | 层          | 技术                                                                                |
