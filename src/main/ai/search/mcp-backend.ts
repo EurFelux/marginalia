@@ -47,7 +47,9 @@ const exaPayloadSchema = z.object({
 });
 
 /**
- * 将 Exa MCP callTool 返回值映射为 SearchHit[]。
+ * 将 MCP callTool 返回值映射为 SearchHit[]。
+ * 解析通用 "MCP text-content → JSON results[]" 格式——Exa 及 Exa 兼容后端均适用：
+ *   { content: [{ type:"text", text: JSON }] }，JSON 内含 { results: [{title, url, text/snippet?, publishedDate?}] }。
  * 格式假设来自 Exa 文档，将在 smoke 阶段对真实响应校验。
  */
 export function mapExaResult(raw: unknown): SearchHit[] {
@@ -72,7 +74,13 @@ export function exaBackendOpts(apiKey: string): McpBackendOpts {
   };
 }
 
-/** 构造通用 MCP 后端配置（支持自定义请求头与工具名）。 */
+/**
+ * 构造通用 MCP 后端配置（支持自定义请求头与工具名）。
+ *
+ * 备用 `kind:"mcp"` server 复用 `mapExaResult`，即假设其 MCP tool 返回 Exa 兼容格式
+ * （`content[].text` 内 JSON `{ results:[{title,url,text/snippet?,publishedDate?}] }`）；
+ * 返回异形结构的后端属未来扩展（spec 非目标），届时再为其特化 `mapResult`。
+ */
 export function genericBackendOpts(
   cfg: Extract<WebSearchBackendConfig, { kind: "mcp" }>,
 ): McpBackendOpts {
@@ -97,16 +105,23 @@ export function backendOptsFor(cfg: WebSearchBackendConfig): McpBackendOpts {
  */
 export function makeMcpBackend(opts: McpBackendOpts): SearchBackend {
   let client: Client | undefined;
+  let connecting: Promise<Client> | undefined;
 
   async function ensure(): Promise<Client> {
     if (client) return client;
-    const c = new Client({ name: "marginalia", version: "1.0.0" });
-    const transport = new StreamableHTTPClientTransport(new URL(opts.url), {
-      requestInit: { headers: opts.headers },
-    });
-    await c.connect(transport);
-    client = c;
-    return c;
+    if (!connecting) {
+      connecting = (async () => {
+        const c = new Client({ name: "marginalia", version: "1.0.0" });
+        const transport = new StreamableHTTPClientTransport(new URL(opts.url), {
+          requestInit: { headers: opts.headers },
+        });
+        await c.connect(transport);
+        client = c;
+        connecting = undefined;
+        return c;
+      })();
+    }
+    return connecting;
   }
 
   return {

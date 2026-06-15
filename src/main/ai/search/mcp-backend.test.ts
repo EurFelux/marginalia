@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { mapExaResult, exaBackendOpts, genericBackendOpts } from "@main/ai/search/mcp-backend";
+import {
+  mapExaResult,
+  exaBackendOpts,
+  genericBackendOpts,
+  backendOptsFor,
+} from "@main/ai/search/mcp-backend";
 
 // NOTE: EXA_CONTENT shape is ASSUMED from Exa MCP docs and will be reconciled
 // against a real Exa call during smoke testing (a later task). The callTool
@@ -47,5 +52,14 @@ describe("backend opts builders", () => {
     });
     expect(o.headers).toEqual({ authorization: "k" });
     expect(o.toolName).toBe("s");
+  });
+});
+
+describe("backendOptsFor", () => {
+  it("dispatches exa-mcp to the Exa preset", () => {
+    expect(backendOptsFor({ kind: "exa-mcp", apiKey: "k" }).id).toBe("exa-mcp");
+  });
+  it("dispatches mcp to the generic builder", () => {
+    expect(backendOptsFor({ kind: "mcp", url: "https://x/mcp", toolName: "s" }).id).toBe("mcp:x");
   });
 });

@@ -23,7 +23,7 @@ export class SearchService {
     throw new Error("all web search backends failed", { cause: lastErr });
   }
 
-  close(): Promise<unknown> {
-    return Promise.allSettled(this.backends.map((b) => b.close()));
+  async close(): Promise<void> {
+    await Promise.allSettled(this.backends.map((b) => b.close()));
   }
 }
