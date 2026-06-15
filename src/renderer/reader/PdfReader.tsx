@@ -12,6 +12,7 @@ import { useNavigationStore } from "@renderer/store/navigation-store";
 import type { ChapterRefDto } from "@shared/library";
 import { qk } from "../query/keys";
 import { createPdfBook, type PdfBook } from "./pdf-book";
+import { BookFileMissingPanel } from "./BookFileMissingPanel";
 import { makePdfLocator, parsePdfLocator, parsePdfLocatorRange } from "./pdf-locator";
 import { pdfAnnosByPage, rangeFromOffsets, relativeRects } from "./pdf-annotations";
 import { buildPdfSelectionInfo, flatOffsetOf, pointInDomSelection } from "./pdf-selection";
@@ -330,6 +331,7 @@ export function PdfReader({ bookId, chapters }: Props) {
     );
   }, [pageH]);
 
+  if (bytes.data?.ok === false) return <BookFileMissingPanel bookId={bookId} />;
   if (bytes.isError) {
     return <p className="p-6 font-sans text-sm text-destructive">{t("reader.epub.loadError")}</p>;
   }
