@@ -21,18 +21,18 @@
 
 ## §1 核心决策总览
 
-| 决策点       | 结论                                                                                      |
-| ------------ | ----------------------------------------------------------------------------------------- |
-| 定位         | inline 工具不动；后台 pass 作补网，不替换                                                 |
-| 核心职责     | 补提取（读对话补漏存）+ 顺手巩固（合并近似 / 精炼已有记忆）                               |
-| 写入机制     | 结构化单发：`generateObject` 产出操作清单（Zod 判别联合）→ 纯函数 `applyMemoryOps` 落库   |
-| 触发         | 每 **N** 轮（常量，默认 5）；挂现有 `streamAssistantReply.onFinish`，紧邻 compaction      |
-| 进度水位线   | `conversations.memoryThroughSeq`，镜像 `summarizedThroughSeq`                             |
-| 删除约束     | 仅删「已并入他条的冗余副本」；**不删「陈旧」**（守 2026-06-10 §10.2：陈旧只有用户能判断） |
-| 模型 / 并发  | 复用 `summaryModel`（与压缩 / 命名 / 摘要同源）+ `runBackground` 限流器                   |
-| 门控         | 专属 `memoryAutoConsolidate`（默认 **false**）；且受 `memoryEnabled`（默认 true）总闸约束 |
-| 可见性       | 完成且有变更时，main 经 `app:notify` 推**结构化 counts**，renderer 本地化成轻 toast       |
-| 通知通道形态 | main 推结构化数据、renderer 本地化（i18n 在 renderer）；判别联合，今天只一个成员          |
+| 决策点       | 结论                                                                                                           |
+| ------------ | -------------------------------------------------------------------------------------------------------------- |
+| 定位         | inline 工具不动；后台 pass 作补网，不替换                                                                      |
+| 核心职责     | 补提取（读对话补漏存）+ 顺手巩固（合并近似 / 精炼已有记忆）                                                    |
+| 写入机制     | `generateText` 单发产出 JSON → 自管 `parseMemoryOps`（剥围栏/平衡括号/Zod 校验）→ 纯函数 `applyMemoryOps` 落库 |
+| 触发         | 每 **N** 轮（常量，默认 5）；挂现有 `streamAssistantReply.onFinish`，紧邻 compaction                           |
+| 进度水位线   | `conversations.memoryThroughSeq`，镜像 `summarizedThroughSeq`                                                  |
+| 删除约束     | 仅删「已并入他条的冗余副本」；**不删「陈旧」**（守 2026-06-10 §10.2：陈旧只有用户能判断）                      |
+| 模型 / 并发  | 复用 `summaryModel`（与压缩 / 命名 / 摘要同源）+ `runBackground` 限流器                                        |
+| 门控         | 专属 `memoryAutoConsolidate`（默认 **false**）；且受 `memoryEnabled`（默认 true）总闸约束                      |
+| 可见性       | 完成且有变更时，main 经 `app:notify` 推**结构化 counts**，renderer 本地化成轻 toast                            |
+| 通知通道形态 | main 推结构化数据、renderer 本地化（i18n 在 renderer）；判别联合，今天只一个成员                               |
 
 ## §2 触发与数据流
 
@@ -78,7 +78,7 @@ conversations
 
 ### 3.1 操作清单 schema
 
-用 `generateObject`（AI SDK v6）产出 Zod 判别联合操作清单（schema 定义在 `memory-consolidation.ts`，**不跨 IPC、不入 shared**）：
+操作清单是 Zod 判别联合（schema 定义在 `memory-consolidation.ts`，**不跨 IPC、不入 shared**）：
 
 ```ts
 const memoryOp = z.discriminatedUnion("op", [
@@ -91,6 +91,12 @@ const memoryPassOutput = z.object({ ops: z.array(memoryOp) });
 
 - `slug` 复用 `@shared/memory` 的 `memorySlug`（kebab-case 校验）。
 - `reason`：每条操作一句话理由，仅供 `log.debug` / 排障，不落库。
+
+### 3.1.1 取结构化输出：`generateText` + 自管解析（不依赖 `response_format`）
+
+**不用 `generateObject` / `response_format: json_object`**：OpenAI 兼容 provider 对 json_object 支持参差——DeepSeek/zenmux 等要求 prompt 含 "json" 字样否则直接拒（`AI_APICallError: must contain the word 'json'`），部分网关根本不支持该响应格式；`generateObject` 的 tool/function-calling 模式在部分模型上也不可靠。改用 `generateText` 单发（与压缩/摘要/命名一致——代码库其它 AI 调用本就全是 `generateText`），prompt 内给出明确 JSON 模板 + 范例，让模型直接吐 JSON。
+
+纯函数 `parseMemoryOps(text)` 健壮解析、provider 无关：剥 markdown 代码围栏 → 平衡括号扫出最外层 `{…}`（容忍模型在 JSON 前后夹带 prose）→ `JSON.parse` → `memoryPassOutput.safeParse`。任何环节失败返回 `null` → orchestrator `log.warn` + **不推进水位线** + 下轮重试（与 LLM 调用失败同一软失败路径）。解析逻辑可单测（干净 JSON / 代码围栏 / 夹带 prose / 畸形 JSON / schema 不符 / 无 JSON 各一例），比信任 provider 内部结构化输出更稳、更可观测。
 
 ### 3.2 确定性 apply
 
@@ -192,9 +198,11 @@ export type AppNotification = {
 
 - `applyMemoryOps`：save 新增 / update 既有 / delete；撞 slug 跳过 + warn；缺 slug 跳过 + warn；body 改动重解析互链（边表同步）；单条坏 op 不中断整批；counts 正确；`sourceBookId` 自动填。
 - `renderMemoryPassInput`：确定性、char 上限截断保留较新内容、空库 / 空切片形态。
+- `parseMemoryOps`：干净 JSON / 代码围栏包裹 / 夹带 prose 抽取 / 畸形 JSON → null / schema 不符 → null / 无 JSON → null。
+- `CONSOLIDATION_SYSTEM`：prompt 明确要求 JSON 输出（自管解析依赖此）。
 - 触发与水位线：assistant 轮数 < N 不跑、≥ N 跑；成功推进、空操作也推进、失败不推进。
 - 门控：`memoryAutoConsolidate=off` no-op；`memoryEnabled=off` no-op。
-- `maybeConsolidateMemory`：注入「返回固定 ops」的假模型 → 落库 + 推进水位线 + 有变更时调一次 `notify`（counts 正确）；注入「失败」的假模型 → warn + 水位线不变 + 不调 notify；零变更 → 不调 notify。
+- `maybeConsolidateMemory`：注入「返回固定 ops JSON」的假模型 → 落库 + 推进水位线 + 有变更时调一次 `notify`（counts 正确）；注入「调用抛错」「输出不可解析」的假模型 → warn + 水位线不变 + 不调 notify；零变更 → 不调 notify。
 - `preferences:set`：`memoryAutoConsolidate` 落盘（switch case 穷尽性，验证以 sqlite 为准）。
 - preload-api 漂移测试：`app.onNotify` 通道纳入收集。
 

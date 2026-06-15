@@ -21,15 +21,46 @@ import {
   maybeConsolidateMemory,
   __resetConsolidationRuntime,
   CONSOLIDATION_SYSTEM,
+  parseMemoryOps,
 } from "@main/ai/memory-consolidation";
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
 
 describe("CONSOLIDATION_SYSTEM", () => {
-  // 回归守卫：OpenAI 兼容 provider 在 json_object 响应格式下要求 prompt 含 "json" 字样，
-  // 否则整理 pass 每轮必挂（AI_APICallError: "must contain the word 'json'"）。
-  it("mentions json (required by OpenAI-compatible json_object response format)", () => {
+  // 自管解析依赖模型吐 JSON——prompt 必须明确要求 JSON 输出，否则 parseMemoryOps 无从下手。
+  it("instructs the model to output JSON", () => {
     expect(CONSOLIDATION_SYSTEM.toLowerCase()).toContain("json");
+  });
+});
+
+describe("parseMemoryOps", () => {
+  it("parses a clean JSON object", () => {
+    const r = parseMemoryOps('{"ops":[{"op":"delete","slug":"x","reason":"r"}]}');
+    expect(r?.ops).toHaveLength(1);
+  });
+
+  it("parses JSON wrapped in markdown code fences", () => {
+    const r = parseMemoryOps('```json\n{"ops":[]}\n```');
+    expect(r?.ops).toEqual([]);
+  });
+
+  it("extracts the JSON object even when the model wraps it in prose", () => {
+    const r = parseMemoryOps(
+      'Sure! Here are the operations:\n{"ops":[{"op":"delete","slug":"y","reason":"merged"}]}\nHope that helps.',
+    );
+    expect(r?.ops?.[0]?.slug).toBe("y");
+  });
+
+  it("returns null on malformed JSON", () => {
+    expect(parseMemoryOps("{ops: [}")).toBeNull();
+  });
+
+  it("returns null when the shape violates the schema", () => {
+    expect(parseMemoryOps('{"ops":[{"op":"frobnicate","slug":"z"}]}')).toBeNull();
+  });
+
+  it("returns null when there is no JSON object at all", () => {
+    expect(parseMemoryOps("I'm sorry, I can't help with that.")).toBeNull();
   });
 });
 
@@ -335,7 +366,7 @@ describe("maybeConsolidateMemory", () => {
     expect(notify).not.toHaveBeenCalled();
   });
 
-  it("holds the watermark and does not notify when generateObject throws", async () => {
+  it("holds the watermark and does not notify when the model call throws", async () => {
     const { db, conversationId, bookId } = await seedConvo(2);
     setPreference(db, "memoryAutoConsolidate", true);
     const notify = vi.fn();
@@ -350,6 +381,40 @@ describe("maybeConsolidateMemory", () => {
     };
     await maybeConsolidateMemory(
       { db, resolveModel: () => throwing, runBackground: passThrough, notify },
+      conversationId,
+      bookId,
+      2,
+    );
+    expect(readThrough(db, conversationId) ?? null).toBeNull();
+    expect(notify).not.toHaveBeenCalled();
+  });
+
+  it("holds the watermark and does not notify when the model output is unparseable", async () => {
+    const { db, conversationId, bookId } = await seedConvo(2);
+    setPreference(db, "memoryAutoConsolidate", true);
+    const notify = vi.fn();
+    const garbage: ResolvedModel = {
+      ok: true,
+      modelId: "garbage",
+      model: new MockLanguageModelV3({
+        doGenerate: async () => ({
+          finishReason: { unified: "stop" as const, raw: undefined },
+          usage: {
+            inputTokens: {
+              total: 1,
+              noCache: undefined,
+              cacheRead: undefined,
+              cacheWrite: undefined,
+            },
+            outputTokens: { total: 1, text: undefined, reasoning: undefined },
+          },
+          content: [{ type: "text" as const, text: "I'm sorry, I can't do that." }],
+          warnings: [],
+        }),
+      }),
+    };
+    await maybeConsolidateMemory(
+      { db, resolveModel: () => garbage, runBackground: passThrough, notify },
       conversationId,
       bookId,
       2,
