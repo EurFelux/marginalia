@@ -20,17 +20,23 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@renderer/components/ui/context-menu";
-import { useChatStore, getActiveConversationId } from "@renderer/store/chat-store";
+import {
+  useChatStore,
+  getActiveConversationId,
+  useActiveConversationId,
+} from "@renderer/store/chat-store";
 import { relativeTime } from "@renderer/lib/relative-time";
 import { conversationsQuery } from "@renderer/query/conversation-queries";
 import { qk } from "@renderer/query/keys";
+import { type ChatContext, contextKey } from "@renderer/ai/chat-context";
 
-export function ConversationsTab({ bookId }: { bookId: string }) {
+export function ConversationsTab({ context }: { context: ChatContext }) {
   const { t, i18n } = useTranslation();
   const qc = useQueryClient();
-  const activeId = useChatStore((s) => s.activeByBook[bookId] ?? null);
+  const key = contextKey(context);
+  const activeId = useActiveConversationId(context);
   const openConversation = useChatStore((s) => s.openConversation);
-  const convos = useQuery(conversationsQuery(bookId));
+  const convos = useQuery(conversationsQuery(context));
   const [confirmTarget, setConfirmTarget] = useState<ConversationDto | null>(null);
 
   // 删会话：abort 在跑流 + 级联删消息由主进程负责；成功后先清 active 再失效列表 + toast。
@@ -40,13 +46,13 @@ export function ConversationsTab({ bookId }: { bookId: string }) {
       // 先清 active（防 dangling 窗口内向已删会话发送），再失效列表。
       // 回落 = 新会话空状态（spec DD-3）：AIPanel 既有 effect 清面板，chips 预亮镜像「开书无会话」。
       const s = useChatStore.getState();
-      if (getActiveConversationId() === c.id) {
-        s.setActiveConversation(null);
+      if (getActiveConversationId(context) === c.id) {
+        s.setActiveConversation(context, null);
         s.setSummaryChipsPreset();
       }
       // 该会话的消息缓存整体移除（remove 非 invalidate——实体已没，不该 refetch；镜像 deleteBook）。
       qc.removeQueries({ queryKey: qk.messages(c.id) });
-      void qc.invalidateQueries({ queryKey: qk.conversations(bookId) });
+      void qc.invalidateQueries({ queryKey: qk.conversations(key) });
       toast.success(t("reader.conversation.deleted", "已删除会话"));
     },
     onError: (e) => {
@@ -95,7 +101,7 @@ export function ConversationsTab({ bookId }: { bookId: string }) {
               active={c.id === activeId}
               label={primaryLabel(c)}
               time={relativeTime(c.updatedAt, now, i18n.language)}
-              onOpen={() => openConversation(c.id)}
+              onOpen={() => openConversation(context, c.id)}
               onDeleteRequest={() => setConfirmTarget(c)}
             />
           ))}

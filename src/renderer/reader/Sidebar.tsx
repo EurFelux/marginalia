@@ -67,7 +67,7 @@ export function Sidebar({ bookId }: { bookId: string }) {
           <AnnotationsList bookId={bookId} />
         </TabsContent>
         <TabsContent value="conversations" className="min-h-0 overflow-hidden">
-          <ConversationsTab bookId={bookId} />
+          <ConversationsTab context={{ kind: "book", bookId }} />
         </TabsContent>
         <TabsContent value="book-notes" className="min-h-0 overflow-hidden">
           <BookNotesPanel bookId={bookId} />
