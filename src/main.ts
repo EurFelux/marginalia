@@ -20,6 +20,7 @@ import { registerPreferenceHandlers } from "@main/ipc/preferences-handlers";
 import { registerStatsHandlers } from "@main/ipc/stats-handlers";
 import { registerBackupHandlers } from "@main/ipc/backup-handlers";
 import { registerMemoryHandlers } from "@main/ipc/memory-handlers";
+import { registerAgentHandlers } from "@main/ipc/agent-handlers";
 import { initReadingClock, bindWindowToClock } from "@main/stats/clock-wiring";
 import { registerCoverProtocol, registerCoverProtocolScheme } from "@main/library/cover-protocol";
 import { registerMediaProtocol, registerMediaProtocolScheme } from "@main/media/media-protocol";
@@ -154,6 +155,7 @@ app.on("ready", async () => {
   registerAnnotationHandlers();
   registerBookNotesHandlers();
   registerPreferenceHandlers();
+  registerAgentHandlers();
   registerAiHandlers();
   registerLogHandlers();
   registerStatsHandlers();

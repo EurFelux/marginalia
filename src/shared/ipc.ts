@@ -52,6 +52,7 @@ import type { BackupExportResult, BackupInspection } from "@shared/backup";
 import { backupRestoreInput } from "@shared/backup";
 import type { MemoryDto } from "@shared/memory";
 import { deleteMemoryInput, updateMemoryInput } from "@shared/memory";
+import type { AvatarPickResult } from "@shared/agent";
 
 /** ping —— 演示"带入参且经 Zod 校验"的往返 */
 export const pingInput = z.object({ msg: z.string().min(1) });
@@ -277,4 +278,8 @@ export const C = {
   // logging
   logWrite: def("log:write", "invoke", logWriteInput, out<void>()),
   appOpenLogsDir: def("app:open-logs-dir", "invoke", z.void(), out<void>()),
+
+  // agent（头像）
+  agentPickAvatar: def("agent:pick-avatar", "invoke", z.void(), out<AvatarPickResult>()),
+  agentResetAvatar: def("agent:reset-avatar", "invoke", z.void(), out<void>()),
 };
