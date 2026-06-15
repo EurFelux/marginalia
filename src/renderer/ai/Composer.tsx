@@ -10,6 +10,7 @@ import { useChatStore } from "@renderer/store/chat-store";
 import { useNavigationStore } from "@renderer/store/navigation-store";
 import { registerComposerFocus } from "@renderer/ai/composer-focus";
 import { ContextPillBar } from "@renderer/ai/ContextPillBar";
+import { type ChatContext } from "@renderer/ai/chat-context";
 import { materializeSummaryChips } from "@renderer/ai/summary-chips";
 import { bookSummaryQuery, chapterSummaryQuery } from "@renderer/query/summary-queries";
 
@@ -17,16 +18,18 @@ interface Props {
   status: ChatStatus;
   onSend: (text: string, chips: Chip[]) => void;
   onStop: () => void;
+  context: ChatContext;
 }
 
-export function Composer({ status, onSend, onStop }: Props) {
+export function Composer({ status, onSend, onStop, context }: Props) {
   const { t } = useTranslation();
   const draftText = useChatStore((s) => s.draftText);
   const draftChips = useChatStore((s) => s.draftChips);
   const setDraftText = useChatStore((s) => s.setDraftText);
   const setDraftChips = useChatStore((s) => s.setDraftChips);
   const summaryChips = useChatStore((s) => s.summaryChips);
-  const bookId = useNavigationStore((s) => s.currentBookId);
+  // 摘要 chip 仅书上下文有意义；库上下文 bookId=null 使下面的 summary query 整体 disabled。
+  const bookId = context.kind === "book" ? context.bookId : null;
   const chapterId = useNavigationStore((s) => s.currentChapterId);
   const ref = useRef<HTMLTextAreaElement | null>(null);
   const isStreaming = status === "streaming" || status === "submitted";
@@ -76,7 +79,7 @@ export function Composer({ status, onSend, onStop }: Props) {
 
   return (
     <div className="shrink-0 border-t border-border bg-card/40 p-3">
-      <ContextPillBar />
+      <ContextPillBar context={context} />
       <div className="flex items-end gap-2 rounded-xl border border-border bg-background p-2 focus-within:ring-1 focus-within:ring-ring">
         <textarea
           ref={ref}

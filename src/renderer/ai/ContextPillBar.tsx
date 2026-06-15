@@ -10,6 +10,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "@renderer/compone
 import { useChatStore } from "@renderer/store/chat-store";
 import { useNavigationStore } from "@renderer/store/navigation-store";
 import { usePrefsStore } from "@renderer/store/prefs-store";
+import { type ChatContext } from "@renderer/ai/chat-context";
 import { bookSummaryQuery, chapterSummaryQuery } from "@renderer/query/summary-queries";
 import { qk } from "@renderer/query/keys";
 import type { SummaryView } from "@renderer/ai/summary-chips";
@@ -108,10 +109,11 @@ function SummaryHover({ view }: { view: SummaryView | undefined }) {
  * 摘要行为与原 SummaryChipToggles 一致：手动 off→on 且未生成（pending/unavailable）触发生成
  * （主进程 inFlight 幂等兜底）；自动预亮不触发。
  */
-export function ContextPillBar() {
+export function ContextPillBar({ context }: { context: ChatContext }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
-  const bookId = useNavigationStore((s) => s.currentBookId);
+  // 书相关 pill（章节/全书摘要、选区）只在 book 上下文出现；库上下文 bookId=null，仅留联网开关。
+  const bookId = context.kind === "book" ? context.bookId : null;
   const chapterId = useNavigationStore((s) => s.currentChapterId);
   const summaryChips = useChatStore((s) => s.summaryChips);
   const setSummaryChip = useChatStore((s) => s.setSummaryChip);
@@ -127,8 +129,30 @@ export function ContextPillBar() {
   });
   const book = useQuery({ ...bookSummaryQuery(bookId ?? ""), enabled: !!bookId });
 
-  if (!bookId) return null;
+  // 联网开关在两种上下文都显示（仅取决于是否配置了后端），故先构建好。
+  const webSearchPill = webSearchConfigured ? (
+    <ContextPill
+      icon={<Globe className="size-3" />}
+      label={t("ai.webSearch.toggle", "联网")}
+      on={webSearchEnabled}
+      onClick={() => setWebSearchEnabled(!webSearchEnabled)}
+      ariaPressed={webSearchEnabled}
+      hover={
+        <p className="text-muted-foreground">
+          {t("ai.webSearch.hover", "启用后 AI 可联网搜索（Exa）")}
+        </p>
+      }
+    />
+  ) : null;
 
+  // 库（library）上下文：无书，仅渲染联网开关（无开关则整体不渲染）。
+  if (!bookId) {
+    return webSearchPill ? (
+      <div className="mb-2 flex flex-wrap gap-1.5">{webSearchPill}</div>
+    ) : null;
+  }
+
+  // ↓ book 上下文（bookId 已收窄为 string）：摘要 pill + 联网开关 + 选区 pill。
   const selCtx = selectionContextOf(draftChips);
 
   // 手动点亮触发的生成失败要透传真实原因（如「未配置摘要模型」）——与 SummaryPill 显式生成同款 toast；
@@ -201,20 +225,7 @@ export function ContextPillBar() {
         summaryChips.book,
         BookOpen,
       )}
-      {webSearchConfigured && (
-        <ContextPill
-          icon={<Globe className="size-3" />}
-          label={t("ai.webSearch.toggle", "联网")}
-          on={webSearchEnabled}
-          onClick={() => setWebSearchEnabled(!webSearchEnabled)}
-          ariaPressed={webSearchEnabled}
-          hover={
-            <p className="text-muted-foreground">
-              {t("ai.webSearch.hover", "启用后 AI 可联网搜索（Exa）")}
-            </p>
-          }
-        />
-      )}
+      {webSearchPill}
       {selCtx && (
         <ContextPill
           icon={<TextSelect className="size-3" />}

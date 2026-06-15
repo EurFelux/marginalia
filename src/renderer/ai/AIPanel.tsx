@@ -175,7 +175,7 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
         </div>
       )}
 
-      <Composer status={status} onStop={stop} onSend={handleSend} />
+      <Composer status={status} onStop={stop} onSend={handleSend} context={context} />
     </div>
   );
 }
