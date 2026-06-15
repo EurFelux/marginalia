@@ -60,7 +60,11 @@ export function EpubSessionProvider({
   });
 
   useEffect(() => {
-    if (!bytes.data?.ok) return;
+    // enabled 守卫：非 epub 书（pdf）时本 Provider enabled=false。但 bytes query 与 PdfReader 共享
+    // 同一 qk.bookBytes，disabled observer 仍从共享缓存读到 pdf 字节——若不守卫，会对 pdf 字节误调
+    // createEpubBook：epubjs 解非 zip 字节卡死，且与 PdfReader 的 createPdfBook 争抢同一 ArrayBuffer
+    // （pdf.js 把 data transfer 到 worker 会 detach buffer），导致 pdf 永远卡「加载中」。故仅 epub 建 book。
+    if (!enabled || !bytes.data?.ok) return;
     const fileBytes = bytes.data.data;
     let alive = true;
     let created: EpubBook | null = null;
@@ -86,7 +90,7 @@ export function EpubSessionProvider({
       setBook(null);
       setParseError(null); // 换书/重解析时清旧错误，避免新书加载前短暂残留上一本的 parseError
     };
-  }, [bytes.data]);
+  }, [enabled, bytes.data]);
 
   // 共享 href（锚点切章）的章节需 anchor 级边界 CFI 才能归属标注。开书后异步预计算：
   // 渲染相关 section、为每个锚点章生成起点 CFI，按 CFI 升序存。未就绪时侧栏退化 href 级。
