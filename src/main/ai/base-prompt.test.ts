@@ -4,7 +4,7 @@ import { createDb, runMigrations } from "@main/db/client";
 import { createMemory } from "@main/memory/repository";
 import { setPreference } from "@main/preferences/repository";
 import { invalidateAllAgentContexts } from "@main/ai/agent-context";
-import { BASE_SYSTEM_PROMPT, buildSystemPrompt } from "@main/ai/base-prompt";
+import { BASE_SYSTEM_PROMPT, LIBRARY_SYSTEM_PROMPT, buildSystemPrompt } from "@main/ai/base-prompt";
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
 
@@ -38,5 +38,19 @@ describe("buildSystemPrompt", () => {
     const text = buildSystemPrompt(db, "conv-1");
     expect(text).not.toContain("## Memory guidance");
     expect(text).toContain("reading companion"); // base 模板仍在
+  });
+});
+
+describe("buildSystemPrompt — library kind", () => {
+  it("uses the librarian base when kind=library", () => {
+    const db = freshDb();
+    const text = buildSystemPrompt(db, "conv-lib", "library");
+    expect(text.startsWith(LIBRARY_SYSTEM_PROMPT)).toBe(true);
+    // Must not use the book-reader base template
+    expect(text.startsWith(BASE_SYSTEM_PROMPT)).toBe(false);
+  });
+  it("defaults to the reading-companion base (book) when kind omitted", () => {
+    const db = freshDb();
+    expect(buildSystemPrompt(db, "conv-book").startsWith(BASE_SYSTEM_PROMPT)).toBe(true);
   });
 });

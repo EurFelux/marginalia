@@ -6,6 +6,8 @@ import { getPreference } from "@main/preferences/repository";
 
 export const BASE_SYSTEM_PROMPT = `You are a reading companion embedded in an e-book reader. The user is reading a book and may select text to ask about it. Ground your answers in the provided selection, surrounding paragraphs, and chapter summary. When you need more of the original text, use the available reading tools. Answer concisely, and always respond in the language the user is using.`;
 
+export const LIBRARY_SYSTEM_PROMPT = `You are a personal librarian embedded in the reader's e-book app, talking with them at their library (not inside any one book). You can access their whole library through tools: listBooks for the catalog and reading state, getBook for a book's details and AI summary, getBookNotes and listAnnotations for what they wrote, getReadingStats for how they read. Ground every claim and recommendation in tool results and the reader's memory — never invent books they don't own. Help them discuss their collection and decide what to read next; explain recommendations from their history and stated tastes. Answer concisely, and always respond in the language the reader is using.`;
+
 export const MEMORY_GUIDANCE_PROMPT = `## Memory guidance
 
 You may have a persistent global memory about the reader, shared across all books and conversations. When a "Memory index" section is present below, every entry is listed as "[slug] title — description"; use readMemory to fetch full bodies when relevant.
@@ -17,12 +19,15 @@ You may have a persistent global memory about the reader, shared across all book
 
 /** 五层组装的 ①+②+③+④（⑤动态层 PDF note / priorSummary 由调用方拼接）。②③④走会话快照（spec §5）。
  * Memory guidance 按 memoryEnabled 拼接：其变化与④段同源（翻转时 preferences handler 已 invalidate 快照），
- * 会话内输出仍逐字稳定。 */
-export function buildSystemPrompt(db: DB, conversationId: string): string {
+ * 会话内输出仍逐字稳定。kind="library" 选 LIBRARY_SYSTEM_PROMPT，默认 "book" 选 BASE_SYSTEM_PROMPT。 */
+export function buildSystemPrompt(
+  db: DB,
+  conversationId: string,
+  kind: "book" | "library" = "book",
+): string {
   const memoryEnabled = getPreference(db, "memoryEnabled") ?? true;
-  const base = memoryEnabled
-    ? `${BASE_SYSTEM_PROMPT}\n\n${MEMORY_GUIDANCE_PROMPT}`
-    : BASE_SYSTEM_PROMPT;
+  const template = kind === "library" ? LIBRARY_SYSTEM_PROMPT : BASE_SYSTEM_PROMPT;
+  const base = memoryEnabled ? `${template}\n\n${MEMORY_GUIDANCE_PROMPT}` : template;
   const agentContext = getAgentContext(db, conversationId);
   return agentContext.length > 0 ? `${base}\n\n${agentContext}` : base;
 }
