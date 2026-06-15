@@ -75,11 +75,13 @@ export function createIpcChatTransport(): ChatTransport<ChatUIMessage> {
           const { default: i18n } = await import("@renderer/i18n");
           throw new Error(i18n.t("ai.cannotResend", "无法重发：找不到会话或目标消息"));
         }
+        const webSearch = useChatStore.getState().webSearchEnabled;
         const ack = await window.api.ai.resend({
           streamId,
           conversationId,
           userMessageId: last.id,
           userText,
+          webSearch,
         });
         if (!ack.ok) {
           void stream.cancel();
@@ -96,6 +98,7 @@ export function createIpcChatTransport(): ChatTransport<ChatUIMessage> {
         conversationId = convo.id;
       }
       const chips = (last?.metadata?.contextChips ?? []).filter((c) => c.state !== "off");
+      const webSearch = useChatStore.getState().webSearchEnabled;
       const ack = await window.api.ai.send({
         streamId,
         bookId: currentBookId,
@@ -103,6 +106,7 @@ export function createIpcChatTransport(): ChatTransport<ChatUIMessage> {
         chips,
         userText,
         readingContext,
+        webSearch,
       });
       if (!ack.ok) {
         void stream.cancel(); // 触发 cancel() → 退订，避免监听器泄漏

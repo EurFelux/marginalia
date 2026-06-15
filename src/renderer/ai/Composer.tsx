@@ -1,13 +1,14 @@
 import { useEffect, useRef, type KeyboardEvent } from "react";
 import type { ChatStatus } from "ai";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowUp, Square } from "lucide-react";
+import { ArrowUp, Globe, Square } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { Chip } from "@shared/chat";
 import { Button } from "@renderer/components/ui/button";
 import { isSubmitEnter } from "@renderer/lib/keyboard";
 import { useChatStore } from "@renderer/store/chat-store";
 import { useNavigationStore } from "@renderer/store/navigation-store";
+import { usePrefsStore } from "@renderer/store/prefs-store";
 import { registerComposerFocus } from "@renderer/ai/composer-focus";
 import { ContextPillBar } from "@renderer/ai/ContextPillBar";
 import { materializeSummaryChips } from "@renderer/ai/summary-chips";
@@ -26,6 +27,9 @@ export function Composer({ status, onSend, onStop }: Props) {
   const setDraftText = useChatStore((s) => s.setDraftText);
   const setDraftChips = useChatStore((s) => s.setDraftChips);
   const summaryChips = useChatStore((s) => s.summaryChips);
+  const webSearchEnabled = useChatStore((s) => s.webSearchEnabled);
+  const setWebSearchEnabled = useChatStore((s) => s.setWebSearchEnabled);
+  const webSearchConfigured = usePrefsStore((s) => s.webSearch?.enabled ?? false);
   const bookId = useNavigationStore((s) => s.currentBookId);
   const chapterId = useNavigationStore((s) => s.currentChapterId);
   const ref = useRef<HTMLTextAreaElement | null>(null);
@@ -87,6 +91,21 @@ export function Composer({ status, onSend, onStop }: Props) {
           placeholder={t("ai.composer.placeholder", "问点什么…（Enter 发送，Shift+Enter 换行）")}
           className="max-h-32 min-h-9 flex-1 resize-none overflow-y-auto bg-transparent px-1 py-1 text-sm outline-none placeholder:text-muted-foreground"
         />
+        <Button
+          type="button"
+          variant={webSearchEnabled ? "default" : "ghost"}
+          size="icon-lg"
+          disabled={!webSearchConfigured}
+          aria-label={t("ai.webSearch.toggle", "联网搜索")}
+          title={
+            webSearchConfigured
+              ? undefined
+              : t("ai.webSearch.notConfigured", "请先在设置中配置联网搜索")
+          }
+          onClick={() => setWebSearchEnabled(!webSearchEnabled)}
+        >
+          <Globe />
+        </Button>
         {isStreaming ? (
           <Button
             variant="secondary"
