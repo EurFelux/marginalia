@@ -81,12 +81,13 @@ const config: ForgeConfig = {
     new MakerDeb({}),
   ],
   publishers: [
-    // 发布到 GitHub Release：draft 先上传草稿（网页补 notes 后手动发布），0.x 阶段一律标 prerelease。
-    // token 经 GITHUB_TOKEN 注入（见 package.json 的 release script，从 gh keyring 现取不落盘）。
+    // 发布到 GitHub Release，直接发布为 Latest（notes 由 pnpm release:notes 自动填，无需网页手动补）。
+    // ⚠️ 非 draft 发布时 GitHub 按 origin/main 远端 HEAD 打 v<ver> tag，故 release 前必须先 push main，
+    //    否则 tag 落在旧 commit。token 经 GITHUB_TOKEN 注入（见 package.json release script，从 gh keyring 现取不落盘）。
     new PublisherGithub({
       repository: { owner: "EurFelux", name: "marginalia" },
-      prerelease: true,
-      draft: true,
+      prerelease: false,
+      draft: false,
     }),
   ],
   plugins: [
