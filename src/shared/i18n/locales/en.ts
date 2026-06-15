@@ -22,7 +22,7 @@ export default {
   "ai.emptyHint": "Select text and tap 「Ask AI」, or just ask below.",
   "ai.messageActions": "Message actions",
   "ai.newConversation": "New conversation",
-  "ai.noBookToSend": "No book is open; cannot send.",
+  "ai.openLibraryAssistant": "Ask Lia",
   "ai.panelTitle": "{{name}}",
   "ai.regenerate": "Regenerate",
   "ai.resend": "Resend",

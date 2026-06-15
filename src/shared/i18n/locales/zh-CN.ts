@@ -22,7 +22,7 @@ export default {
   "ai.emptyHint": "划选正文后点「AI 问」，或直接在下方提问。",
   "ai.messageActions": "消息操作",
   "ai.newConversation": "新对话",
-  "ai.noBookToSend": "没有正在阅读的书，无法发送。",
+  "ai.openLibraryAssistant": "问问 Lia",
   "ai.panelTitle": "{{name}}",
   "ai.regenerate": "重新生成",
   "ai.resend": "重新发送",
