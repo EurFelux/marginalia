@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { annotationStyle } from "@shared/annotations";
 import { uiLanguage } from "@shared/i18n/language";
+import { webSearchConfig } from "@shared/web-search";
 
 /** 正文字体档位:default=原书默认(零干预);其余映射到打包字体栈(见 renderer 的 font-stacks)。 */
 export const readerFontFamily = z.enum(["default", "wenkai", "serif", "sans"]);
@@ -104,6 +105,7 @@ export const PREFERENCE_SCHEMAS = {
   ttsPrefs: ttsPrefsSchema,
   showAgentAvatar: z.boolean(),
   avatarBlobId: z.string().nullable(),
+  webSearch: webSearchConfig,
 } as const;
 
 export type PreferenceKey = keyof typeof PREFERENCE_SCHEMAS;
@@ -140,5 +142,6 @@ export const setPreferenceInput = z.discriminatedUnion("key", [
   z.object({ key: z.literal("ttsPrefs"), value: ttsPrefsSchema }),
   z.object({ key: z.literal("showAgentAvatar"), value: z.boolean() }),
   z.object({ key: z.literal("avatarBlobId"), value: z.string().nullable() }),
+  z.object({ key: z.literal("webSearch"), value: webSearchConfig }),
 ]);
 export type SetPreferenceInput = z.infer<typeof setPreferenceInput>;

@@ -38,6 +38,7 @@ describe("preferences schemas", () => {
       "stepLimit",
       "summaryModel",
       "ttsPrefs",
+      "webSearch",
     ]);
   });
 
@@ -178,5 +179,18 @@ describe("ttsPrefs preference", () => {
     expect(schema.safeParse({ rate: 1.5, voiceByLang: { zh: "Tingting" } }).success).toBe(true);
     expect(schema.safeParse({ rate: 3, voiceByLang: {} }).success).toBe(false);
     expect(schema.safeParse({ rate: 0.1, voiceByLang: {} }).success).toBe(false);
+  });
+});
+
+describe("webSearch preference", () => {
+  it("is registered in PREFERENCE_SCHEMAS", () => {
+    expect("webSearch" in PREFERENCE_SCHEMAS).toBe(true);
+  });
+  it("validates a set payload", () => {
+    const r = setPreferenceInput.safeParse({
+      key: "webSearch",
+      value: { enabled: true, backends: [{ kind: "exa-mcp", apiKey: "sk" }] },
+    });
+    expect(r.success).toBe(true);
   });
 });
