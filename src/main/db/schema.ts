@@ -1,5 +1,5 @@
 import {
-  blob,
+  blob as blob_,
   check,
   index,
   integer,
@@ -56,7 +56,7 @@ export const books = sqliteTable(
     id: text("id").primaryKey(), // 内容稳定 ID：ePub 取 dc:identifier（缺失回退文件哈希）；PDF 恒为文件哈希（#50 记有统一议题）
     title: text("title"),
     author: text("author"),
-    cover: blob("cover", { mode: "buffer" }),
+    cover: blob_("cover", { mode: "buffer" }),
     toc: text("toc", { mode: "json" }).$type<TocNode[]>(),
     // 全书摘要正文：唯一持久化的事实。状态（pending/generating/ready/unavailable）是运行时派生，
     // 不入 DB——summary!=null=ready，内存 inFlight=generating，内存 failed=unavailable，否则 pending。
@@ -280,3 +280,12 @@ export const readingDaily = sqliteTable(
     index("reading_daily_book_id_idx").on(t.bookId),
   ],
 );
+
+// 通用二进制资源池（spec 2026-06-15-assistant-avatar §2.1）。本期首个使用者＝assistant 头像；
+// 书封面 cover 迁入见 #83。业务表以 FK（如 preferences.avatarBlobId）引用，不再各自存 BLOB。
+export const blob = sqliteTable("blob", {
+  id: pkUuid(),
+  data: blob_("data", { mode: "buffer" }).notNull(),
+  mimeType: text("mime_type").notNull(), // 写入时 magic-byte 嗅探一次存入；读时直接用
+  createdAt: nowMs(),
+});
