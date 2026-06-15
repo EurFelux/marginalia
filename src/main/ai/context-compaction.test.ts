@@ -269,6 +269,8 @@ describe("maybeCompactConversation", () => {
     );
 
     // Yield to allow microtasks + the limiter to schedule the first slot.
+    // 用宏任务（setTimeout 0）而非 await Promise.resolve()：maybeCompactConversation 在 generateText
+    // 前有 DB 读 + planFold 等多层微任务，单个微任务 tick 不足以推进到第一个槽进入，需宏任务边界兜住调度。
     await new Promise<void>((r) => setTimeout(r, 0));
 
     // First generateText must have started (it holds the only slot).
