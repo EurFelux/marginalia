@@ -8,7 +8,6 @@ import { Button } from "@renderer/components/ui/button";
 import { ScrollArea } from "@renderer/components/ui/scroll-area";
 import { useChatStore, useActiveConversationId } from "@renderer/store/chat-store";
 import { usePrefsStore } from "@renderer/store/prefs-store";
-import { useNavigationStore } from "@renderer/store/navigation-store";
 import { createIpcChatTransport } from "@renderer/ai/ipc-chat-transport";
 import type { ChatUIMessage } from "@renderer/ai/types";
 import { MessageList } from "@renderer/ai/MessageList";
@@ -19,23 +18,23 @@ import type { Chip } from "@shared/chat";
 import { openPanelAndFocusComposer } from "@renderer/ai/composer-focus";
 import { ChatActionsContext, nextAssistantId, type ChatActions } from "@renderer/ai/chat-actions";
 import { createLogger } from "@renderer/logger";
+import { type ChatContext } from "@renderer/ai/chat-context";
 
 const log = createLogger("ai");
 
-export function AIPanel() {
+export function AIPanel({ context, onClose }: { context: ChatContext; onClose: () => void }) {
   const { t } = useTranslation();
   const { messages, sendMessage, status, stop, setMessages, regenerate, error } =
     useChat<ChatUIMessage>({
-      transport: createIpcChatTransport(),
+      transport: createIpcChatTransport(context),
       // 流式错误此前只塞进 error 字段弹 banner、从不落日志；补一条 warn 使渲染侧失败也有痕迹可查。
       onError: (err) => log.warn("chat stream error", err),
     });
-  const updateLayout = usePrefsStore((s) => s.updateLayout);
   const agentName = usePrefsStore((s) => s.soul.name);
   const openCommand = useChatStore((s) => s.openCommand);
-  const activeConversationId = useActiveConversationId();
-  const bookId = useNavigationStore((s) => s.currentBookId);
-  const convosQuery = useQuery({ ...conversationsQuery(bookId ?? ""), enabled: !!bookId });
+  const activeConversationId = useActiveConversationId(context);
+  const bookId = context.kind === "book" ? context.bookId : null;
+  const convosQuery = useQuery(conversationsQuery(context));
   const activeTitle = activeConversationId
     ? convosQuery.data?.find((c) => c.id === activeConversationId)?.title?.trim() ||
       t("reader.conversation.untitled", "未命名会话")
@@ -89,13 +88,13 @@ export function AIPanel() {
   }, [activeConversationId, setMessages]);
 
   const newConversation = async () => {
-    const bookId = useNavigationStore.getState().currentBookId;
-    if (!bookId) return;
     try {
       // 显式创建空会话（spec §2/§7）；防堆积由主进程兜底（复用既有空会话）
-      const convo = await window.api.chat.conversations.create({ bookId });
+      const convo = await window.api.chat.conversations.create({
+        bookId: context.kind === "book" ? context.bookId : null,
+      });
       setMessages([]);
-      useChatStore.getState().setActiveConversation(convo.id);
+      useChatStore.getState().setActiveConversation(context, convo.id);
       useChatStore.getState().setSummaryChipsPreset();
       openPanelAndFocusComposer();
       void qc.invalidateQueries({ queryKey: ["conversations"] });
@@ -150,7 +149,7 @@ export function AIPanel() {
           <Button
             variant="ghost"
             size="icon-sm"
-            onClick={() => updateLayout({ panelOpen: false })}
+            onClick={onClose}
             aria-label={t("ai.closePanel", "关闭面板")}
             className="text-muted-foreground"
           >

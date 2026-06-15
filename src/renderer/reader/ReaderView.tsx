@@ -279,7 +279,10 @@ export function ReaderView() {
             onWidthChange={setPanelWidth}
             label={t("reader.expandAiPanel", "展开 AI 面板")}
           >
-            <AIPanel />
+            <AIPanel
+              context={{ kind: "book", bookId }}
+              onClose={() => updateLayout({ panelOpen: false })}
+            />
           </CollapsiblePane>
         </div>
       </EpubSessionProvider>

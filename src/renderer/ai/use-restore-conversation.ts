@@ -40,9 +40,9 @@ export function useRestoreConversation(bookId: string | null) {
         const s = useChatStore.getState();
         const target = pickRestoreTarget(list, s.activeByBook[bookId]);
         if (target.kind === "restore") {
-          s.restoreConversation(target.id);
+          s.restoreConversation({ kind: "book", bookId }, target.id);
         } else {
-          s.setActiveConversation(null);
+          s.setActiveConversation({ kind: "book", bookId }, null);
           s.setSummaryChipsPreset();
         }
       })
