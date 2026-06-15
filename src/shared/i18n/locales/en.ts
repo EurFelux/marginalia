@@ -58,8 +58,9 @@ export default {
   "ai.toolStep.readPageFallback": "Reading page",
   "ai.toolStep.webSearch": "Web search: {{query}}",
   "ai.toolStep.webSearchFallback": "Web search",
+  "ai.webSearch.hover": "Enable web search for this message (Exa)",
   "ai.webSearch.notConfigured": "Configure web search in settings first",
-  "ai.webSearch.toggle": "Web search",
+  "ai.webSearch.toggle": "Web",
   "bookNotes.add": "New note",
   "bookNotes.addTitle": "New note",
   "bookNotes.createError": "Failed to save note: {{error}}",
@@ -386,6 +387,10 @@ export default {
   "settings.tts.voiceZh": "Chinese voice",
   "settings.webSearch": "Web search",
   "settings.webSearch.apiKey": "Exa API Key",
+  "settings.webSearch.apiKeyHint":
+    "Free tier works without a key. Adding a key raises rate limits and improves result quality.",
+  "settings.webSearch.apiKeyOptional": "(optional)",
+  "settings.webSearch.apiKeyPlaceholder": "exa-… (leave blank for free tier)",
   "settings.webSearch.enable": "Enable web search",
   "settings.webSearch.enableHint":
     "Let the AI fetch external information when you toggle web search on per message (Exa).",
