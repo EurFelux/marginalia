@@ -16,6 +16,7 @@ import { qk } from "../query/keys";
 import { chapterIdByHref } from "./chapter-id-by-href";
 import { pickAnchorChapterId } from "./current-anchor-chapter";
 import { useEpubSession } from "./epub-session";
+import { BookFileMissingPanel } from "./BookFileMissingPanel";
 import { epubPercent } from "./percent";
 import { prefsToCss } from "./prefs-to-css";
 import { readerThemeCss } from "./reader-theme-css";
@@ -52,7 +53,7 @@ const CURRENT_EPUB_READ_CHARS = 4_000;
 export function EpubReader({ bookId, chapters }: Props) {
   const { t } = useTranslation();
   const vRef = useRef<VirtualDocsHandle | null>(null);
-  const { book, parseError, bytesError } = useEpubSession();
+  const { book, parseError, bytesError, bytesMissing } = useEpubSession();
 
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
   const currentChapterId = useNavigationStore((s) => s.currentChapterId);
@@ -363,6 +364,7 @@ export function EpubReader({ bookId, chapters }: Props) {
     return () => document.removeEventListener("scroll", onScroll, true);
   }, [closeStyleBar, setSelection, closeNoteHover]);
 
+  if (bytesMissing) return <BookFileMissingPanel bookId={bookId} />;
   if (bytesError)
     return <ReaderError message={t("reader.epub.loadError", "无法读取此书的文件。")} />;
   if (parseError)

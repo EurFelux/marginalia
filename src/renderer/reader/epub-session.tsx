@@ -16,6 +16,8 @@ export interface EpubSession {
   spineHrefs: string[];
   anchorBoundaries: AnchorBoundary[];
   parseError: string | null;
+  /** app 自有副本缺失（safe-return ok:false）——EpubReader 据此挂缺失面板。 */
+  bytesMissing: boolean;
   bytesError: boolean;
 }
 
@@ -135,7 +137,14 @@ export function EpubSessionProvider({
 
   return (
     <EpubSessionContext.Provider
-      value={{ book, spineHrefs, anchorBoundaries, parseError, bytesError: bytes.isError }}
+      value={{
+        book,
+        spineHrefs,
+        anchorBoundaries,
+        parseError,
+        bytesMissing: bytes.data?.ok === false,
+        bytesError: bytes.isError,
+      }}
     >
       {children}
     </EpubSessionContext.Provider>
