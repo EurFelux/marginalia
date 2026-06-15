@@ -1,3 +1,6 @@
+import type { DB } from "@main/db/client";
+import { dailyTotals, perBookTotals } from "@main/stats/reading-daily";
+import { localDayKey } from "@main/stats/day-key";
 import type { DailyPoint, ReadingStatsDto } from "@shared/stats";
 
 /** 当天合计达此秒数才算「读过书的一天」（streak / readingDays 计入门槛）。 */
@@ -67,4 +70,16 @@ export function aggregateStats(
     readingDays: qualifyingDays.length,
     daily,
   };
+}
+
+/** Stats 视图默认窗口（与 statsGet handler 的 `?? 30` 对齐）。 */
+export const DEFAULT_DAILY_DAYS = 30;
+
+/**
+ * 纯函数（注入 DB）组装完整 ReadingStatsDto。
+ * 供书库 AI 工具（library-tools）与 stats handler 共用，避免重复拼装逻辑。
+ */
+export function aggregateReadingStats(db: DB): ReadingStatsDto {
+  const core = aggregateStats(dailyTotals(db), DEFAULT_DAILY_DAYS, localDayKey(Date.now()));
+  return { ...core, perBook: perBookTotals(db) };
 }
