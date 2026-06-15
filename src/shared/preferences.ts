@@ -102,6 +102,8 @@ export const PREFERENCE_SCHEMAS = {
   soul: soulSchema,
   instructions: z.string(),
   ttsPrefs: ttsPrefsSchema,
+  showAgentAvatar: z.boolean(),
+  avatarBlobId: z.string().nullable(),
 } as const;
 
 export type PreferenceKey = keyof typeof PREFERENCE_SCHEMAS;
@@ -136,5 +138,7 @@ export const setPreferenceInput = z.discriminatedUnion("key", [
   z.object({ key: z.literal("soul"), value: soulSchema }),
   z.object({ key: z.literal("instructions"), value: z.string() }),
   z.object({ key: z.literal("ttsPrefs"), value: ttsPrefsSchema }),
+  z.object({ key: z.literal("showAgentAvatar"), value: z.boolean() }),
+  z.object({ key: z.literal("avatarBlobId"), value: z.string().nullable() }),
 ]);
 export type SetPreferenceInput = z.infer<typeof setPreferenceInput>;

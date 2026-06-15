@@ -50,6 +50,10 @@ export const preferencesBindings: Binding[] = [
       }
       case "ttsPrefs":
         return setPreference(getDb(), input.key, input.value);
+      case "showAgentAvatar":
+        return setPreference(getDb(), input.key, input.value);
+      case "avatarBlobId":
+        return setPreference(getDb(), input.key, input.value);
       default: {
         // 穷尽性守卫：注册新 preference key 后漏补本 switch 的 case 会在此编译报错。
         // （曾静默吞写：readerLayout/summaryModel 缺 case 时 IPC 返回成功但什么都没落盘。）

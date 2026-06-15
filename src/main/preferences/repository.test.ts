@@ -129,4 +129,14 @@ describe("preferences repository", () => {
     const row = db.select().from(preferences).where(eq(preferences.key, "autoSummarize")).get();
     expect(row?.updatedAt).toBeGreaterThan(1);
   });
+
+  it("round-trips avatarBlobId (nullable) and showAgentAvatar", () => {
+    const db = freshDb();
+    setPreference(db, "showAgentAvatar", false);
+    expect(getPreference(db, "showAgentAvatar")).toBe(false);
+    setPreference(db, "avatarBlobId", "blob-123");
+    expect(getPreference(db, "avatarBlobId")).toBe("blob-123");
+    setPreference(db, "avatarBlobId", null);
+    expect(getPreference(db, "avatarBlobId")).toBeNull();
+  });
 });

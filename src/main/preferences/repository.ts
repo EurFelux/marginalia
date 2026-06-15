@@ -16,13 +16,18 @@ export function getPreference<K extends PreferenceKey>(db: DB, key: K): Preferen
   return parsed.success ? (parsed.data as PreferenceValue<K>) : null;
 }
 
-/** 写单个偏好（upsert）；写前按 key 的 schema 校验，非法值抛错。 */
+/** 写单个偏好（upsert）；写前按 key 的 schema 校验，非法值抛错。值为 null 时删除行（等效于 unset）。 */
 export function setPreference<K extends PreferenceKey>(
   db: DB,
   key: K,
   value: PreferenceValue<K>,
 ): void {
   const validated = PREFERENCE_SCHEMAS[key].parse(value);
+  if (validated === null) {
+    // nullable preference（如 avatarBlobId）置 null = 删行；getPreference 缺行已返回 null。
+    db.delete(preferences).where(eq(preferences.key, key)).run();
+    return;
+  }
   const now = Date.now();
   db.insert(preferences)
     .values({ key, value: validated, updatedAt: now })
