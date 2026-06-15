@@ -40,6 +40,7 @@ import { openPanelAndFocusComposer } from "@renderer/ai/composer-focus";
 import { TtsControlBar } from "@renderer/reader/TtsControlBar";
 import { ttsController } from "@renderer/reader/tts/tts-controller";
 import { useTtsStore } from "@renderer/store/tts-store";
+import { EpubSessionProvider } from "@renderer/reader/epub-session";
 
 export function ReaderView() {
   const { t } = useTranslation();
@@ -250,36 +251,38 @@ export function ReaderView() {
         </header>
       </CollapsiblePane>
       {/* overflow-hidden：收起抽屉以 translate 藏出容器边缘，不裁剪会撑出横向滚动。 */}
-      <div className="relative flex min-h-0 flex-1 overflow-hidden">
-        <CollapsiblePane
-          side="left"
-          open={layout.sidebarOpen}
-          width={sidebarWidth}
-          onWidthChange={setSidebarWidth}
-          label={t("reader.expandSidebar", "展开侧栏")}
-        >
-          <Sidebar bookId={bookId} />
-        </CollapsiblePane>
-        <main className="relative min-w-0 flex-1">
-          {/* 按格式分发：book 查询就绪前不渲染（避免 PDF 书闪挂 EpubReader）。
-              EpubReader 自管载入/错误态，并据 CFI 进度恢复初始位置。 */}
-          {book.isPending ? null : book.data?.format === "pdf" ? (
-            <PdfReader bookId={bookId} chapters={chapters.data ?? []} />
-          ) : (
-            <EpubReader bookId={bookId} chapters={chapters.data ?? []} />
-          )}
-          <TtsControlBar />
-        </main>
-        <CollapsiblePane
-          side="right"
-          open={layout.panelOpen}
-          width={panelWidth}
-          onWidthChange={setPanelWidth}
-          label={t("reader.expandAiPanel", "展开 AI 面板")}
-        >
-          <AIPanel />
-        </CollapsiblePane>
-      </div>
+      <EpubSessionProvider bookId={bookId} enabled={book.data?.format === "epub"}>
+        <div className="relative flex min-h-0 flex-1 overflow-hidden">
+          <CollapsiblePane
+            side="left"
+            open={layout.sidebarOpen}
+            width={sidebarWidth}
+            onWidthChange={setSidebarWidth}
+            label={t("reader.expandSidebar", "展开侧栏")}
+          >
+            <Sidebar bookId={bookId} />
+          </CollapsiblePane>
+          <main className="relative min-w-0 flex-1">
+            {/* 按格式分发：book 查询就绪前不渲染（避免 PDF 书闪挂 EpubReader）。
+                EpubReader 自管载入/错误态，并据 CFI 进度恢复初始位置。 */}
+            {book.isPending ? null : book.data?.format === "pdf" ? (
+              <PdfReader bookId={bookId} chapters={chapters.data ?? []} />
+            ) : (
+              <EpubReader bookId={bookId} chapters={chapters.data ?? []} />
+            )}
+            <TtsControlBar />
+          </main>
+          <CollapsiblePane
+            side="right"
+            open={layout.panelOpen}
+            width={panelWidth}
+            onWidthChange={setPanelWidth}
+            label={t("reader.expandAiPanel", "展开 AI 面板")}
+          >
+            <AIPanel />
+          </CollapsiblePane>
+        </div>
+      </EpubSessionProvider>
       <SelectionToolbar />
       <HighlightStyleBar />
       <NoteModal />

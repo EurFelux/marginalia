@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { createLogger } from "@renderer/logger";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -15,7 +15,7 @@ import { usePrefsStore } from "@renderer/store/prefs-store";
 import { qk } from "../query/keys";
 import { chapterIdByHref } from "./chapter-id-by-href";
 import { pickAnchorChapterId } from "./current-anchor-chapter";
-import { createEpubBook, type EpubBook } from "./epub-book";
+import { useEpubSession } from "./epub-session";
 import { epubPercent } from "./percent";
 import { prefsToCss } from "./prefs-to-css";
 import { readerThemeCss } from "./reader-theme-css";
@@ -52,8 +52,7 @@ const CURRENT_EPUB_READ_CHARS = 4_000;
 export function EpubReader({ bookId, chapters }: Props) {
   const { t } = useTranslation();
   const vRef = useRef<VirtualDocsHandle | null>(null);
-  const [book, setBook] = useState<EpubBook | null>(null);
-  const [parseError, setParseError] = useState<string | null>(null);
+  const { book, parseError, bytesError } = useEpubSession();
 
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
   const currentChapterId = useNavigationStore((s) => s.currentChapterId);
@@ -78,12 +77,6 @@ export function EpubReader({ bookId, chapters }: Props) {
   // 进度精确恢复只做一次（每次开书/换书重置）；防 progress 缓存更新触发的重复恢复。
   const restoredRef = useRef(false);
 
-  const bytes = useQuery({
-    queryKey: qk.bookBytes(bookId),
-    queryFn: () => window.api.library.readBookBytes({ bookId }),
-    staleTime: Infinity,
-  });
-
   // 恢复位置：进度 locator（ePub 下为 CFI 串）→ spine index（开书时取一次）。
   const progress = useQuery({
     queryKey: qk.progress(bookId),
@@ -97,36 +90,14 @@ export function EpubReader({ bookId, chapters }: Props) {
     staleTime: Infinity,
   });
 
+  // book 生命周期已提升到 EpubSessionProvider；reader 自有状态的「切书重置」改由此处接管。
   useEffect(() => {
-    if (!bytes.data) return;
-    let alive = true;
-    let created: EpubBook | null = null;
-    setParseError(null);
-    createEpubBook(bytes.data)
-      .then((b) => {
-        if (!alive) {
-          b.destroy();
-          return;
-        }
-        created = b;
-        setBook(b);
-      })
-      .catch((err: unknown) => {
-        if (alive) {
-          log.error("epub parse failed", err);
-          setParseError(err instanceof Error ? err.message : String(err));
-        }
-      });
-    return () => {
-      alive = false;
-      created?.destroy();
-      setBook(null);
-      // 换书/重解析时丢弃挂起的进度保存与滚动章快照，避免把上一本的状态带到下一本。
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-      topChapterIdRef.current = null;
-      restoredRef.current = false;
-    };
-  }, [bytes.data]);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = null;
+    topChapterIdRef.current = null;
+    topSectionIndexRef.current = 0;
+    restoredRef.current = false;
+  }, [bookId]);
 
   // 把锚点级 CFI 解析回 section 内元素并精确滚到它（恢复 / 标注跳转复用）。CFI → section index →
   // VirtualDocs 等 iframe 就绪 + virtuoso 测量后收敛定位到该元素。失败退化为 section 顶。
@@ -392,7 +363,7 @@ export function EpubReader({ bookId, chapters }: Props) {
     return () => document.removeEventListener("scroll", onScroll, true);
   }, [closeStyleBar, setSelection, closeNoteHover]);
 
-  if (bytes.isError)
+  if (bytesError)
     return <ReaderError message={t("reader.epub.loadError", "无法读取此书的文件。")} />;
   if (parseError)
     return (
