@@ -5,6 +5,7 @@ import { getBook } from "@main/library/repository";
 import { resolveChatModel, resolveSummaryModel } from "@main/ai/assistant-model";
 import { getPreference } from "@main/preferences/repository";
 import { Limiter } from "@main/ai/background-limiter";
+import { notifyRenderer } from "@main/notify";
 import { DEFAULT_BACKGROUND_CONCURRENCY, DEFAULT_STEP_LIMIT } from "@shared/preferences";
 import { createSearchTools } from "@main/ai/search/web-search-tool";
 import { DEFAULT_WEB_SEARCH } from "@shared/web-search";
@@ -43,6 +44,7 @@ export function makeSendDeps(): SendDeps {
     stepLimit: getPreference(db, "stepLimit") ?? DEFAULT_STEP_LIMIT,
     createSearchTools,
     webSearchConfig: getPreference(db, "webSearch") ?? DEFAULT_WEB_SEARCH,
+    notify: notifyRenderer,
   };
 }
 

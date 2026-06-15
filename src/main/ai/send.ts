@@ -21,6 +21,7 @@ import {
 } from "@main/chat/messages";
 import { t } from "@main/i18n";
 import { type ResendInput, type SendInput } from "@shared/chat";
+import type { AppNotification } from "@shared/chat";
 import { streamAssistantReply, type OkSendResult } from "@main/ai/stream-assistant";
 export type { SendInput };
 
@@ -44,6 +45,8 @@ export interface SendDeps {
   };
   /** 当前联网搜索配置快照（settings 级）。 */
   webSearchConfig?: WebSearchConfig;
+  /** main→renderer 通知端口（后台记忆整理完成的 toast）。 */
+  notify: (n: AppNotification) => void;
 }
 
 export type SendResult = OkSendResult | { ok: false; reason: string };

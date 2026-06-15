@@ -14,6 +14,7 @@ import { createLibraryTools } from "@main/ai/library-tools";
 import { providerCallOptions, supportsImageToolResults } from "@main/ai/model-factory";
 import { withPromptCaching } from "@main/ai/prompt-caching";
 import { maybeCompactConversation } from "@main/ai/context-compaction";
+import { maybeConsolidateMemory } from "@main/ai/memory-consolidation";
 import { nameConversation } from "@main/chat/conversation-title";
 import { appendMessage } from "@main/chat/messages";
 import { textOfParts } from "@main/ai/prompt";
@@ -55,7 +56,7 @@ export function streamAssistantReply(
   systemPrompt: string | undefined,
   opts?: { abortSignal?: AbortSignal },
 ): OkSendResult {
-  const { db, loadBytes, resolveSummaryModel, stepLimit, runBackground } = deps;
+  const { db, loadBytes, resolveSummaryModel, stepLimit, runBackground, notify } = deps;
   const { conversationId, bookId, resolved } = ctx;
   const imageToolResults = supportsImageToolResults(resolved.providerType);
   const memoryTools = createMemoryTools({ db, bookId });
@@ -171,6 +172,11 @@ export function streamAssistantReply(
         void maybeCompactConversation(
           { db, resolveModel: resolveSummaryModel, runBackground },
           conversationId,
+        );
+        void maybeConsolidateMemory(
+          { db, resolveModel: resolveSummaryModel, runBackground, notify },
+          conversationId,
+          bookId,
         );
       }
     },
