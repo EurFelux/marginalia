@@ -158,3 +158,26 @@ describe("library conversations (null bookId)", () => {
     expect(back).toHaveLength(1);
   });
 });
+
+describe("createConversation / listConversationsByBook for library (null bookId)", () => {
+  it("creates a library conversation when bookId is null/omitted", () => {
+    const db = freshDb();
+    const convo = createConversation(db, { bookId: null });
+    expect(convo.bookId).toBeNull();
+    expect(getConversation(db, convo.id)?.bookId ?? null).toBeNull();
+  });
+  it("reuses an existing empty library conversation (anti-pileup)", () => {
+    const db = freshDb();
+    const a = createConversation(db, {});
+    const b = createConversation(db, {});
+    expect(b.id).toBe(a.id);
+  });
+  it("listConversationsByBook(null) lists only library conversations", () => {
+    const db = freshDb();
+    seedBookWithChapters(db); // book-1
+    const lib = createConversation(db, { bookId: null });
+    const booky = createConversation(db, { bookId: "book-1" });
+    expect(listConversationsByBook(db, null).map((c) => c.id)).toEqual([lib.id]);
+    expect(listConversationsByBook(db, "book-1").map((c) => c.id)).toEqual([booky.id]);
+  });
+});

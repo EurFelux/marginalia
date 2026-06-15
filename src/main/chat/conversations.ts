@@ -20,21 +20,24 @@ function toDto(row: ConversationRow): ConversationDto {
 }
 
 /**
- * 创建会话（绑定到书；单一全局 agent，无 assistant 概念）。
- * 防堆积（spec §5）：该书已存在零消息会话 → 返回最新的那个而不新建。
+ * 创建会话（绑定到书或书库；单一全局 agent，无 assistant 概念）。
+ * 防堆积（spec §5）：该书/书库已存在零消息会话 → 返回最新的那个而不新建。
  */
 export function createConversation(db: DB, input: CreateConversationInput): ConversationDto {
+  const bookId = input.bookId ?? null;
+  const bookMatch =
+    bookId === null ? isNull(conversations.bookId) : eq(conversations.bookId, bookId);
   const empty = db
     .select({ row: conversations })
     .from(conversations)
     .leftJoin(messages, eq(messages.conversationId, conversations.id))
-    .where(and(eq(conversations.bookId, input.bookId), isNull(messages.id)))
+    .where(and(bookMatch, isNull(messages.id)))
     .orderBy(desc(conversations.updatedAt))
     .limit(1)
     .get();
   if (empty) return toDto(empty.row);
 
-  const row = db.insert(conversations).values({ bookId: input.bookId }).returning().get();
+  const row = db.insert(conversations).values({ bookId }).returning().get();
   return toDto(row);
 }
 
@@ -54,12 +57,13 @@ export function deleteConversation(db: DB, id: string): void {
   dropAgentContext(id);
 }
 
-/** 列出某书的会话，最近更新在前。 */
-export function listConversationsByBook(db: DB, bookId: string): ConversationDto[] {
+/** 列出某书的会话（bookId 为 null ⇒ 书库会话），最近更新在前。 */
+export function listConversationsByBook(db: DB, bookId: string | null): ConversationDto[] {
+  const match = bookId === null ? isNull(conversations.bookId) : eq(conversations.bookId, bookId);
   return db
     .select()
     .from(conversations)
-    .where(eq(conversations.bookId, bookId))
+    .where(match)
     .orderBy(desc(conversations.updatedAt))
     .all()
     .map(toDto);
