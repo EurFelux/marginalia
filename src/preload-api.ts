@@ -146,8 +146,6 @@ export function createApi(d: PreloadDeps) {
     },
 
     agent: {
-      /** 选本地图片设为头像（主进程弹 dialog）；取消/超大/类型不符返回对应判别状态。 */
-      pickAvatar: inv(C.agentPickAvatar),
       resetAvatar: inv(C.agentResetAvatar),
       setAvatar: inv(C.agentSetAvatar),
     },
