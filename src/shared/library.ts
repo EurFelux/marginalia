@@ -108,3 +108,11 @@ export interface BookSummaryContentDto {
   status: SummaryStatus;
   summary: string | null;
 }
+
+/**
+ * library:read-book-bytes 的返回契约。仅「文件缺失」走 ok:false（reason 预留为字面量联合，
+ * 未来别的预期失败再扩）；其余意外错误仍由 handler throw（走 registry 落盘 + 渲染层 query.isError）。
+ */
+export type ReadBookBytesResult =
+  | { ok: true; data: Uint8Array }
+  | { ok: false; error: { reason: "missing" } };

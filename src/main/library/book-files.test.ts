@@ -7,6 +7,7 @@ import {
   BookFileMissingError,
   deleteBookFile,
   readBookFile,
+  readBookFileResult,
   relinkBookFile,
   storedBookPath,
   writeBookFile,
@@ -70,5 +71,18 @@ describe("book-files", () => {
     await expect(readBookFile(dir, "not-the-right-hash", "epub")).rejects.toBeInstanceOf(
       BookFileMissingError,
     );
+  });
+
+  it("readBookFileResult returns ok with bytes when the copy exists", async () => {
+    const bytes = new Uint8Array([5, 6, 7]);
+    await writeBookFile(dir, "book-x", "epub", bytes);
+    expect(await readBookFileResult(dir, "book-x", "epub")).toEqual({ ok: true, data: bytes });
+  });
+
+  it("readBookFileResult returns missing when the copy is absent", async () => {
+    expect(await readBookFileResult(dir, "gone", "epub")).toEqual({
+      ok: false,
+      error: { reason: "missing" },
+    });
   });
 });

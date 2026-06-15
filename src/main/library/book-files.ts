@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { createLogger } from "@main/logger";
+import type { ReadBookBytesResult } from "@shared/library";
 
 const log = createLogger("library");
 
@@ -65,6 +66,21 @@ export async function readBookFile(
     return new Uint8Array(await readFile(storedBookPath(booksDir, bookId, format)));
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") throw new BookFileMissingError(bookId);
+    throw err;
+  }
+}
+
+/** 读副本并把「文件缺失」收敛为 safe-return；其余意外错误原样 rethrow（交 handler/registry）。 */
+export async function readBookFileResult(
+  booksDir: string,
+  bookId: string,
+  format: BookFormat,
+): Promise<ReadBookBytesResult> {
+  try {
+    const data = await readBookFile(booksDir, bookId, format);
+    return { ok: true, data };
+  } catch (err) {
+    if (err instanceof BookFileMissingError) return { ok: false, error: { reason: "missing" } };
     throw err;
   }
 }
