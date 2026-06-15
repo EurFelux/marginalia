@@ -210,7 +210,7 @@ export function ContextPillBar() {
           ariaPressed={webSearchEnabled}
           hover={
             <p className="text-muted-foreground">
-              {t("ai.webSearch.hover", "为这条消息开启联网搜索（Exa）")}
+              {t("ai.webSearch.hover", "启用后 AI 可联网搜索（Exa）")}
             </p>
           }
         />

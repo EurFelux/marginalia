@@ -58,7 +58,7 @@ export default {
   "ai.toolStep.readPageFallback": "Reading page",
   "ai.toolStep.webSearch": "Web search: {{query}}",
   "ai.toolStep.webSearchFallback": "Web search",
-  "ai.webSearch.hover": "Enable web search for this message (Exa)",
+  "ai.webSearch.hover": "Let the assistant search the web (Exa)",
   "ai.webSearch.toggle": "Web",
   "bookNotes.add": "New note",
   "bookNotes.addTitle": "New note",
@@ -391,7 +391,7 @@ export default {
   "settings.webSearch.apiKeyOptional": "(optional)",
   "settings.webSearch.apiKeyPlaceholder": "exa-… (leave blank for free tier)",
   "settings.webSearch.description":
-    "Web search is on by default (Exa). Toggle it per message with the Web button in the AI panel.",
+    "Web search is available by default (Exa). Use the Web button in the AI panel to turn it on or off.",
   "shell.tabLibrary": "Library",
   "shell.tabStats": "Stats",
   "stats.currentStreak": "Current streak",
