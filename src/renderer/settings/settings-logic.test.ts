@@ -4,8 +4,9 @@ import {
   providerModelOptions,
   providerFormToUpsertInput,
   clampStepLimit,
+  clampBackgroundConcurrency,
 } from "@renderer/settings/settings-logic";
-import { DEFAULT_STEP_LIMIT } from "@shared/preferences";
+import { DEFAULT_STEP_LIMIT, DEFAULT_BACKGROUND_CONCURRENCY } from "@shared/preferences";
 
 describe("mergeModels", () => {
   it("unions and dedups, preserving order", () => {
@@ -28,6 +29,16 @@ describe("clampStepLimit", () => {
     expect(clampStepLimit(100)).toBe(99);
     expect(clampStepLimit(3.7)).toBe(3);
     expect(clampStepLimit(NaN)).toBe(DEFAULT_STEP_LIMIT);
+  });
+});
+
+describe("clampBackgroundConcurrency", () => {
+  it("clamps to [1,10], truncates floats, falls back on non-finite", () => {
+    expect(clampBackgroundConcurrency(3)).toBe(3);
+    expect(clampBackgroundConcurrency(0)).toBe(1);
+    expect(clampBackgroundConcurrency(11)).toBe(10);
+    expect(clampBackgroundConcurrency(2.7)).toBe(2);
+    expect(clampBackgroundConcurrency(NaN)).toBe(DEFAULT_BACKGROUND_CONCURRENCY);
   });
 });
 

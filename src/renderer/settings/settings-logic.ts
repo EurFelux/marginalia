@@ -1,5 +1,5 @@
 import type { AiProviderApiType, UpsertProviderInput } from "@shared/providers";
-import { DEFAULT_STEP_LIMIT } from "@shared/preferences";
+import { DEFAULT_BACKGROUND_CONCURRENCY, DEFAULT_STEP_LIMIT } from "@shared/preferences";
 
 export interface ProviderFormState {
   id: string | undefined; // 有=编辑，无=新建
@@ -34,6 +34,12 @@ export function providerModelOptions(providerModels: string[], current: string |
 export function clampStepLimit(raw: number): number {
   if (!Number.isFinite(raw)) return DEFAULT_STEP_LIMIT;
   return Math.min(99, Math.max(1, Math.trunc(raw)));
+}
+
+/** 数字输入框的 backgroundConcurrency 取值收敛到 [1, 10] 整数；非有限值（空输入/NaN）回退默认。 */
+export function clampBackgroundConcurrency(raw: number): number {
+  if (!Number.isFinite(raw)) return DEFAULT_BACKGROUND_CONCURRENCY;
+  return Math.min(10, Math.max(1, Math.trunc(raw)));
 }
 
 /** 表单态 → upsert IPC 入参：空 baseUrl→null、空 label→null、空 apiKey 省略（不改 key）、id 省略=新建。 */

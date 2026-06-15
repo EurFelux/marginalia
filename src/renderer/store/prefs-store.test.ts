@@ -4,7 +4,7 @@ vi.mock("@renderer/store/persist-preference", () => ({ persistPreference: vi.fn(
 
 import { persistPreference } from "@renderer/store/persist-preference";
 import { usePrefsStore, PREFS_INITIAL } from "@renderer/store/prefs-store";
-import { DEFAULT_STEP_LIMIT } from "@shared/preferences";
+import { DEFAULT_STEP_LIMIT, DEFAULT_BACKGROUND_CONCURRENCY } from "@shared/preferences";
 
 beforeEach(() => {
   usePrefsStore.setState(PREFS_INITIAL);
@@ -51,5 +51,13 @@ describe("prefs-store", () => {
   });
   it("stepLimit defaults to DEFAULT_STEP_LIMIT", () => {
     expect(PREFS_INITIAL.stepLimit).toBe(DEFAULT_STEP_LIMIT);
+  });
+  it("setBackgroundConcurrency updates value and persists", () => {
+    usePrefsStore.getState().setBackgroundConcurrency(5);
+    expect(usePrefsStore.getState().backgroundConcurrency).toBe(5);
+    expect(persistPreference).toHaveBeenCalledWith({ key: "backgroundConcurrency", value: 5 });
+  });
+  it("backgroundConcurrency defaults to DEFAULT_BACKGROUND_CONCURRENCY", () => {
+    expect(PREFS_INITIAL.backgroundConcurrency).toBe(DEFAULT_BACKGROUND_CONCURRENCY);
   });
 });

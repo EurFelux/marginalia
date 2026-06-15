@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { AnnotationStyle } from "@shared/annotations";
 import {
+  DEFAULT_BACKGROUND_CONCURRENCY,
   DEFAULT_SOUL,
   DEFAULT_STEP_LIMIT,
   DEFAULT_TTS_PREFS,
@@ -29,6 +30,8 @@ interface PrefsState {
   pdfZoom: number;
   /** AI 对话 agent 循环的多步上限；0 = 不限制。落盘记忆，重启恢复。 */
   stepLimit: number;
+  /** 后台模型调用全局并发上限（章节/全书摘要 + 命名 + 压缩）；前台对话不受限。落盘记忆。 */
+  backgroundConcurrency: number;
   /** 首启 onboarding 卡片已跳过/已完成（持久化，不再唠叨）。 */
   onboardingDismissed: boolean;
   /** AI 记忆功能总开关（默认开）。 */
@@ -49,6 +52,7 @@ interface PrefsActions {
   updateLayout: (patch: Partial<ReaderLayout>) => void;
   setPdfZoom: (v: number) => void;
   setStepLimit: (v: number) => void;
+  setBackgroundConcurrency: (v: number) => void;
   setOnboardingDismissed: (v: boolean) => void;
   setMemoryEnabled: (v: boolean) => void;
   setSoul: (v: Soul) => void;
@@ -65,6 +69,7 @@ export const PREFS_INITIAL: PrefsState = {
   layout: { sidebarOpen: true, panelOpen: false, headerOpen: true },
   pdfZoom: 1,
   stepLimit: DEFAULT_STEP_LIMIT,
+  backgroundConcurrency: DEFAULT_BACKGROUND_CONCURRENCY,
   onboardingDismissed: false,
   memoryEnabled: true,
   soul: DEFAULT_SOUL,
@@ -113,6 +118,10 @@ export const usePrefsStore = create<PrefsState & PrefsActions>()((set) => ({
   setStepLimit: (stepLimit) => {
     persistPreference({ key: "stepLimit", value: stepLimit });
     set({ stepLimit });
+  },
+  setBackgroundConcurrency: (backgroundConcurrency) => {
+    persistPreference({ key: "backgroundConcurrency", value: backgroundConcurrency });
+    set({ backgroundConcurrency });
   },
   setOnboardingDismissed: (onboardingDismissed) => {
     persistPreference({ key: "onboardingDismissed", value: onboardingDismissed });

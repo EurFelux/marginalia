@@ -21,6 +21,9 @@ export function hydratePreferences(): void {
   if (snap.summaryModel) usePrefsStore.setState({ summaryModel: snap.summaryModel });
   if (snap.pdfZoom !== undefined) usePrefsStore.setState({ pdfZoom: snap.pdfZoom });
   if (snap.stepLimit !== undefined) usePrefsStore.setState({ stepLimit: snap.stepLimit });
+  if (snap.backgroundConcurrency !== undefined) {
+    usePrefsStore.setState({ backgroundConcurrency: snap.backgroundConcurrency });
+  }
   if (snap.onboardingDismissed !== undefined) {
     usePrefsStore.setState({ onboardingDismissed: snap.onboardingDismissed });
   }
