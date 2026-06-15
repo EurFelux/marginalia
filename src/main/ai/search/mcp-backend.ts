@@ -111,14 +111,17 @@ export function makeMcpBackend(opts: McpBackendOpts): SearchBackend {
     if (client) return client;
     if (!connecting) {
       connecting = (async () => {
-        const c = new Client({ name: "marginalia", version: "1.0.0" });
-        const transport = new StreamableHTTPClientTransport(new URL(opts.url), {
-          requestInit: { headers: opts.headers },
-        });
-        await c.connect(transport);
-        client = c;
-        connecting = undefined;
-        return c;
+        try {
+          const c = new Client({ name: "marginalia", version: "1.0.0" });
+          const transport = new StreamableHTTPClientTransport(new URL(opts.url), {
+            requestInit: { headers: opts.headers },
+          });
+          await c.connect(transport);
+          client = c;
+          return c;
+        } finally {
+          connecting = undefined;
+        }
       })();
     }
     return connecting;
