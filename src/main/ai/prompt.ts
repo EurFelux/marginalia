@@ -19,6 +19,7 @@ export interface AssemblePromptParams {
     readingContext?: ReadingContext | null;
     /** 当前本地时间（已格式化为 ISO 8601 带偏移）。运行时由调用方注入，仅进当前轮、不持久化。 */
     currentDateTime?: string | null;
+    webSearchEnabled?: boolean;
   };
 }
 
@@ -96,6 +97,14 @@ export function formatCurrentDateTime(now: Temporal.ZonedDateTime): string {
 
 function renderCurrentDateTime(dt: string | null | undefined): string | null {
   return dt ? `## Current date and time\n${dt}` : null;
+}
+
+/** 当前 user turn 尾部软提示：本条联网状态。undefined（未注册工具）= 不注入。 */
+export function renderWebSearchHint(enabled: boolean | undefined): string | null {
+  if (enabled === undefined) return null;
+  return enabled
+    ? "[Web search is available for this message. Use the web_search tool when current or external information would help.]"
+    : "[Web search is turned off for this message. Do not call the web_search tool; answer from available context.]";
 }
 
 /** PDF 会话的 system prompt 附注（spec §7）：让模型知道页粒度工具的存在与扫描版的现实。 */
@@ -193,6 +202,7 @@ export async function assemblePrompt(params: AssemblePromptParams): Promise<Mode
       renderCurrentDateTime(params.current.currentDateTime),
       renderReadingContext(params.current.readingContext),
       renderUserTurn(params.current.chips, params.current.userText),
+      renderWebSearchHint(params.current.webSearchEnabled),
     ]
       .filter((s): s is string => Boolean(s))
       .join("\n\n"),

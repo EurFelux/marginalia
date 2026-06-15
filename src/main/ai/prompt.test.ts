@@ -5,6 +5,7 @@ import {
   formatCurrentDateTime,
   pdfSystemNote,
   renderHistoryMessage,
+  renderWebSearchHint,
   type PromptHistoryMessage,
 } from "@main/ai/prompt";
 import type { Chip } from "@shared/chat";
@@ -543,5 +544,31 @@ describe("formatCurrentDateTime", () => {
   it("drops the bracketed time-zone annotation and keeps a UTC offset", () => {
     const zdt = Temporal.ZonedDateTime.from("2026-01-03T09:04:07+00:00[UTC]");
     expect(formatCurrentDateTime(zdt)).toBe("2026-01-03T09:04:07+00:00");
+  });
+});
+
+describe("renderWebSearchHint", () => {
+  it("returns an 'available' hint when true", () => {
+    expect(renderWebSearchHint(true)).toMatch(/available/i);
+  });
+  it("returns a 'turned off' hint when false", () => {
+    expect(renderWebSearchHint(false)).toMatch(/turned off|do not/i);
+  });
+  it("returns null when undefined", () => {
+    expect(renderWebSearchHint(undefined)).toBeNull();
+  });
+});
+
+describe("assemblePrompt web search hint", () => {
+  it("injects the hint only into the last user turn, not the prefix", async () => {
+    const msgs = await assemblePrompt({
+      systemPrompt: "SYS",
+      priorSummary: null,
+      history: [],
+      current: { chips: [], userText: "hello", readingContext: null, webSearchEnabled: false },
+    });
+    const sys = msgs.find((m) => m.role === "system");
+    expect(JSON.stringify(sys ?? {})).not.toMatch(/web search/i);
+    expect(JSON.stringify(msgs.at(-1))).toMatch(/turned off|do not/i);
   });
 });
