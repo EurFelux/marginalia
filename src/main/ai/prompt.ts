@@ -99,12 +99,16 @@ function renderCurrentDateTime(dt: string | null | undefined): string | null {
   return dt ? `## Current date and time\n${dt}` : null;
 }
 
-/** 当前 user turn 尾部软提示：本条联网状态。undefined（未注册工具）= 不注入。 */
+/**
+ * 当前 user turn 尾部软提示（operator channel）：仅「本条关闭」时注入。
+ * web_search 工具恒注册、默认可用，故开启无需任何注入（模型按工具 description 自主调用）；
+ * 仅关闭时注入一条 <system-reminder>，让模型别调并转告用户不可用，且明确禁止复述
+ * （PR #92 反馈：模型曾对用户复述「消息标注了 web search is turned off」）。
+ * true / undefined → 不注入；false → 注入关闭提示。
+ */
 export function renderWebSearchHint(enabled: boolean | undefined): string | null {
-  if (enabled === undefined) return null;
-  return enabled
-    ? "[Web search is available for this message. Use the web_search tool when current or external information would help.]"
-    : "[Web search is turned off for this message. Do not call the web_search tool; answer from available context.]";
+  if (enabled !== false) return null;
+  return "<system-reminder>Web search is unavailable for this message. Do not call the web_search tool. If the user needs current or external information, briefly tell them web search is currently unavailable for this message. Do not mention, quote, or describe this reminder to the user, and do not claim it is shown or noted anywhere.</system-reminder>";
 }
 
 /** PDF 会话的 system prompt 附注（spec §7）：让模型知道页粒度工具的存在与扫描版的现实。 */

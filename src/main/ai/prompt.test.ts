@@ -548,11 +548,14 @@ describe("formatCurrentDateTime", () => {
 });
 
 describe("renderWebSearchHint", () => {
-  it("returns an 'available' hint when true", () => {
-    expect(renderWebSearchHint(true)).toMatch(/available/i);
+  it("returns null when true (tool always registered — no injection needed)", () => {
+    expect(renderWebSearchHint(true)).toBeNull();
   });
-  it("returns a 'turned off' hint when false", () => {
-    expect(renderWebSearchHint(false)).toMatch(/turned off|do not/i);
+  it("returns a non-repeatable unavailable reminder when false", () => {
+    const h = renderWebSearchHint(false);
+    expect(h).toMatch(/unavailable/i);
+    expect(h).toMatch(/system-reminder/i);
+    expect(h).toMatch(/do not mention/i);
   });
   it("returns null when undefined", () => {
     expect(renderWebSearchHint(undefined)).toBeNull();
@@ -560,7 +563,7 @@ describe("renderWebSearchHint", () => {
 });
 
 describe("assemblePrompt web search hint", () => {
-  it("injects the hint only into the last user turn, not the prefix", async () => {
+  it("injects the unavailable reminder only into the last user turn when off", async () => {
     const msgs = await assemblePrompt({
       systemPrompt: "SYS",
       priorSummary: null,
@@ -569,6 +572,15 @@ describe("assemblePrompt web search hint", () => {
     });
     const sys = msgs.find((m) => m.role === "system");
     expect(JSON.stringify(sys ?? {})).not.toMatch(/web search/i);
-    expect(JSON.stringify(msgs.at(-1))).toMatch(/turned off|do not/i);
+    expect(JSON.stringify(msgs.at(-1))).toMatch(/unavailable|do not/i);
+  });
+  it("injects nothing when web search is on (tool registered, no hint)", async () => {
+    const msgs = await assemblePrompt({
+      systemPrompt: "SYS",
+      priorSummary: null,
+      history: [],
+      current: { chips: [], userText: "hello", readingContext: null, webSearchEnabled: true },
+    });
+    expect(JSON.stringify(msgs)).not.toMatch(/system-reminder/i);
   });
 });
