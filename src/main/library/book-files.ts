@@ -38,6 +38,23 @@ export async function writeBookFile(
   await writeFile(storedBookPath(booksDir, bookId, format), bytes);
 }
 
+/**
+ * 重连：仅当选回文件的内容哈希等于原 bookId（= 同一文件）才写回副本。
+ * 不匹配返回 "mismatch" 且不写任何东西，绝不污染库。format 由调用方从 books 行取并传入
+ * （不调 detectFormat，避免 book-files ↔ repository 循环依赖）。
+ */
+export async function relinkBookFile(
+  booksDir: string,
+  bookId: string,
+  format: BookFormat,
+  bytes: Uint8Array,
+): Promise<"ok" | "mismatch"> {
+  const contentHash = createHash("sha256").update(bytes).digest("hex");
+  if (contentHash !== bookId) return "mismatch";
+  await writeBookFile(booksDir, bookId, format, bytes);
+  return "ok";
+}
+
 /** 读 app 自有副本；缺失抛 BookFileMissingError。 */
 export async function readBookFile(
   booksDir: string,

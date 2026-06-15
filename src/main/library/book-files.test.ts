@@ -7,6 +7,7 @@ import {
   BookFileMissingError,
   deleteBookFile,
   readBookFile,
+  relinkBookFile,
   storedBookPath,
   writeBookFile,
 } from "@main/library/book-files";
@@ -52,5 +53,22 @@ describe("book-files", () => {
 
   it("delete is best-effort (no throw when already absent)", async () => {
     await expect(deleteBookFile(dir, "never-written", "epub")).resolves.toBeUndefined();
+  });
+
+  it("relinkBookFile writes bytes back when sha256 matches the bookId", async () => {
+    const bytes = new Uint8Array([1, 2, 3, 4]);
+    const bookId = createHash("sha256").update(bytes).digest("hex");
+    const result = await relinkBookFile(dir, bookId, "epub", bytes);
+    expect(result).toBe("ok");
+    expect(new Uint8Array(await readFile(storedBookPath(dir, bookId, "epub")))).toEqual(bytes);
+  });
+
+  it("relinkBookFile returns mismatch and writes nothing when sha256 differs", async () => {
+    const bytes = new Uint8Array([9, 9, 9]);
+    const result = await relinkBookFile(dir, "not-the-right-hash", "epub", bytes);
+    expect(result).toBe("mismatch");
+    await expect(readBookFile(dir, "not-the-right-hash", "epub")).rejects.toBeInstanceOf(
+      BookFileMissingError,
+    );
   });
 });
