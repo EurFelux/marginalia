@@ -284,12 +284,20 @@ export class Limiter {
     new Promise((resolve, reject) => {
       const attempt = () => {
         this.active++;
-        fn()
-          .then(resolve, reject)
-          .finally(() => {
+        // active--/pump 须在 resolve/reject 之前：让排队任务先于本 caller 的 await 续体启动，
+        // 才能保证 FIFO 进度（用 .then().finally() 会让 pump 落在 resolve 之后，破坏顺序）。
+        fn().then(
+          (value) => {
             this.active--;
             this.pump();
-          });
+            resolve(value);
+          },
+          (err: unknown) => {
+            this.active--;
+            this.pump();
+            reject(err);
+          },
+        );
       };
       if (this.active < this.getLimit()) attempt();
       else this.queue.push(attempt);
