@@ -21,6 +21,7 @@ describe("preferences schemas", () => {
   it("registers exactly the keys with current consumers", () => {
     expect(Object.keys(PREFERENCE_SCHEMAS).sort()).toEqual([
       "autoSummarize",
+      "avatarBlobId",
       "backgroundConcurrency",
       "chatModel",
       "colorMode",
@@ -32,6 +33,7 @@ describe("preferences schemas", () => {
       "pdfZoom",
       "readerLayout",
       "readerPrefs",
+      "showAgentAvatar",
       "soul",
       "stepLimit",
       "summaryModel",
