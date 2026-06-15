@@ -459,6 +459,62 @@ describe("openai-responses store handling", () => {
   });
 });
 
+type CapturedMsg = { role: string; providerOptions?: { anthropic?: { cacheControl?: unknown } } };
+
+function rawPromptCapturingModel(captured: { prompt?: CapturedMsg[] }) {
+  return new MockLanguageModelV3({
+    doStream: async ({ prompt }) => {
+      captured.prompt = prompt as unknown as CapturedMsg[];
+      return {
+        stream: simulateReadableStream({
+          chunks: [
+            { type: "text-start", id: "t1" },
+            { type: "text-delta", id: "t1", delta: "ok" },
+            { type: "text-end", id: "t1" },
+            finishChunk("stop"),
+          ],
+        }),
+      };
+    },
+  });
+}
+
+describe("anthropic prompt caching", () => {
+  const cc = (m: CapturedMsg | undefined) => m?.providerOptions?.anthropic?.cacheControl;
+
+  it("marks system and the current user turn with an ephemeral cache breakpoint", async () => {
+    const captured: { prompt?: CapturedMsg[] } = {};
+    const { db, book, deps } = await setup({
+      ok: true,
+      model: rawPromptCapturingModel(captured),
+      modelId: "claude",
+      providerType: "anthropic",
+    });
+    const convo = createConversation(db, { bookId: book.id });
+    const r = await runSend(deps, input(book.id, convo.id));
+    if (!r.ok) throw new Error(r.reason);
+    await r.finished;
+    const prompt = captured.prompt ?? [];
+    expect(cc(prompt.find((m) => m.role === "system"))).toEqual({ type: "ephemeral" });
+    expect(cc([...prompt].reverse().find((m) => m.role === "user"))).toEqual({ type: "ephemeral" });
+  });
+
+  it("does not add cache breakpoints for non-anthropic providers", async () => {
+    const captured: { prompt?: CapturedMsg[] } = {};
+    const { db, book, deps } = await setup({
+      ok: true,
+      model: rawPromptCapturingModel(captured),
+      modelId: "gpt-5",
+      providerType: "openai-responses",
+    });
+    const convo = createConversation(db, { bookId: book.id });
+    const r = await runSend(deps, input(book.id, convo.id));
+    if (!r.ok) throw new Error(r.reason);
+    await r.finished;
+    for (const m of captured.prompt ?? []) expect(cc(m)).toBeUndefined();
+  });
+});
+
 function systemCapturingModel(captured: { system?: string }) {
   return new MockLanguageModelV3({
     doStream: async ({ prompt }) => {
