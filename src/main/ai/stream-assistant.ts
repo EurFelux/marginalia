@@ -40,6 +40,7 @@ export interface StreamCtx {
   resolved: ResolvedOk;
   /** 本轮 user 文本（首轮自动命名用）。 */
   userText: string;
+  webSearchTurn: boolean;
 }
 
 /**
@@ -57,6 +58,18 @@ export function streamAssistantReply(
   const { conversationId, bookId, resolved } = ctx;
   const imageToolResults = supportsImageToolResults(resolved.providerType);
   const memoryTools = createMemoryTools({ db, bookId });
+
+  let closeSearch: (() => Promise<unknown>) | undefined;
+  const wsCfg = deps.webSearchConfig;
+  const searchTools =
+    deps.createSearchTools && wsCfg?.enabled && wsCfg.backends.length
+      ? (() => {
+          const s = deps.createSearchTools!(wsCfg, ctx.webSearchTurn);
+          closeSearch = s.close;
+          return s.tools;
+        })()
+      : {};
+
   const tools = {
     ...createReadingTools({ db, bookId, loadBytes, imageToolResults }),
     ...Object.fromEntries(
@@ -64,6 +77,7 @@ export function streamAssistantReply(
         (entry): entry is [string, NonNullable<(typeof entry)[1]>] => entry[1] != null,
       ),
     ),
+    ...searchTools,
   };
 
   let capturedUsage: LanguageModelUsage | undefined;
@@ -168,6 +182,7 @@ export function streamAssistantReply(
     } catch (err) {
       log.warn("assistant persist / stream drain failed", err);
     } finally {
+      void closeSearch?.();
       resolveDone();
     }
   })();

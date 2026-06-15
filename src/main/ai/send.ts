@@ -33,6 +33,16 @@ export interface SendDeps {
   runBackground: RunBackground;
   /** agent 多步上限（默认 DEFAULT_STEP_LIMIT=10）；0 = 不限制（永不主动刹车，靠模型自然停止 + abort）。 */
   stepLimit?: number;
+  /** 联网搜索工具工厂（注入式，便于测试 mock）；未配置则跳过注入。 */
+  createSearchTools?: (
+    cfg: import("@shared/web-search").WebSearchConfig,
+    turnEnabled: boolean,
+  ) => {
+    tools: Record<string, unknown>;
+    close: () => Promise<unknown>;
+  };
+  /** 当前联网搜索配置快照（settings 级）。 */
+  webSearchConfig?: import("@shared/web-search").WebSearchConfig;
 }
 
 export type SendResult = OkSendResult | { ok: false; reason: string };
@@ -91,6 +101,11 @@ export async function runSend(
     });
     systemPromptText = `${systemPromptText}\n\n${note}`;
   }
+  const cfg = deps.webSearchConfig;
+  const searchRegistered = Boolean(cfg?.enabled && cfg.backends.length);
+  const webSearchTurn = input.webSearch ?? false;
+  const webSearchEnabled = searchRegistered ? webSearchTurn : undefined;
+
   const allMessages: ModelMessage[] = await assemblePrompt({
     systemPrompt: systemPromptText,
     priorSummary: convo.contextSummary,
@@ -100,6 +115,7 @@ export async function runSend(
       userText: input.userText,
       readingContext: input.readingContext,
       currentDateTime: formatCurrentDateTime(Temporal.Now.zonedDateTimeISO()),
+      webSearchEnabled,
     },
   });
 
@@ -117,7 +133,7 @@ export async function runSend(
   // 6. 流式回复（共享尾段）
   return streamAssistantReply(
     deps,
-    { conversationId, bookId: input.bookId, resolved, userText: input.userText },
+    { conversationId, bookId: input.bookId, resolved, userText: input.userText, webSearchTurn },
     messages,
     systemPrompt,
     opts,
@@ -187,6 +203,11 @@ export async function runResend(
     systemPromptText = `${systemPromptText}\n\n${note}`;
   }
 
+  const cfg = deps.webSearchConfig;
+  const searchRegistered = Boolean(cfg?.enabled && cfg.backends.length);
+  const webSearchTurn = input.webSearch ?? false;
+  const webSearchEnabled = searchRegistered ? webSearchTurn : undefined;
+
   const allMessages: ModelMessage[] = await assemblePrompt({
     systemPrompt: systemPromptText,
     priorSummary: c2?.contextSummary ?? null,
@@ -196,6 +217,7 @@ export async function runResend(
       userText: textOfParts(current.parts),
       readingContext: null,
       currentDateTime: formatCurrentDateTime(Temporal.Now.zonedDateTimeISO()),
+      webSearchEnabled,
     },
   });
 
@@ -216,6 +238,7 @@ export async function runResend(
       bookId: convo.bookId,
       resolved,
       userText: input.userText,
+      webSearchTurn,
     },
     messages,
     systemPrompt,
