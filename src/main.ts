@@ -22,6 +22,7 @@ import { registerBackupHandlers } from "@main/ipc/backup-handlers";
 import { registerMemoryHandlers } from "@main/ipc/memory-handlers";
 import { initReadingClock, bindWindowToClock } from "@main/stats/clock-wiring";
 import { registerCoverProtocol, registerCoverProtocolScheme } from "@main/library/cover-protocol";
+import { registerMediaProtocol, registerMediaProtocolScheme } from "@main/media/media-protocol";
 import { maybeSeedSampleBook } from "@main/onboarding/seed-sample";
 import { appService } from "@main/app";
 
@@ -63,6 +64,7 @@ if (started) {
 
 // cover:// 自定义协议：scheme 注册须在 app.ready 前。
 registerCoverProtocolScheme();
+registerMediaProtocolScheme(); // media:// scheme 注册须在 app.ready 前
 
 function isExternalUrl(url: string): boolean {
   try {
@@ -144,6 +146,7 @@ app.on("ready", async () => {
   // （部分地区直连 api.anthropic.com 会被 403「Request not allowed」按区域拦截，须经系统代理出网。）
   setModelFetch((input, init) => net.fetch(input instanceof URL ? input.toString() : input, init));
   registerCoverProtocol(); // cover:// handler 需 getDb()，故在 initDb 后
+  registerMediaProtocol(); // media:// handler 需 getDb()，故在 initDb 后
   registerAppHandlers();
   registerLibraryHandlers();
   registerSettingsHandlers();
