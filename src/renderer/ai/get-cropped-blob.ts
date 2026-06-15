@@ -19,7 +19,10 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 }
 
 /** 按裁剪区从 dataURL 出图，缩放到最长边 ≤ AVATAR_OUTPUT_MAX，返回 png 字节。 */
-export async function getCroppedBlob(imageSrc: string, area: CropArea): Promise<Uint8Array> {
+export async function getCroppedBlob(
+  imageSrc: string,
+  area: CropArea,
+): Promise<Uint8Array<ArrayBuffer>> {
   const img = await loadImage(imageSrc);
   const scale = Math.min(1, AVATAR_OUTPUT_MAX / Math.max(area.width, area.height));
   const dstW = Math.max(1, Math.round(area.width * scale));
