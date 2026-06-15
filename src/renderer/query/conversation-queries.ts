@@ -1,17 +1,15 @@
 // src/renderer/query/conversation-queries.ts
 import type { ConversationDto } from "@shared/chat";
 import { qk } from "@renderer/query/keys";
+import { type ChatContext, contextKey } from "@renderer/ai/chat-context";
 
 type IntervalQuery = { state: { data?: ConversationDto[] } };
 
-/**
- * 会话列表 query（ConversationsTab / AIPanel header 共用）。isNaming 是主进程后台推进的
- * 进程内瞬态（spec §5/§8）：staleTime:0 防缓存冻结，命名期间短轮询、终态（无 isNaming）即停
- * ——镜像 summary-queries 的非终态轮询取向。
- */
-export function conversationsQuery(bookId: string) {
+/** 会话列表 query（按上下文）；book→bookId，library→null。key 用 contextKey 区分。 */
+export function conversationsQuery(ctx: ChatContext) {
+  const bookId = ctx.kind === "book" ? ctx.bookId : null;
   return {
-    queryKey: qk.conversations(bookId),
+    queryKey: qk.conversations(contextKey(ctx)),
     queryFn: (): Promise<ConversationDto[]> => window.api.chat.conversations.listByBook({ bookId }),
     staleTime: 0,
     refetchInterval: (q: IntervalQuery) => (q.state.data?.some((c) => c.isNaming) ? 1200 : false),
