@@ -241,9 +241,12 @@ export default {
   "reader.tts.start": "Read aloud",
   "reader.tts.stop": "Stop",
   "settings.advanced": "Advanced",
+  "settings.advanced.about": "About",
   "settings.advanced.backgroundConcurrency": "Max concurrent background tasks",
   "settings.advanced.backgroundConcurrencyDesc":
     "The maximum number of background AI tasks (chapter/book summaries, conversation naming, and long-conversation compaction) running at once. Lower it to ease quota/rate-limit pressure; it never affects your active chat replies.",
+  "settings.advanced.checkUpdate": "Check for updates",
+  "settings.advanced.currentVersion": "Current version",
   "settings.advanced.stepLimit": "Max steps per reply",
   "settings.advanced.stepLimitDesc":
     'Cap on how many consecutive tool-call steps the AI takes in a single reply — raise it for page-by-page PDF reading. With "Unlimited", only the model stopping on its own or you stopping it ends the turn; a model stuck in a loop keeps spending tokens.',
@@ -409,4 +412,8 @@ export default {
   "streamdown.tableFormatTsv": "TSV",
   "streamdown.viewFullscreen": "View fullscreen",
   "terms.provider": "provider",
+  "update.available": "New version {{version}} available",
+  "update.checkFailed": "Update check failed",
+  "update.upToDate": "You're on the latest version",
+  "update.view": "View",
 } as const;
