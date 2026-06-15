@@ -1,8 +1,12 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { usePrefsStore } from "@renderer/store/prefs-store";
+import { toast } from "sonner";
+import { AssistantAvatar } from "@renderer/ai/AssistantAvatar";
+import { Button } from "@renderer/components/ui/button";
+import { Checkbox } from "@renderer/components/ui/checkbox";
 import { Input } from "@renderer/components/ui/input";
 import { Textarea } from "@renderer/components/ui/textarea";
+import { usePrefsStore } from "@renderer/store/prefs-store";
 
 /**
  * 助手设置：SOUL（name + persona）+ 全局 instructions。
@@ -14,6 +18,23 @@ export function AgentSettings() {
   const setSoul = usePrefsStore((s) => s.setSoul);
   const instructions = usePrefsStore((s) => s.instructions);
   const setInstructions = usePrefsStore((s) => s.setInstructions);
+  const showAgentAvatar = usePrefsStore((s) => s.showAgentAvatar);
+  const setShowAgentAvatar = usePrefsStore((s) => s.setShowAgentAvatar);
+  const setAvatarBlobId = usePrefsStore((s) => s.setAvatarBlobId);
+
+  const onPickAvatar = async () => {
+    const r = await window.api.agent.pickAvatar();
+    if (r.status === "set") setAvatarBlobId(r.blobId);
+    else if (r.status === "too-large")
+      toast.error(t("settings.agent.avatarTooLarge", "图片太大，请选择 2 MB 以内的图片"));
+    else if (r.status === "unsupported")
+      toast.error(t("settings.agent.avatarUnsupported", "不支持的图片格式"));
+  };
+
+  const onResetAvatar = async () => {
+    await window.api.agent.resetAvatar();
+    setAvatarBlobId(null);
+  };
 
   const [draftName, setDraftName] = useState<string | null>(null);
   const [draftPersona, setDraftPersona] = useState<string | null>(null);
@@ -43,6 +64,35 @@ export function AgentSettings() {
   return (
     <section className="space-y-5">
       <h2 className="font-serif text-lg">{t("settings.agent", "助手")}</h2>
+
+      {/* 头像 */}
+      <div className="space-y-1.5">
+        <span className="block text-sm font-medium">{t("settings.agent.avatar", "头像")}</span>
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
+          {t(
+            "settings.agent.avatarDesc",
+            "显示在对话中的 AI 头像。支持 png/jpg/webp/gif，2 MB 以内。",
+          )}
+        </p>
+        <div className="flex items-center gap-3">
+          <AssistantAvatar className="size-14" />
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={onPickAvatar}>
+              {t("settings.agent.avatarUpload", "上传头像")}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onResetAvatar}>
+              {t("settings.agent.avatarReset", "恢复默认")}
+            </Button>
+          </div>
+        </div>
+        <label className="mt-1 flex items-center gap-2 text-sm">
+          <Checkbox
+            checked={showAgentAvatar}
+            onCheckedChange={(v) => setShowAgentAvatar(v === true)}
+          />
+          {t("settings.agent.avatarShowInChat", "在对话中显示头像")}
+        </label>
+      </div>
 
       {/* 名字 */}
       <div className="space-y-1.5">

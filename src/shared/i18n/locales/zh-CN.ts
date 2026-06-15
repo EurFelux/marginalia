@@ -237,6 +237,13 @@ export default {
     "AI 单次回复中连续调用工具的步数上限，阅读 PDF 逐页时需要调高。勾选「不限制」后仅靠模型自然停止与手动停止收尾——模型若陷入循环会持续消耗额度。",
   "settings.advanced.stepLimitUnlimited": "不限制",
   "settings.agent": "助手",
+  "settings.agent.avatar": "头像",
+  "settings.agent.avatarDesc": "显示在对话中的 AI 头像。支持 png/jpg/webp/gif，2 MB 以内。",
+  "settings.agent.avatarReset": "恢复默认",
+  "settings.agent.avatarShowInChat": "在对话中显示头像",
+  "settings.agent.avatarTooLarge": "图片太大，请选择 2 MB 以内的图片",
+  "settings.agent.avatarUnsupported": "不支持的图片格式",
+  "settings.agent.avatarUpload": "上传头像",
   "settings.agent.instructions": "全局指令",
   "settings.agent.instructionsDesc":
     "叠加在人设之上的额外行为要求，例如「回复时始终引用原文」、「优先用中文」等。每次对话都会生效。",
