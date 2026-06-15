@@ -63,7 +63,10 @@ export function resolveChapterRef(db: DB, bookId: string, ref: string): string {
  * 回复（onError → 该轮 status=error），模型没有自我纠正的机会；转 result 后错误进入
  * 对话流，模型可据错误信息（如 resolveChapterRef 的章节清单）换参重试。
  */
-async function runTool<T>(name: string, fn: () => Promise<T> | T): Promise<T | { error: string }> {
+export async function runTool<T>(
+  name: string,
+  fn: () => Promise<T> | T,
+): Promise<T | { error: string }> {
   try {
     return await fn();
   } catch (err) {
