@@ -34,6 +34,7 @@ import {
   buildChipsInput,
   conversationIdInput,
   createConversationInput,
+  listConversationsInput,
   messagesByConversationInput,
   resendRequest,
   sendRequest,
@@ -252,7 +253,7 @@ export const C = {
   conversationsListByBook: def(
     "conversations:list-by-book",
     "invoke",
-    bookIdInput,
+    listConversationsInput,
     out<ConversationDto[]>(),
   ),
   conversationsCreate: def(
