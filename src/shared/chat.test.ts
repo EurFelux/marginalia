@@ -5,6 +5,7 @@ import {
   buildChipsInput,
   chipSchema,
   createConversationInput,
+  listConversationsInput,
   messagesByConversationInput,
   sendAck,
   sendInputSchema,
@@ -162,5 +163,26 @@ describe("sendInputSchema.webSearch", () => {
         webSearch: true,
       }).success,
     ).toBe(true);
+  });
+});
+
+describe("nullable bookId contract", () => {
+  it("createConversationInput accepts omitted and null bookId", () => {
+    expect(createConversationInput.parse({}).bookId ?? null).toBeNull();
+    expect(createConversationInput.parse({ bookId: null }).bookId).toBeNull();
+    expect(createConversationInput.parse({ bookId: "b1" }).bookId).toBe("b1");
+  });
+  it("sendInputSchema accepts null bookId", () => {
+    const parsed = sendInputSchema.parse({
+      bookId: null,
+      conversationId: "c1",
+      chips: [],
+      userText: "hi",
+    });
+    expect(parsed.bookId).toBeNull();
+  });
+  it("listConversationsInput accepts string or null", () => {
+    expect(listConversationsInput.parse({ bookId: null }).bookId).toBeNull();
+    expect(listConversationsInput.parse({ bookId: "b1" }).bookId).toBe("b1");
   });
 });

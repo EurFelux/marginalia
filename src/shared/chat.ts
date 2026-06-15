@@ -48,11 +48,17 @@ export const readingContextSchema = z.discriminatedUnion("format", [
 ]);
 export type ReadingContext = z.infer<typeof readingContextSchema>;
 
-/** conversations:create 入参。 */
+/** conversations:create 入参。bookId 省略/为 null ⇒ 书库（library）会话（spec 2026-06-16 §4.1）。 */
 export const createConversationInput = z.object({
-  bookId: z.string().min(1),
+  bookId: z.string().min(1).nullable().optional(),
 });
 export type CreateConversationInput = z.infer<typeof createConversationInput>;
+
+/** conversations:list-by-book 入参。bookId 为 null ⇒ 列出书库会话（bookId IS NULL）。 */
+export const listConversationsInput = z.object({
+  bookId: z.string().min(1).nullable(),
+});
+export type ListConversationsInput = z.infer<typeof listConversationsInput>;
 
 /** conversations:get 入参 */
 export const conversationIdInput = z.object({ id: z.string().min(1) });
@@ -62,10 +68,10 @@ export type ConversationIdInput = z.infer<typeof conversationIdInput>;
 export const messagesByConversationInput = z.object({ conversationId: z.string().min(1) });
 export type MessagesByConversationInput = z.infer<typeof messagesByConversationInput>;
 
-/** 会话视图。bookId 恒非空（列已 NOT NULL）；isNaming 为主进程内存瞬态合成（spec §5）。 */
+/** 会话视图。bookId 为 null ⇒ 书库会话（spec 2026-06-16 §3）；isNaming 为主进程内存瞬态合成（spec §5）。 */
 export interface ConversationDto {
   id: string;
-  bookId: string;
+  bookId: string | null;
   title: string | null;
   /** auto naming 进行中（下一任务接线真状态前恒 false）。 */
   isNaming: boolean;
@@ -86,7 +92,7 @@ export interface MessageDto {
 
 /** runSend 的业务入参（不含传输层 streamId）。conversationId 必传：send 只校验不分配（spec §5）。 */
 export const sendInputSchema = z.object({
-  bookId: z.string().min(1),
+  bookId: z.string().min(1).nullable(), // null ⇒ 书库上下文
   conversationId: z.string().min(1),
   chips: z.array(chipSchema),
   userText: z.string().min(1),
