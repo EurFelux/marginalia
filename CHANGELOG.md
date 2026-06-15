@@ -1,5 +1,22 @@
 # marginalia
 
+## 0.14.0
+
+### Minor Changes
+
+- b1dab8d: Add a customizable assistant avatar shown in conversation. Upload your own image (or keep the built-in default) in Settings → Agent; the avatar appears beside the assistant's messages along with its name, grouped so consecutive replies show it once. The avatar can be toggled off in settings.
+- 8945d88: Crop the assistant avatar when uploading: pick an image, frame it with a round 1:1 crop (zoom + drag), and only the cropped result is saved.
+- ca4c3eb: Recover from missing book files: when a book's stored copy is gone, the reader now shows a recovery panel offering to relink the original file (restoring reading progress and annotations) or remove the book from the library, instead of a dead error message.
+
+### Patch Changes
+
+- b46de4d: Fix epub highlights showing no chapter in single-file books where every chapter shares one spine file (table of contents split by anchors). Annotation chapter lookup now subdivides such a shared file to the correct anchor chapter using boundary CFIs precomputed when the book opens. Multi-file books are unaffected.
+- 75b3644: Add a lightweight update check: the app now checks GitHub Releases on startup and shows a toast when a newer version is available, plus a "Check for updates" button in Advanced settings. It only notifies and links to the release page (no auto-download/install yet).
+- 5862712: Fix the selection toolbar's "Ask AI" action wiping out text you'd already typed in the chat composer. It now attaches the selected passage as context and keeps your draft intact, so you can finish the question you started. The preset actions (Explain / Translate / Summarize) still fill in their prompt as before.
+- fd0cb40: Add a configurable global concurrency cap for background AI tasks (chapter/book summaries, conversation naming, and long-conversation compaction). Set it in Settings → Advanced (default 3); excess tasks queue and run as slots free up. Foreground chat replies are never throttled.
+- c993045: Fix epub highlights showing the wrong chapter (or none) in the annotations sidebar. Chapter lookup matched a CFI's spine position against the TOC-based order index — two different numbering bases — so any book with a cover or front-matter page before its chapters was mislabeled. Annotations now resolve their chapter from the spine href, the same way current-chapter tracking already does.
+- f096fab: Fix AI chat failing partway through a tool-calling turn when using an OpenAI Responses–API provider (notably third-party gateways) with a reasoning model. The request used to error with "Item … not found. Items are not persisted when `store` is set to false." Reasoning is now sent inline instead of as a server-side id reference, so tool-calling conversations complete on stateless endpoints. Also fixed the send-failure hint that always told you to configure an "Anthropic" API key regardless of the provider you'd set up — it now refers to your API key and model generically.
+
 ## 0.13.0
 
 ### Minor Changes
