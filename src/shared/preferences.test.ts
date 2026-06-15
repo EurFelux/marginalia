@@ -21,6 +21,7 @@ describe("preferences schemas", () => {
   it("registers exactly the keys with current consumers", () => {
     expect(Object.keys(PREFERENCE_SCHEMAS).sort()).toEqual([
       "autoSummarize",
+      "backgroundConcurrency",
       "chatModel",
       "colorMode",
       "instructions",
@@ -142,6 +143,29 @@ describe("language preference", () => {
     expect(setPreferenceInput.safeParse({ key: "language", value: "en" }).success).toBe(true);
     expect(setPreferenceInput.safeParse({ key: "language", value: "zh-CN" }).success).toBe(true);
     expect(setPreferenceInput.safeParse({ key: "language", value: "fr" }).success).toBe(false);
+  });
+});
+
+describe("backgroundConcurrency preference", () => {
+  it("accepts positive ints, rejects 0/negatives/floats/strings", () => {
+    expect(setPreferenceInput.safeParse({ key: "backgroundConcurrency", value: 3 }).success).toBe(
+      true,
+    );
+    expect(setPreferenceInput.safeParse({ key: "backgroundConcurrency", value: 1 }).success).toBe(
+      true,
+    );
+    expect(setPreferenceInput.safeParse({ key: "backgroundConcurrency", value: 0 }).success).toBe(
+      false,
+    );
+    expect(setPreferenceInput.safeParse({ key: "backgroundConcurrency", value: -1 }).success).toBe(
+      false,
+    );
+    expect(setPreferenceInput.safeParse({ key: "backgroundConcurrency", value: 2.5 }).success).toBe(
+      false,
+    );
+    expect(setPreferenceInput.safeParse({ key: "backgroundConcurrency", value: "3" }).success).toBe(
+      false,
+    );
   });
 });
 

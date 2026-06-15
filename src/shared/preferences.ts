@@ -44,6 +44,12 @@ export const stepLimitSchema = z.number().int().min(0);
 /** stepLimit 缺省值：主进程兜底（makeSendDeps / runSend）与渲染层初值共用单一源。 */
 export const DEFAULT_STEP_LIMIT = 10;
 
+/** 后台模型调用（章节/全书摘要 + 会话命名 + 上下文压缩）的全局并发上限。正整数；无「不限制」档（0=摘要永不跑＝坑）。 */
+export const backgroundConcurrencySchema = z.number().int().positive();
+
+/** backgroundConcurrency 缺省值：主进程兜底与渲染层初值共用单一源。 */
+export const DEFAULT_BACKGROUND_CONCURRENCY = 3;
+
 /** 聊天模型（接替 assistants 表配置；spec 2026-06-10 §2.2）：语义同 summaryModel——显式对，未存 = 未配置。 */
 export const chatModelSchema = z.object({
   providerId: z.string().min(1),
@@ -90,6 +96,7 @@ export const PREFERENCE_SCHEMAS = {
   summaryModel: summaryModelSchema,
   pdfZoom: pdfZoomSchema,
   stepLimit: stepLimitSchema,
+  backgroundConcurrency: backgroundConcurrencySchema,
   chatModel: chatModelSchema,
   memoryEnabled: z.boolean(),
   soul: soulSchema,
@@ -123,6 +130,7 @@ export const setPreferenceInput = z.discriminatedUnion("key", [
   z.object({ key: z.literal("summaryModel"), value: summaryModelSchema }),
   z.object({ key: z.literal("pdfZoom"), value: pdfZoomSchema }),
   z.object({ key: z.literal("stepLimit"), value: stepLimitSchema }),
+  z.object({ key: z.literal("backgroundConcurrency"), value: backgroundConcurrencySchema }),
   z.object({ key: z.literal("chatModel"), value: chatModelSchema }),
   z.object({ key: z.literal("memoryEnabled"), value: z.boolean() }),
   z.object({ key: z.literal("soul"), value: soulSchema }),

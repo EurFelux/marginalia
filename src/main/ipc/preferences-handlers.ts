@@ -32,6 +32,8 @@ export const preferencesBindings: Binding[] = [
         return setPreference(getDb(), input.key, input.value);
       case "stepLimit":
         return setPreference(getDb(), input.key, input.value);
+      case "backgroundConcurrency":
+        return setPreference(getDb(), input.key, input.value);
       case "chatModel":
         return setPreference(getDb(), input.key, input.value);
       case "memoryEnabled": {
