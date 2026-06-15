@@ -4,12 +4,14 @@ import { MessageCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@renderer/components/ui/button";
 import { AIPanel } from "@renderer/ai/AIPanel";
+import { usePrefsStore } from "@renderer/store/prefs-store";
 import type { ChatContext } from "@renderer/ai/chat-context";
 
 const LIBRARY_CONTEXT: ChatContext = { kind: "library" };
 
 export function FloatingAssistant() {
   const { t } = useTranslation();
+  const agentName = usePrefsStore((s) => s.soul.name);
   const [open, setOpen] = useState(false);
 
   if (!open) {
@@ -17,7 +19,7 @@ export function FloatingAssistant() {
       <Button
         size="icon"
         onClick={() => setOpen(true)}
-        aria-label={t("ai.openLibraryAssistant", "问问 Lia")}
+        aria-label={t("ai.openLibraryAssistant", "问问 {{name}}", { name: agentName })}
         className="fixed bottom-6 end-6 z-40 size-12 rounded-full shadow-lg"
       >
         <MessageCircle />

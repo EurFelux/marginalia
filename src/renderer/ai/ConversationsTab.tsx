@@ -82,7 +82,9 @@ export function ConversationsTab({ context }: { context: ChatContext }) {
   if (list.length === 0)
     return (
       <p className="p-4 text-center text-xs text-muted-foreground">
-        {t("reader.conversation.empty", "还没有会话。选段问 AI 试试～")}
+        {context.kind === "library"
+          ? t("ai.conversation.libraryEmpty", "还没有会话，开一个聊聊吧～")
+          : t("reader.conversation.empty", "还没有会话。选段问 AI 试试～")}
       </p>
     );
 
