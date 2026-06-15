@@ -13,7 +13,7 @@ import {
   AlertDialogTitle,
 } from "@renderer/components/ui/alert-dialog";
 import { usePrefsStore } from "@renderer/store/prefs-store";
-import { clampStepLimit } from "@renderer/settings/settings-logic";
+import { clampBackgroundConcurrency, clampStepLimit } from "@renderer/settings/settings-logic";
 import { DEFAULT_STEP_LIMIT } from "@shared/preferences";
 import type { BackupInspection } from "@shared/backup";
 
@@ -21,6 +21,8 @@ export function AdvancedSettings() {
   const { t } = useTranslation();
   const stepLimit = usePrefsStore((s) => s.stepLimit);
   const setStepLimit = usePrefsStore((s) => s.setStepLimit);
+  const backgroundConcurrency = usePrefsStore((s) => s.backgroundConcurrency);
+  const setBackgroundConcurrency = usePrefsStore((s) => s.setBackgroundConcurrency);
   const unlimited = stepLimit === 0;
   const [busy, setBusy] = useState(false);
   // 已检视、待用户确认的还原目标；非 null 时打开确认弹窗。
@@ -121,6 +123,31 @@ export function AdvancedSettings() {
               <span className="text-sm">{t("settings.advanced.stepLimitUnlimited", "不限制")}</span>
             </label>
           </div>
+        </div>
+
+        <div className="flex items-start justify-between gap-3">
+          <label htmlFor="background-concurrency" className="min-w-0 cursor-pointer">
+            <span className="block text-sm font-medium">
+              {t("settings.advanced.backgroundConcurrency", "后台任务并发上限")}
+            </span>
+            <span className="mt-0.5 block text-[11px] leading-relaxed text-muted-foreground">
+              {t(
+                "settings.advanced.backgroundConcurrencyDesc",
+                "同时进行的后台 AI 任务（章节/全书摘要、会话命名、长对话压缩）数量上限。调低可缓解额度/速率压力；不影响你正在进行的对话回复。",
+              )}
+            </span>
+          </label>
+          <Input
+            id="background-concurrency"
+            type="number"
+            min={1}
+            max={10}
+            value={backgroundConcurrency}
+            onChange={(e) =>
+              setBackgroundConcurrency(clampBackgroundConcurrency(e.target.valueAsNumber))
+            }
+            className="w-16 shrink-0"
+          />
         </div>
 
         <div className="flex items-center justify-between gap-3">

@@ -229,6 +229,9 @@ export default {
   "reader.tts.start": "朗读",
   "reader.tts.stop": "停止",
   "settings.advanced": "高级",
+  "settings.advanced.backgroundConcurrency": "后台任务并发上限",
+  "settings.advanced.backgroundConcurrencyDesc":
+    "同时进行的后台 AI 任务（章节/全书摘要、会话命名、长对话压缩）数量上限。调低可缓解额度/速率压力；不影响你正在进行的对话回复。",
   "settings.advanced.stepLimit": "单次回复最多步数",
   "settings.advanced.stepLimitDesc":
     "AI 单次回复中连续调用工具的步数上限，阅读 PDF 逐页时需要调高。勾选「不限制」后仅靠模型自然停止与手动停止收尾——模型若陷入循环会持续消耗额度。",
