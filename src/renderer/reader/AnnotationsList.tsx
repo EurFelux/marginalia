@@ -1,6 +1,5 @@
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { EpubCFI } from "epubjs";
 import { Trash2 } from "lucide-react";
 import type { AnnotationDto } from "@shared/annotations";
 import type { ChapterRefDto } from "@shared/library";
@@ -12,18 +11,13 @@ import { useAnnotationStore } from "@renderer/store/annotation-store";
 import { STYLE_STRIPE } from "./highlight";
 import { chapterIdAtPage } from "./pdf-chapter-at-page";
 import { parsePdfLocatorRange } from "./pdf-locator";
-
-function spineOf(cfi: string): number {
-  try {
-    return new EpubCFI(cfi).spinePos ?? -1;
-  } catch {
-    return -1;
-  }
-}
+import { chapterIdAtCfi } from "./chapter-id-at-cfi";
+import { useEpubSession } from "./epub-session";
 
 export function AnnotationsList({ bookId }: { bookId: string }) {
   const { t } = useTranslation();
   const requestScroll = useAnnotationStore((s) => s.requestScroll);
+  const { spineHrefs } = useEpubSession();
   const qc = useQueryClient();
   const annos = useQuery({
     queryKey: qk.annotations(bookId),
@@ -67,9 +61,8 @@ export function AnnotationsList({ bookId }: { bookId: string }) {
       const title = (chapters.data ?? []).find((c: ChapterRefDto) => c.id === chId)?.title;
       return title ? `${title} · p.${pdfRange.page}` : `p.${pdfRange.page}`;
     }
-    const sp = spineOf(locator);
-    const ch = (chapters.data ?? []).find((c: ChapterRefDto) => c.orderIndex === sp);
-    return ch?.title ?? null;
+    const chId = chapterIdAtCfi(chapters.data ?? [], spineHrefs, locator);
+    return (chapters.data ?? []).find((c: ChapterRefDto) => c.id === chId)?.title ?? null;
   };
 
   return (
