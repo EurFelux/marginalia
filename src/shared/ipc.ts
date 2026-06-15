@@ -142,6 +142,7 @@ export const C = {
   appGetInfo: def("app:get-info", "invoke", z.void(), out<AppGetInfoResult>()),
   appGetLocaleSync: def("app:get-locale-sync", "sync", z.void(), out<string>()),
   appOpenExternal: def("app:open-external", "invoke", openExternalInput, out<void>()),
+  appCheckUpdate: def("app:check-update", "invoke", z.void(), out<UpdateCheckResult>()),
   ping: def("ping", "invoke", pingInput, out<PingResult>()),
 
   // library
