@@ -20,9 +20,18 @@ import {
   renderMemoryPassInput,
   maybeConsolidateMemory,
   __resetConsolidationRuntime,
+  CONSOLIDATION_SYSTEM,
 } from "@main/ai/memory-consolidation";
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
+
+describe("CONSOLIDATION_SYSTEM", () => {
+  // 回归守卫：OpenAI 兼容 provider 在 json_object 响应格式下要求 prompt 含 "json" 字样，
+  // 否则整理 pass 每轮必挂（AI_APICallError: "must contain the word 'json'"）。
+  it("mentions json (required by OpenAI-compatible json_object response format)", () => {
+    expect(CONSOLIDATION_SYSTEM.toLowerCase()).toContain("json");
+  });
+});
 
 function freshDb() {
   const db = createDb(":memory:");
