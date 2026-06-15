@@ -1,6 +1,6 @@
 // src/main/chat/conversations.test.ts
 import path from "node:path";
-import { eq } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { createDb, runMigrations } from "@main/db/client";
 import { books, chapters, conversations, messages } from "@main/db/schema";
@@ -146,5 +146,15 @@ describe("deleteConversation", () => {
     const b = createConversation(db, { bookId: "book-1" });
     deleteConversation(db, a.id);
     expect(getConversation(db, b.id)?.id).toBe(b.id);
+  });
+});
+
+describe("library conversations (null bookId)", () => {
+  it("allows inserting a conversation row with null bookId", () => {
+    const db = freshDb();
+    const row = db.insert(conversations).values({ bookId: null }).returning().get();
+    expect(row.bookId).toBeNull();
+    const back = db.select().from(conversations).where(isNull(conversations.bookId)).all();
+    expect(back).toHaveLength(1);
   });
 });
