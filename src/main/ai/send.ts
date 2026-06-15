@@ -103,7 +103,7 @@ export async function runSend(
     systemPromptText = `${systemPromptText}\n\n${note}`;
   }
   const cfg = deps.webSearchConfig;
-  const searchRegistered = Boolean(cfg?.enabled && cfg.backends.length);
+  const searchRegistered = Boolean(cfg?.backends.length);
   const webSearchTurn = input.webSearch ?? false;
   const webSearchEnabled = searchRegistered ? webSearchTurn : undefined;
 
@@ -205,7 +205,7 @@ export async function runResend(
   }
 
   const cfg = deps.webSearchConfig;
-  const searchRegistered = Boolean(cfg?.enabled && cfg.backends.length);
+  const searchRegistered = Boolean(cfg?.backends.length);
   const webSearchTurn = input.webSearch ?? false;
   const webSearchEnabled = searchRegistered ? webSearchTurn : undefined;
 

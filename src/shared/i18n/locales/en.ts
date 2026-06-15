@@ -59,7 +59,6 @@ export default {
   "ai.toolStep.webSearch": "Web search: {{query}}",
   "ai.toolStep.webSearchFallback": "Web search",
   "ai.webSearch.hover": "Enable web search for this message (Exa)",
-  "ai.webSearch.notConfigured": "Configure web search in settings first",
   "ai.webSearch.toggle": "Web",
   "bookNotes.add": "New note",
   "bookNotes.addTitle": "New note",
@@ -391,9 +390,8 @@ export default {
     "Free tier works without a key. Adding a key raises rate limits and improves result quality.",
   "settings.webSearch.apiKeyOptional": "(optional)",
   "settings.webSearch.apiKeyPlaceholder": "exa-… (leave blank for free tier)",
-  "settings.webSearch.enable": "Enable web search",
-  "settings.webSearch.enableHint":
-    "Let the AI fetch external information when you toggle web search on per message (Exa).",
+  "settings.webSearch.description":
+    "Web search is on by default (Exa). Toggle it per message with the Web button in the AI panel.",
   "shell.tabLibrary": "Library",
   "shell.tabStats": "Stats",
   "stats.currentStreak": "Current streak",

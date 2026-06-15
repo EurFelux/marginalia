@@ -62,7 +62,7 @@ export function streamAssistantReply(
   let closeSearch: (() => Promise<unknown>) | undefined;
   const wsCfg = deps.webSearchConfig;
   const searchTools =
-    deps.createSearchTools && wsCfg?.enabled && wsCfg.backends.length
+    deps.createSearchTools && wsCfg?.backends.length
       ? (() => {
           const s = deps.createSearchTools!(wsCfg, ctx.webSearchTurn);
           closeSearch = s.close;

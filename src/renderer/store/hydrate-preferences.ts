@@ -41,4 +41,7 @@ export function hydratePreferences(): void {
     usePrefsStore.setState({ avatarBlobId: snap.avatarBlobId });
   }
   usePrefsStore.setState({ webSearch: snap.webSearch ?? DEFAULT_WEB_SEARCH });
+  if (snap.webSearchEnabled !== undefined) {
+    usePrefsStore.setState({ webSearchEnabled: snap.webSearchEnabled });
+  }
 }

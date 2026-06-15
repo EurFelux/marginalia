@@ -3,6 +3,7 @@ import { v7 as uuidv7 } from "uuid";
 import type { AiStreamEvent } from "@shared/chat";
 import { useNavigationStore } from "@renderer/store/navigation-store";
 import { useChatStore, getActiveConversationId } from "@renderer/store/chat-store";
+import { usePrefsStore } from "@renderer/store/prefs-store";
 import type { ChatUIMessage } from "@renderer/ai/types";
 
 /** onChunk 订阅器签名（与 window.api.ai.onChunk 一致；测试可注入假实现）。 */
@@ -75,7 +76,7 @@ export function createIpcChatTransport(): ChatTransport<ChatUIMessage> {
           const { default: i18n } = await import("@renderer/i18n");
           throw new Error(i18n.t("ai.cannotResend", "无法重发：找不到会话或目标消息"));
         }
-        const webSearch = useChatStore.getState().webSearchEnabled;
+        const webSearch = usePrefsStore.getState().webSearchEnabled;
         const ack = await window.api.ai.resend({
           streamId,
           conversationId,
@@ -98,7 +99,7 @@ export function createIpcChatTransport(): ChatTransport<ChatUIMessage> {
         conversationId = convo.id;
       }
       const chips = (last?.metadata?.contextChips ?? []).filter((c) => c.state !== "off");
-      const webSearch = useChatStore.getState().webSearchEnabled;
+      const webSearch = usePrefsStore.getState().webSearchEnabled;
       const ack = await window.api.ai.send({
         streamId,
         bookId: currentBookId,

@@ -106,6 +106,7 @@ export const PREFERENCE_SCHEMAS = {
   showAgentAvatar: z.boolean(),
   avatarBlobId: z.string().nullable(),
   webSearch: webSearchConfig,
+  webSearchEnabled: z.boolean(),
 } as const;
 
 export type PreferenceKey = keyof typeof PREFERENCE_SCHEMAS;
@@ -143,5 +144,6 @@ export const setPreferenceInput = z.discriminatedUnion("key", [
   z.object({ key: z.literal("showAgentAvatar"), value: z.boolean() }),
   z.object({ key: z.literal("avatarBlobId"), value: z.string().nullable() }),
   z.object({ key: z.literal("webSearch"), value: webSearchConfig }),
+  z.object({ key: z.literal("webSearchEnabled"), value: z.boolean() }),
 ]);
 export type SetPreferenceInput = z.infer<typeof setPreferenceInput>;
