@@ -29,6 +29,8 @@ export interface EpubBook {
   unloadSection: (index: number) => void;
   /** 给定 section 文档与其内某元素，算该元素起点 CFI（进度锚点级存储）。失败返回 null。 */
   cfiFromElement: (index: number, el: Element) => string | null;
+  /** 确保 section 已渲染，为其中 anchorId 元素生成 point CFI；失败返回 null。 */
+  anchorCfi: (index: number, anchorId: string) => Promise<string | null>;
   /** 释放 epubjs 资源（卸载书、blob URL）。 */
   destroy: () => void;
 }
@@ -168,6 +170,20 @@ export async function createEpubBook(bytes: Uint8Array): Promise<EpubBook> {
       const s = sectionAt(index);
       if (!s) return null;
       try {
+        return new EpubCFI(el, s.cfiBase, ANNO_IGNORE_CLASS).toString();
+      } catch {
+        return null;
+      }
+    },
+
+    anchorCfi: async (index, anchorId) => {
+      const s = sectionAt(index);
+      if (!s) return null;
+      try {
+        // s.document 在 render 前为 undefined；未就绪先 render（与 loadSection 同路径）。
+        if (!s.document) await (s.render(book.load.bind(book)) as unknown as Promise<string>);
+        const el = s.document?.getElementById(anchorId) ?? null;
+        if (!el) return null;
         return new EpubCFI(el, s.cfiBase, ANNO_IGNORE_CLASS).toString();
       } catch {
         return null;
