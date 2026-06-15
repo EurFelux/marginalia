@@ -10,6 +10,7 @@ import { eq } from "drizzle-orm";
 import { conversations } from "@main/db/schema";
 import { createReadingTools } from "@main/ai/tools";
 import { createMemoryTools } from "@main/ai/memory-tools";
+import { createLibraryTools } from "@main/ai/library-tools";
 import { providerCallOptions, supportsImageToolResults } from "@main/ai/model-factory";
 import { withPromptCaching } from "@main/ai/prompt-caching";
 import { maybeCompactConversation } from "@main/ai/context-compaction";
@@ -36,7 +37,7 @@ export interface OkSendResult {
 
 export interface StreamCtx {
   conversationId: string;
-  bookId: string;
+  bookId: string | null;
   resolved: ResolvedOk;
   /** 本轮 user 文本（首轮自动命名用）。 */
   userText: string;
@@ -70,8 +71,11 @@ export function streamAssistantReply(
         })()
       : {};
 
+  const contextTools = bookId
+    ? createReadingTools({ db, bookId, loadBytes, imageToolResults })
+    : createLibraryTools({ db });
   const tools = {
-    ...createReadingTools({ db, bookId, loadBytes, imageToolResults }),
+    ...contextTools,
     ...Object.fromEntries(
       Object.entries(memoryTools).filter(
         (entry): entry is [string, NonNullable<(typeof entry)[1]>] => entry[1] != null,
