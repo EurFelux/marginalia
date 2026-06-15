@@ -23,7 +23,7 @@ export function WebSearchSettings() {
       <p className="text-[11px] leading-relaxed text-muted-foreground">
         {t(
           "settings.webSearch.description",
-          "联网搜索默认启用（Exa），可在 AI 面板的「联网」按钮逐条开关。",
+          "联网搜索默认可用（Exa），用 AI 面板的「联网」按钮启用或关闭。",
         )}
       </p>
       <div className="space-y-2">
