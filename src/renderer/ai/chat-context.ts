@@ -1,4 +1,4 @@
-// src/renderer/ai/chat-context.ts —— Lia 的上下文脊柱（spec 2026-06-16 §2/§5）。
+// src/renderer/ai/chat-context.ts —— AI 助手的上下文脊柱（spec 2026-06-16 §2/§5）。
 export type ChatContext = { kind: "book"; bookId: string } | { kind: "library" };
 
 /** 稳定 key：用于 chat-store 槽、TanStack Query key。 */

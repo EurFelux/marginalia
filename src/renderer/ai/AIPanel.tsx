@@ -1,7 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useChat } from "@ai-sdk/react";
-import { Plus, X } from "lucide-react";
+import { MessagesSquare, Plus, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@renderer/components/ui/button";
@@ -12,6 +12,7 @@ import { createIpcChatTransport } from "@renderer/ai/ipc-chat-transport";
 import type { ChatUIMessage } from "@renderer/ai/types";
 import { MessageList } from "@renderer/ai/MessageList";
 import { Composer } from "@renderer/ai/Composer";
+import { ConversationsTab } from "@renderer/ai/ConversationsTab";
 import { messagesToUI } from "@renderer/ai/message-history";
 import { conversationsQuery } from "@renderer/query/conversation-queries";
 import type { Chip } from "@shared/chat";
@@ -34,6 +35,9 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
   const openCommand = useChatStore((s) => s.openCommand);
   const activeConversationId = useActiveConversationId(context);
   const bookId = context.kind === "book" ? context.bookId : null;
+  // 会话列表内嵌于面板（仅 library 上下文；阅读器的列表在 Sidebar）：header 切换 chat ↔ 列表。
+  const isLibrary = context.kind === "library";
+  const [showList, setShowList] = useState(false);
   const convosQuery = useQuery(conversationsQuery(context));
   const activeTitle = activeConversationId
     ? convosQuery.data?.find((c) => c.id === activeConversationId)?.title?.trim() ||
@@ -54,6 +58,7 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
     if (!openCommand) return;
     const { conversationId } = openCommand;
     let cancelled = false;
+    setShowList(false); // 从列表选中一条会话 → 回到聊天视图
     void stop();
     void window.api.chat.messages
       .listByConversation({ conversationId })
@@ -94,6 +99,7 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
         bookId: context.kind === "book" ? context.bookId : null,
       });
       setMessages([]);
+      setShowList(false); // 新建后回到聊天视图
       useChatStore.getState().setActiveConversation(context, convo.id);
       useChatStore.getState().setSummaryChipsPreset();
       openPanelAndFocusComposer();
@@ -137,6 +143,18 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
           )}
         </div>
         <div className="ms-auto flex shrink-0 items-center gap-1.5">
+          {isLibrary && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => setShowList((v) => !v)}
+              aria-label={t("ai.conversationList", "会话列表")}
+              aria-pressed={showList}
+              className={showList ? "text-foreground" : "text-muted-foreground"}
+            >
+              <MessagesSquare />
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon-sm"
@@ -158,24 +176,32 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
         </div>
       </header>
 
-      <ScrollArea className="min-h-0 flex-1" viewportRef={scrollRef}>
-        <div className="p-4">
-          <ChatActionsContext.Provider value={actions}>
-            <MessageList messages={messages} status={status} bookId={bookId} />
-          </ChatActionsContext.Provider>
+      {showList ? (
+        <div className="min-h-0 flex-1">
+          <ConversationsTab context={context} />
         </div>
-      </ScrollArea>
+      ) : (
+        <>
+          <ScrollArea className="min-h-0 flex-1" viewportRef={scrollRef}>
+            <div className="p-4">
+              <ChatActionsContext.Provider value={actions}>
+                <MessageList messages={messages} status={status} bookId={bookId} />
+              </ChatActionsContext.Provider>
+            </div>
+          </ScrollArea>
 
-      {error && (
-        <div className="shrink-0 border-t border-border bg-destructive/10 px-3 py-2 text-xs text-destructive">
-          {t("ai.sendFailed", "发送失败：{{message}}", { message: error.message })}
-          <span className="text-muted-foreground">
-            {t("ai.sendFailedHint", "（请确认已在「设置」配置 API Key 与模型）")}
-          </span>
-        </div>
+          {error && (
+            <div className="shrink-0 border-t border-border bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              {t("ai.sendFailed", "发送失败：{{message}}", { message: error.message })}
+              <span className="text-muted-foreground">
+                {t("ai.sendFailedHint", "（请确认已在「设置」配置 API Key 与模型）")}
+              </span>
+            </div>
+          )}
+
+          <Composer status={status} onStop={stop} onSend={handleSend} context={context} />
+        </>
       )}
-
-      <Composer status={status} onStop={stop} onSend={handleSend} context={context} />
     </div>
   );
 }

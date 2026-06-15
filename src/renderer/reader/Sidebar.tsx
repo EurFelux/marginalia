@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@renderer/components/u
 import { BookCard } from "./BookCard";
 import { ChapterList } from "./ChapterList";
 import { AnnotationsList } from "./AnnotationsList";
-import { ConversationsTab } from "./ConversationsTab";
+import { ConversationsTab } from "@renderer/ai/ConversationsTab";
 import { BookNotesPanel } from "@renderer/book-notes/BookNotesPanel";
 
 export function Sidebar({ bookId }: { bookId: string }) {
