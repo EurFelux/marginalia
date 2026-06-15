@@ -1,9 +1,10 @@
-import { app, ipcMain, shell } from "electron";
+import { app, ipcMain, net, shell } from "electron";
 import { C } from "@shared/ipc";
 import { getDb } from "@main/db/instance";
 import { getAppInfo, ping } from "@main/app-info";
 import { bind, register, type Binding } from "@main/ipc/registry";
 import { isAllowedExternalUrl } from "@main/app/external-url";
+import { checkForUpdate } from "@main/app/update-check";
 import { createLogger } from "@main/logger";
 
 const log = createLogger("app");
@@ -18,6 +19,12 @@ export const appBindings: Binding[] = [
     }
     void shell.openExternal(input.url);
   }),
+  bind(C.appCheckUpdate, () =>
+    checkForUpdate(
+      app.getVersion(),
+      (url, init) => net.fetch(url as string, init) as ReturnType<typeof fetch>,
+    ),
+  ),
 ];
 
 export function registerAppHandlers(): void {

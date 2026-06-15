@@ -32,6 +32,7 @@ export function createApi(d: PreloadDeps) {
       locale: d.appLocale,
       openLogsDir: inv(C.appOpenLogsDir),
       openExternal: inv(C.appOpenExternal),
+      checkUpdate: inv(C.appCheckUpdate),
     },
     log: {
       write: inv(C.logWrite),
