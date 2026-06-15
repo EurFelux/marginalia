@@ -28,14 +28,22 @@ describe("webSearchBackend", () => {
 });
 
 describe("webSearchConfig", () => {
-  it("accepts enabled + ordered backends", () => {
+  it("accepts ordered backends", () => {
     expect(
-      webSearchConfig.safeParse({ enabled: true, backends: [{ kind: "exa-mcp", apiKey: "sk" }] })
-        .success,
+      webSearchConfig.safeParse({ backends: [{ kind: "exa-mcp", apiKey: "sk" }] }).success,
     ).toBe(true);
   });
-  it("accepts the empty default", () => {
-    expect(webSearchConfig.safeParse({ enabled: false, backends: [] }).success).toBe(true);
+  it("accepts empty backends list", () => {
+    expect(webSearchConfig.safeParse({ backends: [] }).success).toBe(true);
+  });
+  it("strips unknown keys (back-compat: old stored { enabled, backends } parses fine)", () => {
+    const result = webSearchConfig.safeParse({ enabled: true, backends: [{ kind: "exa-mcp" }] });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      // enabled is stripped; only backends survives
+      expect(result.data).not.toHaveProperty("enabled");
+      expect(result.data.backends).toHaveLength(1);
+    }
   });
 });
 
@@ -44,9 +52,11 @@ describe("DEFAULT_WEB_SEARCH", () => {
     const result = webSearchConfig.safeParse(DEFAULT_WEB_SEARCH);
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.enabled).toBe(true);
       expect(result.data.backends).toHaveLength(1);
       expect(result.data.backends[0]?.kind).toBe("exa-mcp");
     }
+  });
+  it("DEFAULT_WEB_SEARCH equals { backends: [{ kind: 'exa-mcp' }] }", () => {
+    expect(DEFAULT_WEB_SEARCH).toEqual({ backends: [{ kind: "exa-mcp" }] });
   });
 });

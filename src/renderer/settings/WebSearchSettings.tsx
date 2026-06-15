@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { usePrefsStore } from "@renderer/store/prefs-store";
 import { Input } from "@renderer/components/ui/input";
-import { Checkbox } from "@renderer/components/ui/checkbox";
 import { Button } from "@renderer/components/ui/button";
 import { DEFAULT_WEB_SEARCH, type WebSearchConfig } from "@shared/web-search";
 
@@ -14,35 +13,19 @@ export function WebSearchSettings() {
   const exa = cfg.backends.find((b) => b.kind === "exa-mcp");
   const [apiKey, setApiKey] = useState(exa && "apiKey" in exa ? (exa.apiKey ?? "") : "");
 
-  // setWebSearch already calls persistPreference internally (same idiom as all other prefs setters)
-  // When toggling, always keep a keyless-or-keyed exa-mcp backend present so web search stays usable.
   const exaBackend = (key: string) =>
     key ? { kind: "exa-mcp" as const, apiKey: key } : { kind: "exa-mcp" as const };
-  const onToggle = (enabled: boolean) => setWebSearch({ enabled, backends: [exaBackend(apiKey)] });
-  const onSaveKey = () => setWebSearch({ ...cfg, backends: [exaBackend(apiKey)] });
+  const onSaveKey = () => setWebSearch({ backends: [exaBackend(apiKey)] });
 
   return (
     <section className="space-y-4">
       <h2 className="font-serif text-lg">{t("settings.webSearch", "联网搜索")}</h2>
-      <div className="flex items-start justify-between gap-3">
-        <label htmlFor="ws-enable" className="min-w-0 cursor-pointer">
-          <span className="block text-sm font-medium">
-            {t("settings.webSearch.enable", "启用联网搜索")}
-          </span>
-          <span className="mt-0.5 block text-[11px] leading-relaxed text-muted-foreground">
-            {t(
-              "settings.webSearch.enableHint",
-              "允许 AI 在你逐条勾选「联网」时检索外部信息（Exa）。",
-            )}
-          </span>
-        </label>
-        <Checkbox
-          id="ws-enable"
-          checked={cfg.enabled}
-          onCheckedChange={(v) => onToggle(v === true)}
-          className="mt-0.5"
-        />
-      </div>
+      <p className="text-[11px] leading-relaxed text-muted-foreground">
+        {t(
+          "settings.webSearch.description",
+          "联网搜索默认启用（Exa），可在 AI 面板的「联网」按钮逐条开关。",
+        )}
+      </p>
       <div className="space-y-2">
         <label htmlFor="ws-apikey" className="min-w-0">
           <span className="block text-xs text-muted-foreground">

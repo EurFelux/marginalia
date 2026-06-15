@@ -20,15 +20,13 @@ export const webSearchBackend = z.discriminatedUnion("kind", [
 ]);
 export type WebSearchBackendConfig = z.infer<typeof webSearchBackend>;
 
-/** 联网搜索偏好：enabled 决定是否注册 web_search 工具；backends 顺序 = 回退优先级。 */
+/** 联网搜索偏好：backends 顺序 = 回退优先级（工具注册由 backends.length 决定，per-message 开关走 webSearchEnabled 偏好）。 */
 export const webSearchConfig = z.object({
-  enabled: z.boolean(),
   backends: z.array(webSearchBackend),
 });
 export type WebSearchConfig = z.infer<typeof webSearchConfig>;
 
-/** 出厂默认：启用，Exa 免费层（无 key 即可用）。 */
+/** 出厂默认：Exa 免费层（无 key 即可用）。 */
 export const DEFAULT_WEB_SEARCH: WebSearchConfig = {
-  enabled: true,
   backends: [{ kind: "exa-mcp" }],
 };

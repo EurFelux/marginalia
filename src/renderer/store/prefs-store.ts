@@ -49,6 +49,8 @@ interface PrefsState {
   avatarBlobId: string | null;
   /** 联网搜索配置（enabled + backends）；null = 未 hydrate 前的占位（hydrate 后至少为出厂默认）。 */
   webSearch: WebSearchConfig | null;
+  /** 联网搜索 composer 开关（per-message toggle；持久化，重启恢复）。 */
+  webSearchEnabled: boolean;
 }
 interface PrefsActions {
   setAutoSummarize: (v: boolean) => void;
@@ -68,6 +70,7 @@ interface PrefsActions {
   setShowAgentAvatar: (v: boolean) => void;
   setAvatarBlobId: (v: string | null) => void;
   setWebSearch: (v: WebSearchConfig) => void;
+  setWebSearchEnabled: (v: boolean) => void;
 }
 
 export const PREFS_INITIAL: PrefsState = {
@@ -88,6 +91,7 @@ export const PREFS_INITIAL: PrefsState = {
   showAgentAvatar: true,
   avatarBlobId: null,
   webSearch: DEFAULT_WEB_SEARCH,
+  webSearchEnabled: false,
 };
 
 /**
@@ -166,5 +170,9 @@ export const usePrefsStore = create<PrefsState & PrefsActions>()((set) => ({
   setWebSearch: (webSearch) => {
     persistPreference({ key: "webSearch", value: webSearch });
     set({ webSearch });
+  },
+  setWebSearchEnabled: (webSearchEnabled) => {
+    persistPreference({ key: "webSearchEnabled", value: webSearchEnabled });
+    set({ webSearchEnabled });
   },
 }));

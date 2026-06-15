@@ -117,11 +117,9 @@ export function ContextPillBar() {
   const setSummaryChip = useChatStore((s) => s.setSummaryChip);
   const draftChips = useChatStore((s) => s.draftChips);
   const setDraftChips = useChatStore((s) => s.setDraftChips);
-  const webSearchEnabled = useChatStore((s) => s.webSearchEnabled);
-  const setWebSearchEnabled = useChatStore((s) => s.setWebSearchEnabled);
-  const webSearchConfigured = usePrefsStore((s) =>
-    Boolean(s.webSearch?.enabled && s.webSearch.backends.length),
-  );
+  const webSearchEnabled = usePrefsStore((s) => s.webSearchEnabled);
+  const setWebSearchEnabled = usePrefsStore((s) => s.setWebSearchEnabled);
+  const webSearchConfigured = usePrefsStore((s) => Boolean(s.webSearch?.backends.length));
 
   const chapter = useQuery({
     ...chapterSummaryQuery(bookId ?? "", chapterId ?? ""),

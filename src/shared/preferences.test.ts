@@ -39,6 +39,7 @@ describe("preferences schemas", () => {
       "summaryModel",
       "ttsPrefs",
       "webSearch",
+      "webSearchEnabled",
     ]);
   });
 
@@ -186,11 +187,35 @@ describe("webSearch preference", () => {
   it("is registered in PREFERENCE_SCHEMAS", () => {
     expect("webSearch" in PREFERENCE_SCHEMAS).toBe(true);
   });
-  it("validates a set payload", () => {
+  it("validates a set payload (backends-only, no enabled field)", () => {
     const r = setPreferenceInput.safeParse({
       key: "webSearch",
-      value: { enabled: true, backends: [{ kind: "exa-mcp", apiKey: "sk" }] },
+      value: { backends: [{ kind: "exa-mcp", apiKey: "sk" }] },
     });
     expect(r.success).toBe(true);
+  });
+  it("back-compat: old stored { enabled, backends } still parses (enabled stripped)", () => {
+    const r = setPreferenceInput.safeParse({
+      key: "webSearch",
+      value: { enabled: true, backends: [{ kind: "exa-mcp" }] },
+    });
+    expect(r.success).toBe(true);
+  });
+});
+
+describe("webSearchEnabled preference", () => {
+  it("is registered in PREFERENCE_SCHEMAS", () => {
+    expect("webSearchEnabled" in PREFERENCE_SCHEMAS).toBe(true);
+  });
+  it("setPreferenceInput accepts boolean values", () => {
+    expect(setPreferenceInput.safeParse({ key: "webSearchEnabled", value: true }).success).toBe(
+      true,
+    );
+    expect(setPreferenceInput.safeParse({ key: "webSearchEnabled", value: false }).success).toBe(
+      true,
+    );
+    expect(setPreferenceInput.safeParse({ key: "webSearchEnabled", value: "yes" }).success).toBe(
+      false,
+    );
   });
 });

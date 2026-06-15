@@ -8,8 +8,6 @@ import { safeStorage } from "@renderer/store/lazy-storage";
 interface ChatState {
   draftText: string;
   draftChips: Chip[];
-  /** 会话内联网搜索开关（session-sticky，不持久化；false = 关闭）。 */
-  webSearchEnabled: boolean;
   /**
    * 一次性命令信号（非状态）：nonce 递增触发 AIPanel 载入该会话历史。
    * 与「当前 active 会话」解耦——发消息路径只写记忆槽、不发本命令，
@@ -28,7 +26,6 @@ interface ChatState {
 interface ChatActions {
   /** 设当前书的 active（写记忆槽）；id=null 同时清 openCommand（其载入命令失效）。 */
   setActiveConversation: (id: string | null) => void;
-  setWebSearchEnabled: (v: boolean) => void;
   setDraftText: (text: string) => void;
   setDraftChips: (chips: Chip[]) => void;
   /** 重开会话：发命令信号（触发载历史）+ 写记忆槽 + 开面板（经 prefs-store 布局）。 */
@@ -47,7 +44,6 @@ interface ChatActions {
 export const CHAT_INITIAL: ChatState = {
   draftText: "",
   draftChips: [],
-  webSearchEnabled: false,
   openCommand: null,
   summaryChips: { chapter: false, book: false },
   activeByBook: {},
@@ -71,7 +67,6 @@ export const useChatStore = create<ChatState & ChatActions>()(
           activeByBook: rememberSlot(s.activeByBook, id),
           ...(id === null ? { openCommand: null } : {}),
         })),
-      setWebSearchEnabled: (webSearchEnabled) => set({ webSearchEnabled }),
       setDraftText: (draftText) => set({ draftText }),
       setDraftChips: (draftChips) => set({ draftChips }),
       openConversation: (id) => {
