@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { LucideIcon } from "lucide-react";
 import { BookOpen, FileText, List, ScrollText, Sparkles, Wrench } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { AssistantAvatar } from "@renderer/ai/AssistantAvatar";
 import { chipLabel } from "@renderer/ai/chip-label";
 import { useChatActions } from "@renderer/ai/chat-actions";
 import { MessageEditor } from "@renderer/ai/MessageEditor";
@@ -16,6 +17,7 @@ import type { ChatUIMessage } from "@renderer/ai/types";
 import { LocalizedStreamdown } from "@renderer/components/LocalizedStreamdown";
 import { cn } from "@renderer/lib/utils";
 import { qk } from "@renderer/query/keys";
+import { usePrefsStore } from "@renderer/store/prefs-store";
 import type { ChapterRefDto } from "@shared/library";
 
 export function MessageList({
@@ -45,10 +47,12 @@ export function MessageList({
       </div>
     );
   }
+  const showAvatar = usePrefsStore((s) => s.showAgentAvatar);
+  const agentName = usePrefsStore((s) => s.soul.name);
   const lastId = messages.at(-1)?.id;
   return (
     <div className="space-y-5">
-      {messages.map((m) =>
+      {messages.map((m, i) =>
         m.role === "user" ? (
           <UserBubble key={m.id} m={m} />
         ) : (
@@ -57,6 +61,9 @@ export function MessageList({
             m={m}
             streaming={status === "streaming" && m.id === lastId}
             chapters={chapters}
+            showAvatar={showAvatar}
+            agentName={agentName}
+            groupHead={i === 0 || messages[i - 1].role !== "assistant"}
           />
         ),
       )}
@@ -137,17 +144,27 @@ function AssistantBubble({
   m,
   streaming,
   chapters,
+  showAvatar,
+  agentName,
+  groupHead,
 }: {
   m: ChatUIMessage;
   streaming: boolean;
   chapters: ChapterRefDto[];
+  showAvatar: boolean;
+  agentName: string;
+  groupHead: boolean;
 }) {
   const segs = segments(m.parts);
   const hasText = segs.some((s) => s.kind === "text");
   if (segs.length === 0 && !streaming) return null;
-  return (
+
+  const bubble = (
     <div className="group flex flex-col items-start">
-      <div className="max-w-[88%] space-y-2 rounded-2xl rounded-bl-sm bg-muted px-3.5 py-2 text-sm leading-relaxed text-foreground">
+      {showAvatar && groupHead && (
+        <span className="mb-1 text-xs font-medium text-muted-foreground">{agentName}</span>
+      )}
+      <div className="max-w-full space-y-2 rounded-2xl rounded-bl-sm bg-muted px-3.5 py-2 text-sm leading-relaxed text-foreground">
         {segs.map((s, i) =>
           s.kind === "text" ? (
             // Streamdown 自带 markdown 排版（经 @source 由 Tailwind 生成其类）；不叠 prose 以免边距打架
@@ -159,6 +176,18 @@ function AssistantBubble({
         {streaming && !hasText && <ThinkingCursor />}
       </div>
       {!streaming && <MessageToolbar m={m} />}
+    </div>
+  );
+
+  if (!showAvatar) {
+    // 开关关闭：回到原布局（气泡自身限宽 88%）。
+    return <div className="max-w-[88%]">{bubble}</div>;
+  }
+  // 开关开启：头像列（首条显头像、后续留白）+ 内容列（缩进对齐）。
+  return (
+    <div className="flex max-w-[92%] items-start gap-2">
+      <div className="w-7 shrink-0">{groupHead && <AssistantAvatar className="size-7" />}</div>
+      <div className="min-w-0 flex-1">{bubble}</div>
     </div>
   );
 }
