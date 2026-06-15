@@ -11,6 +11,7 @@ import { supportsImageToolResults } from "@main/ai/model-factory";
 import { getBook } from "@main/library/repository";
 import type { ResolvedModel } from "@main/ai/assistant-model";
 import type { RunBackground } from "@main/ai/background-limiter";
+import type { WebSearchConfig } from "@shared/web-search";
 import {
   appendMessage,
   getMessage,
@@ -35,14 +36,14 @@ export interface SendDeps {
   stepLimit?: number;
   /** 联网搜索工具工厂（注入式，便于测试 mock）；未配置则跳过注入。 */
   createSearchTools?: (
-    cfg: import("@shared/web-search").WebSearchConfig,
+    cfg: WebSearchConfig,
     turnEnabled: boolean,
   ) => {
     tools: Record<string, unknown>;
     close: () => Promise<unknown>;
   };
   /** 当前联网搜索配置快照（settings 级）。 */
-  webSearchConfig?: import("@shared/web-search").WebSearchConfig;
+  webSearchConfig?: WebSearchConfig;
 }
 
 export type SendResult = OkSendResult | { ok: false; reason: string };
