@@ -201,6 +201,7 @@ export default {
   "reader.missingFile.mismatch": "这不是同一个文件（内容不一致）",
   "reader.missingFile.relinkFailed": "重新连接失败：{{error}}",
   "reader.missingFile.delete": "从书库删除",
+  "reader.missingFile.deleted": "已从书库删除",
   "reader.missingFile.deleteFailed": "删除失败：{{error}}",
   "reader.missingFile.deleteConfirm.title": "从书库删除这本书？",
   "reader.missingFile.deleteConfirm.body":

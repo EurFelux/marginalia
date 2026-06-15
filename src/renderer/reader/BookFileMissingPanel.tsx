@@ -20,18 +20,17 @@ export function BookFileMissingPanel({ bookId }: { bookId: string }) {
   const qc = useQueryClient();
   const backToLibrary = useNavigationStore((s) => s.backToLibrary);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [mismatch, setMismatch] = useState(false);
 
   const relink = async () => {
     try {
       const r = await window.api.library.relink({ bookId });
       if (r.status === "ok") {
+        setMismatch(false);
         toast.success(t("reader.missingFile.relinked", "已重新连接文件"));
         void qc.invalidateQueries({ queryKey: qk.bookBytes(bookId) });
       } else if (r.status === "mismatch") {
-        toast.error(t("reader.missingFile.mismatch", "这不是同一个文件（内容不一致）"), {
-          closeButton: true,
-          duration: Infinity,
-        });
+        setMismatch(true);
       }
       // canceled：无动作
     } catch (e) {
@@ -48,6 +47,7 @@ export function BookFileMissingPanel({ bookId }: { bookId: string }) {
     setConfirmOpen(false);
     try {
       await window.api.library.delete({ bookId });
+      toast.success(t("reader.missingFile.deleted", "已从书库删除"));
       backToLibrary();
     } catch (e) {
       toast.error(
@@ -84,6 +84,11 @@ export function BookFileMissingPanel({ bookId }: { bookId: string }) {
           {t("reader.missingFile.delete", "从书库删除")}
         </Button>
       </div>
+      {mismatch && (
+        <p className="font-sans text-sm text-destructive">
+          {t("reader.missingFile.mismatch", "这不是同一个文件（内容不一致）")}
+        </p>
+      )}
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogTitle>

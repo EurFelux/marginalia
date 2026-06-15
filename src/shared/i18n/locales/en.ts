@@ -213,6 +213,7 @@ export default {
   "reader.missingFile.mismatch": "That's not the same file (content differs)",
   "reader.missingFile.relinkFailed": "Reconnect failed: {{error}}",
   "reader.missingFile.delete": "Remove from library",
+  "reader.missingFile.deleted": "Removed from library",
   "reader.missingFile.deleteFailed": "Delete failed: {{error}}",
   "reader.missingFile.deleteConfirm.title": "Remove this book from the library?",
   "reader.missingFile.deleteConfirm.body":
