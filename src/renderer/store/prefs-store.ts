@@ -10,7 +10,7 @@ import {
   type SummaryModel,
   type TtsPrefs,
 } from "@shared/preferences";
-import type { WebSearchConfig } from "@shared/web-search";
+import { DEFAULT_WEB_SEARCH, type WebSearchConfig } from "@shared/web-search";
 import type { ReaderLayout, ReaderPrefs } from "@renderer/types";
 import { persistPreference } from "@renderer/store/persist-preference";
 
@@ -47,7 +47,7 @@ interface PrefsState {
   showAgentAvatar: boolean;
   /** 当前头像 blob 引用；null = 用默认头像。由主进程 agent IPC 落盘，渲染层只镜像。 */
   avatarBlobId: string | null;
-  /** 联网搜索配置（enabled + backends）；null = 未 hydrate（用出厂默认，不启用）。 */
+  /** 联网搜索配置（enabled + backends）；null = 未 hydrate 前的占位（hydrate 后至少为出厂默认）。 */
   webSearch: WebSearchConfig | null;
 }
 interface PrefsActions {
@@ -87,7 +87,7 @@ export const PREFS_INITIAL: PrefsState = {
   ttsPrefs: DEFAULT_TTS_PREFS,
   showAgentAvatar: true,
   avatarBlobId: null,
-  webSearch: null,
+  webSearch: DEFAULT_WEB_SEARCH,
 };
 
 /**

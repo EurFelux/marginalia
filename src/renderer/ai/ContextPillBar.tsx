@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookOpen, FileText, Loader2, TextSelect, X } from "lucide-react";
+import { BookOpen, FileText, Globe, Loader2, TextSelect, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import type { SummaryStatus } from "@shared/library";
@@ -9,6 +9,7 @@ import { ScrollArea } from "@renderer/components/ui/scroll-area";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@renderer/components/ui/hover-card";
 import { useChatStore } from "@renderer/store/chat-store";
 import { useNavigationStore } from "@renderer/store/navigation-store";
+import { usePrefsStore } from "@renderer/store/prefs-store";
 import { bookSummaryQuery, chapterSummaryQuery } from "@renderer/query/summary-queries";
 import { qk } from "@renderer/query/keys";
 import type { SummaryView } from "@renderer/ai/summary-chips";
@@ -116,6 +117,11 @@ export function ContextPillBar() {
   const setSummaryChip = useChatStore((s) => s.setSummaryChip);
   const draftChips = useChatStore((s) => s.draftChips);
   const setDraftChips = useChatStore((s) => s.setDraftChips);
+  const webSearchEnabled = useChatStore((s) => s.webSearchEnabled);
+  const setWebSearchEnabled = useChatStore((s) => s.setWebSearchEnabled);
+  const webSearchConfigured = usePrefsStore((s) =>
+    Boolean(s.webSearch?.enabled && s.webSearch.backends.length),
+  );
 
   const chapter = useQuery({
     ...chapterSummaryQuery(bookId ?? "", chapterId ?? ""),
@@ -196,6 +202,20 @@ export function ContextPillBar() {
         book.data,
         summaryChips.book,
         BookOpen,
+      )}
+      {webSearchConfigured && (
+        <ContextPill
+          icon={<Globe className="size-3" />}
+          label={t("ai.webSearch.toggle", "联网")}
+          on={webSearchEnabled}
+          onClick={() => setWebSearchEnabled(!webSearchEnabled)}
+          ariaPressed={webSearchEnabled}
+          hover={
+            <p className="text-muted-foreground">
+              {t("ai.webSearch.hover", "为这条消息开启联网搜索（Exa）")}
+            </p>
+          }
+        />
       )}
       {selCtx && (
         <ContextPill

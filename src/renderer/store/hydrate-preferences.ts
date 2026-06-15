@@ -1,3 +1,4 @@
+import { DEFAULT_WEB_SEARCH } from "@shared/web-search";
 import { usePrefsStore } from "@renderer/store/prefs-store";
 
 /**
@@ -39,5 +40,5 @@ export function hydratePreferences(): void {
   if (snap.avatarBlobId !== undefined) {
     usePrefsStore.setState({ avatarBlobId: snap.avatarBlobId });
   }
-  if (snap.webSearch) usePrefsStore.setState({ webSearch: snap.webSearch });
+  usePrefsStore.setState({ webSearch: snap.webSearch ?? DEFAULT_WEB_SEARCH });
 }
