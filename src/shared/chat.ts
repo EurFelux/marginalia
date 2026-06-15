@@ -91,6 +91,7 @@ export const sendInputSchema = z.object({
   chips: z.array(chipSchema),
   userText: z.string().min(1),
   readingContext: readingContextSchema.nullish(),
+  webSearch: z.boolean().optional(),
 });
 export type SendInput = z.infer<typeof sendInputSchema>;
 
@@ -120,6 +121,7 @@ export const resendInputSchema = z.object({
   conversationId: z.string().min(1),
   userMessageId: z.string().min(1),
   userText: z.string().min(1),
+  webSearch: z.boolean().optional(),
 });
 export type ResendInput = z.infer<typeof resendInputSchema>;
 /** ai:resend 入站载体 = 业务入参 + streamId。 */

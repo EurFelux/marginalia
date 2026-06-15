@@ -7,6 +7,7 @@ import {
   createConversationInput,
   messagesByConversationInput,
   sendAck,
+  sendInputSchema,
   sendRequest,
 } from "@shared/chat";
 
@@ -141,5 +142,25 @@ describe("sendAck", () => {
 describe("abortInput", () => {
   it("rejects empty streamId", () => {
     expect(abortInput.safeParse({ streamId: "" }).success).toBe(false);
+  });
+});
+
+describe("sendInputSchema.webSearch", () => {
+  it("is optional (omitted parses)", () => {
+    expect(
+      sendInputSchema.safeParse({ bookId: "b", conversationId: "c", chips: [], userText: "hi" })
+        .success,
+    ).toBe(true);
+  });
+  it("accepts a boolean", () => {
+    expect(
+      sendInputSchema.safeParse({
+        bookId: "b",
+        conversationId: "c",
+        chips: [],
+        userText: "hi",
+        webSearch: true,
+      }).success,
+    ).toBe(true);
   });
 });
