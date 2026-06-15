@@ -176,6 +176,7 @@ export const conversations = sqliteTable(
     // null = 尚未折叠（全量逐字，等价旧行为）。
     contextSummary: text("context_summary"),
     summarizedThroughSeq: integer("summarized_through_seq"),
+    memoryThroughSeq: integer("memory_through_seq"),
     createdAt: nowMs(),
     updatedAt: integer("updated_at")
       .notNull()
