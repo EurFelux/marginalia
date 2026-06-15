@@ -14,6 +14,7 @@ export class Limiter {
   private active = 0;
   private readonly queue: Array<() => void> = [];
 
+  // 箭头函数字段（非方法）：使 this 绑定到实例，调用方可直接把 `limiter.run` 当值传递/注入而不丢 this。
   run: RunBackground = (fn) =>
     new Promise((resolve, reject) => {
       const attempt = () => {

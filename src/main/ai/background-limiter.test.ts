@@ -97,7 +97,7 @@ describe("Limiter", () => {
     });
     void limiter.run(async () => {
       started++;
-      await new Promise(() => {});
+      await new Promise(() => {}); // 故意永不 settle：模拟长期占用槽位的任务
     });
     await Promise.resolve();
     expect(started).toBe(1);
