@@ -108,6 +108,7 @@ async function setup(
     resolveModel: () => model,
     resolveSummaryModel: () => summaryModel,
     runBackground: passThrough,
+    notify: () => {},
   };
   return { db, book, deps };
 }
@@ -133,6 +134,7 @@ function makeDeps(db: ReturnType<typeof freshDb>): SendDeps {
     resolveModel: () => model,
     resolveSummaryModel: () => ({ ok: false as const, reason: "summary model unset" }),
     runBackground: passThrough,
+    notify: () => {},
   };
 }
 
@@ -572,6 +574,7 @@ describe("pdf system prompt injection", () => {
       }),
       resolveSummaryModel: () => ({ ok: false, reason: "unset" }),
       runBackground: passThrough,
+      notify: () => {},
     };
     const convo = createConversation(db, { bookId: book.id });
     const r = await runSend(deps, {
