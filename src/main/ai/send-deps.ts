@@ -6,6 +6,8 @@ import { resolveChatModel, resolveSummaryModel } from "@main/ai/assistant-model"
 import { getPreference } from "@main/preferences/repository";
 import { Limiter } from "@main/ai/background-limiter";
 import { DEFAULT_BACKGROUND_CONCURRENCY, DEFAULT_STEP_LIMIT } from "@shared/preferences";
+import { createSearchTools } from "@main/ai/search/web-search-tool";
+import { DEFAULT_WEB_SEARCH } from "@shared/web-search";
 import type { DB } from "@main/db/client";
 import type { SummaryDeps } from "@main/ai/summary";
 import type { LoadBytes } from "@main/ai/tools";
@@ -39,6 +41,8 @@ export function makeSendDeps(): SendDeps {
     resolveSummaryModel: () => resolveSummaryModel(db),
     runBackground: backgroundLimiter.run,
     stepLimit: getPreference(db, "stepLimit") ?? DEFAULT_STEP_LIMIT,
+    createSearchTools,
+    webSearchConfig: getPreference(db, "webSearch") ?? DEFAULT_WEB_SEARCH,
   };
 }
 
