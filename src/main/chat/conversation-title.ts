@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import type { DB } from "@main/db/client";
 import { conversations } from "@main/db/schema";
 import type { ResolvedModel } from "@main/ai/assistant-model";
+import type { RunBackground } from "@main/ai/background-limiter";
 import { createLogger } from "@main/logger";
 
 const log = createLogger("chat");
@@ -25,6 +26,8 @@ const NAMING_SYSTEM =
 export interface NamingDeps {
   db: DB;
   resolveModel: () => ResolvedModel;
+  /** 后台并发限流端口（与摘要/压缩共用全局上限）。 */
+  runBackground: RunBackground;
 }
 
 // 命名中状态：进程内存瞬态（spec §5）——settle 即清除、不落库；重启自然归零，
@@ -72,11 +75,13 @@ export async function nameConversation(
   }
   namingInFlight.add(conversationId);
   try {
-    const { text } = await generateText({
-      model: resolved.model,
-      system: NAMING_SYSTEM,
-      prompt: `用户：${userText}\n\n助手：${assistantText}`,
-    });
+    const { text } = await deps.runBackground(() =>
+      generateText({
+        model: resolved.model,
+        system: NAMING_SYSTEM,
+        prompt: `用户：${userText}\n\n助手：${assistantText}`,
+      }),
+    );
     const title = sanitizeTitle(text);
     if (!title) return;
     // 写回前复查 title 仍为 null——不覆盖期间已被设置的标题

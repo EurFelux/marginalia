@@ -52,7 +52,7 @@ export function streamAssistantReply(
   systemPrompt: string | undefined,
   opts?: { abortSignal?: AbortSignal },
 ): OkSendResult {
-  const { db, loadBytes, resolveSummaryModel, stepLimit } = deps;
+  const { db, loadBytes, resolveSummaryModel, stepLimit, runBackground } = deps;
   const { conversationId, bookId, resolved } = ctx;
   const imageToolResults = supportsImageToolResults(resolved.providerType);
   const memoryTools = createMemoryTools({ db, bookId });
@@ -137,13 +137,16 @@ export function streamAssistantReply(
           .get();
         if (assistantText && row && row.title == null) {
           void nameConversation(
-            { db, resolveModel: resolveSummaryModel },
+            { db, resolveModel: resolveSummaryModel, runBackground },
             conversationId,
             ctx.userText,
             assistantText,
           );
         }
-        void maybeCompactConversation({ db, resolveModel: resolveSummaryModel }, conversationId);
+        void maybeCompactConversation(
+          { db, resolveModel: resolveSummaryModel, runBackground },
+          conversationId,
+        );
       }
     },
   });

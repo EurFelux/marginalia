@@ -19,6 +19,9 @@ import type { ResolvedModel } from "@main/ai/assistant-model";
 import type { LoadBytes } from "@main/ai/tools";
 import { runResend, runSend, type SendDeps, type SendInput } from "@main/ai/send";
 import { __resetNamingRuntime } from "@main/chat/conversation-title";
+import type { RunBackground } from "@main/ai/background-limiter";
+
+const passThrough: RunBackground = (fn) => fn();
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
 
@@ -104,6 +107,7 @@ async function setup(
     loadBytes,
     resolveModel: () => model,
     resolveSummaryModel: () => summaryModel,
+    runBackground: passThrough,
   };
   return { db, book, deps };
 }
@@ -128,6 +132,7 @@ function makeDeps(db: ReturnType<typeof freshDb>): SendDeps {
     loadBytes,
     resolveModel: () => model,
     resolveSummaryModel: () => ({ ok: false as const, reason: "summary model unset" }),
+    runBackground: passThrough,
   };
 }
 
@@ -490,6 +495,7 @@ describe("pdf system prompt injection", () => {
         providerType: "anthropic",
       }),
       resolveSummaryModel: () => ({ ok: false, reason: "unset" }),
+      runBackground: passThrough,
     };
     const convo = createConversation(db, { bookId: book.id });
     const r = await runSend(deps, {

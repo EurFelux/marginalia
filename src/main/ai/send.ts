@@ -10,6 +10,7 @@ import { type LoadBytes } from "@main/ai/tools";
 import { supportsImageToolResults } from "@main/ai/model-factory";
 import { getBook } from "@main/library/repository";
 import type { ResolvedModel } from "@main/ai/assistant-model";
+import type { RunBackground } from "@main/ai/background-limiter";
 import {
   appendMessage,
   getMessage,
@@ -28,6 +29,8 @@ export interface SendDeps {
   resolveModel: () => ResolvedModel;
   /** 摘要模型解析器（auto naming 用；章节/全书摘要在 makeSummaryDeps 注入同一解析器）。不回退聊天模型——未配置则 naming/摘要跳过。 */
   resolveSummaryModel: () => ResolvedModel;
+  /** 后台并发限流端口：透传给 auto-naming / 压缩；摘要在 makeSummaryDeps 注入同一单例。 */
+  runBackground: RunBackground;
   /** agent 多步上限（默认 DEFAULT_STEP_LIMIT=10）；0 = 不限制（永不主动刹车，靠模型自然停止 + abort）。 */
   stepLimit?: number;
 }

@@ -37,6 +37,7 @@ export function makeSendDeps(): SendDeps {
     loadBytes,
     resolveModel,
     resolveSummaryModel: () => resolveSummaryModel(db),
+    runBackground: backgroundLimiter.run,
     stepLimit: getPreference(db, "stepLimit") ?? DEFAULT_STEP_LIMIT,
   };
 }

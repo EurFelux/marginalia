@@ -8,6 +8,7 @@ import { conversations } from "@main/db/schema";
 import { listMessagesAfterSeq } from "@main/chat/messages";
 import { estimateTokens } from "@shared/tokens";
 import type { ResolvedModel } from "@main/ai/assistant-model";
+import type { RunBackground } from "@main/ai/background-limiter";
 import { createLogger } from "@main/logger";
 
 const log = createLogger("summary");
@@ -84,6 +85,8 @@ export interface CompactionDeps {
   db: DB;
   /** 摘要模型解析器（与章节/全书摘要、自动命名同源 resolveSummaryModel）。 */
   resolveModel: () => ResolvedModel;
+  /** 后台并发限流端口（与摘要/命名共用全局上限）。 */
+  runBackground: RunBackground;
 }
 
 const COMPACTION_SYSTEM =
@@ -140,13 +143,15 @@ export async function maybeCompactConversation(
 
     const prior = convo.summary?.trim() ? `Previous summary:\n${convo.summary.trim()}\n\n` : "";
     const transcript = renderFoldedTranscript(plan.foldedTurns);
-    const { text } = await generateText({
-      model: resolved.model,
-      system: COMPACTION_SYSTEM,
-      prompt: `${prior}New exchanges:\n${transcript}`,
-      maxOutputTokens: SUMMARY_MAX_TOKENS,
-      maxRetries: 1,
-    });
+    const { text } = await deps.runBackground(() =>
+      generateText({
+        model: resolved.model,
+        system: COMPACTION_SYSTEM,
+        prompt: `${prior}New exchanges:\n${transcript}`,
+        maxOutputTokens: SUMMARY_MAX_TOKENS,
+        maxRetries: 1,
+      }),
+    );
     if (!text.trim()) {
       log.warn(`conversation ${conversationId} compaction produced empty summary; skip`);
       return;

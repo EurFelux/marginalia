@@ -10,11 +10,15 @@ import { createConversation } from "@main/chat/conversations";
 import { appendMessage } from "@main/chat/messages";
 import { conversations } from "@main/db/schema";
 import type { ResolvedModel } from "@main/ai/assistant-model";
+import type { RunBackground } from "@main/ai/background-limiter";
+import { Limiter } from "@main/ai/background-limiter";
 import {
   __resetCompactionRuntime,
   maybeCompactConversation,
   planFold,
 } from "@main/ai/context-compaction";
+
+const passThrough: RunBackground = (fn) => fn();
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
 
@@ -131,7 +135,7 @@ describe("maybeCompactConversation", () => {
   it("folds old turns into the summary and advances summarizedThroughSeq", async () => {
     const { db, conversationId } = await seedSixTurns();
     await maybeCompactConversation(
-      { db, resolveModel: () => summaryModel("ROLLED UP") },
+      { db, resolveModel: () => summaryModel("ROLLED UP"), runBackground: passThrough },
       conversationId,
       FORCE,
     );
@@ -143,7 +147,7 @@ describe("maybeCompactConversation", () => {
   it("leaves summary and seq untouched when the model is unconfigured", async () => {
     const { db, conversationId } = await seedSixTurns();
     await maybeCompactConversation(
-      { db, resolveModel: () => ({ ok: false, reason: "unset" }) },
+      { db, resolveModel: () => ({ ok: false, reason: "unset" }), runBackground: passThrough },
       conversationId,
       FORCE,
     );
@@ -163,7 +167,11 @@ describe("maybeCompactConversation", () => {
         },
       }),
     };
-    await maybeCompactConversation({ db, resolveModel: () => throwing }, conversationId, FORCE);
+    await maybeCompactConversation(
+      { db, resolveModel: () => throwing, runBackground: passThrough },
+      conversationId,
+      FORCE,
+    );
     const row = readConvo(db, conversationId);
     expect(row?.summary).toBeNull();
     expect(row?.through).toBeNull();
@@ -171,13 +179,109 @@ describe("maybeCompactConversation", () => {
 
   it("is a no-op below the high-water budget", async () => {
     const { db, conversationId } = await seedSixTurns();
-    await maybeCompactConversation({ db, resolveModel: () => summaryModel("X") }, conversationId, {
-      high: 1_000_000,
-      low: 10,
-      minRecent: 2,
-    });
+    await maybeCompactConversation(
+      { db, resolveModel: () => summaryModel("X"), runBackground: passThrough },
+      conversationId,
+      { high: 1_000_000, low: 10, minRecent: 2 },
+    );
     const row = readConvo(db, conversationId);
     expect(row?.summary).toBeNull();
     expect(row?.through).toBeNull();
+  });
+
+  it("serialises concurrent compactions: second call does not start generateText until first finishes", async () => {
+    // Use a shared Limiter capped at 1 to assert real serialization.
+    const limiter = new Limiter(() => 1);
+    const runBackground = limiter.run;
+
+    // Two separate DBs / conversations so the per-conversation dedup doesn't suppress the second call.
+    const { db: db1, conversationId: convoId1 } = await seedSixTurns();
+    const { db: db2, conversationId: convoId2 } = await seedSixTurns();
+
+    let firstGenerateEntered = false;
+    let secondGenerateEntered = false;
+    let resolveGate!: () => void;
+    const gate = new Promise<void>((res) => {
+      resolveGate = res;
+    });
+
+    // Controlled model for the first conversation: signals entry, then waits on gate.
+    const blockedModel: ResolvedModel = {
+      ok: true,
+      modelId: "blocked",
+      model: new MockLanguageModelV3({
+        doGenerate: async () => {
+          firstGenerateEntered = true;
+          await gate;
+          return {
+            finishReason: { unified: "stop" as const, raw: undefined },
+            usage: {
+              inputTokens: {
+                total: 1,
+                noCache: undefined,
+                cacheRead: undefined,
+                cacheWrite: undefined,
+              },
+              outputTokens: { total: 1, text: undefined, reasoning: undefined },
+            },
+            content: [{ type: "text" as const, text: "summary1" }],
+            warnings: [],
+          };
+        },
+      }),
+    };
+
+    // Instant model for the second conversation.
+    const instantModel: ResolvedModel = {
+      ok: true,
+      modelId: "instant",
+      model: new MockLanguageModelV3({
+        doGenerate: async () => {
+          secondGenerateEntered = true;
+          return {
+            finishReason: { unified: "stop" as const, raw: undefined },
+            usage: {
+              inputTokens: {
+                total: 1,
+                noCache: undefined,
+                cacheRead: undefined,
+                cacheWrite: undefined,
+              },
+              outputTokens: { total: 1, text: undefined, reasoning: undefined },
+            },
+            content: [{ type: "text" as const, text: "summary2" }],
+            warnings: [],
+          };
+        },
+      }),
+    };
+
+    // Fire both compactions concurrently — neither awaited yet.
+    const p1 = maybeCompactConversation(
+      { db: db1, resolveModel: () => blockedModel, runBackground },
+      convoId1,
+      FORCE,
+    );
+    const p2 = maybeCompactConversation(
+      { db: db2, resolveModel: () => instantModel, runBackground },
+      convoId2,
+      FORCE,
+    );
+
+    // Yield to allow microtasks + the limiter to schedule the first slot.
+    await new Promise<void>((r) => setTimeout(r, 0));
+
+    // First generateText must have started (it holds the only slot).
+    expect(firstGenerateEntered).toBe(true);
+    // Second generateText must NOT have started yet (blocked by the cap-1 limiter).
+    expect(secondGenerateEntered).toBe(false);
+
+    // Release the gate so the first compaction can finish.
+    resolveGate();
+    await Promise.all([p1, p2]);
+
+    // Both must have run by now.
+    expect(firstGenerateEntered).toBe(true);
+    expect(secondGenerateEntered).toBe(true);
   });
 });

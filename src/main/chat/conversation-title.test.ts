@@ -15,8 +15,11 @@ import {
   sanitizeTitle,
   __resetNamingRuntime,
 } from "@main/chat/conversation-title";
+import type { RunBackground } from "@main/ai/background-limiter";
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
+
+const passThrough: RunBackground = (fn) => fn();
 
 function freshDb() {
   const db = createDb(":memory:");
@@ -61,7 +64,11 @@ describe("nameConversation", () => {
     const db = freshDb();
     const convo = createConversation(db, { bookId: "book-1" });
     await nameConversation(
-      { db, resolveModel: () => ({ ok: true, model: namingModel("雾的象征"), modelId: "m" }) },
+      {
+        db,
+        resolveModel: () => ({ ok: true, model: namingModel("雾的象征"), modelId: "m" }),
+        runBackground: passThrough,
+      },
       convo.id,
       "这段雾的描写是什么意思",
       "雾在这里象征……",
@@ -74,7 +81,7 @@ describe("nameConversation", () => {
     const db = freshDb();
     const convo = createConversation(db, { bookId: "book-1" });
     await nameConversation(
-      { db, resolveModel: () => ({ ok: false, reason: "no model" }) },
+      { db, resolveModel: () => ({ ok: false, reason: "no model" }), runBackground: passThrough },
       convo.id,
       "u",
       "a",
@@ -87,7 +94,11 @@ describe("nameConversation", () => {
     const convo = createConversation(db, { bookId: "book-1" });
     setConversationTitle(db, convo.id, "手动名");
     await nameConversation(
-      { db, resolveModel: () => ({ ok: true, model: namingModel("AI 名"), modelId: "m" }) },
+      {
+        db,
+        resolveModel: () => ({ ok: true, model: namingModel("AI 名"), modelId: "m" }),
+        runBackground: passThrough,
+      },
       convo.id,
       "u",
       "a",
@@ -104,7 +115,11 @@ describe("nameConversation", () => {
       },
     });
     await nameConversation(
-      { db, resolveModel: () => ({ ok: true, model: throwing, modelId: "m" }) },
+      {
+        db,
+        resolveModel: () => ({ ok: true, model: throwing, modelId: "m" }),
+        runBackground: passThrough,
+      },
       convo.id,
       "u",
       "a",
