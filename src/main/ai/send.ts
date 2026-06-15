@@ -91,9 +91,9 @@ export async function runSend(
   });
 
   // 5. 组装 prompt：①内置模板+②instructions+③SOUL+④记忆索引（会话快照冻结）+⑤PDF 注记
-  const book = getBook(db, input.bookId);
+  const book = input.bookId ? getBook(db, input.bookId) : undefined;
   const imageToolResults = supportsImageToolResults(resolved.providerType);
-  let systemPromptText = buildSystemPrompt(db, conversationId);
+  let systemPromptText = buildSystemPrompt(db, conversationId, input.bookId ? "book" : "library");
   if (book?.format === "pdf") {
     const note = pdfSystemNote({
       pageCount: book.pageCount,
@@ -192,9 +192,13 @@ export async function runResend(
   const history = window.slice(0, -1);
 
   // system（同 runSend：五层组装 + PDF 注记）
-  const book = getBook(db, convo.bookId);
+  const book = convo.bookId ? getBook(db, convo.bookId) : undefined;
   const imageToolResults = supportsImageToolResults(resolved.providerType);
-  let systemPromptText = buildSystemPrompt(db, input.conversationId);
+  let systemPromptText = buildSystemPrompt(
+    db,
+    input.conversationId,
+    convo.bookId ? "book" : "library",
+  );
   if (book?.format === "pdf") {
     const note = pdfSystemNote({
       pageCount: book.pageCount,

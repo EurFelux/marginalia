@@ -671,6 +671,52 @@ describe("runSend context summary injection", () => {
   });
 });
 
+describe("runSend library context", () => {
+  beforeEach(() => __resetNamingRuntime());
+
+  it("runSend with null bookId uses the librarian prompt and library tools", async () => {
+    const db = freshDb();
+    const convo = createConversation(db, { bookId: null });
+
+    let capturedSystem = "";
+    const capturingModel = new MockLanguageModelV3({
+      doStream: async ({ prompt }) => {
+        const sys = prompt.find((m) => m.role === "system");
+        capturedSystem = sys && typeof sys.content === "string" ? sys.content : "";
+        return {
+          stream: simulateReadableStream({
+            chunks: [
+              { type: "text-start", id: "t1" },
+              { type: "text-delta", id: "t1", delta: "Try Meditations." },
+              { type: "text-end", id: "t1" },
+              finishChunk("stop"),
+            ],
+          }),
+        };
+      },
+    });
+
+    const loadBytes: LoadBytes = async () => makeFixtureEpub();
+    const deps: SendDeps = {
+      ...makeDeps(db),
+      loadBytes,
+      resolveModel: () => ({ ok: true, model: capturingModel, modelId: "mock" }),
+    };
+
+    const res = await runSend(deps, {
+      bookId: null,
+      conversationId: convo.id,
+      chips: [],
+      userText: "what should I read next?",
+    });
+    expect(res.ok).toBe(true);
+    if (res.ok) await res.finished;
+    expect(capturedSystem.startsWith("You are a personal librarian")).toBe(true);
+    const msgs = listMessages(db, convo.id);
+    expect(msgs.some((m) => m.role === "assistant")).toBe(true);
+  });
+});
+
 describe("runResend", () => {
   beforeEach(() => __resetNamingRuntime());
 
