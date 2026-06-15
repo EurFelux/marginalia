@@ -80,6 +80,27 @@ export const appGetInfoResult = z.object({
 });
 export type AppGetInfoResult = z.infer<typeof appGetInfoResult>;
 
+/** app:check-update —— 更新检测结果（判别联合，discriminator=status） */
+export const updateCheckResult = z.discriminatedUnion("status", [
+  z.object({
+    status: z.literal("update-available"),
+    currentVersion: z.string(),
+    latestVersion: z.string(),
+    releaseUrl: z.string(),
+  }),
+  z.object({
+    status: z.literal("up-to-date"),
+    currentVersion: z.string(),
+    latestVersion: z.string(),
+  }),
+  z.object({
+    status: z.literal("error"),
+    currentVersion: z.string(),
+    message: z.string(),
+  }),
+]);
+export type UpdateCheckResult = z.infer<typeof updateCheckResult>;
+
 /** output 幽灵类型载体：零运行时值，仅在类型层携带 O（main 不做 output 运行时校验，故无需 schema）。 */
 declare const OUT: unique symbol;
 export interface Out<O> {
