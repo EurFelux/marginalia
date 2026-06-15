@@ -250,13 +250,16 @@ export default {
   "settings.advanced.stepLimitUnlimited": "Unlimited",
   "settings.agent": "Assistant",
   "settings.agent.avatar": "Avatar",
+  "settings.agent.avatarCropTitle": "Crop avatar",
   "settings.agent.avatarDesc":
     "AI avatar shown in conversation. Supports png/jpg/webp/gif, up to 2 MB.",
+  "settings.agent.avatarReadFailed": "Couldn't read the image",
   "settings.agent.avatarReset": "Reset to default",
   "settings.agent.avatarShowInChat": "Show avatar in conversation",
   "settings.agent.avatarTooLarge": "Image too large; please choose one under 2 MB.",
   "settings.agent.avatarUnsupported": "Unsupported image format",
   "settings.agent.avatarUpload": "Upload avatar",
+  "settings.agent.avatarZoom": "Zoom",
   "settings.agent.instructions": "Global instructions",
   "settings.agent.instructionsDesc":
     'Extra behavioural requirements layered on top of the persona — for example: "always quote the original text", "prefer English". Applied to every conversation.',
