@@ -37,6 +37,8 @@ export function MessageList({
     enabled: bookId !== null,
   });
   const chapters = chaptersQuery.data ?? [];
+  const showAvatar = usePrefsStore((s) => s.showAgentAvatar);
+  const agentName = usePrefsStore((s) => s.soul.name);
   if (messages.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 px-8 text-center text-sm text-muted-foreground">
@@ -47,8 +49,6 @@ export function MessageList({
       </div>
     );
   }
-  const showAvatar = usePrefsStore((s) => s.showAgentAvatar);
-  const agentName = usePrefsStore((s) => s.soul.name);
   const lastId = messages.at(-1)?.id;
   return (
     <div className="space-y-5">
