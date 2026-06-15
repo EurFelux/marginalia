@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Download, FolderOpen, Upload } from "lucide-react";
@@ -27,6 +27,41 @@ export function AdvancedSettings() {
   const [busy, setBusy] = useState(false);
   // 已检视、待用户确认的还原目标；非 null 时打开确认弹窗。
   const [pendingRestore, setPendingRestore] = useState<BackupInspection | null>(null);
+
+  const [appVersion, setAppVersion] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [latestAvailable, setLatestAvailable] = useState<string | null>(null);
+
+  useEffect(() => {
+    void window.api.app.getInfo().then((info) => setAppVersion(info.version));
+  }, []);
+
+  const onCheckUpdate = async () => {
+    setChecking(true);
+    setLatestAvailable(null);
+    try {
+      const res = await window.api.app.checkUpdate();
+      if (res.status === "update-available") {
+        setLatestAvailable(res.latestVersion);
+        toast(t("update.available", "发现新版本 {{version}}", { version: res.latestVersion }), {
+          action: {
+            label: t("update.view", "查看"),
+            onClick: () => void window.api.app.openExternal({ url: res.releaseUrl }),
+          },
+          duration: Infinity,
+          closeButton: true,
+        });
+      } else if (res.status === "up-to-date") {
+        toast.success(t("update.upToDate", "已是最新版本"));
+      } else {
+        toast.error(t("update.checkFailed", "检查更新失败"));
+      }
+    } catch {
+      toast.error(t("update.checkFailed", "检查更新失败"));
+    } finally {
+      setChecking(false);
+    }
+  };
 
   const onExport = async () => {
     setBusy(true);
@@ -148,6 +183,28 @@ export function AdvancedSettings() {
             }
             className="w-16 shrink-0"
           />
+        </div>
+
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <span className="block text-sm font-medium">
+              {t("settings.advanced.about", "关于")}
+            </span>
+            <span className="mt-0.5 block text-[11px] leading-relaxed text-muted-foreground">
+              {t("settings.advanced.currentVersion", "当前版本")} v{appVersion ?? "…"}
+              {latestAvailable
+                ? ` · ${t("update.available", "发现新版本 {{version}}", { version: latestAvailable })}`
+                : ""}
+            </span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={checking}
+            onClick={() => void onCheckUpdate()}
+          >
+            {t("settings.advanced.checkUpdate", "检查更新")}
+          </Button>
         </div>
 
         <div className="flex items-center justify-between gap-3">
