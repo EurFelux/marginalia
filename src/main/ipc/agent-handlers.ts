@@ -29,6 +29,8 @@ export const agentBindings: Binding[] = [
   }),
 
   bind(C.agentResetAvatar, () => resetAvatar(getDb())),
+
+  bind(C.agentSetAvatar, (bytes) => storeAvatar(getDb(), bytes)),
 ];
 
 export function registerAgentHandlers(): void {

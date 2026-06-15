@@ -282,4 +282,10 @@ export const C = {
   // agent（头像）
   agentPickAvatar: def("agent:pick-avatar", "invoke", z.void(), out<AvatarPickResult>()),
   agentResetAvatar: def("agent:reset-avatar", "invoke", z.void(), out<void>()),
+  agentSetAvatar: def(
+    "agent:set-avatar",
+    "invoke",
+    z.instanceof(Uint8Array),
+    out<AvatarPickResult>(),
+  ),
 };
