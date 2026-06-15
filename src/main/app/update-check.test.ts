@@ -39,6 +39,13 @@ describe("checkForUpdate", () => {
     if (res.status === "update-available") expect(res.latestVersion).toBe("0.14.0-beta.1");
   });
 
+  it("prompts update when current is a prerelease and a stable release exists", async () => {
+    const { impl } = fetchReturning([{ tag_name: "v0.14.0", html_url: "https://x/r" }]);
+    const res = await checkForUpdate("0.14.0-beta.1", impl, REPO);
+    expect(res.status).toBe("update-available");
+    if (res.status === "update-available") expect(res.latestVersion).toBe("0.14.0");
+  });
+
   it("reports up-to-date when latest equals current", async () => {
     const { impl } = fetchReturning([{ tag_name: "v0.13.0", html_url: "https://x/r" }]);
     const res = await checkForUpdate("0.13.0", impl, REPO);
@@ -52,7 +59,11 @@ describe("checkForUpdate", () => {
   it("reports up-to-date when latest is lower (no downgrade prompt)", async () => {
     const { impl } = fetchReturning([{ tag_name: "v0.12.0", html_url: "https://x/r" }]);
     const res = await checkForUpdate("0.13.0", impl, REPO);
-    expect(res.status).toBe("up-to-date");
+    expect(res).toEqual({
+      status: "up-to-date",
+      currentVersion: "0.13.0",
+      latestVersion: "0.12.0",
+    });
   });
 
   it("reports up-to-date on empty releases array", async () => {

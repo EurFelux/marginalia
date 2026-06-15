@@ -9,6 +9,9 @@ import { createLogger } from "@main/logger";
 
 const log = createLogger("app");
 
+// net.fetch 走系统代理（同 settings-handlers）；annotated binding 免去结果 cast。
+const netFetch: typeof fetch = (url, init) => net.fetch(url as string, init);
+
 export const appBindings: Binding[] = [
   bind(C.ping, ping),
   bind(C.appGetInfo, () => getAppInfo(getDb(), app.getVersion())),
@@ -19,12 +22,7 @@ export const appBindings: Binding[] = [
     }
     void shell.openExternal(input.url);
   }),
-  bind(C.appCheckUpdate, () =>
-    checkForUpdate(
-      app.getVersion(),
-      (url, init) => net.fetch(url as string, init) as ReturnType<typeof fetch>,
-    ),
-  ),
+  bind(C.appCheckUpdate, () => checkForUpdate(app.getVersion(), netFetch)),
 ];
 
 export function registerAppHandlers(): void {
