@@ -515,6 +515,26 @@ describe("anthropic prompt caching", () => {
   });
 });
 
+describe("current date/time injection", () => {
+  it("injects the current date/time into the live user turn, not the system prompt", async () => {
+    const captured: { prompt?: CapturedMsg[] } = {};
+    const { db, book, deps } = await setup({
+      ok: true,
+      model: rawPromptCapturingModel(captured),
+      modelId: "mock",
+    });
+    const convo = createConversation(db, { bookId: book.id });
+    const r = await runSend(deps, input(book.id, convo.id));
+    if (!r.ok) throw new Error(r.reason);
+    await r.finished;
+    const prompt = captured.prompt ?? [];
+    const lastUser = [...prompt].reverse().find((m) => m.role === "user");
+    expect(JSON.stringify(lastUser)).toContain("Current date and time");
+    const system = prompt.find((m) => m.role === "system");
+    expect(JSON.stringify(system)).not.toContain("Current date and time");
+  });
+});
+
 function systemCapturingModel(captured: { system?: string }) {
   return new MockLanguageModelV3({
     doStream: async ({ prompt }) => {

@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import {
   assemblePrompt,
+  formatCurrentDateTime,
   pdfSystemNote,
   renderHistoryMessage,
   type PromptHistoryMessage,
@@ -392,6 +393,54 @@ describe("assemblePrompt", () => {
     expect(toolMsg).toBeDefined();
     expect(JSON.stringify(toolMsg!.content)).toContain("page 99 is out of range");
   });
+
+  it("injects the current date/time into the live user turn when provided", async () => {
+    const out = await assemblePrompt({
+      systemPrompt: "sys",
+      history: [],
+      current: {
+        chips: [],
+        userText: "what year is it?",
+        currentDateTime: "2026-06-16T14:30:05+08:00",
+      },
+    });
+    const last = out[out.length - 1];
+    expect(last.role).toBe("user");
+    expect(last.content).toContain("## Current date and time\n2026-06-16T14:30:05+08:00");
+    // It is environment context for THIS turn, never the cached system prefix.
+    expect(out[0].content).not.toContain("Current date and time");
+  });
+
+  it("omits the date/time section when currentDateTime is absent", async () => {
+    const out = await assemblePrompt({
+      systemPrompt: null,
+      history: [],
+      current: { chips: [], userText: "hi" },
+    });
+    expect(out[out.length - 1].content).toBe("hi");
+  });
+
+  it("places date/time before reading position and chips in the live turn", async () => {
+    const out = await assemblePrompt({
+      systemPrompt: null,
+      history: [],
+      current: {
+        chips: userChips("the cat"),
+        userText: "Q",
+        currentDateTime: "2026-06-16T14:30:05+08:00",
+        readingContext: {
+          format: "pdf",
+          page: 1,
+          pageCount: 10,
+          chapterId: "c",
+          chapterTitle: "T",
+        },
+      },
+    });
+    const c = out[out.length - 1].content as string;
+    expect(c.indexOf("Current date and time")).toBeLessThan(c.indexOf("Current reading position"));
+    expect(c.indexOf("Current reading position")).toBeLessThan(c.indexOf("选中文本"));
+  });
 });
 
 describe("pdfSystemNote", () => {
@@ -462,6 +511,16 @@ describe("assemblePrompt priorSummary", () => {
     expect(msgs[0]?.content).toBe("BASE");
   });
 
+  it("does not inject date/time into the system message even with priorSummary", async () => {
+    const msgs = await assemblePrompt({
+      systemPrompt: "BASE",
+      priorSummary: "S",
+      history: [],
+      current: { chips: [], userText: "now", currentDateTime: "2026-06-16T14:30:05+08:00" },
+    });
+    expect(msgs[0]?.content).not.toContain("Current date and time");
+  });
+
   it("only renders the tail history it is given", async () => {
     const msgs = await assemblePrompt({
       systemPrompt: "BASE",
@@ -472,5 +531,17 @@ describe("assemblePrompt priorSummary", () => {
     const joined = JSON.stringify(msgs);
     expect(joined).toContain("kept");
     expect(joined).toContain("now");
+  });
+});
+
+describe("formatCurrentDateTime", () => {
+  it("formats a ZonedDateTime as ISO 8601 with offset, to second precision", () => {
+    const zdt = Temporal.ZonedDateTime.from("2026-06-16T14:30:05.123+08:00[Asia/Shanghai]");
+    expect(formatCurrentDateTime(zdt)).toBe("2026-06-16T14:30:05+08:00");
+  });
+
+  it("drops the bracketed time-zone annotation and keeps a UTC offset", () => {
+    const zdt = Temporal.ZonedDateTime.from("2026-01-03T09:04:07+00:00[UTC]");
+    expect(formatCurrentDateTime(zdt)).toBe("2026-01-03T09:04:07+00:00");
   });
 });

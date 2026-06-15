@@ -17,6 +17,8 @@ export interface AssemblePromptParams {
     chips: ReadonlyArray<{ id: string; content: string }>;
     userText: string;
     readingContext?: ReadingContext | null;
+    /** 当前本地时间（已格式化为 ISO 8601 带偏移）。运行时由调用方注入，仅进当前轮、不持久化。 */
+    currentDateTime?: string | null;
   };
 }
 
@@ -80,6 +82,20 @@ function renderReadingContext(ctx: ReadingContext | null | undefined): string | 
     `Estimated chapter text offset: ${offset}.\n` +
     `To read from the user's current ePub location without loading the whole chapter, call readChapterText with {"chapterId":"${ctx.chapterId}","offset":${offset},"maxChars":${maxChars}}.`
   );
+}
+
+/**
+ * 当前本地时间 → ISO 8601（带本地 UTC 偏移，如 `2026-06-16T14:30:05+08:00`）。
+ * 全程 Temporal：调用方传 `Temporal.Now.zonedDateTimeISO()`，本函数仅做投影（秒精度、剥 `[时区]` 注释）。
+ * Temporal 是 Electron 41 的 V8（14.6）内置；注意独立 Node 24 的 V8（13.6）尚无此 API——
+ * 本仓库主进程与 vitest 均跑 Electron 运行时（见 CLAUDE.md），故安全。给模型一个时间锚点（spec #93）。
+ */
+export function formatCurrentDateTime(now: Temporal.ZonedDateTime): string {
+  return now.toString({ smallestUnit: "second", timeZoneName: "never" });
+}
+
+function renderCurrentDateTime(dt: string | null | undefined): string | null {
+  return dt ? `## Current date and time\n${dt}` : null;
 }
 
 /** PDF 会话的 system prompt 附注（spec §7）：让模型知道页粒度工具的存在与扫描版的现实。 */
@@ -168,12 +184,13 @@ export async function assemblePrompt(params: AssemblePromptParams): Promise<Mode
     out.push({ role: "user", content: renderHistoryMessage(h) });
   }
 
-  // Reading position is intentionally injected only into the live/current user turn:
-  // it changes on scroll, so putting it in system/history would churn prompt-cache prefixes.
-  // It is also not persisted in message metadata; future turns get their own fresh position.
+  // Date/time and reading position are intentionally injected only into the live/current user turn:
+  // both change every turn (clock ticks, user scrolls), so putting them in system/history would churn
+  // prompt-cache prefixes. Neither is persisted in message metadata; future turns recompute their own.
   out.push({
     role: "user",
     content: [
+      renderCurrentDateTime(params.current.currentDateTime),
       renderReadingContext(params.current.readingContext),
       renderUserTurn(params.current.chips, params.current.userText),
     ]
