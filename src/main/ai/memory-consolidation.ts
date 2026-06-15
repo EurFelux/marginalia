@@ -133,7 +133,11 @@ export function renderMemoryPassInput(
   return combined.length > maxChars ? combined.slice(combined.length - maxChars) : combined;
 }
 
-const CONSOLIDATION_SYSTEM =
+// 末句必须出现 "json" 字样：OpenAI 兼容 provider（DeepSeek / zenmux 等）在 generateObject 的
+// json_object 响应格式下，要求 prompt 中含 "json" 一词，否则 API 直接拒
+// （AI_APICallError: "Prompt must contain the word 'json' ... to use 'response_format' of type 'json_object'"）。
+// 导出供回归测试断言该词存在——删除会让所有 OpenAI 兼容 provider 上的整理 pass 每轮必挂。
+export const CONSOLIDATION_SYSTEM =
   "You are the memory librarian for a reading assistant named Lia. You are given Lia's existing " +
   "long-term memories about the reader and the most recent exchanges of one conversation. Keep the " +
   "memory store accurate and tidy by emitting a list of operations.\n\n" +
@@ -147,7 +151,9 @@ const CONSOLIDATION_SYSTEM =
   "the same batch. NEVER delete a memory just because it looks old or stale — only the reader can judge that.\n\n" +
   "Write memory content in the reader's language; slugs are always English kebab-case. Link related " +
   "memories inside body text with [[slug]]. Be conservative: if nothing is clearly worth changing, return " +
-  "an empty ops array. Give a one-sentence reason for each operation.";
+  "an empty ops array. Give a one-sentence reason for each operation.\n\n" +
+  'Respond with a single JSON object of the form {"ops": [...]} matching the required schema; ' +
+  "output JSON only, with no surrounding prose.";
 
 export interface ConsolidationDeps {
   db: DB;
@@ -198,7 +204,10 @@ export async function maybeConsolidateMemory(
   const through = convo.through ?? null;
   const tail = listMessagesAfterSeq(db, conversationId, through);
   const assistantTurns = tail.filter((m) => m.role === "assistant").length;
-  if (assistantTurns < everyN) return; // 未到阈值
+  if (assistantTurns < everyN) {
+    log.debug(`consolidation pending conv=${conversationId} turns=${assistantTurns}/${everyN}`);
+    return; // 未到阈值
+  }
 
   const resolved = resolveModel();
   if (!resolved.ok) {
@@ -210,6 +219,9 @@ export async function maybeConsolidateMemory(
   try {
     const memories = listMemories(db);
     const input = renderMemoryPassInput(tail, memories);
+    log.debug(
+      `consolidation start conv=${conversationId} turns=${assistantTurns} memories=${memories.length} inputChars=${input.length}`,
+    );
     const { object } = await runBackground(() =>
       generateObject({
         model: resolved.model,
@@ -247,10 +259,12 @@ export async function maybeConsolidateMemory(
         updated: applied.updated,
         deleted: applied.deleted,
       });
+      log.info(
+        `consolidated memories conv=${conversationId} saved=${applied.saved} updated=${applied.updated} deleted=${applied.deleted}`,
+      );
+    } else {
+      log.debug(`consolidation produced no changes conv=${conversationId} (empty ops)`);
     }
-    log.debug(
-      `consolidation done conv=${conversationId} saved=${applied.saved} updated=${applied.updated} deleted=${applied.deleted}`,
-    );
   } catch (err) {
     log.warn(`conversation ${conversationId} consolidation failed`, err);
   } finally {
