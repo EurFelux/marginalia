@@ -325,4 +325,27 @@ describe("maybeConsolidateMemory", () => {
     expect(readThrough(db, conversationId) ?? null).toBeNull();
     expect(notify).not.toHaveBeenCalled();
   });
+
+  it("holds the watermark and does not notify when generateObject throws", async () => {
+    const { db, conversationId, bookId } = await seedConvo(2);
+    setPreference(db, "memoryAutoConsolidate", true);
+    const notify = vi.fn();
+    const throwing: ResolvedModel = {
+      ok: true,
+      modelId: "boom",
+      model: new MockLanguageModelV3({
+        doGenerate: async () => {
+          throw new Error("boom");
+        },
+      }),
+    };
+    await maybeConsolidateMemory(
+      { db, resolveModel: () => throwing, runBackground: passThrough, notify },
+      conversationId,
+      bookId,
+      2,
+    );
+    expect(readThrough(db, conversationId) ?? null).toBeNull();
+    expect(notify).not.toHaveBeenCalled();
+  });
 });
