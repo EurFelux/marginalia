@@ -10,7 +10,7 @@ import { eq } from "drizzle-orm";
 import { conversations } from "@main/db/schema";
 import { createReadingTools } from "@main/ai/tools";
 import { createMemoryTools } from "@main/ai/memory-tools";
-import { supportsImageToolResults } from "@main/ai/model-factory";
+import { providerCallOptions, supportsImageToolResults } from "@main/ai/model-factory";
 import { maybeCompactConversation } from "@main/ai/context-compaction";
 import { nameConversation } from "@main/chat/conversation-title";
 import { appendMessage } from "@main/chat/messages";
@@ -72,6 +72,7 @@ export function streamAssistantReply(
     system: systemPrompt,
     messages,
     tools,
+    providerOptions: providerCallOptions(resolved.providerType),
     stopWhen: limit === 0 ? () => false : stepCountIs(limit),
     abortSignal: opts?.abortSignal,
     onFinish: ({ totalUsage }) => {

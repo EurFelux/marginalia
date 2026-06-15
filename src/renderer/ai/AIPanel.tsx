@@ -171,7 +171,7 @@ export function AIPanel() {
         <div className="shrink-0 border-t border-border bg-destructive/10 px-3 py-2 text-xs text-destructive">
           {t("ai.sendFailed", "发送失败：{{message}}", { message: error.message })}
           <span className="text-muted-foreground">
-            {t("ai.sendFailedHint", "（请确认已在「设置」配置 Anthropic API Key 与模型）")}
+            {t("ai.sendFailedHint", "（请确认已在「设置」配置 API Key 与模型）")}
           </span>
         </div>
       )}

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { resolveLanguageModel, supportsImageToolResults } from "@main/ai/model-factory";
+import {
+  providerCallOptions,
+  resolveLanguageModel,
+  supportsImageToolResults,
+} from "@main/ai/model-factory";
 
 describe("resolveLanguageModel", () => {
   it("builds an openai model carrying the given model id", () => {
@@ -47,6 +51,20 @@ describe("resolveLanguageModel", () => {
         model: "x",
       }),
     ).toThrow(/baseUrl/i);
+  });
+});
+
+describe("providerCallOptions", () => {
+  it("forces store:false for openai-responses so reasoning items ride inline (encrypted_content) instead of as item_reference id lookups", () => {
+    // 无状态中转/网关不持久化 Responses API 的 reasoning item（rs_…）；AI SDK 默认 store:true
+    // 会以 item_reference(id) 回传上一步 reasoning，引用失效报「Item not found …store is set to false」。
+    expect(providerCallOptions("openai-responses")).toEqual({ openai: { store: false } });
+  });
+  it("returns undefined for providers that have no Responses-store concern", () => {
+    expect(providerCallOptions("anthropic")).toBeUndefined();
+    expect(providerCallOptions("google-generate-content")).toBeUndefined();
+    expect(providerCallOptions("openai-chat-completions")).toBeUndefined();
+    expect(providerCallOptions(undefined)).toBeUndefined();
   });
 });
 

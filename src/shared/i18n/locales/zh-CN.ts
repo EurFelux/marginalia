@@ -28,7 +28,7 @@ export default {
   "ai.resend": "重新发送",
   "ai.send": "发送",
   "ai.sendFailed": "发送失败：{{message}}",
-  "ai.sendFailedHint": "（请确认已在「设置」配置 Anthropic API Key 与模型）",
+  "ai.sendFailedHint": "（请确认已在「设置」配置 API Key 与模型）",
   "ai.stop": "停止",
   "ai.summary.generate": "生成摘要",
   "ai.summary.generateFailed": "生成摘要失败：{{error}}",
