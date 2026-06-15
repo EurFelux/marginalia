@@ -249,6 +249,13 @@ export default {
     'Cap on how many consecutive tool-call steps the AI takes in a single reply — raise it for page-by-page PDF reading. With "Unlimited", only the model stopping on its own or you stopping it ends the turn; a model stuck in a loop keeps spending tokens.',
   "settings.advanced.stepLimitUnlimited": "Unlimited",
   "settings.agent": "Assistant",
+  "settings.agent.avatar": "",
+  "settings.agent.avatarDesc": "",
+  "settings.agent.avatarReset": "",
+  "settings.agent.avatarShowInChat": "",
+  "settings.agent.avatarTooLarge": "",
+  "settings.agent.avatarUnsupported": "",
+  "settings.agent.avatarUpload": "",
   "settings.agent.instructions": "Global instructions",
   "settings.agent.instructionsDesc":
     'Extra behavioural requirements layered on top of the persona — for example: "always quote the original text", "prefer English". Applied to every conversation.',
