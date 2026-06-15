@@ -7,6 +7,7 @@ import { ReaderView } from "@renderer/reader/ReaderView";
 import { SettingsShell } from "@renderer/settings/SettingsShell";
 import { ThemeController } from "@renderer/theme/ThemeController";
 import { Toaster } from "@renderer/components/ui/sonner";
+import { useStartupUpdateCheck } from "@renderer/update/useStartupUpdateCheck";
 
 export function App() {
   const view = useNavigationStore((s) => s.view);
@@ -14,6 +15,7 @@ export function App() {
   useEffect(() => {
     hydratePreferences();
   }, []);
+  useStartupUpdateCheck();
   return (
     <TooltipProvider>
       <ThemeController />
