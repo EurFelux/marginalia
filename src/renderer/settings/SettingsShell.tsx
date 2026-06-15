@@ -11,6 +11,7 @@ import { ReadingSettings } from "./ReadingSettings";
 import { AdvancedSettings } from "./AdvancedSettings";
 import { AgentSettings } from "./AgentSettings";
 import { MemorySettings } from "./MemorySettings";
+import { WebSearchSettings } from "./WebSearchSettings";
 
 export function SettingsShell() {
   const { t } = useTranslation();
@@ -25,6 +26,7 @@ export function SettingsShell() {
     { key: "reading", label: t("settings.reading", "阅读") },
     { key: "agent", label: t("settings.agent", "助手") },
     { key: "memory", label: t("settings.memory", "记忆") },
+    { key: "webSearch", label: t("settings.webSearch", "联网搜索") },
     { key: "advanced", label: t("settings.advanced", "高级") },
   ];
 
@@ -80,6 +82,7 @@ export function SettingsShell() {
             {active === "reading" && <ReadingSettings />}
             {active === "agent" && <AgentSettings />}
             {active === "memory" && <MemorySettings />}
+            {active === "webSearch" && <WebSearchSettings />}
             {active === "advanced" && <AdvancedSettings />}
           </div>
         </ScrollArea>

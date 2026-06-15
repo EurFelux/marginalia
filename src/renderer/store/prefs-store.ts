@@ -10,6 +10,7 @@ import {
   type SummaryModel,
   type TtsPrefs,
 } from "@shared/preferences";
+import type { WebSearchConfig } from "@shared/web-search";
 import type { ReaderLayout, ReaderPrefs } from "@renderer/types";
 import { persistPreference } from "@renderer/store/persist-preference";
 
@@ -46,6 +47,8 @@ interface PrefsState {
   showAgentAvatar: boolean;
   /** 当前头像 blob 引用；null = 用默认头像。由主进程 agent IPC 落盘，渲染层只镜像。 */
   avatarBlobId: string | null;
+  /** 联网搜索配置（enabled + backends）；null = 未 hydrate（用出厂默认，不启用）。 */
+  webSearch: WebSearchConfig | null;
 }
 interface PrefsActions {
   setAutoSummarize: (v: boolean) => void;
@@ -64,6 +67,7 @@ interface PrefsActions {
   updateTtsPrefs: (patch: Partial<TtsPrefs>) => void;
   setShowAgentAvatar: (v: boolean) => void;
   setAvatarBlobId: (v: string | null) => void;
+  setWebSearch: (v: WebSearchConfig) => void;
 }
 
 export const PREFS_INITIAL: PrefsState = {
@@ -83,6 +87,7 @@ export const PREFS_INITIAL: PrefsState = {
   ttsPrefs: DEFAULT_TTS_PREFS,
   showAgentAvatar: true,
   avatarBlobId: null,
+  webSearch: null,
 };
 
 /**
@@ -158,4 +163,8 @@ export const usePrefsStore = create<PrefsState & PrefsActions>()((set) => ({
     set({ showAgentAvatar });
   },
   setAvatarBlobId: (avatarBlobId) => set({ avatarBlobId }),
+  setWebSearch: (webSearch) => {
+    persistPreference({ key: "webSearch", value: webSearch });
+    set({ webSearch });
+  },
 }));

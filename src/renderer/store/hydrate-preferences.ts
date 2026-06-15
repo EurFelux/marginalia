@@ -39,4 +39,5 @@ export function hydratePreferences(): void {
   if (snap.avatarBlobId !== undefined) {
     usePrefsStore.setState({ avatarBlobId: snap.avatarBlobId });
   }
+  if (snap.webSearch) usePrefsStore.setState({ webSearch: snap.webSearch });
 }
