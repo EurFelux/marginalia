@@ -8,9 +8,8 @@ import {
 } from "ai";
 import { eq } from "drizzle-orm";
 import { conversations } from "@main/db/schema";
-import { createReadingTools } from "@main/ai/tools";
+import { createContextTools } from "@main/ai/context-tools";
 import { createMemoryTools } from "@main/ai/memory-tools";
-import { createLibraryTools } from "@main/ai/library-tools";
 import { providerCallOptions, supportsImageToolResults } from "@main/ai/model-factory";
 import { withPromptCaching } from "@main/ai/prompt-caching";
 import { maybeCompactConversation } from "@main/ai/context-compaction";
@@ -72,9 +71,7 @@ export function streamAssistantReply(
         })()
       : {};
 
-  const contextTools = bookId
-    ? createReadingTools({ db, bookId, loadBytes, imageToolResults })
-    : createLibraryTools({ db });
+  const contextTools = createContextTools({ db, bookId, loadBytes, imageToolResults });
   const tools = {
     ...contextTools,
     ...Object.fromEntries(
