@@ -1,7 +1,7 @@
 // src/main/ai/tools.test.ts
 import path from "node:path";
 import { z } from "zod";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { makeFixtureEpub, type ChapterTextSlice } from "@marginalia/epub-parser";
 import { makeScannedPdf, makeTextPdf } from "@marginalia/pdf-parser/fixture";
 import { eq } from "drizzle-orm";
@@ -9,6 +9,7 @@ import { books } from "@main/db/schema";
 import { createDb, runMigrations } from "@main/db/client";
 import { importBook, resolveChapterByHref } from "@main/library/repository";
 import { createReadingTools, resolveChapterRef, type LoadBytes } from "@main/ai/tools";
+import { __resetBookSummaryRuntime } from "@main/ai/summary";
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
 
@@ -78,20 +79,24 @@ describe("createReadingTools", () => {
     });
   });
 
-  it("getBookSummary returns the whole-book summary state (pending when none)", async () => {
-    const { tools } = await setup();
-    expect(await tools.getBookSummary.execute!({}, opts)).toEqual({
-      status: "pending",
-      summary: null,
-    });
-  });
+  describe("getBookSummary", () => {
+    beforeEach(() => __resetBookSummaryRuntime());
 
-  it("getBookSummary returns the stored whole-book summary when present", async () => {
-    const { db, book, tools } = await setup();
-    db.update(books).set({ summary: "the whole-book gist" }).where(eq(books.id, book.id)).run();
-    expect(await tools.getBookSummary.execute!({}, opts)).toEqual({
-      status: "ready",
-      summary: "the whole-book gist",
+    it("returns the whole-book summary state (pending when none)", async () => {
+      const { tools } = await setup();
+      expect(await tools.getBookSummary.execute!({}, opts)).toEqual({
+        status: "pending",
+        summary: null,
+      });
+    });
+
+    it("returns the stored whole-book summary when present", async () => {
+      const { db, book, tools } = await setup();
+      db.update(books).set({ summary: "the whole-book gist" }).where(eq(books.id, book.id)).run();
+      expect(await tools.getBookSummary.execute!({}, opts)).toEqual({
+        status: "ready",
+        summary: "the whole-book gist",
+      });
     });
   });
 
