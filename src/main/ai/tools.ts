@@ -5,7 +5,7 @@ import { and, eq } from "drizzle-orm";
 import type { DB } from "@main/db/client";
 import { chapters } from "@main/db/schema";
 import { listChapters, readChapterText } from "@main/library/content";
-import { getChapterSummaryView } from "@main/ai/summary";
+import { getChapterSummaryView, getBookSummaryView } from "@main/ai/summary";
 import { getBook, resolveChapterByHref } from "@main/library/repository";
 import { extractPdfText, renderPageImage } from "@marginalia/pdf-parser";
 import { createLogger } from "@main/logger";
@@ -94,6 +94,12 @@ export function createReadingTools(deps: ReadingToolsDeps) {
         runTool("getChapterSummary", () =>
           getChapterSummaryView(db, bookId, resolveChapterRef(db, bookId, chapterId)),
         ),
+    }),
+    getBookSummary: tool({
+      description:
+        "Get the AI-generated whole-book summary (and its status) for the book you're reading. No arguments — it always targets the current book.",
+      inputSchema: z.object({}),
+      execute: async () => runTool("getBookSummary", () => getBookSummaryView(db, bookId)),
     }),
     readChapterText: tool({
       description:

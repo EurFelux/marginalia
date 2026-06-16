@@ -4,6 +4,8 @@ import { z } from "zod";
 import { describe, expect, it } from "vitest";
 import { makeFixtureEpub, type ChapterTextSlice } from "@marginalia/epub-parser";
 import { makeScannedPdf, makeTextPdf } from "@marginalia/pdf-parser/fixture";
+import { eq } from "drizzle-orm";
+import { books } from "@main/db/schema";
 import { createDb, runMigrations } from "@main/db/client";
 import { importBook, resolveChapterByHref } from "@main/library/repository";
 import { createReadingTools, resolveChapterRef, type LoadBytes } from "@main/ai/tools";
@@ -73,6 +75,23 @@ describe("createReadingTools", () => {
     expect(await tools.getChapterSummary.execute!({ chapterId: ch1.id }, opts)).toEqual({
       status: "pending",
       summary: null,
+    });
+  });
+
+  it("getBookSummary returns the whole-book summary state (pending when none)", async () => {
+    const { tools } = await setup();
+    expect(await tools.getBookSummary.execute!({}, opts)).toEqual({
+      status: "pending",
+      summary: null,
+    });
+  });
+
+  it("getBookSummary returns the stored whole-book summary when present", async () => {
+    const { db, book, tools } = await setup();
+    db.update(books).set({ summary: "the whole-book gist" }).where(eq(books.id, book.id)).run();
+    expect(await tools.getBookSummary.execute!({}, opts)).toEqual({
+      status: "ready",
+      summary: "the whole-book gist",
     });
   });
 
