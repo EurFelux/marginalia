@@ -22,6 +22,7 @@ export default {
   "ai.editCancel": "Cancel",
   "ai.editSave": "Send",
   "ai.emptyHint": "Select text and tap 「Ask AI」, or just ask below.",
+  "ai.emptyHintLibrary": "Just ask {{name}} anything below ~",
   "ai.messageActions": "Message actions",
   "ai.newConversation": "New conversation",
   "ai.openLibraryAssistant": "Ask {{name}}",

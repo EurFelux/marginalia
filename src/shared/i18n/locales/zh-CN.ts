@@ -22,6 +22,7 @@ export default {
   "ai.editCancel": "取消",
   "ai.editSave": "发送",
   "ai.emptyHint": "划选正文后点「AI 问」，或直接在下方提问。",
+  "ai.emptyHintLibrary": "直接在下方向 {{name}} 提问吧～",
   "ai.messageActions": "消息操作",
   "ai.newConversation": "新对话",
   "ai.openLibraryAssistant": "问问 {{name}}",

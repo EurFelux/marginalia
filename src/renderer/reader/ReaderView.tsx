@@ -46,7 +46,7 @@ export function ReaderView() {
   const { t } = useTranslation();
   const bookId = useNavigationStore((s) => s.currentBookId);
   useReadingClock(bookId);
-  useRestoreConversation(bookId);
+  useRestoreConversation(bookId ? { kind: "book", bookId } : null);
   const chapterId = useNavigationStore((s) => s.currentChapterId);
   const backToLibrary = useNavigationStore((s) => s.backToLibrary);
   const readingPercent = useNavigationStore((s) => s.readingPercent);
