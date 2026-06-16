@@ -11,7 +11,7 @@ export function Toaster(props: ToasterProps) {
     <Sonner
       theme={theme}
       richColors
-      position="bottom-right"
+      position="top-center"
       className="toaster group font-sans"
       {...props}
     />
