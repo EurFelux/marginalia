@@ -32,8 +32,8 @@ describe("renderAgentContext", () => {
   it("renders instructions and memory index lines in (createdAt, id) order", () => {
     const db = freshDb();
     setPreference(db, "instructions", "be brief");
-    createMemory(db, { slug: "m1", title: "T1", description: "D1", body: "b", sourceBookId: null });
-    createMemory(db, { slug: "m2", title: "T2", description: "D2", body: "b", sourceBookId: null });
+    createMemory(db, { slug: "m1", title: "T1", description: "D1", body: "b" });
+    createMemory(db, { slug: "m2", title: "T2", description: "D2", body: "b" });
     const text = renderAgentContext(db);
     expect(text).toContain("be brief");
     expect(text.indexOf("[m1]")).toBeLessThan(text.indexOf("[m2]"));
@@ -43,7 +43,7 @@ describe("renderAgentContext", () => {
   it("omits memory index when memoryEnabled=false (soul still present)", () => {
     const db = freshDb();
     setPreference(db, "memoryEnabled", false);
-    createMemory(db, { slug: "m1", title: "T1", description: "D1", body: "b", sourceBookId: null });
+    createMemory(db, { slug: "m1", title: "T1", description: "D1", body: "b" });
     const text = renderAgentContext(db);
     expect(text).not.toContain("[m1]");
     expect(text).toContain("Lia");
@@ -54,7 +54,7 @@ describe("session snapshot freeze", () => {
   it("returns identical text within a conversation even after new memory", () => {
     const db = freshDb();
     const first = getAgentContext(db, "conv-1");
-    createMemory(db, { slug: "new", title: "N", description: "D", body: "b", sourceBookId: null });
+    createMemory(db, { slug: "new", title: "N", description: "D", body: "b" });
     expect(getAgentContext(db, "conv-1")).toBe(first); // 冻结：逐字一致
     expect(getAgentContext(db, "conv-2")).toContain("[new]"); // 新会话见新记忆
   });
@@ -73,13 +73,13 @@ describe("session snapshot freeze", () => {
     const db = freshDb();
     getAgentContext(db, "conv-1");
     dropAgentContext("conv-1");
-    createMemory(db, { slug: "late", title: "L", description: "D", body: "b", sourceBookId: null });
+    createMemory(db, { slug: "late", title: "L", description: "D", body: "b" });
     expect(getAgentContext(db, "conv-1")).toContain("[late]");
   });
 
   it("memory index disappears after memoryEnabled flips off and contexts invalidated", () => {
     const db = freshDb();
-    createMemory(db, { slug: "m", title: "T", description: "D", body: "b", sourceBookId: null });
+    createMemory(db, { slug: "m", title: "T", description: "D", body: "b" });
     expect(getAgentContext(db, "conv-1")).toContain("[m]");
     setPreference(db, "memoryEnabled", false);
     invalidateAllAgentContexts();

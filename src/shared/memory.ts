@@ -3,15 +3,13 @@ import { z } from "zod";
 /** AI 侧统一标识符：英文 kebab-case 短名（spec 2026-06-10 §2.1）。 */
 export const memorySlug = z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "kebab-case slug expected");
 
-/** 管理面板用的记忆视图（含来源书名投影）。 */
+/** 管理面板用的记忆视图。 */
 export interface MemoryDto {
   id: string;
   slug: string;
   title: string;
   description: string;
   body: string;
-  sourceBookId: string | null;
-  sourceBookTitle: string | null;
   createdAt: number;
   updatedAt: number;
 }
