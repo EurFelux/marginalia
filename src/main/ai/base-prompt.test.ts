@@ -4,7 +4,12 @@ import { createDb, runMigrations } from "@main/db/client";
 import { createMemory } from "@main/memory/repository";
 import { setPreference } from "@main/preferences/repository";
 import { invalidateAllAgentContexts } from "@main/ai/agent-context";
-import { BASE_SYSTEM_PROMPT, LIBRARY_SYSTEM_PROMPT, buildSystemPrompt } from "@main/ai/base-prompt";
+import {
+  BASE_SYSTEM_PROMPT,
+  LIBRARY_SYSTEM_PROMPT,
+  LIBRARY_TOOLS_FRAGMENT,
+  buildSystemPrompt,
+} from "@main/ai/base-prompt";
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
 
@@ -52,5 +57,21 @@ describe("buildSystemPrompt — library kind", () => {
   it("defaults to the reading-companion base (book) when kind omitted", () => {
     const db = freshDb();
     expect(buildSystemPrompt(db, "conv-book").startsWith(BASE_SYSTEM_PROMPT)).toBe(true);
+  });
+});
+
+describe("buildSystemPrompt — book kind library tools", () => {
+  it("appends the shared library tools fragment to the reading-companion base", () => {
+    const db = freshDb();
+    const text = buildSystemPrompt(db, "conv-book"); // kind 默认 book
+    expect(text.startsWith(BASE_SYSTEM_PROMPT)).toBe(true);
+    expect(text).toContain(LIBRARY_TOOLS_FRAGMENT);
+    expect(text).toContain("listBooks");
+  });
+
+  it("library kind reuses the same fragment (single source of truth)", () => {
+    const db = freshDb();
+    const text = buildSystemPrompt(db, "conv-lib", "library");
+    expect(text).toContain(LIBRARY_TOOLS_FRAGMENT);
   });
 });

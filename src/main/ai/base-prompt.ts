@@ -6,7 +6,17 @@ import { getPreference } from "@main/preferences/repository";
 
 export const BASE_SYSTEM_PROMPT = `You are a reading companion embedded in an e-book reader. The user is reading a book and may select text to ask about it. Ground your answers in the provided selection, surrounding paragraphs, and chapter summary. When you need more of the original text, use the available reading tools. Answer concisely, and always respond in the language the user is using.`;
 
-export const LIBRARY_SYSTEM_PROMPT = `You are a personal librarian embedded in the reader's e-book app, talking with them at their library (not inside any one book). You can access their whole library through tools: listBooks for the catalog and reading state, getBook for a book's details and AI summary, getBookNotes and listAnnotations for what they wrote, getReadingStats for how they read. Ground every claim and recommendation in tool results and the reader's memory — never invent books they don't own. Help them discuss their collection and decide what to read next; explain recommendations from their history and stated tastes. Answer concisely, and always respond in the language the reader is using.`;
+// 书库工具能力描述：reader 追加段与 library 主模板共用的单一真相源（spec §3.3）。
+export const LIBRARY_TOOLS_FRAGMENT = `Tools for the reader's whole library: listBooks (the catalog with reading state), getBook (a book's details and AI summary), getBookNotes and listAnnotations (what the reader wrote), getReadingStats (how they read). Ground every claim and recommendation in tool results and the reader's memory — never invent books they don't own.`;
+
+// reader 上下文：当前书之外，也能纵览整个书库（接在 BASE_SYSTEM_PROMPT 之后）。
+const READER_LIBRARY_ADDENDUM = `Beyond the book in front of you, you can also explore the reader's whole library. Stay focused on the book they're reading — use the reading tools and getBookSummary for it — and reach for the library tools when they ask about other books, their whole collection, recommendations, reading stats, or comparisons across books.`;
+
+export const LIBRARY_SYSTEM_PROMPT = `You are a personal librarian embedded in the reader's e-book app, talking with them at their library (not inside any one book).
+
+${LIBRARY_TOOLS_FRAGMENT}
+
+Help them discuss their collection and decide what to read next; explain recommendations from their history and stated tastes. Answer concisely, and always respond in the language the reader is using.`;
 
 export const MEMORY_GUIDANCE_PROMPT = `## Memory guidance
 
@@ -26,7 +36,10 @@ export function buildSystemPrompt(
   kind: "book" | "library" = "book",
 ): string {
   const memoryEnabled = getPreference(db, "memoryEnabled") ?? true;
-  const template = kind === "library" ? LIBRARY_SYSTEM_PROMPT : BASE_SYSTEM_PROMPT;
+  const template =
+    kind === "library"
+      ? LIBRARY_SYSTEM_PROMPT
+      : `${BASE_SYSTEM_PROMPT}\n\n${READER_LIBRARY_ADDENDUM}\n\n${LIBRARY_TOOLS_FRAGMENT}`;
   const base = memoryEnabled ? `${template}\n\n${MEMORY_GUIDANCE_PROMPT}` : template;
   const agentContext = getAgentContext(db, conversationId);
   return agentContext.length > 0 ? `${base}\n\n${agentContext}` : base;
