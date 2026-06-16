@@ -1,5 +1,9 @@
 import { and, asc, eq, gt } from "drizzle-orm";
-import { extractBookText, extractChapterText, type ReadOptions } from "@marginalia/epub-parser";
+import {
+  extractBookText,
+  extractChapterAcrossSpine,
+  type ReadOptions,
+} from "@marginalia/epub-parser";
 import { extractPdfText } from "@marginalia/pdf-parser";
 import type { DB } from "@main/db/client";
 import { books, chapters } from "@main/db/schema";
@@ -60,25 +64,27 @@ export async function readChapterText(
       maxChars: opts.maxChars,
     });
   }
-  // epub：同 href、orderIndex 更大的下一边界 anchor 作为本章终点（无则到文件末）。
-  let nextAnchor: string | undefined;
-  if (ch.anchor != null && ch.orderIndex != null) {
+  // epub：本章正文 = 从本章 (href, anchor) 起，到「下一目录项」(阅读顺序 = orderIndex 递增) 的
+  // (href, anchor) 之前，按 spine 顺序跨文件拼接。下一目录项可能在另一个 spine 文件，中间没有独立
+  // 目录项的孤儿 spine 文件（如《七个习惯》第二章正文所在的 split 文件）由 extractChapterAcrossSpine
+  // 归入本章——单 href 抽取会把它们整段漏掉。末章（无下一项）读到全书末尾。
+  let end: { href: string; anchor?: string } | undefined;
+  if (ch.orderIndex != null) {
     const next = db
-      .select({ anchor: chapters.anchor })
+      .select({ href: chapters.href, anchor: chapters.anchor })
       .from(chapters)
-      .where(
-        and(
-          eq(chapters.bookId, bookId),
-          eq(chapters.href, ch.href),
-          gt(chapters.orderIndex, ch.orderIndex),
-        ),
-      )
+      .where(and(eq(chapters.bookId, bookId), gt(chapters.orderIndex, ch.orderIndex)))
       .orderBy(asc(chapters.orderIndex))
       .limit(1)
       .get();
-    nextAnchor = next?.anchor ?? undefined;
+    if (next) end = { href: next.href, anchor: next.anchor ?? undefined };
   }
-  return extractChapterText(bytes, ch.href, opts, ch.anchor ?? undefined, nextAnchor);
+  return extractChapterAcrossSpine(
+    bytes,
+    { href: ch.href, anchor: ch.anchor ?? undefined },
+    end,
+    opts,
+  );
 }
 
 /**

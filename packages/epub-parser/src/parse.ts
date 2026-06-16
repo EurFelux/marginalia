@@ -38,8 +38,13 @@ function textOf(v: unknown): string | undefined {
   return undefined;
 }
 
-export function parseEpub(bytes: Uint8Array): ParsedEpub {
-  const files = unzipSync(bytes);
+type Manifest = Map<string, { href: string; properties: string }>;
+
+/**
+ * 定位并解析 OPF：返回 package 节点、OPF 目录、manifest(id→解析后包内绝对 href) 与取文件文本的闭包。
+ * 供 parseEpub 与 readSpine 共享——后者要在不重复定位 container/OPF 的前提下拿到有序 spine。
+ */
+function loadOpf(files: Record<string, Uint8Array>) {
   const text = (p: string): string => {
     const b = files[p];
     if (!b) throw new Error(`epub: missing entry ${p}`);
@@ -57,6 +62,39 @@ export function parseEpub(bytes: Uint8Array): ParsedEpub {
   if (pkg === undefined || typeof pkg !== "object") {
     throw new Error(`epub: OPF at "${opfPath}" has no <package> root element`);
   }
+
+  const manifest: Manifest = new Map();
+  for (const it of asArray(pkg.manifest?.item)) {
+    manifest.set(it["@_id"], {
+      href: resolveHref(opfDir, it["@_href"]),
+      properties: it["@_properties"] ?? "",
+    });
+  }
+  return { pkg, opfDir, manifest, text };
+}
+
+/** 由 spine 的 itemref 列表 + manifest 组出有序 spine 项（保 itemref 顺序，丢弃 manifest 缺失项）。 */
+function buildSpine(itemref: unknown, manifest: Manifest): SpineItem[] {
+  return asArray(itemref as { "@_idref": string } | { "@_idref": string }[] | undefined)
+    .map((ref) => {
+      const m = manifest.get(ref["@_idref"]);
+      return m ? { id: ref["@_idref"], href: m.href } : undefined;
+    })
+    .filter((s): s is SpineItem => s !== undefined);
+}
+
+/**
+ * 从已解压的 epub `files` 读有序 spine（包内绝对 href）。调用方已 `unzipSync` 后传入，
+ * 避免二次全解压——供跨 spine 章节抽取（extractChapterAcrossSpine）按阅读顺序枚举文件。
+ */
+export function readSpine(files: Record<string, Uint8Array>): SpineItem[] {
+  const { pkg, manifest } = loadOpf(files);
+  return buildSpine(pkg.spine?.itemref, manifest);
+}
+
+export function parseEpub(bytes: Uint8Array): ParsedEpub {
+  const files = unzipSync(bytes);
+  const { pkg, manifest, text } = loadOpf(files);
   const meta = pkg.metadata ?? {};
   const uniqueId: string | undefined = pkg["@_unique-identifier"];
 
@@ -68,21 +106,7 @@ export function parseEpub(bytes: Uint8Array): ParsedEpub {
   const title = textOf(asArray(meta.title)[0]);
   const author = textOf(asArray(meta.creator)[0]);
 
-  const manifest = new Map<string, { href: string; properties: string }>();
-  for (const it of asArray(pkg.manifest?.item)) {
-    manifest.set(it["@_id"], {
-      href: resolveHref(opfDir, it["@_href"]),
-      properties: it["@_properties"] ?? "",
-    });
-  }
-
-  const spine: SpineItem[] = asArray(pkg.spine?.itemref)
-    .map((ref) => {
-      const id = ref["@_idref"];
-      const m = manifest.get(id);
-      return m ? { id, href: m.href } : undefined;
-    })
-    .filter((s): s is SpineItem => s !== undefined);
+  const spine = buildSpine(pkg.spine?.itemref, manifest);
 
   let coverHref: string | undefined;
   coverHref = manifest
