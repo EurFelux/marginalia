@@ -46,6 +46,43 @@ function anchorBook(): Uint8Array {
   });
 }
 
+/**
+ * TOC 只标注 s1（第二章）与 s3（付诸行动），中间的 s2 是没有目录项的「孤儿」spine 文件，
+ * 逻辑上属于第二章正文。复现《七个习惯》第二章正文（在独立 spine 文件里）被整段漏读的 bug。
+ */
+function orphanSpineBook(): Uint8Array {
+  return zipSync({
+    mimetype: [strToU8("application/epub+zip"), { level: 0 }],
+    "META-INF/container.xml": strToU8(`<?xml version="1.0"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>
+</container>`),
+    "OEBPS/content.opf": strToU8(`<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="2.0" unique-identifier="bid">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="bid">urn:uuid:orphan-spine</dc:identifier><dc:title>Orphan</dc:title></metadata>
+  <manifest>
+    <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
+    <item id="s1" href="s1.xhtml" media-type="application/xhtml+xml"/>
+    <item id="s2" href="s2.xhtml" media-type="application/xhtml+xml"/>
+    <item id="s3" href="s3.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine toc="ncx"><itemref idref="s1"/><itemref idref="s2"/><itemref idref="s3"/></spine>
+</package>`),
+    "OEBPS/toc.ncx": strToU8(`<?xml version="1.0" encoding="utf-8"?>
+<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><navMap>
+  <navPoint id="n1"><navLabel><text>第二章</text></navLabel><content src="s1.xhtml#aA"/></navPoint>
+  <navPoint id="n2"><navLabel><text>付诸行动</text></navLabel><content src="s3.xhtml#aB"/></navPoint>
+</navMap></ncx>`),
+    "OEBPS/s1.xhtml": strToU8(
+      `<html><body><p><span id="aA">第二章 概论</span></p><p>引子段落。</p></body></html>`,
+    ),
+    "OEBPS/s2.xhtml": strToU8(`<html><body><p>正文主体段落。</p></body></html>`),
+    "OEBPS/s3.xhtml": strToU8(
+      `<html><body><p><span id="aB">付诸行动</span></p><p>下一章正文。</p></body></html>`,
+    ),
+  });
+}
+
 beforeAll(() => initMainI18n("zh-CN"));
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
@@ -198,6 +235,21 @@ describe("readChapterText with anchors", () => {
     const slice = await readChapterText(db, anchorBook(), book.id, ch2.id, {});
     expect(slice.text).toBe("第2章");
     expect(slice.text).not.toContain("第1章");
+  });
+});
+
+describe("readChapterText across orphan spine files", () => {
+  it("includes spine files between two TOC entries (no orphan-file loss)", async () => {
+    const db = freshDb();
+    const bytes = orphanSpineBook();
+    const book = await importBook(db, { bytes });
+    const ch = listChapters(db, book.id).find((c) => c.anchor === "aA")!;
+    const slice = await readChapterText(db, bytes, book.id, ch.id, {});
+    expect(slice.text).toContain("第二章 概论"); // 起始锚点所在块
+    expect(slice.text).toContain("引子段落。"); // s1 锚点之后
+    expect(slice.text).toContain("正文主体段落。"); // ← 关键：孤儿 s2 不再丢
+    expect(slice.text).not.toContain("付诸行动"); // 下一目录项（边界）不含
+    expect(slice.text).not.toContain("下一章正文。");
   });
 });
 
