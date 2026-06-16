@@ -41,7 +41,7 @@ describe("navigation-store", () => {
   it("openBook clears stale openCommand but keeps per-book memory", () => {
     useChatStore.setState({
       activeByBook: { b2: "conv-b2" },
-      openCommand: { conversationId: "stale", nonce: 1 },
+      openCommand: { conversationId: "stale", context: { kind: "book", bookId: "b9" }, nonce: 1 },
     });
     useNavigationStore.getState().openBook("b2");
     expect(useChatStore.getState().openCommand).toBeNull(); // 残留命令被清（修 bug）

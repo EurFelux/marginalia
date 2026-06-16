@@ -19,7 +19,7 @@ import type { Chip } from "@shared/chat";
 import { openPanelAndFocusComposer } from "@renderer/ai/composer-focus";
 import { ChatActionsContext, nextAssistantId, type ChatActions } from "@renderer/ai/chat-actions";
 import { createLogger } from "@renderer/logger";
-import { type ChatContext } from "@renderer/ai/chat-context";
+import { contextKey, resolveOpenCommandTarget, type ChatContext } from "@renderer/ai/chat-context";
 
 const log = createLogger("ai");
 
@@ -54,9 +54,13 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
 
   // 重开会话：openCommand.nonce 变 → 先中止在跑的流（避免增量灌入将被替换的历史、streamId 串台）→ 载历史 → setMessages。
   // 只认 openCommand（一次性命令信号），不认 activeConversationId——后者也被发消息 ack 写入，监听它会在发完消息后误重载。
+  // 经 resolveOpenCommandTarget 守卫：跨 context 的残留命令（如读书时的 book 会话）不属于本面板 ⇒ 不载入。
+  // 依赖稳定的 contextKey 字符串而非 context 对象：ReaderView 每 render 新建 { kind, bookId }，
+  // 入依赖会致每渲染重载（甚至 stop() 杀流）；不能靠 React Compiler 记忆化保正确性。
+  const ctxKey = contextKey(context);
   useEffect(() => {
-    if (!openCommand) return;
-    const { conversationId } = openCommand;
+    const conversationId = resolveOpenCommandTarget(openCommand, ctxKey);
+    if (!conversationId) return;
     let cancelled = false;
     setShowList(false); // 从列表选中一条会话 → 回到聊天视图
     void stop();
@@ -69,7 +73,7 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
     return () => {
       cancelled = true;
     };
-  }, [openCommand, stop, setMessages]);
+  }, [openCommand, ctxKey, stop, setMessages]);
 
   // 一轮发送结束（曾 streaming/submitted → 回 ready/error）→ 刷新会话列表（新会话 / 标题 / updatedAt）。
   // 同时从 DB 重载消息以同步 UI message ids 到持久化 ids（resend 截断后 id 会变）。

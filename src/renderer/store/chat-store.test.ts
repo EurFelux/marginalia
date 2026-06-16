@@ -57,7 +57,11 @@ describe("openConversation", () => {
     useChatStore.getState().openConversation(BOOK_CTX, "conv-1");
     expect(getActiveConversationId(BOOK_CTX)).toBe("conv-1");
     expect(usePrefsStore.getState().layout.panelOpen).toBe(true);
-    expect(useChatStore.getState().openCommand).toEqual({ conversationId: "conv-1", nonce: 1 });
+    expect(useChatStore.getState().openCommand).toEqual({
+      conversationId: "conv-1",
+      context: BOOK_CTX,
+      nonce: 1,
+    });
     useChatStore.getState().openConversation(BOOK_CTX, "conv-1");
     expect(useChatStore.getState().openCommand?.nonce).toBe(2); // 同会话重开也递增 → 触发重载
   });
@@ -65,6 +69,12 @@ describe("openConversation", () => {
     useChatStore.getState().setSummaryChipsPreset();
     useChatStore.getState().openConversation(BOOK_CTX, "conv-1");
     expect(useChatStore.getState().summaryChips).toEqual({ chapter: false, book: false });
+  });
+  it("tags openCommand with the library context so it can't leak into a book panel", () => {
+    useChatStore.getState().openConversation(LIB_CTX, "lib-conv");
+    expect(useChatStore.getState().openCommand?.context).toEqual(LIB_CTX);
+    // 守卫拒绝把 library 命令喂给某本书的面板，反向亦然
+    expect(contextKey(useChatStore.getState().openCommand!.context)).toBe(contextKey(LIB_CTX));
   });
 });
 
@@ -74,6 +84,7 @@ describe("restoreConversation", () => {
     expect(getActiveConversationId(BOOK_CTX)).toBe("conv-restore");
     expect(useChatStore.getState().openCommand).toEqual({
       conversationId: "conv-restore",
+      context: BOOK_CTX,
       nonce: 1,
     });
     expect(usePrefsStore.getState().layout.panelOpen).toBe(false);

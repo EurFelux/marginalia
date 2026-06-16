@@ -3,7 +3,7 @@ import { persist } from "zustand/middleware";
 import type { Chip } from "@shared/chat";
 import { openPanelAndFocusComposer } from "@renderer/ai/composer-focus";
 import { safeStorage } from "@renderer/store/lazy-storage";
-import type { ChatContext } from "@renderer/ai/chat-context";
+import type { ChatContext, OpenCommand } from "@renderer/ai/chat-context";
 
 interface ChatState {
   draftText: string;
@@ -12,8 +12,10 @@ interface ChatState {
    * 一次性命令信号（非状态）：nonce 递增触发 AIPanel 载入该会话历史。
    * 与「当前 active 会话」解耦——发消息路径只写记忆槽、不发本命令，
    * 故发消息不会触发历史重载（避免覆盖刚流式出来的内容）。镜像 annotation-store.scrollCommand。
+   * 带 context 标签：消费侧 resolveOpenCommandTarget 据此拒绝跨 context 命令
+   * （如读书时设下的 book 会话泄漏进 library 浮窗助手）。
    */
-  openCommand: { conversationId: string; nonce: number } | null;
+  openCommand: OpenCommand | null;
   /** 常驻摘要 toggle（spec §6）：true=on 随下条消息发送。 */
   summaryChips: { chapter: boolean; book: boolean };
   /**
@@ -75,7 +77,7 @@ export const useChatStore = create<ChatState & ChatActions>()(
       openConversation: (ctx, id) => {
         openPanelAndFocusComposer();
         return set((s) => ({
-          openCommand: { conversationId: id, nonce: (s.openCommand?.nonce ?? 0) + 1 },
+          openCommand: { conversationId: id, context: ctx, nonce: (s.openCommand?.nonce ?? 0) + 1 },
           summaryChips: { chapter: false, book: false },
           ...(ctx.kind === "book"
             ? { activeByBook: { ...s.activeByBook, [ctx.bookId]: id } }
@@ -84,7 +86,7 @@ export const useChatStore = create<ChatState & ChatActions>()(
       },
       restoreConversation: (ctx, id) =>
         set((s) => ({
-          openCommand: { conversationId: id, nonce: (s.openCommand?.nonce ?? 0) + 1 },
+          openCommand: { conversationId: id, context: ctx, nonce: (s.openCommand?.nonce ?? 0) + 1 },
           summaryChips: { chapter: false, book: false },
           ...(ctx.kind === "book"
             ? { activeByBook: { ...s.activeByBook, [ctx.bookId]: id } }

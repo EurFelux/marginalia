@@ -15,3 +15,26 @@ export function deriveChatContext(
     ? { kind: "book", bookId: currentBookId }
     : { kind: "library" };
 }
+
+/**
+ * 一次性「载入某会话历史」命令信号（非状态）：nonce 递增触发面板载入。
+ * 带 `context` 标签——消费侧据此判断该命令是否属于自己（见 resolveOpenCommandTarget）。
+ */
+export type OpenCommand = { conversationId: string; context: ChatContext; nonce: number };
+
+/**
+ * 消费侧守卫（纯函数）：openCommand 是否该被「contextKey === panelKey 的面板」消费。
+ * 命中 ⇒ 返回要载入的会话 id；否则（无命令 / 跨 context）⇒ null。
+ * 防止读书时设下的 book 会话命令泄漏进 library 浮窗助手（反之亦然）。
+ *
+ * 取面板的 contextKey **字符串**（而非 context 对象）是有意为之：调用方据此可让 effect 依赖
+ * 稳定的字符串，不受 ReaderView 每 render 新建 `{ kind, bookId }` 对象的引用抖动影响——
+ * effect 正确性不能押在 React Compiler 的记忆化上（它是性能优化、允许 bail）。
+ */
+export function resolveOpenCommandTarget(
+  openCommand: OpenCommand | null,
+  panelKey: string,
+): string | null {
+  if (!openCommand) return null;
+  return contextKey(openCommand.context) === panelKey ? openCommand.conversationId : null;
+}
