@@ -1,5 +1,17 @@
 # marginalia
 
+## 0.16.0
+
+### Minor Changes
+
+- f214f79: The library assistant now keeps its own conversations. Opening it no longer shows a conversation left over from a book you were just reading, and it remembers and restores your last library conversation when you come back to the library. Its empty state also reads sensibly outside a book.
+- a53df57: The in-book AI assistant can now reach your whole library: ask it to compare the current book with others you've read, recall highlights and notes from any book, or check your reading stats — without leaving the book. It also gained a direct way to fetch the current book's whole-book summary.
+
+### Patch Changes
+
+- abeae14: Fixed the in-book AI assistant reading and summarizing only a sliver of some EPUB chapters. When a chapter's text is split across several internal files (common in many EPUBs), the assistant previously saw just the first fragment — often only the chapter title and opening line — and missed the rest of the body. It now reads the chapter in full.
+- eae95b2: AI memories are now purely global notes about you, no longer tied to the book they happened to be recorded in. The memory list in Settings no longer shows a source-book label, and memories are fully independent of your library — removing a book never touches them.
+
 ## 0.15.0
 
 ### Minor Changes
