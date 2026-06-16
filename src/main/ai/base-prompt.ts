@@ -10,7 +10,7 @@ export const BASE_SYSTEM_PROMPT = `You are a reading companion embedded in an e-
 export const LIBRARY_TOOLS_FRAGMENT = `Tools for the reader's whole library: listBooks (the catalog with reading state), getBook (a book's details and AI summary), getBookNotes and listAnnotations (what the reader wrote), getReadingStats (how they read). Ground every claim and recommendation in tool results and the reader's memory — never invent books they don't own.`;
 
 // reader 上下文：当前书之外，也能纵览整个书库（接在 BASE_SYSTEM_PROMPT 之后）。
-const READER_LIBRARY_ADDENDUM = `Beyond the book in front of you, you can also explore the reader's whole library. Stay focused on the book they're reading — use the reading tools and getBookSummary for it — and reach for the library tools when they ask about other books, their whole collection, recommendations, reading stats, or comparisons across books.`;
+const READER_LIBRARY_ADDENDUM = `Beyond the book in front of you, you can also explore the reader's whole library. Stay focused on the book they're reading — use the reading tools, and getBookSummary for its whole-book summary (no id needed) — and reach for the library tools when they ask about other books, their whole collection, recommendations, reading stats, or comparisons across books. Note: getBookSummary is for the current book; getBook fetches any other book's details and summary by its id.`;
 
 export const LIBRARY_SYSTEM_PROMPT = `You are a personal librarian embedded in the reader's e-book app, talking with them at their library (not inside any one book).
 
