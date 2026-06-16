@@ -1,5 +1,19 @@
 # marginalia
 
+## 0.15.0
+
+### Minor Changes
+
+- 6d35b47: Give the AI companion awareness of the current date and time. Each turn now injects the wall-clock time (in your local timezone, ISO 8601 with offset) into the live message sent to the model, so it can answer time-relative questions ("how recent is this", "what year is it now") and reason about recency instead of guessing. The timestamp rides along only on the current turn — it never enters the cached system prefix and is never persisted, so it stays accurate every turn without disturbing prompt caching.
+- c3fee3c: Added an optional background pass that periodically catches up on memories the assistant missed and tidies existing ones, with a low-key toast when it runs. Off by default — enable it under Settings → Memory.
+- 43ade04: Add a library AI companion: a floating assistant in the library lets you chat with your AI assistant about your whole collection, not just one open book. It can browse your catalog, summaries, notes, highlights, and reading stats through tools — and, grounded in its memory of you, discuss your shelf and recommend what to read next. The same assistant panel is reused everywhere (including its conversation list and web-search toggle); conversations are no longer tied to a single book.
+- fab63cf: Add an AI web search tool. Turn on the web search button in the AI panel's context row and the assistant can search the web (powered by Exa) for current or external information beyond the book — searches show up as a step in the reply and sources are linked inline. Works out of the box: Exa's free tier needs no API key. It's off by default; flip it on (the choice is remembered) and optionally add an Exa API key under Settings → Web search for higher rate limits. Backends are pluggable with automatic fallback so you can point it at another MCP search server.
+
+### Patch Changes
+
+- d516a4c: Enable prompt caching for Anthropic (Claude) models, cutting cost and first-token latency on multi-turn conversations. The stable prefix that gets resent every turn — system prompt, tools, and prior messages — is now marked as cacheable (a fixed breakpoint on the system prompt plus rolling breakpoints on the last two turns), so repeated context is billed at the reduced cache-read rate and processed faster instead of re-charged in full each time. Caching is applied through a per-provider strategy layer: Claude (which has no implicit caching) gets explicit cache breakpoints, while OpenAI, Gemini, and OpenAI-compatible providers (e.g. DeepSeek) are passed through untouched since they cache long prefixes automatically server-side.
+- 9c2e2e8: Fix PDF zoom interactions. Pinch and Ctrl+scroll now stay anchored to the cursor (and the toolbar +/− buttons and percentage input to the viewport center) instead of jumping to a different page — including during continuous pinch gestures, which previously drifted unpredictably. Zooming no longer flashes white: pages stay visible by stretching the current frame during the gesture and re-rendering to the new resolution once it settles, swapped in through an offscreen buffer so the canvas is never cleared on screen. Pinch/scroll sensitivity is also increased for a more responsive feel.
+
 ## 0.14.0
 
 ### Minor Changes
