@@ -65,6 +65,20 @@ export function renderHistoryMessage(h: PromptHistoryMessage): string {
     : renderUserTurn(h.metadata?.contextChips ?? [], textOfParts(h.parts));
 }
 
+/**
+ * 把一串历史消息渲染成「角色清晰分隔」的 transcript：每轮用 <user>/<assistant> 标签框定，
+ * 消除长多段轮在扁平文本里的归属歧义。正文走 renderHistoryMessage（单一口径）；
+ * 上下文压缩与后台记忆整理共用此函数（spec 2026-06-16 §2.4）。
+ */
+export function renderRoleTaggedTranscript(messages: PromptHistoryMessage[]): string {
+  return messages
+    .map((m) => {
+      const tag = m.role === "assistant" ? "assistant" : "user";
+      return `<${tag}>\n${renderHistoryMessage(m).trim()}\n</${tag}>`;
+    })
+    .join("\n\n");
+}
+
 function renderReadingContext(ctx: ReadingContext | null | undefined): string | null {
   if (!ctx) return null;
   if (ctx.format === "pdf") {

@@ -68,7 +68,7 @@ conversations
 
 ### 2.4 pass 的输入
 
-1. **对话切片** = `listMessagesAfterSeq(db, conversationId, memoryThroughSeq ?? 0)` 转写成 `User: … / Assistant: …`（复用 `renderHistoryMessage`，仿 `renderFoldedTranscript`）。
+1. **对话切片** = `listMessagesAfterSeq(db, conversationId, memoryThroughSeq ?? 0)` 经 `renderRoleTaggedTranscript`（prompt.ts，**与上下文压缩共用同一函数**）转写成 `<user>…</user>` / `<assistant>…</assistant>` 标签块——XML 标签框定边界、消除长多段轮在扁平文本里的归属歧义（早期 `User: …` 单标签格式会让摘要模型分不清谁说的、并把书内容误当用户观点）；正文仍走 `renderHistoryMessage`。CONSOLIDATION_SYSTEM 另点明：`<user>` 里的 `## 选中文本/全书概要` 等是读者在看的引文、非其本人观点。
 2. **现有记忆全库** = `listMemories(db)`（已返回含 `body` 的完整行）渲染为「slug · title · description · body」清单——巩固需要看到正文才能判断合并 / 精炼。
 3. 两段合并后按 char 上限截断（仿 `COMPACTION_INPUT_MAX_CHARS`，超长保留较新内容）。
 

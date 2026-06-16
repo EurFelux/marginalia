@@ -209,8 +209,10 @@ describe("renderMemoryPassInput", () => {
     );
     expect(out).toContain("likes-tea");
     expect(out).toContain("drinks tea daily");
-    expect(out).toContain("User: hello");
-    expect(out).toContain("Assistant: hi there");
+    expect(out).toContain("<user>");
+    expect(out).toContain("hello");
+    expect(out).toContain("<assistant>");
+    expect(out).toContain("hi there");
   });
 
   it("marks an empty memory store", () => {
@@ -222,7 +224,8 @@ describe("renderMemoryPassInput", () => {
     const long = "z".repeat(1000);
     const out = renderMemoryPassInput([turn(1, "user", long)], [], 200);
     expect(out.length).toBeLessThanOrEqual(200);
-    expect(out.endsWith("z")).toBe(true);
+    expect(out).toContain("z");
+    expect(out).not.toContain("## Existing memories");
   });
 });
 

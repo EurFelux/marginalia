@@ -13,7 +13,7 @@ import {
   updateMemoryById,
 } from "@main/memory/repository";
 import { memorySlug } from "@shared/memory";
-import { renderHistoryMessage } from "@main/ai/prompt";
+import { renderRoleTaggedTranscript } from "@main/ai/prompt";
 import { conversations } from "@main/db/schema";
 import { listMessagesAfterSeq } from "@main/chat/messages";
 import { getPreference } from "@main/preferences/repository";
@@ -114,7 +114,8 @@ export function applyMemoryOps(
   return result;
 }
 
-/** 渲染整理输入：现有记忆全库（含正文）+ 最近对话转写。超长前载截断保留较新内容。 */
+/** 渲染整理输入：现有记忆全库（含正文）+ 最近对话转写（角色用 <user>/<assistant> 标签清晰分隔，
+ * 与上下文压缩共用 renderRoleTaggedTranscript，正文同走 renderHistoryMessage）。超长前载截断保留较新内容。 */
 export function renderMemoryPassInput(
   turns: MessageDto[],
   memories: MemoryDto[],
@@ -128,10 +129,8 @@ export function renderMemoryPassInput(
             (m) => `- [${m.slug}] ${m.title} — ${m.description}\n  ${m.body.replace(/\n/g, " ")}`,
           )
           .join("\n");
-  const transcript = turns
-    .map((m) => `${m.role === "assistant" ? "Assistant" : "User"}: ${renderHistoryMessage(m)}`)
-    .join("\n\n");
-  const combined = `## Existing memories\n\n${memoryBlock}\n\n## Recent conversation\n\n${transcript}`;
+  const transcript = renderRoleTaggedTranscript(turns);
+  const combined = `## Existing memories\n\n${memoryBlock}\n\n## Recent conversation (oldest first)\n\n${transcript}`;
   return combined.length > maxChars ? combined.slice(combined.length - maxChars) : combined;
 }
 
@@ -181,6 +180,11 @@ export const CONSOLIDATION_SYSTEM =
   "You are the memory librarian for a reading assistant named Lia. You are given Lia's existing " +
   "long-term memories about the reader and the most recent exchanges of one conversation. Keep the " +
   "memory store accurate and tidy by emitting a list of operations.\n\n" +
+  "The conversation is given as <user> and <assistant> turns. Attribute facts carefully: only text " +
+  "the reader wrote inside <user> reflects the reader. Inside a <user> turn, sections like " +
+  '"## 选中文本" / "## 全书概要" / "## 本章概要" / "## 周围上下文" are book material the reader was ' +
+  "viewing — quoted content, NOT the reader's own words or opinions. Text inside <assistant> is Lia " +
+  "speaking, not the reader. Never attribute a book passage's claims to the reader.\n\n" +
   'Save (op "save") a NEW memory only for durable facts worth remembering across conversations: the ' +
   "reader's lasting preferences, distinctive viewpoints, recurring concepts, thinking frameworks, or " +
   "corrections to Lia's behavior. Do NOT save book content (summaries cover that) or one-off, " +
