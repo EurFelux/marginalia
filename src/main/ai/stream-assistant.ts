@@ -58,7 +58,7 @@ export function streamAssistantReply(
   const { db, loadBytes, resolveSummaryModel, stepLimit, runBackground, notify } = deps;
   const { conversationId, bookId, resolved } = ctx;
   const imageToolResults = supportsImageToolResults(resolved.providerType);
-  const memoryTools = createMemoryTools({ db, bookId });
+  const memoryTools = createMemoryTools({ db });
 
   let closeSearch: (() => Promise<unknown>) | undefined;
   const wsCfg = deps.webSearchConfig;
@@ -173,7 +173,6 @@ export function streamAssistantReply(
         void maybeConsolidateMemory(
           { db, resolveModel: resolveSummaryModel, runBackground, notify },
           conversationId,
-          bookId,
         );
       }
     },

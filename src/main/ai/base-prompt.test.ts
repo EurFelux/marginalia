@@ -24,7 +24,7 @@ beforeEach(() => invalidateAllAgentContexts());
 describe("buildSystemPrompt", () => {
   it("starts with base template and appends agent context", () => {
     const db = freshDb();
-    createMemory(db, { slug: "m", title: "T", description: "D", body: "b", sourceBookId: null });
+    createMemory(db, { slug: "m", title: "T", description: "D", body: "b" });
     const text = buildSystemPrompt(db, "conv-1");
     expect(text.startsWith(BASE_SYSTEM_PROMPT)).toBe(true);
     expect(text).toContain("[m] T — D");
@@ -33,7 +33,7 @@ describe("buildSystemPrompt", () => {
   it("is verbatim-stable across turns of the same conversation", () => {
     const db = freshDb();
     const a = buildSystemPrompt(db, "conv-1");
-    createMemory(db, { slug: "m2", title: "T", description: "D", body: "b", sourceBookId: null });
+    createMemory(db, { slug: "m2", title: "T", description: "D", body: "b" });
     expect(buildSystemPrompt(db, "conv-1")).toBe(a);
   });
 

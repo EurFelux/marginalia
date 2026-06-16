@@ -64,11 +64,7 @@ export interface ApplyResult {
 }
 
 /** 确定性把操作清单落库；复用 repository CRUD（连带 [[slug]] 边表同步）。逐条 try/catch 隔离。 */
-export function applyMemoryOps(
-  db: DB,
-  ops: MemoryOp[],
-  opts: { sourceBookId: string | null },
-): ApplyResult {
+export function applyMemoryOps(db: DB, ops: MemoryOp[]): ApplyResult {
   const result: ApplyResult = { saved: 0, updated: 0, deleted: 0 };
   for (const op of ops) {
     try {
@@ -82,7 +78,6 @@ export function applyMemoryOps(
           title: op.title,
           description: op.description,
           body: op.body,
-          sourceBookId: opts.sourceBookId,
         });
         result.saved++;
       } else if (op.op === "update") {
@@ -230,7 +225,6 @@ export function __resetConsolidationRuntime(): void {
 export async function maybeConsolidateMemory(
   deps: ConsolidationDeps,
   conversationId: string,
-  bookId: string | null,
   everyN = MEMORY_PASS_EVERY_N_TURNS,
 ): Promise<void> {
   const { db, resolveModel, runBackground, notify } = deps;
@@ -299,7 +293,7 @@ export async function maybeConsolidateMemory(
       return;
     }
 
-    const applied = applyMemoryOps(db, parsed.ops, { sourceBookId: bookId });
+    const applied = applyMemoryOps(db, parsed.ops);
     const latestSeq = tail.at(-1)?.seq ?? through ?? 0;
     db.update(conversations)
       .set({ memoryThroughSeq: latestSeq })

@@ -18,13 +18,13 @@ describe("createMemoryTools", () => {
   it("omits memory tools when memoryEnabled=false but always exposes updateSoul", () => {
     const db = freshDb();
     setPreference(db, "memoryEnabled", false);
-    const tools = createMemoryTools({ db, bookId: "b1" });
+    const tools = createMemoryTools({ db });
     expect(Object.keys(tools)).toEqual(["updateSoul"]);
   });
 
-  it("saveMemory fills sourceBookId from deps and returns the slug", async () => {
+  it("saveMemory saves a new memory and returns the slug", async () => {
     const db = freshDb();
-    const tools = createMemoryTools({ db, bookId: null });
+    const tools = createMemoryTools({ db });
     if (!tools.saveMemory) throw new Error("expected full toolset");
     const out = await tools.saveMemory.execute!(
       { slug: "econ", title: "T", description: "D", body: "B" },
@@ -36,8 +36,8 @@ describe("createMemoryTools", () => {
 
   it("saveMemory reports slug conflict as tool result (model self-corrects)", async () => {
     const db = freshDb();
-    createMemory(db, { slug: "dup", title: "t", description: "d", body: "b", sourceBookId: null });
-    const tools = createMemoryTools({ db, bookId: null });
+    createMemory(db, { slug: "dup", title: "t", description: "d", body: "b" });
+    const tools = createMemoryTools({ db });
     if (!tools.saveMemory) throw new Error("expected full toolset");
     const out = await tools.saveMemory.execute!(
       { slug: "dup", title: "T", description: "D", body: "B" },
@@ -53,9 +53,8 @@ describe("createMemoryTools", () => {
       title: "A",
       description: "d",
       body: "see [[ghost]]",
-      sourceBookId: null,
     });
-    const tools = createMemoryTools({ db, bookId: null });
+    const tools = createMemoryTools({ db });
     if (!tools.readMemory) throw new Error("expected full toolset");
     const ok = await tools.readMemory.execute!({ slug: "a" }, {} as never);
     expect(ok).toMatchObject({ found: true, danglingLinks: ["ghost"] });
@@ -65,8 +64,8 @@ describe("createMemoryTools", () => {
 
   it("updateMemory / deleteMemory operate by slug; unknown slug self-correct result", async () => {
     const db = freshDb();
-    createMemory(db, { slug: "m", title: "t", description: "d", body: "b", sourceBookId: null });
-    const tools = createMemoryTools({ db, bookId: null });
+    createMemory(db, { slug: "m", title: "t", description: "d", body: "b" });
+    const tools = createMemoryTools({ db });
     if (!tools.updateMemory || !tools.deleteMemory) throw new Error("expected full toolset");
     const upd = await tools.updateMemory.execute!({ slug: "m", title: "t2" }, {} as never);
     expect(upd).toMatchObject({ updated: true });
@@ -78,7 +77,7 @@ describe("createMemoryTools", () => {
 
   it("updateSoul patches name/persona and invalidates snapshots", async () => {
     const db = freshDb();
-    const tools = createMemoryTools({ db, bookId: null });
+    const tools = createMemoryTools({ db });
     const out = await tools.updateSoul!.execute!({ name: "Mia" }, {} as never);
     expect(out).toMatchObject({ updated: true });
     expect(getPreference(db, "soul")?.name).toBe("Mia");

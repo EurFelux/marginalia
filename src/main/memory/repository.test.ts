@@ -1,8 +1,6 @@
 import path from "node:path";
-import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { createDb, runMigrations } from "@main/db/client";
-import { books } from "@main/db/schema";
 import {
   createMemory,
   deleteMemoryById,
@@ -27,7 +25,6 @@ describe("memories repository", () => {
       title: "经济学框架",
       description: "用经济学框架理解社会问题",
       body: "详细正文",
-      sourceBookId: null,
     });
     expect(m.slug).toBe("econ-framework");
     expect(getMemoryBySlug(db, "econ-framework")?.id).toBe(m.id);
@@ -35,14 +32,13 @@ describe("memories repository", () => {
 
   it("rejects duplicate slug", () => {
     const db = freshDb();
-    createMemory(db, { slug: "a", title: "t", description: "d", body: "b", sourceBookId: null });
+    createMemory(db, { slug: "a", title: "t", description: "d", body: "b" });
     expect(() =>
       createMemory(db, {
         slug: "a",
         title: "t2",
         description: "d2",
         body: "b2",
-        sourceBookId: null,
       }),
     ).toThrow();
   });
@@ -54,14 +50,12 @@ describe("memories repository", () => {
       title: "t",
       description: "d",
       body: "b",
-      sourceBookId: null,
     });
     const m = createMemory(db, {
       slug: "source",
       title: "t",
       description: "d",
       body: "links [[target]] and [[not-yet]]",
-      sourceBookId: null,
     });
     const read = getMemoryBySlug(db, "source");
     expect(read?.outgoing.map((o) => o.slug)).toEqual(["target"]);
@@ -78,14 +72,12 @@ describe("memories repository", () => {
       title: "t",
       description: "d",
       body: "b",
-      sourceBookId: null,
     });
     const b = createMemory(db, {
       slug: "b",
       title: "t",
       description: "d",
       body: "see [[a]]",
-      sourceBookId: null,
     });
     updateMemoryById(db, { id: b.id, body: "no links now" });
     expect(getMemoryBySlug(db, "a")?.incoming).toEqual([]);
@@ -95,38 +87,23 @@ describe("memories repository", () => {
     expect(getMemoryBySlug(db, "b")?.danglingLinks).toEqual(["a"]);
   });
 
-  it("keeps memory on book deletion (sourceBookId SET NULL)", () => {
-    const db = freshDb();
-    db.insert(books).values({ id: "book-1", title: "Book One" }).run();
-    createMemory(db, {
-      slug: "m",
-      title: "t",
-      description: "d",
-      body: "b",
-      sourceBookId: "book-1",
-    });
-    db.delete(books).where(eq(books.id, "book-1")).run();
-    expect(listMemories(db)[0].sourceBookId).toBeNull();
-  });
-
   it("returns outgoing links in body appearance order", () => {
     const db = freshDb();
-    createMemory(db, { slug: "zz", title: "t", description: "d", body: "b", sourceBookId: null });
-    createMemory(db, { slug: "aa", title: "t", description: "d", body: "b", sourceBookId: null });
+    createMemory(db, { slug: "zz", title: "t", description: "d", body: "b" });
+    createMemory(db, { slug: "aa", title: "t", description: "d", body: "b" });
     createMemory(db, {
       slug: "src",
       title: "t",
       description: "d",
       body: "first [[zz]] then [[aa]]",
-      sourceBookId: null,
     });
     expect(getMemoryBySlug(db, "src")?.outgoing.map((o) => o.slug)).toEqual(["zz", "aa"]);
   });
 
   it("lists memories with stable order (createdAt, id)", () => {
     const db = freshDb();
-    createMemory(db, { slug: "m1", title: "t1", description: "d1", body: "b", sourceBookId: null });
-    createMemory(db, { slug: "m2", title: "t2", description: "d2", body: "b", sourceBookId: null });
+    createMemory(db, { slug: "m1", title: "t1", description: "d1", body: "b" });
+    createMemory(db, { slug: "m2", title: "t2", description: "d2", body: "b" });
     expect(listMemories(db).map((m) => m.slug)).toEqual(["m1", "m2"]);
   });
 });

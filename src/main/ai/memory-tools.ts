@@ -19,12 +19,10 @@ const log = createLogger("memory");
 
 export interface MemoryToolsDeps {
   db: DB;
-  /** 当前会话归属书；saveMemory 自动填 sourceBookId（溯源标签，非归属）。 */
-  bookId: string | null;
 }
 
 export function createMemoryTools(deps: MemoryToolsDeps) {
-  const { db, bookId } = deps;
+  const { db } = deps;
 
   const updateSoul = tool({
     description:
@@ -82,7 +80,7 @@ export function createMemoryTools(deps: MemoryToolsDeps) {
       }),
       execute: async ({ slug, title, description, body }) => {
         try {
-          createMemory(db, { slug, title, description, body, sourceBookId: bookId });
+          createMemory(db, { slug, title, description, body });
           return { saved: true as const, slug };
         } catch (err) {
           log.warn("saveMemory failed", err);

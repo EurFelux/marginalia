@@ -208,11 +208,6 @@ export function MemorySettings() {
                         <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
                       )}
                       <span className="truncate text-sm font-medium">{mem.title}</span>
-                      {mem.sourceBookTitle && (
-                        <span className="shrink-0 text-[11px] text-muted-foreground">
-                          · {mem.sourceBookTitle}
-                        </span>
-                      )}
                     </button>
                     <div className="flex shrink-0 items-center gap-1">
                       <Button

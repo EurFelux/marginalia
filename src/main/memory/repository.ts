@@ -2,7 +2,7 @@
 // 纯函数注入 DB；不触 Electron。边表是派生索引：任何 body 写入路径都过 syncLinks。
 import { asc, eq, inArray } from "drizzle-orm";
 import type { DB } from "@main/db/client";
-import { books, memories, memoryLinks } from "@main/db/schema";
+import { memories, memoryLinks } from "@main/db/schema";
 import { extractLinks } from "@main/memory/links";
 import type { MemoryDto, UpdateMemoryInput } from "@shared/memory";
 
@@ -26,7 +26,6 @@ export interface CreateMemoryInput {
   title: string;
   description: string;
   body: string;
-  sourceBookId: string | null;
 }
 
 function syncLinks(tx: Omit<DB, "$client">, fromId: string, body: string): void {
@@ -118,14 +117,10 @@ export function listMemories(db: DB): MemoryDto[] {
       title: memories.title,
       description: memories.description,
       body: memories.body,
-      sourceBookId: memories.sourceBookId,
-      sourceBookTitle: books.title,
       createdAt: memories.createdAt,
       updatedAt: memories.updatedAt,
     })
     .from(memories)
-    .leftJoin(books, eq(memories.sourceBookId, books.id))
     .orderBy(asc(memories.createdAt), asc(memories.id))
-    .all()
-    .map((r) => ({ ...r, sourceBookTitle: r.sourceBookTitle ?? null }));
+    .all();
 }
