@@ -5,6 +5,7 @@ import {
   formatCurrentDateTime,
   pdfSystemNote,
   renderHistoryMessage,
+  renderRoleTaggedTranscript,
   renderWebSearchHint,
   type PromptHistoryMessage,
 } from "@main/ai/prompt";
@@ -486,6 +487,16 @@ describe("renderHistoryMessage", () => {
     });
     expect(out).toContain("## 选中文本\nthe cat");
     expect(out).toContain("why?");
+  });
+});
+
+describe("renderRoleTaggedTranscript", () => {
+  it("wraps each turn in <user>/<assistant> tags using renderHistoryMessage content", () => {
+    const out = renderRoleTaggedTranscript([
+      { role: "user", parts: [{ type: "text", text: "hello" }], metadata: null },
+      { role: "assistant", parts: [{ type: "text", text: "hi" }], metadata: null },
+    ]);
+    expect(out).toBe("<user>\nhello\n</user>\n\n<assistant>\nhi\n</assistant>");
   });
 });
 

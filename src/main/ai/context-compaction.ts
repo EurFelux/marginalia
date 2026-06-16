@@ -1,6 +1,6 @@
 // src/main/ai/context-compaction.ts
 import type { MessageDto } from "@shared/chat";
-import { renderHistoryMessage } from "@main/ai/prompt";
+import { renderHistoryMessage, renderRoleTaggedTranscript } from "@main/ai/prompt";
 import { generateText } from "ai";
 import { eq } from "drizzle-orm";
 import type { DB } from "@main/db/client";
@@ -75,9 +75,7 @@ export function renderFoldedTranscript(
   folded: MessageDto[],
   maxChars = COMPACTION_INPUT_MAX_CHARS,
 ): string {
-  const transcript = folded
-    .map((m) => `${m.role === "assistant" ? "Assistant" : "User"}: ${renderHistoryMessage(m)}`)
-    .join("\n\n");
+  const transcript = renderRoleTaggedTranscript(folded);
   return transcript.length > maxChars ? transcript.slice(transcript.length - maxChars) : transcript;
 }
 
