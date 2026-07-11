@@ -8,7 +8,7 @@ import {
   getConversation,
   listConversationsByBook,
 } from "@main/chat/conversations";
-import { listMessages } from "@main/chat/messages";
+import { listMessagesPaginated } from "@main/chat/messages";
 import { abortConversationStreams } from "@main/ipc/ai-handlers";
 import { bind, register, type Binding } from "@main/ipc/registry";
 
@@ -21,7 +21,9 @@ export const chatBindings: Binding[] = [
     abortConversationStreams(input.id);
     deleteConversation(getDb(), input.id);
   }),
-  bind(C.messagesListByConversation, (input) => listMessages(getDb(), input.conversationId)),
+  bind(C.messagesListByConversation, (input) =>
+    listMessagesPaginated(getDb(), input.conversationId, input.beforeSeq, input.limit),
+  ),
   bind(C.aiBuildChips, buildChips),
 ];
 

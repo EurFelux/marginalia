@@ -24,10 +24,14 @@ export function MessageList({
   messages,
   status,
   bookId,
+  hasMore,
+  loadingMore,
 }: {
   messages: ChatUIMessage[];
   status: ChatStatus;
   bookId: string | null;
+  hasMore?: boolean;
+  loadingMore?: boolean;
 }) {
   const { t } = useTranslation();
   // 章节列表给步骤行解析人话标题（chapterId → 章节名）；静态数据，与 ChapterList 共享缓存。
@@ -54,6 +58,13 @@ export function MessageList({
   const lastId = messages.at(-1)?.id;
   return (
     <div className="space-y-5">
+      {(hasMore || loadingMore) && (
+        <div className="py-2 text-center text-xs text-muted-foreground">
+          {loadingMore
+            ? t("ai.loadingOlder", "加载更早消息…")
+            : t("ai.scrollToLoadOlder", "上滑加载更早消息")}
+        </div>
+      )}
       {messages.map((m, i) =>
         m.role === "user" ? (
           <UserBubble key={m.id} m={m} />
@@ -116,7 +127,7 @@ function UserBubble({ m }: { m: ChatUIMessage }) {
   }
 
   return (
-    <div className="group flex flex-col items-end">
+    <div className="group flex flex-col items-end" data-message-id={m.id}>
       <div className="max-w-[88%] rounded-2xl rounded-br-sm bg-primary px-3 py-2.5 text-primary-foreground">
         {chips.length > 0 && (
           <div className="mb-2 space-y-1.5 border-b border-primary-foreground/20 pb-2">
@@ -162,7 +173,7 @@ function AssistantBubble({
   if (segs.length === 0 && !streaming) return null;
 
   const bubble = (
-    <div className="group flex flex-col items-start">
+    <div className="group flex flex-col items-start" data-message-id={m.id}>
       {showAvatar && groupHead && (
         <span className="mb-1 text-xs font-medium text-muted-foreground">{agentName}</span>
       )}
@@ -183,11 +194,15 @@ function AssistantBubble({
 
   if (!showAvatar) {
     // 开关关闭：回到原布局（气泡自身限宽 88%）。
-    return <div className="max-w-[88%]">{bubble}</div>;
+    return (
+      <div className="max-w-[88%]" data-message-id={m.id}>
+        {bubble}
+      </div>
+    );
   }
   // 开关开启：头像列（首条显头像、后续留白）+ 内容列（缩进对齐）。
   return (
-    <div className="flex max-w-[92%] items-start gap-2">
+    <div className="flex max-w-[92%] items-start gap-2" data-message-id={m.id}>
       <div className="w-7 shrink-0">{groupHead && <AssistantAvatar className="size-7" />}</div>
       <div className="min-w-0 flex-1">{bubble}</div>
     </div>

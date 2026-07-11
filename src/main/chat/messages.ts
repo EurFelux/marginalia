@@ -1,5 +1,5 @@
 // src/main/chat/messages.ts
-import { and, asc, desc, eq, gt, max } from "drizzle-orm";
+import { and, asc, desc, eq, gt, lt, max } from "drizzle-orm";
 import type { UIMessage } from "ai";
 import type { DB } from "@main/db/client";
 import { conversations, messages } from "@main/db/schema";
@@ -89,6 +89,25 @@ export function listMessages(db: DB, conversationId: string): MessageDto[] {
     .orderBy(asc(messages.seq))
     .all()
     .map(toDto);
+}
+
+/** 分页列出会话内消息：beforeSeq 指定时返回 seq < beforeSeq 的较早一页；
+ *  limit 指定时多拿一条探测 hasMore。 */
+export function listMessagesPaginated(
+  db: DB,
+  conversationId: string,
+  beforeSeq?: number,
+  limit?: number,
+): { messages: MessageDto[]; hasMore: boolean } {
+  const where =
+    beforeSeq != null
+      ? and(eq(messages.conversationId, conversationId), lt(messages.seq, beforeSeq))
+      : eq(messages.conversationId, conversationId);
+  const query = db.select().from(messages).where(where).orderBy(desc(messages.seq));
+  const rows = limit != null ? query.limit(limit + 1).all() : query.all();
+  const hasMore = limit != null && rows.length > limit;
+  const page = hasMore ? rows.slice(0, limit) : rows;
+  return { messages: page.reverse().map(toDto), hasMore };
 }
 
 /** 列出 seq > afterSeq 的尾轮（升序）；afterSeq 为 null 取全量（等价 listMessages）。 */

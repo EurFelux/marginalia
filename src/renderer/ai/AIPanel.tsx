@@ -15,13 +15,23 @@ import { Composer } from "@renderer/ai/Composer";
 import { ConversationsTab } from "@renderer/ai/ConversationsTab";
 import { messagesToUI } from "@renderer/ai/message-history";
 import { conversationsQuery } from "@renderer/query/conversation-queries";
-import type { Chip } from "@shared/chat";
+import type { Chip, MessageDto } from "@shared/chat";
 import { openPanelAndFocusComposer } from "@renderer/ai/composer-focus";
 import { ChatActionsContext, nextAssistantId, type ChatActions } from "@renderer/ai/chat-actions";
+import { ChatPerfMonitor } from "@renderer/ai/ChatPerfMonitor";
 import { createLogger } from "@renderer/logger";
 import { contextKey, resolveOpenCommandTarget, type ChatContext } from "@renderer/ai/chat-context";
 
 const log = createLogger("ai");
+
+const PAGE_SIZE = 80;
+const SCROLL_TOP_THRESHOLD = 100;
+
+interface PaginationState {
+  hasMore: boolean;
+  loadingMore: boolean;
+  oldestSeq: number | null;
+}
 
 export function AIPanel({ context, onClose }: { context: ChatContext; onClose: () => void }) {
   const { t } = useTranslation();
@@ -46,11 +56,49 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
   const qc = useQueryClient();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const prevStatus = useRef(status);
+  const [pagination, setPagination] = useState<PaginationState>({
+    hasMore: false,
+    loadingMore: false,
+    oldestSeq: null,
+  });
+  const seqMapRef = useRef<Map<string, number>>(new Map());
+  const isOpeningRef = useRef(false);
+
+  const resetPagination = () => {
+    setPagination({ hasMore: false, loadingMore: false, oldestSeq: null });
+    seqMapRef.current = new Map();
+  };
+
+  const updateSeqMap = (dtos: MessageDto[]) => {
+    for (const dto of dtos) {
+      seqMapRef.current.set(dto.id, dto.seq);
+    }
+  };
+
+  const prevMessagesRef = useRef<ChatUIMessage[]>([]);
 
   useEffect(() => {
     const el = scrollRef.current;
-    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-  }, [messages]);
+    if (!el) return;
+
+    const prev = prevMessagesRef.current;
+    prevMessagesRef.current = messages;
+
+    // 历史消息 prepend（长度增加且首条 id 变化）时不自动滚底，避免把用户拉回底部。
+    if (prev.length > 0 && messages.length > prev.length && messages[0]?.id !== prev[0]?.id) {
+      return;
+    }
+
+    // 初始加载由打开会话的 effect 负责滚底，这里不处理。
+    if (prev.length === 0) return;
+
+    // 新消息追加或 streaming assistant 增长时滚底。
+    const lastIdChanged = messages.at(-1)?.id !== prev.at(-1)?.id;
+    const streamingAssistant = status === "streaming" && messages.at(-1)?.role === "assistant";
+    if (lastIdChanged || streamingAssistant) {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    }
+  }, [messages, status]);
 
   // 重开会话：openCommand.nonce 变 → 先中止在跑的流（避免增量灌入将被替换的历史、streamId 串台）→ 载历史 → setMessages。
   // 只认 openCommand（一次性命令信号），不认 activeConversationId——后者也被发消息 ack 写入，监听它会在发完消息后误重载。
@@ -63,28 +111,59 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
     if (!conversationId) return;
     let cancelled = false;
     setShowList(false); // 从列表选中一条会话 → 回到聊天视图
+    resetPagination();
+    isOpeningRef.current = true;
     void stop();
     void window.api.chat.messages
-      .listByConversation({ conversationId })
-      .then((dtos) => {
-        if (!cancelled) setMessages(messagesToUI(dtos));
+      .listByConversation({ conversationId, limit: PAGE_SIZE })
+      .then(({ messages: dtos, hasMore }) => {
+        if (cancelled) return;
+        updateSeqMap(dtos);
+        setMessages(messagesToUI(dtos));
+        setPagination({ hasMore, loadingMore: false, oldestSeq: dtos[0]?.seq ?? null });
+        // 等 React 渲染 + Streamdown/markdown 高度稳定后再 instant 滚底，
+        // 避免 smooth 动画与 content 高度变化竞争导致停在中间。
+        setTimeout(() => {
+          if (cancelled) return;
+          const el = scrollRef.current;
+          if (el) el.scrollTo({ top: el.scrollHeight, behavior: "instant" });
+          isOpeningRef.current = false;
+        }, 100);
       })
       .catch((err: unknown) => log.warn("load conversation history failed", err));
     return () => {
       cancelled = true;
+      isOpeningRef.current = false;
     };
   }, [openCommand, ctxKey, stop, setMessages]);
 
   // 一轮发送结束（曾 streaming/submitted → 回 ready/error）→ 刷新会话列表（新会话 / 标题 / updatedAt）。
-  // 同时从 DB 重载消息以同步 UI message ids 到持久化 ids（resend 截断后 id 会变）。
+  // 同时从 DB 重载最新一页消息以同步 UI message ids 到持久化 ids（resend 截断后 id 会变）。
   // 用前缀 ["conversations"] 失效（不需 bookId），匹配 qk.conversations(bookId)=["conversations",bookId]。
   useEffect(() => {
     if (prevStatus.current !== "ready" && (status === "ready" || status === "error")) {
       void qc.invalidateQueries({ queryKey: ["conversations"] });
       if (activeConversationId) {
         void window.api.chat.messages
-          .listByConversation({ conversationId: activeConversationId })
-          .then((dtos) => setMessages(messagesToUI(dtos)))
+          .listByConversation({ conversationId: activeConversationId, limit: PAGE_SIZE })
+          .then(({ messages: dtos, hasMore }) => {
+            updateSeqMap(dtos);
+            const newUis = messagesToUI(dtos);
+            const oldestNewSeq = dtos[0]?.seq ?? null;
+            setMessages((prev) => {
+              if (oldestNewSeq == null) return newUis;
+              const kept = prev.filter(
+                (m) => (seqMapRef.current.get(m.id) ?? Infinity) < oldestNewSeq,
+              );
+              return [...kept, ...newUis];
+            });
+            setPagination((p) => ({
+              ...p,
+              // 若此前已加载全部历史，resync 只取最新一页不应把 hasMore 重新打开
+              hasMore: p.hasMore ? hasMore : false,
+              oldestSeq: dtos[0]?.seq ?? p.oldestSeq,
+            }));
+          })
           .catch((err: unknown) => log.warn("reload conversation after turn failed", err));
       }
     }
@@ -93,7 +172,10 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
 
   // active 置空（开书无会话 / 切书）→ 清面板；初始即空时为 no-op。
   useEffect(() => {
-    if (activeConversationId === null) setMessages([]);
+    if (activeConversationId === null) {
+      setMessages([]);
+      resetPagination();
+    }
   }, [activeConversationId, setMessages]);
 
   const newConversation = async () => {
@@ -112,6 +194,78 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
       log.warn("create conversation failed", err);
     }
   };
+
+  const loadMore = () => {
+    const conversationId = activeConversationId;
+    const beforeSeq = pagination.oldestSeq;
+    if (
+      isOpeningRef.current ||
+      !conversationId ||
+      beforeSeq == null ||
+      pagination.loadingMore ||
+      !pagination.hasMore
+    ) {
+      return;
+    }
+
+    // 加载前记录锚点：第一条可见消息到 viewport 顶部的距离，
+    // 加载完成后恢复该距离，避免跳动和连续误触发 loadMore。
+    const el = scrollRef.current;
+    const anchorId = messages[0]?.id;
+    const anchorEl = anchorId
+      ? (el?.querySelector(`[data-message-id="${anchorId}"]`) as HTMLElement | null)
+      : null;
+    const anchorOffset = anchorEl && el ? anchorEl.offsetTop - el.scrollTop : null;
+
+    setPagination((p) => ({ ...p, loadingMore: true }));
+    void window.api.chat.messages
+      .listByConversation({ conversationId, beforeSeq, limit: PAGE_SIZE })
+      .then(({ messages: dtos, hasMore }) => {
+        if (dtos.length === 0) {
+          setPagination((p) => ({ ...p, hasMore: false, loadingMore: false }));
+          return;
+        }
+        updateSeqMap(dtos);
+        const newUis = messagesToUI(dtos);
+        setMessages((prev) => {
+          const existingIds = new Set(prev.map((m) => m.id));
+          const uniqueNew = newUis.filter((m) => !existingIds.has(m.id));
+          return [...uniqueNew, ...prev];
+        });
+        setPagination({
+          hasMore,
+          loadingMore: false,
+          oldestSeq: dtos[0]?.seq ?? beforeSeq,
+        });
+        // 恢复锚定位置：让原来在 viewport 顶部的消息仍保持在原位。
+        requestAnimationFrame(() => {
+          const newEl = scrollRef.current;
+          if (anchorOffset == null || !anchorId || !newEl) return;
+          const newAnchorEl = newEl.querySelector(
+            `[data-message-id="${anchorId}"]`,
+          ) as HTMLElement | null;
+          if (!newAnchorEl) return;
+          newEl.scrollTop = newAnchorEl.offsetTop - anchorOffset;
+        });
+      })
+      .catch((err: unknown) => {
+        setPagination((p) => ({ ...p, loadingMore: false }));
+        log.warn("load older messages failed", err);
+      });
+  };
+
+  // 滚动到顶部附近时加载更早一页。
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !pagination.hasMore || pagination.loadingMore) return;
+    const onScroll = () => {
+      if (el.scrollTop < SCROLL_TOP_THRESHOLD) {
+        loadMore();
+      }
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [pagination.hasMore, pagination.loadingMore, pagination.oldestSeq, activeConversationId]);
 
   const actions: ChatActions = {
     regenerate: (a) => void regenerate({ messageId: a.id }),
@@ -186,10 +340,20 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
         </div>
       ) : (
         <>
-          <ScrollArea className="min-h-0 flex-1" viewportRef={scrollRef}>
+          <ScrollArea
+            className="min-h-0 flex-1"
+            viewportRef={scrollRef}
+            viewportClassName="ai-messages-viewport"
+          >
             <div className="p-4">
               <ChatActionsContext.Provider value={actions}>
-                <MessageList messages={messages} status={status} bookId={bookId} />
+                <MessageList
+                  messages={messages}
+                  status={status}
+                  bookId={bookId}
+                  hasMore={pagination.hasMore}
+                  loadingMore={pagination.loadingMore}
+                />
               </ChatActionsContext.Provider>
             </div>
           </ScrollArea>
@@ -206,6 +370,7 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
           <Composer status={status} onStop={stop} onSend={handleSend} context={context} />
         </>
       )}
+      {import.meta.env.DEV && <ChatPerfMonitor messages={messages} />}
     </div>
   );
 }

@@ -65,8 +65,18 @@ export const conversationIdInput = z.object({ id: z.string().min(1) });
 export type ConversationIdInput = z.infer<typeof conversationIdInput>;
 
 /** messages:list-by-conversation 入参 */
-export const messagesByConversationInput = z.object({ conversationId: z.string().min(1) });
+export const messagesByConversationInput = z.object({
+  conversationId: z.string().min(1),
+  beforeSeq: z.number().int().positive().optional(),
+  limit: z.number().int().positive().optional(),
+});
 export type MessagesByConversationInput = z.infer<typeof messagesByConversationInput>;
+
+/** messages:list-by-conversation 出参 */
+export interface MessagesByConversationOutput {
+  messages: MessageDto[];
+  hasMore: boolean;
+}
 
 /** 会话视图。bookId 为 null ⇒ 书库会话（spec 2026-06-16 §3）；isNaming 为主进程内存瞬态合成（spec §5）。 */
 export interface ConversationDto {

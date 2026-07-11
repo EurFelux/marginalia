@@ -33,7 +33,7 @@ import type {
   AppNotification,
   Chip,
   ConversationDto,
-  MessageDto,
+  MessagesByConversationOutput,
   SendAck,
 } from "@shared/chat";
 import {
@@ -280,7 +280,7 @@ export const C = {
     "messages:list-by-conversation",
     "invoke",
     messagesByConversationInput,
-    out<MessageDto[]>(),
+    out<MessagesByConversationOutput>(),
   ),
 
   // ai
