@@ -282,6 +282,8 @@ Add the animation token inside the existing `@theme inline` block in `src/index.
 
 ```css
 --animate-thinking-dot: thinking-dot 1.2s ease-in-out infinite;
+--animate-thinking-dot-delay-150: thinking-dot 1.2s ease-in-out 150ms infinite;
+--animate-thinking-dot-delay-300: thinking-dot 1.2s ease-in-out 300ms infinite;
 
 @keyframes thinking-dot {
   0%,
@@ -315,8 +317,8 @@ function AssistantActivityIndicator({ activity }: { activity: Exclude<AssistantA
     >
       <span className="inline-flex gap-1" aria-hidden="true">
         <span className="size-1.5 rounded-full bg-primary/80 motion-safe:animate-thinking-dot" />
-        <span className="size-1.5 rounded-full bg-primary/80 motion-safe:animate-thinking-dot [animation-delay:150ms]" />
-        <span className="size-1.5 rounded-full bg-primary/80 motion-safe:animate-thinking-dot [animation-delay:300ms]" />
+        <span className="size-1.5 rounded-full bg-primary/80 motion-safe:animate-thinking-dot-delay-150" />
+        <span className="size-1.5 rounded-full bg-primary/80 motion-safe:animate-thinking-dot-delay-300" />
       </span>
       <span>{label}</span>
     </div>
@@ -334,7 +336,7 @@ function PendingBubble({ showAvatar, agentName }: { showAvatar: boolean; agentNa
 }
 ```
 
-Each dot runs the same opacity-and-scale breath with 150 ms phase offsets, producing a left-to-right flow. `motion-safe:animate-thinking-dot` means the animation runs only when the operating-system reduced-motion preference is not enabled; otherwise all three dots remain static. The readable label remains unchanged in either mode.
+Each dot runs the same opacity-and-scale breath with 150 ms phase offsets, producing a left-to-right flow. The 150 ms and 300 ms delays live inside dedicated animation-token shorthands instead of separate arbitrary `animation-delay` utilities, preventing a later generated `animation` shorthand from resetting both delays to zero. The `motion-safe:animate-thinking-dot*` utilities run only when the operating-system reduced-motion preference is not enabled; otherwise all three dots remain static. The readable label remains unchanged in either mode.
 
 - [ ] **Step 5: Extract the shared assistant identity shell**
 

@@ -115,7 +115,7 @@ For a submitted placeholder, the shell is always the head of a new assistant gro
 
 ### Activity indicator
 
-A small renderer component maps `AssistantActivity` to localized copy and decorative dots. It renders no reasoning part or reasoning text. Within a real assistant message, place it after all currently visible segments so a post-tool reasoning phase appears directly below the completed tool row. The dots share one semantic color and run the same 1.2-second ease-in-out opacity-and-scale breath with 0 ms, 150 ms, and 300 ms phase offsets, producing a left-to-right flow rather than a synchronized pulse.
+A small renderer component maps `AssistantActivity` to localized copy and decorative dots. It renders no reasoning part or reasoning text. Within a real assistant message, place it after all currently visible segments so a post-tool reasoning phase appears directly below the completed tool row. The dots share one semantic color and run the same 1.2-second ease-in-out opacity-and-scale breath with 0 ms, 150 ms, and 300 ms phase offsets, producing a left-to-right flow rather than a synchronized pulse. Each phase uses its own Tailwind animation token with the delay embedded in the complete `animation` shorthand; this prevents a later generated shorthand rule from resetting a separate `animation-delay` utility to zero.
 
 ### Existing message rendering
 

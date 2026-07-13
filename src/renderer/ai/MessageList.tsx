@@ -107,8 +107,8 @@ function AssistantActivityIndicator({ activity }: { activity: Exclude<AssistantA
     >
       <span className="inline-flex gap-1" aria-hidden="true">
         <span className="size-1.5 rounded-full bg-primary/80 motion-safe:animate-thinking-dot" />
-        <span className="size-1.5 rounded-full bg-primary/80 motion-safe:animate-thinking-dot [animation-delay:150ms]" />
-        <span className="size-1.5 rounded-full bg-primary/80 motion-safe:animate-thinking-dot [animation-delay:300ms]" />
+        <span className="size-1.5 rounded-full bg-primary/80 motion-safe:animate-thinking-dot-delay-150" />
+        <span className="size-1.5 rounded-full bg-primary/80 motion-safe:animate-thinking-dot-delay-300" />
       </span>
       <span>{label}</span>
     </div>

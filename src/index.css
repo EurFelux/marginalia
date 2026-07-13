@@ -125,6 +125,8 @@
   --font-sans: "Manrope Variable", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Fraunces Variable", Georgia, "Songti SC", serif;
   --animate-thinking-dot: thinking-dot 1.2s ease-in-out infinite;
+  --animate-thinking-dot-delay-150: thinking-dot 1.2s ease-in-out 150ms infinite;
+  --animate-thinking-dot-delay-300: thinking-dot 1.2s ease-in-out 300ms infinite;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
