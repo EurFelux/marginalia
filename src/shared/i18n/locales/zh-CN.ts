@@ -2,6 +2,8 @@ export default {
   "ai.action.explain": "请解释选中的这段内容。",
   "ai.action.summarize": "请概括选中的这段内容。",
   "ai.action.translate": "请把选中的这段内容翻译成简体中文。",
+  "ai.activity.preparing": "正在准备回答…",
+  "ai.activity.reasoning": "正在思考…",
   "ai.cannotResend": "无法重发：找不到会话或目标消息",
   "ai.chip.bookSummary": "全书摘要",
   "ai.chip.chapterSummary": "章节摘要",

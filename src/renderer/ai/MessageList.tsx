@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { ChatStatus } from "ai";
 import { getToolName } from "ai";
 import { useQuery } from "@tanstack/react-query";
@@ -6,6 +6,7 @@ import type { LucideIcon } from "lucide-react";
 import { BookOpen, FileText, List, ScrollText, Sparkles, Wrench } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { AssistantAvatar } from "@renderer/ai/AssistantAvatar";
+import { assistantActivity, type AssistantActivity } from "@renderer/ai/assistant-activity";
 import { chipLabel } from "@renderer/ai/chip-label";
 import { useChatActions } from "@renderer/ai/chat-actions";
 import { MessageEditor } from "@renderer/ai/MessageEditor";
@@ -55,7 +56,12 @@ export function MessageList({
       </div>
     );
   }
-  const lastId = messages.at(-1)?.id;
+  const lastMessage = messages.at(-1);
+  const lastId = lastMessage?.id;
+  const activity = assistantActivity(
+    status,
+    lastMessage?.role === "assistant" ? lastMessage.parts : undefined,
+  );
   return (
     <div className="space-y-5">
       {(hasMore || loadingMore) && (
@@ -73,6 +79,7 @@ export function MessageList({
             key={m.id}
             m={m}
             streaming={status === "streaming" && m.id === lastId}
+            activity={m.id === lastId ? activity : null}
             chapters={chapters}
             showAvatar={showAvatar}
             agentName={agentName}
@@ -80,25 +87,41 @@ export function MessageList({
           />
         ),
       )}
-      {/* submitted 空窗（已发送、首 chunk 未到）：即时占位，无缝交接到 streaming 的 ▍。 */}
-      {status === "submitted" && <PendingBubble />}
+      {status === "submitted" && <PendingBubble showAvatar={showAvatar} agentName={agentName} />}
     </div>
   );
 }
 
-/** 脉冲光标：streaming 无文本与 submitted 占位共用的「正在思考」指示。 */
-function ThinkingCursor() {
-  return <span className="inline-block animate-pulse text-primary">▍</span>;
+function AssistantActivityIndicator({ activity }: { activity: Exclude<AssistantActivity, null> }) {
+  const { t } = useTranslation();
+  const label =
+    activity === "preparing"
+      ? t("ai.activity.preparing", "正在准备回答…")
+      : t("ai.activity.reasoning", "正在思考…");
+
+  return (
+    <div
+      className="flex items-center gap-2 text-xs text-muted-foreground"
+      role="status"
+      aria-live="polite"
+    >
+      <span className="inline-flex gap-1 motion-safe:animate-pulse" aria-hidden="true">
+        <span className="size-1.5 rounded-full bg-primary/80" />
+        <span className="size-1.5 rounded-full bg-primary/60" />
+        <span className="size-1.5 rounded-full bg-primary/40" />
+      </span>
+      <span>{label}</span>
+    </div>
+  );
 }
 
-/** submitted 空窗占位气泡：发送后首 chunk 到达前即时显示，与 streaming 的 ThinkingCursor 无缝交接。 */
-function PendingBubble() {
+function PendingBubble({ showAvatar, agentName }: { showAvatar: boolean; agentName: string }) {
   return (
-    <div className="group flex flex-col items-start">
-      <div className="max-w-[88%] space-y-2 rounded-2xl rounded-bl-sm bg-muted px-3.5 py-2 text-sm leading-relaxed text-foreground">
-        <ThinkingCursor />
+    <AssistantShell showAvatar={showAvatar} agentName={agentName} groupHead>
+      <div className="max-w-full space-y-2 rounded-2xl rounded-bl-sm bg-muted px-3.5 py-2 text-sm leading-relaxed text-foreground">
+        <AssistantActivityIndicator activity="preparing" />
       </div>
-    </div>
+    </AssistantShell>
   );
 }
 
@@ -153,9 +176,48 @@ function UserBubble({ m }: { m: ChatUIMessage }) {
   );
 }
 
+function AssistantShell({
+  children,
+  showAvatar,
+  agentName,
+  groupHead,
+  messageId,
+}: {
+  children: ReactNode;
+  showAvatar: boolean;
+  agentName: string;
+  groupHead: boolean;
+  messageId?: string;
+}) {
+  const body = (
+    <div className="group flex flex-col items-start" data-message-id={messageId}>
+      {showAvatar && groupHead && (
+        <span className="mb-1 text-xs font-medium text-muted-foreground">{agentName}</span>
+      )}
+      {children}
+    </div>
+  );
+
+  if (!showAvatar) {
+    return (
+      <div className="max-w-[88%]" data-message-id={messageId}>
+        {body}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex max-w-[92%] items-start gap-2" data-message-id={messageId}>
+      <div className="w-7 shrink-0">{groupHead && <AssistantAvatar className="size-7" />}</div>
+      <div className="min-w-0 flex-1">{body}</div>
+    </div>
+  );
+}
+
 function AssistantBubble({
   m,
   streaming,
+  activity,
   chapters,
   showAvatar,
   agentName,
@@ -163,20 +225,22 @@ function AssistantBubble({
 }: {
   m: ChatUIMessage;
   streaming: boolean;
+  activity: AssistantActivity;
   chapters: ChapterRefDto[];
   showAvatar: boolean;
   agentName: string;
   groupHead: boolean;
 }) {
   const segs = segments(m.parts);
-  const hasText = segs.some((s) => s.kind === "text");
   if (segs.length === 0 && !streaming) return null;
 
-  const bubble = (
-    <div className="group flex flex-col items-start" data-message-id={m.id}>
-      {showAvatar && groupHead && (
-        <span className="mb-1 text-xs font-medium text-muted-foreground">{agentName}</span>
-      )}
+  return (
+    <AssistantShell
+      showAvatar={showAvatar}
+      agentName={agentName}
+      groupHead={groupHead}
+      messageId={m.id}
+    >
       <div className="max-w-full space-y-2 rounded-2xl rounded-bl-sm bg-muted px-3.5 py-2 text-sm leading-relaxed text-foreground">
         {segs.map((s, i) =>
           s.kind === "text" ? (
@@ -186,26 +250,10 @@ function AssistantBubble({
             <ToolStepRow key={i} part={s.part} chapters={chapters} />
           ),
         )}
-        {streaming && !hasText && <ThinkingCursor />}
+        {activity && <AssistantActivityIndicator activity={activity} />}
       </div>
       {!streaming && <MessageToolbar m={m} />}
-    </div>
-  );
-
-  if (!showAvatar) {
-    // 开关关闭：回到原布局（气泡自身限宽 88%）。
-    return (
-      <div className="max-w-[88%]" data-message-id={m.id}>
-        {bubble}
-      </div>
-    );
-  }
-  // 开关开启：头像列（首条显头像、后续留白）+ 内容列（缩进对齐）。
-  return (
-    <div className="flex max-w-[92%] items-start gap-2" data-message-id={m.id}>
-      <div className="w-7 shrink-0">{groupHead && <AssistantAvatar className="size-7" />}</div>
-      <div className="min-w-0 flex-1">{bubble}</div>
-    </div>
+    </AssistantShell>
   );
 }
 
