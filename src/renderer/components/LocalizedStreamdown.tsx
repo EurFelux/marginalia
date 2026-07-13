@@ -1,14 +1,18 @@
 import type { TFunction } from "i18next";
 import { createMathPlugin } from "@streamdown/math";
 import { useTranslation } from "react-i18next";
+import { cn } from "@renderer/lib/utils";
 import {
   defaultTranslations,
   Streamdown,
   type StreamdownProps,
   type StreamdownTranslations,
 } from "streamdown";
+import { normalizeMathDelimiters } from "./markdown-math";
 
 const math = createMathPlugin({ singleDollarTextMath: true });
+const mathDisplayClasses =
+  "[&_.katex-display]:max-w-full [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden";
 
 export function buildStreamdownTranslations(t: TFunction): StreamdownTranslations {
   return {
@@ -65,15 +69,24 @@ export function buildStreamdownTranslations(t: TFunction): StreamdownTranslation
   };
 }
 
-export function LocalizedStreamdown({ translations, plugins, ...props }: StreamdownProps) {
+export function LocalizedStreamdown({
+  children,
+  className,
+  translations,
+  plugins,
+  ...props
+}: StreamdownProps) {
   const { t } = useTranslation();
   // 不手写 useMemo：渲染层启用 React Compiler，自动记忆化。
   const localized = buildStreamdownTranslations(t);
   return (
     <Streamdown
+      className={cn(mathDisplayClasses, className)}
       plugins={{ math, ...plugins }}
       translations={{ ...localized, ...translations }}
       {...props}
-    />
+    >
+      {normalizeMathDelimiters(children ?? "")}
+    </Streamdown>
   );
 }
