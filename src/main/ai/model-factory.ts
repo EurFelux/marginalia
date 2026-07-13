@@ -2,14 +2,14 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import type { LanguageModelV3, SharedV3ProviderOptions } from "@ai-sdk/provider";
+import type { LanguageModelV4, SharedV4ProviderOptions } from "@ai-sdk/provider";
 import type { AiProviderApiType } from "@shared/providers";
 
 /**
- * AI SDK 语言模型实例类型：四家 provider 工厂均返回 `@ai-sdk/provider` 的 `LanguageModelV3`
+ * AI SDK 语言模型实例类型：四家 provider 工厂均返回 `@ai-sdk/provider` 的 `LanguageModelV4`
  * （可喂 generateText/streamText）。直接依赖该接口，不再经 `@ai-sdk/openai` 的返回类型推导，免大版本漂移。
  */
-export type ChatModel = LanguageModelV3;
+export type ChatModel = LanguageModelV4;
 
 export interface ResolveModelParams {
   type: AiProviderApiType;
@@ -53,7 +53,7 @@ export function supportsImageToolResults(type?: AiProviderApiType): boolean {
  * `reasoning.encrypted_content`，dist:4906；端点未返回 encrypted_content 的裸 reasoning 会被过滤而非
  * 崩溃，dist:3331），故无状态端点也能跑完工具循环。官方 OpenAI 同样支持该路径。
  */
-export function providerCallOptions(type?: AiProviderApiType): SharedV3ProviderOptions | undefined {
+export function providerCallOptions(type?: AiProviderApiType): SharedV4ProviderOptions | undefined {
   if (type === "openai-responses") return { openai: { store: false } };
   return undefined;
 }

@@ -1,7 +1,7 @@
 // src/main/ai/send.test.ts
 import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { MockLanguageModelV3, simulateReadableStream } from "ai/test";
+import { MockLanguageModelV4, simulateReadableStream } from "ai/test";
 import { makeFixtureEpub } from "@marginalia/epub-parser";
 import { makeTextPdf } from "@marginalia/pdf-parser/fixture";
 import { createDb, runMigrations } from "@main/db/client";
@@ -37,7 +37,7 @@ const finishChunk = (reason: "stop" | "tool-calls") => ({
 });
 
 function textStreamModel(text: string) {
-  return new MockLanguageModelV3({
+  return new MockLanguageModelV4({
     doStream: async () => ({
       stream: simulateReadableStream({
         chunks: [
@@ -53,7 +53,7 @@ function textStreamModel(text: string) {
 
 /** 仅 doGenerate 的 mock（auto-naming 专用——naming 现走独立 resolveSummaryModel）。 */
 function namingOnlyModel(namingTitle: string) {
-  return new MockLanguageModelV3({
+  return new MockLanguageModelV4({
     doGenerate: async () => ({
       finishReason: { unified: "stop" as const, raw: undefined },
       usage: USAGE,
@@ -66,7 +66,7 @@ function namingOnlyModel(namingTitle: string) {
 // 两步 agent mock：第1步发 getToc 工具调用，第2步发文本。
 function tocThenTextModel(text: string) {
   let call = 0;
-  return new MockLanguageModelV3({
+  return new MockLanguageModelV4({
     doStream: async () => {
       call += 1;
       if (call === 1) {
@@ -237,7 +237,7 @@ describe("runSend", () => {
   });
 
   it("persists an error-status assistant message when streaming errors", async () => {
-    const failModel = new MockLanguageModelV3({
+    const failModel = new MockLanguageModelV4({
       doStream: async () => {
         throw new Error("stream boom");
       },
@@ -274,7 +274,7 @@ describe("runSend", () => {
   it("persists an aborted-status assistant message when the signal aborts mid-stream", async () => {
     const controller = new AbortController();
     // 延迟分片：abort 在分片尚未发完时触发 → onFinish 收 isAborted=true。
-    const slowModel = new MockLanguageModelV3({
+    const slowModel = new MockLanguageModelV4({
       doStream: async () => ({
         stream: simulateReadableStream({
           chunkDelayInMs: 50,
@@ -301,7 +301,7 @@ describe("runSend", () => {
   it("drops the assistant persist when the conversation is deleted mid-stream", async () => {
     const controller = new AbortController();
     // 延迟分片：abort+delete 发生在分片尚未发完时（镜像 conversations:delete 的服务端顺序）。
-    const slowModel = new MockLanguageModelV3({
+    const slowModel = new MockLanguageModelV4({
       doStream: async () => ({
         stream: simulateReadableStream({
           chunkDelayInMs: 50,
@@ -410,7 +410,7 @@ describe("runSend", () => {
 });
 
 function providerOptionsCapturingModel(captured: { providerOptions?: unknown }) {
-  return new MockLanguageModelV3({
+  return new MockLanguageModelV4({
     doStream: async ({ providerOptions }) => {
       captured.providerOptions = providerOptions;
       return {
@@ -464,7 +464,7 @@ describe("openai-responses store handling", () => {
 type CapturedMsg = { role: string; providerOptions?: { anthropic?: { cacheControl?: unknown } } };
 
 function rawPromptCapturingModel(captured: { prompt?: CapturedMsg[] }) {
-  return new MockLanguageModelV3({
+  return new MockLanguageModelV4({
     doStream: async ({ prompt }) => {
       captured.prompt = prompt as unknown as CapturedMsg[];
       return {
@@ -538,7 +538,7 @@ describe("current date/time injection", () => {
 });
 
 function systemCapturingModel(captured: { system?: string }) {
-  return new MockLanguageModelV3({
+  return new MockLanguageModelV4({
     doStream: async ({ prompt }) => {
       const sys = prompt.find((m) => m.role === "system");
       captured.system = sys && typeof sys.content === "string" ? sys.content : undefined;
@@ -611,7 +611,7 @@ describe("pdf system prompt injection", () => {
 });
 
 function promptCapturingModel(captured: { system?: string; texts: string[] }) {
-  return new MockLanguageModelV3({
+  return new MockLanguageModelV4({
     doStream: async ({ prompt }) => {
       const sys = prompt.find((m) => m.role === "system");
       captured.system = sys && typeof sys.content === "string" ? sys.content : undefined;
@@ -682,7 +682,7 @@ describe("runSend library context", () => {
     const convo = createConversation(db, { bookId: null });
 
     let capturedSystem = "";
-    const capturingModel = new MockLanguageModelV3({
+    const capturingModel = new MockLanguageModelV4({
       doStream: async ({ prompt }) => {
         const sys = prompt.find((m) => m.role === "system");
         capturedSystem = sys && typeof sys.content === "string" ? sys.content : "";

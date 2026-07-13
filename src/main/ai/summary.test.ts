@@ -2,7 +2,7 @@
 import path from "node:path";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { MockLanguageModelV3, simulateReadableStream } from "ai/test";
+import { MockLanguageModelV4, simulateReadableStream } from "ai/test";
 import { makeFixtureEpub } from "@marginalia/epub-parser";
 import { createDb, runMigrations } from "@main/db/client";
 import { books, chapters } from "@main/db/schema";
@@ -31,7 +31,7 @@ const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
 // NOTE: LanguageModelV3FinishReason is an object { unified, raw }, not a plain string.
 // LanguageModelV3Usage has nested objects for inputTokens/outputTokens.
 function genModel(text: string) {
-  return new MockLanguageModelV3({
+  return new MockLanguageModelV4({
     doGenerate: async () => ({
       content: [{ type: "text" as const, text }],
       finishReason: { unified: "stop" as const, raw: undefined },
@@ -51,7 +51,7 @@ const STREAM_USAGE = {
 
 // 流式模型 mock（ensureBookSummary 用 streamText）：发一段 text-delta 后正常结束。
 function streamModel(text: string) {
-  return new MockLanguageModelV3({
+  return new MockLanguageModelV4({
     doStream: async () => ({
       stream: simulateReadableStream({
         chunks: [
@@ -128,7 +128,7 @@ describe("ensureChapterSummary / getChapterSummaryView (derived status)", () => 
   });
 
   it("derives unavailable when generation throws", async () => {
-    const failModel = new MockLanguageModelV3({
+    const failModel = new MockLanguageModelV4({
       doGenerate: async () => {
         throw new Error("model exploded");
       },
@@ -145,7 +145,7 @@ describe("ensureChapterSummary / getChapterSummaryView (derived status)", () => 
   });
 
   it("restart semantics: clearing runtime vanishes generating/failed; stored summary still derives ready", async () => {
-    const failModel = new MockLanguageModelV3({
+    const failModel = new MockLanguageModelV4({
       doGenerate: async () => {
         throw new Error("boom");
       },
@@ -264,7 +264,7 @@ describe("ensureBookSummary / getBookSummaryView (derived status)", () => {
   });
 
   it("derives unavailable when streaming errors (keeps old summary unwritten)", async () => {
-    const failModel = new MockLanguageModelV3({
+    const failModel = new MockLanguageModelV4({
       doStream: async () => {
         throw new Error("stream boom");
       },
@@ -281,7 +281,7 @@ describe("ensureBookSummary / getBookSummaryView (derived status)", () => {
   });
 
   it("restart semantics: clearing runtime sets vanishes generating/failed; stored summary still derives ready", async () => {
-    const failModel = new MockLanguageModelV3({
+    const failModel = new MockLanguageModelV4({
       doStream: async () => {
         throw new Error("boom");
       },
@@ -334,7 +334,7 @@ describe("background concurrency cap (Limiter integration)", () => {
       releaseGate = res;
     });
 
-    const blockedGenModel = new MockLanguageModelV3({
+    const blockedGenModel = new MockLanguageModelV4({
       doGenerate: async () => {
         firstCallStarted = true;
         await gate; // 阻塞直到外部 releaseGate()
@@ -355,7 +355,7 @@ describe("background concurrency cap (Limiter integration)", () => {
       },
     });
 
-    const blockedStreamModel = new MockLanguageModelV3({
+    const blockedStreamModel = new MockLanguageModelV4({
       doStream: async () => {
         secondCallStarted = true;
         return {

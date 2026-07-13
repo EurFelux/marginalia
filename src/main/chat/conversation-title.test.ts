@@ -1,7 +1,7 @@
 // src/main/chat/conversation-title.test.ts
 import path from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
-import { MockLanguageModelV3 } from "ai/test";
+import { MockLanguageModelV4 } from "ai/test";
 import { createDb, runMigrations } from "@main/db/client";
 import { books } from "@main/db/schema";
 import {
@@ -30,7 +30,7 @@ function freshDb() {
 
 /** doGenerate 直返固定标题的 mock（generateText 走 doGenerate）。 */
 function namingModel(title: string) {
-  return new MockLanguageModelV3({
+  return new MockLanguageModelV4({
     doGenerate: async () => ({
       finishReason: { unified: "stop" as const, raw: undefined },
       usage: {
@@ -109,7 +109,7 @@ describe("nameConversation", () => {
   it("clears isNaming and keeps title null when the model call throws", async () => {
     const db = freshDb();
     const convo = createConversation(db, { bookId: "book-1" });
-    const throwing = new MockLanguageModelV3({
+    const throwing = new MockLanguageModelV4({
       doGenerate: async () => {
         throw new Error("boom");
       },

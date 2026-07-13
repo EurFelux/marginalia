@@ -1,7 +1,7 @@
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
-import { MockLanguageModelV3 } from "ai/test";
+import { MockLanguageModelV4 } from "ai/test";
 import { makeFixtureEpub } from "@marginalia/epub-parser";
 import type { MessageDto } from "@shared/chat";
 import type { MemoryDto } from "@shared/memory";
@@ -211,7 +211,7 @@ function opsModel(ops: unknown[]): ResolvedModel {
   return {
     ok: true,
     modelId: "mem",
-    model: new MockLanguageModelV3({
+    model: new MockLanguageModelV4({
       doGenerate: async () => ({
         finishReason: { unified: "stop" as const, raw: undefined },
         usage: {
@@ -346,7 +346,7 @@ describe("maybeConsolidateMemory", () => {
     const throwing: ResolvedModel = {
       ok: true,
       modelId: "boom",
-      model: new MockLanguageModelV3({
+      model: new MockLanguageModelV4({
         doGenerate: async () => {
           throw new Error("boom");
         },
@@ -368,7 +368,7 @@ describe("maybeConsolidateMemory", () => {
     const garbage: ResolvedModel = {
       ok: true,
       modelId: "garbage",
-      model: new MockLanguageModelV3({
+      model: new MockLanguageModelV4({
         doGenerate: async () => ({
           finishReason: { unified: "stop" as const, raw: undefined },
           usage: {

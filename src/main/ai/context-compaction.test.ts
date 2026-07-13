@@ -1,7 +1,7 @@
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { MockLanguageModelV3 } from "ai/test";
+import { MockLanguageModelV4 } from "ai/test";
 import { makeFixtureEpub } from "@marginalia/epub-parser";
 import type { MessageDto } from "@shared/chat";
 import { createDb, runMigrations } from "@main/db/client";
@@ -82,7 +82,7 @@ function summaryModel(text: string): ResolvedModel {
   return {
     ok: true,
     modelId: "sum",
-    model: new MockLanguageModelV3({
+    model: new MockLanguageModelV4({
       doGenerate: async () => ({
         finishReason: { unified: "stop" as const, raw: undefined },
         usage: {
@@ -161,7 +161,7 @@ describe("maybeCompactConversation", () => {
     const throwing: ResolvedModel = {
       ok: true,
       modelId: "sum",
-      model: new MockLanguageModelV3({
+      model: new MockLanguageModelV4({
         doGenerate: async () => {
           throw new Error("summarizer boom");
         },
@@ -209,7 +209,7 @@ describe("maybeCompactConversation", () => {
     const blockedModel: ResolvedModel = {
       ok: true,
       modelId: "blocked",
-      model: new MockLanguageModelV3({
+      model: new MockLanguageModelV4({
         doGenerate: async () => {
           firstGenerateEntered = true;
           await gate;
@@ -235,7 +235,7 @@ describe("maybeCompactConversation", () => {
     const instantModel: ResolvedModel = {
       ok: true,
       modelId: "instant",
-      model: new MockLanguageModelV3({
+      model: new MockLanguageModelV4({
         doGenerate: async () => {
           secondGenerateEntered = true;
           return {
