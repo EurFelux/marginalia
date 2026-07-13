@@ -89,6 +89,9 @@ importers:
       '@napi-rs/canvas':
         specifier: ^1.0.0
         version: 1.0.0
+      '@streamdown/math':
+        specifier: ^1.0.2
+        version: 1.0.2(react@19.2.6)
       '@tanstack/react-query':
         specifier: ^5.100.14
         version: 5.100.14(react@19.2.6)
@@ -3031,6 +3034,11 @@ packages:
     resolution: {integrity: sha512-9g9dWI4gsSVe8bNLlb+lMkBYsnIKCZTmvqvDG+Avnn69XfmHZKiaMrx7cgTaddq7aTPPmXiTsbFcUy0xgI4+wA==}
     peerDependencies:
       react: '>= 16.3.0'
+
+  '@streamdown/math@1.0.2':
+    resolution: {integrity: sha512-r8Ur9/lBuFnzZAFdEWrLUF2s/gRwRRRwruqltdZibyjbCBnuW7SJbFm26nXqvpJPW/gzpBUMrBVBzd88z05D5g==}
+    peerDependencies:
+      react: ^18.0.0 || ^19.0.0
 
   '@swc/core-darwin-arm64@1.15.40':
     resolution: {integrity: sha512-PaYyclfmQ++77D8ityYvmmVzHv9aG8ROwt2GfG6/ccloy4Hgf80qtOnzb9VYvPsUT7Ty1uhuDRhv3XYpf62qhQ==}
@@ -11222,6 +11230,15 @@ snapshots:
   '@stitches/react@1.2.8(react@19.2.6)':
     dependencies:
       react: 19.2.6
+
+  '@streamdown/math@1.0.2(react@19.2.6)':
+    dependencies:
+      katex: 0.16.47
+      react: 19.2.6
+      rehype-katex: 7.0.1
+      remark-math: 6.0.0
+    transitivePeerDependencies:
+      - supports-color
 
   '@swc/core-darwin-arm64@1.15.40':
     optional: true
