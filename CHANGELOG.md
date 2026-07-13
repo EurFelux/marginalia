@@ -1,5 +1,18 @@
 # marginalia
 
+## 0.17.0
+
+### Minor Changes
+
+- 8775ec2: Add DB-level infinite loading/pagination to the AI message list, improving first-screen render performance for long conversations.
+- bf2e3ea: Show visible preparation and thinking status while the assistant responds, without exposing reasoning content. Assistant identity now appears immediately after submission, tool activity takes over at the right time, and completed reasoning returns to preparation until the next tool or answer begins.
+- 3625240: Render common inline and display LaTeX delimiters in AI replies, book summaries, and saved book notes, with wide formulas scrolling inside their container.
+- 769a17c: Add a configurable reasoning effort (Off / Low / Medium / High) for the chat and summary models in Settings → Models. Leave it on Default to use the provider's own default. Off disables reasoning where the model supports it.
+
+### Patch Changes
+
+- 80efb84: Keep AI replies pinned only while the message viewport is at the bottom, so streaming no longer interrupts browsing or text selection. Returning to the bottom resumes following, while opening an existing conversation still scrolls smoothly to its latest message.
+
 ## 0.16.0
 
 ### Minor Changes
