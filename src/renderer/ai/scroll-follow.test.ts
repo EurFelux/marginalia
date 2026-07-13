@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { isScrollAtBottom, messageScrollBehavior } from "./scroll-follow";
+import {
+  conversationOpenScrollBehavior,
+  isScrollAtBottom,
+  messageScrollBehavior,
+} from "./scroll-follow";
 
 const streamingUpdate = {
   previousLength: 2,
@@ -65,5 +69,11 @@ describe("messageScrollBehavior", () => {
         lastMessageChanged: true,
       }),
     ).toBe(null);
+  });
+});
+
+describe("conversationOpenScrollBehavior", () => {
+  it("uses smooth scrolling for the one-shot history render", () => {
+    expect(conversationOpenScrollBehavior()).toBe("smooth");
   });
 });

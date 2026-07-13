@@ -14,7 +14,11 @@ import { MessageList } from "@renderer/ai/MessageList";
 import { Composer } from "@renderer/ai/Composer";
 import { ConversationsTab } from "@renderer/ai/ConversationsTab";
 import { messagesToUI } from "@renderer/ai/message-history";
-import { isScrollAtBottom, messageScrollBehavior } from "@renderer/ai/scroll-follow";
+import {
+  conversationOpenScrollBehavior,
+  isScrollAtBottom,
+  messageScrollBehavior,
+} from "@renderer/ai/scroll-follow";
 import { conversationsQuery } from "@renderer/query/conversation-queries";
 import type { Chip, MessageDto } from "@shared/chat";
 import { openPanelAndFocusComposer } from "@renderer/ai/composer-focus";
@@ -138,14 +142,14 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
         updateSeqMap(dtos);
         setMessages(messagesToUI(dtos));
         setPagination({ hasMore, loadingMore: false, oldestSeq: dtos[0]?.seq ?? null });
-        // 等 React 渲染 + Streamdown/markdown 高度稳定后再 instant 滚底，
-        // 避免 smooth 动画与 content 高度变化竞争导致停在中间。
+        // 等 React 渲染 + Streamdown/markdown 高度基本稳定后再单次 smooth 滚底；
+        // 该路径已停止当前流，不会与 chunk 跟随竞争。
         setTimeout(() => {
           if (cancelled) return;
           const el = scrollRef.current;
           if (el) {
             followBottomRef.current = true;
-            el.scrollTo({ top: el.scrollHeight, behavior: "instant" });
+            el.scrollTo({ top: el.scrollHeight, behavior: conversationOpenScrollBehavior() });
           }
           isOpeningRef.current = false;
         }, 100);

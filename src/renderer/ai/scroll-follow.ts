@@ -14,6 +14,10 @@ export interface MessageScrollUpdate {
   streamingAssistant: boolean;
 }
 
+export function conversationOpenScrollBehavior(): "smooth" {
+  return "smooth";
+}
+
 export function isScrollAtBottom({
   scrollHeight,
   scrollTop,
