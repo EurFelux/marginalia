@@ -53,6 +53,28 @@ describe("resolveChatModel", () => {
     const r = resolveChatModel(db);
     expect(r).toMatchObject({ ok: false, reason: expect.stringContaining("API key") });
   });
+
+  it("carries reasoningEffort from preference, undefined when unset", () => {
+    const db = freshDb();
+    const provider = upsertProvider(db, {
+      type: "anthropic",
+      baseUrl: "https://api.anthropic.com/v1",
+      apiKey: "k",
+    });
+    setPreference(db, "chatModel", {
+      providerId: provider.id,
+      model: "m",
+      reasoningEffort: "high",
+    });
+    const withEffort = resolveChatModel(db);
+    expect(withEffort.ok).toBe(true);
+    if (withEffort.ok) expect(withEffort.reasoningEffort).toBe("high");
+
+    setPreference(db, "chatModel", { providerId: provider.id, model: "m" });
+    const without = resolveChatModel(db);
+    expect(without.ok).toBe(true);
+    if (without.ok) expect(without.reasoningEffort).toBeUndefined();
+  });
 });
 
 describe("resolveSummaryModel", () => {
@@ -94,5 +116,27 @@ describe("resolveSummaryModel", () => {
     setPreference(db, "summaryModel", { providerId: provider.id, model: "m" });
     const r = resolveSummaryModel(db);
     expect(r).toMatchObject({ ok: false, reason: expect.stringContaining("API key") });
+  });
+
+  it("carries reasoningEffort from preference, undefined when unset", () => {
+    const db = freshDb();
+    const provider = upsertProvider(db, {
+      type: "anthropic",
+      baseUrl: "https://api.anthropic.com/v1",
+      apiKey: "sk-test",
+    });
+    setPreference(db, "summaryModel", {
+      providerId: provider.id,
+      model: "m",
+      reasoningEffort: "low",
+    });
+    const withEffort = resolveSummaryModel(db);
+    expect(withEffort.ok).toBe(true);
+    if (withEffort.ok) expect(withEffort.reasoningEffort).toBe("low");
+
+    setPreference(db, "summaryModel", { providerId: provider.id, model: "m" });
+    const without = resolveSummaryModel(db);
+    expect(without.ok).toBe(true);
+    if (without.ok) expect(without.reasoningEffort).toBeUndefined();
   });
 });

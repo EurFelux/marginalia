@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@renderer/components/ui/select";
+import type { ReasoningEffort } from "@shared/preferences";
 import { providerModelOptions } from "./settings-logic";
 
 export interface ModelPickerSectionProps {
@@ -24,6 +25,12 @@ export interface ModelPickerSectionProps {
   /** 切 provider；调用方应同时弃旧 model（非法 (provider, model) 对防呆）。 */
   onProviderChange: (id: string) => void;
   onModelChange: (model: string) => void;
+  /** 推理强度当前值；undefined = 未设置（默认档）。 */
+  reasoningEffort?: ReasoningEffort;
+  /** 未选定模型 / 切换中禁用（无处可挂）。 */
+  reasoningEffortDisabled?: boolean;
+  /** 传入即渲染推理强度行；undefined = 设回默认档（不下发）。 */
+  onReasoningEffortChange?: (effort: ReasoningEffort | undefined) => void;
 }
 
 /**
@@ -37,8 +44,21 @@ export function ModelPickerSection({
   model,
   onProviderChange,
   onModelChange,
+  reasoningEffort,
+  reasoningEffortDisabled,
+  onReasoningEffortChange,
 }: ModelPickerSectionProps) {
   const { t } = useTranslation();
+  const effortLabel = (v: string) =>
+    v === "none"
+      ? t("settings.reasoningEffort.none", "关闭")
+      : v === "low"
+        ? t("settings.reasoningEffort.low", "低")
+        : v === "medium"
+          ? t("settings.reasoningEffort.medium", "中")
+          : v === "high"
+            ? t("settings.reasoningEffort.high", "高")
+            : t("settings.reasoningEffort.default", "默认");
   const providers = useQuery({
     queryKey: qk.providers,
     queryFn: () => window.api.settings.providers.list(),
@@ -112,6 +132,40 @@ export function ModelPickerSection({
             ))}
           </SelectContent>
         </Select>
+        {onReasoningEffortChange && (
+          <>
+            <span className="text-xs text-muted-foreground">
+              {t("settings.reasoningEffort", "推理强度")}
+            </span>
+            <Select
+              value={reasoningEffort ?? "default"}
+              disabled={reasoningEffortDisabled}
+              onValueChange={(v) => {
+                // "default" = 未设置（不下发）；其余为具体档位。切换时作废旧测试结果。
+                if (v) {
+                  onReasoningEffortChange(v === "default" ? undefined : (v as ReasoningEffort));
+                  setTestResult(null);
+                }
+              }}
+            >
+              <SelectTrigger className="h-9 w-full">
+                {/* Base UI Select.Value 默认渲染裸 value，故用函数 child 映射成本地化标签。 */}
+                <SelectValue>
+                  {(value) => effortLabel(typeof value === "string" ? value : "default")}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="default">
+                  {t("settings.reasoningEffort.default", "默认")}
+                </SelectItem>
+                <SelectItem value="none">{t("settings.reasoningEffort.none", "关闭")}</SelectItem>
+                <SelectItem value="low">{t("settings.reasoningEffort.low", "低")}</SelectItem>
+                <SelectItem value="medium">{t("settings.reasoningEffort.medium", "中")}</SelectItem>
+                <SelectItem value="high">{t("settings.reasoningEffort.high", "高")}</SelectItem>
+              </SelectContent>
+            </Select>
+          </>
+        )}
       </div>
       <div className="flex items-center gap-2">
         <Button

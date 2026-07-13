@@ -144,6 +144,7 @@ export async function maybeCompactConversation(
     const { text } = await deps.runBackground(() =>
       generateText({
         model: resolved.model,
+        reasoning: resolved.reasoningEffort, // v7 顶层 reasoning；undefined = provider 默认
         instructions: COMPACTION_SYSTEM,
         prompt: `${prior}New exchanges:\n${transcript}`,
         maxOutputTokens: SUMMARY_MAX_TOKENS,

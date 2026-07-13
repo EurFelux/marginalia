@@ -32,10 +32,20 @@ export type ReaderLayout = z.infer<typeof readerLayoutSchema>;
 /** PDF 缩放倍率（相对适宽）。存倍率而非档位索引：档位表增删时旧倍率仍可收敛到最近档，索引则会错位。 */
 export const pdfZoomSchema = z.number().positive();
 
+/**
+ * 推理强度档位抽象。取值映射到 AI SDK v7 顶层 `reasoning` 参数的同名值（其全集含
+ * provider-default/none/minimal/low/medium/high/xhigh），SDK 负责翻译成各 provider 原生配置。
+ * 挂在模型偏好上（chat/summary 各自独立）；未设置 = 不下发 reasoning = provider 默认（保持现状）。
+ * `none` = 关闭推理（provider 支持才生效；always-on 推理模型会报错，openai-compatible 退化为不下发）。
+ */
+export const reasoningEffort = z.enum(["none", "low", "medium", "high"]);
+export type ReasoningEffort = z.infer<typeof reasoningEffort>;
+
 /** 摘要模型（章节/全书摘要 + 会话自动命名）：显式 (provider, model) 对；未存 = 未配置（报错态，无回退）。 */
 export const summaryModelSchema = z.object({
   providerId: z.string().min(1),
   model: z.string().min(1),
+  reasoningEffort: reasoningEffort.optional(), // 缺省 = 未设置（不下发）；旧落盘 { providerId, model } 向后兼容
 });
 export type SummaryModel = z.infer<typeof summaryModelSchema>;
 
@@ -55,6 +65,7 @@ export const DEFAULT_BACKGROUND_CONCURRENCY = 3;
 export const chatModelSchema = z.object({
   providerId: z.string().min(1),
   model: z.string().min(1),
+  reasoningEffort: reasoningEffort.optional(), // 缺省 = 未设置（不下发）；旧落盘 { providerId, model } 向后兼容
 });
 export type ChatModel = z.infer<typeof chatModelSchema>;
 

@@ -5,9 +5,17 @@ import { resolveLanguageModel, type ChatModel } from "@main/ai/model-factory";
 import { t } from "@main/i18n";
 import { getPreference } from "@main/preferences/repository";
 import type { AiProviderApiType } from "@shared/providers";
+import type { ReasoningEffort } from "@shared/preferences";
 
 export type ResolvedModel =
-  | { ok: true; model: ChatModel; modelId: string; providerType?: AiProviderApiType }
+  | {
+      ok: true;
+      model: ChatModel;
+      modelId: string;
+      providerType?: AiProviderApiType;
+      /** 推理强度（v7 顶层 reasoning）；undefined = 未设置 = provider 默认。透传给调用点。 */
+      reasoningEffort?: ReasoningEffort;
+    }
   | { ok: false; reason: string };
 
 /**
@@ -39,7 +47,13 @@ export function resolveChatModel(db: DB): ResolvedModel {
       apiKey: provider.apiKey,
       model: pref.model,
     });
-    return { ok: true, model, modelId: pref.model, providerType: provider.type };
+    return {
+      ok: true,
+      model,
+      modelId: pref.model,
+      providerType: provider.type,
+      reasoningEffort: pref.reasoningEffort,
+    };
   } catch (err) {
     return {
       ok: false,
@@ -77,7 +91,13 @@ export function resolveSummaryModel(db: DB): ResolvedModel {
       apiKey: provider.apiKey,
       model: pref.model,
     });
-    return { ok: true, model, modelId: pref.model, providerType: provider.type };
+    return {
+      ok: true,
+      model,
+      modelId: pref.model,
+      providerType: provider.type,
+      reasoningEffort: pref.reasoningEffort,
+    };
   } catch (err) {
     return {
       ok: false,

@@ -461,6 +461,57 @@ describe("openai-responses store handling", () => {
   });
 });
 
+function reasoningCapturingModel(captured: { reasoning?: unknown }) {
+  return new MockLanguageModelV4({
+    doStream: async ({ reasoning }) => {
+      captured.reasoning = reasoning;
+      return {
+        stream: simulateReadableStream({
+          chunks: [
+            { type: "text-start", id: "t1" },
+            { type: "text-delta", id: "t1", delta: "ok" },
+            { type: "text-end", id: "t1" },
+            finishChunk("stop"),
+          ],
+        }),
+      };
+    },
+  });
+}
+
+describe("reasoning effort forwarding", () => {
+  it("forwards chat model's reasoningEffort as top-level reasoning", async () => {
+    const captured: { reasoning?: unknown } = {};
+    const { db, book, deps } = await setup({
+      ok: true,
+      model: reasoningCapturingModel(captured),
+      modelId: "claude",
+      providerType: "anthropic",
+      reasoningEffort: "high",
+    });
+    const convo = createConversation(db, { bookId: book.id });
+    const r = await runSend(deps, input(book.id, convo.id));
+    if (!r.ok) throw new Error(r.reason);
+    await r.finished;
+    expect(captured.reasoning).toBe("high");
+  });
+
+  it("passes undefined reasoning when effort unset (= provider default)", async () => {
+    const captured: { reasoning?: unknown } = {};
+    const { db, book, deps } = await setup({
+      ok: true,
+      model: reasoningCapturingModel(captured),
+      modelId: "claude",
+      providerType: "anthropic",
+    });
+    const convo = createConversation(db, { bookId: book.id });
+    const r = await runSend(deps, input(book.id, convo.id));
+    if (!r.ok) throw new Error(r.reason);
+    await r.finished;
+    expect(captured.reasoning).toBeUndefined();
+  });
+});
+
 type CapturedMsg = { role: string; providerOptions?: { anthropic?: { cacheControl?: unknown } } };
 
 function rawPromptCapturingModel(captured: { prompt?: CapturedMsg[] }) {

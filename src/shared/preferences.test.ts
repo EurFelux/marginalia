@@ -220,3 +220,37 @@ describe("webSearchEnabled preference", () => {
     );
   });
 });
+
+describe("reasoningEffort on chatModel / summaryModel", () => {
+  for (const key of ["chatModel", "summaryModel"] as const) {
+    it(`${key} accepts optional reasoningEffort none/low/medium/high`, () => {
+      for (const effort of ["none", "low", "medium", "high"]) {
+        const r = setPreferenceInput.safeParse({
+          key,
+          value: { providerId: "p1", model: "m", reasoningEffort: effort },
+        });
+        expect(r.success).toBe(true);
+        if (r.success)
+          expect((r.data.value as { reasoningEffort?: string }).reasoningEffort).toBe(effort);
+      }
+    });
+
+    it(`${key} rejects out-of-range reasoningEffort (max/xhigh/minimal/junk)`, () => {
+      for (const bad of ["max", "xhigh", "minimal", "provider-default", ""]) {
+        expect(
+          setPreferenceInput.safeParse({
+            key,
+            value: { providerId: "p1", model: "m", reasoningEffort: bad },
+          }).success,
+        ).toBe(false);
+      }
+    });
+
+    it(`${key} back-compat: old { providerId, model } parses, reasoningEffort undefined`, () => {
+      const r = setPreferenceInput.safeParse({ key, value: { providerId: "p1", model: "m" } });
+      expect(r.success).toBe(true);
+      if (r.success)
+        expect((r.data.value as { reasoningEffort?: string }).reasoningEffort).toBeUndefined();
+    });
+  }
+});

@@ -7,7 +7,7 @@
 
 ## 1. 背景与目标
 
-目前对话（chat/send）与摘要（chapter/book summary）调用 AI 时**完全没有**下发推理强度配置。用户希望能为**对话模型**和**摘要模型**分别配置推理强度，对用户只暴露 `low / medium / high` 三档（外加「默认/未设置」）。
+目前对话（chat/send）与摘要（chapter/book summary）调用 AI 时**完全没有**下发推理强度配置。用户希望能为**对话模型**和**摘要模型**分别配置推理强度，对用户暴露 `关闭(none) / 低 / 中 / 高` 四档（外加「默认/未设置」）。
 
 **关键：AI SDK v7 已内置这层抽象。** `streamText`/`generateText` 有一个顶层 `reasoning` 参数，取值 `'provider-default' | 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh'`，由 SDK 负责翻译成各 provider 的原生推理配置。我们要的 `low/medium/high` 是它的直接子集。因此**不需要**手写 per-provider 映射层——这正是当初考虑在 v6 上做、后来决定先迁 v7 的原因。
 
@@ -15,7 +15,7 @@
 
 - **不做 per-model 能力检测**。无条件把所选档位作为顶层 `reasoning` 下发。若具体模型不支持（如 Claude Haiku 4.5 会报错），收到 provider 的真实报错；解法是把档位设回「默认」。「未设置」态即逃生口。
 - 不引入 `temperature`/`maxOutputTokens` 等其它采样参数。
-- 只暴露 low/medium/high（不暴露 none/minimal/xhigh/provider-default 为独立档；「默认」= 不下发 = provider-default）。
+- 暴露 none/low/medium/high（不暴露 minimal/xhigh 为独立档；「默认」= 不下发 = provider-default）。`none` = 关闭推理（provider 支持才生效，见 §7）。
 
 ## 2. 关键决策（评审已定，v6/v7 通用）
 
@@ -43,7 +43,7 @@
 
 ```ts
 /** 推理强度三档（映射到 v7 顶层 reasoning 的同名值）。未设置 = 不下发、用 provider 默认。 */
-export const reasoningEffort = z.enum(["low", "medium", "high"]);
+export const reasoningEffort = z.enum(["none", "low", "medium", "high"]);
 export type ReasoningEffort = z.infer<typeof reasoningEffort>;
 ```
 
@@ -102,7 +102,7 @@ export type ResolvedModel =
 
 ### 4.4 UI（`AssistantModelPicker.tsx` / `SummaryModelPicker.tsx`）
 
-每个 picker 增加一个小的档位选择器（分段或下拉），四个选项：**默认 / 低 / 中 / 高**。
+每个 picker 增加一个小的档位选择器（分段或下拉），五个选项：**默认 / 关闭 / 低 / 中 / 高**。
 
 - 「默认」= `reasoningEffort` 字段不写入（undefined，`JSON.stringify` 天然丢弃）。
 - 改档位 → 以当前 `chatModel`/`summaryModel` 为基础，仅替换 `reasoningEffort`，保留 providerId+model，走既有 `setChatModel`/`setSummaryModel`。
@@ -126,4 +126,5 @@ export type ResolvedModel =
 ## 7. 风险
 
 - **模型不支持推理强度**：见 §1 非目标。已知 Claude Haiku 4.5 的推理档会报错。缓解 = 「默认」档；文档说明。误设导致的 provider 报错以真实错误流回（对话侧走既有 error 收尾，摘要侧标 failed 可重试）。
+- **`none`（关闭）是 best-effort**（官方 JSDoc："disable reasoning **if supported by the provider**"）：支持切换 thinking 的模型（如 Opus 4.8、Gemini flash `thinkingBudget=0`）能真关；always-on 推理模型（如 Fable 5 系）会报错；**openai-compatible（DeepSeek）** 源码里 `none` 被 `reasoning !== "none"` 守卫排除 → 退化为「不下发」≈ provider 默认，并非真关。与其它档位同一「不支持则设回默认」策略。
 - **v7 顶层 `reasoning` 与 `providerOptions` 不可并存**：本项目无推理类 `providerOptions`，无冲突（§3）；后续若有人给某 provider 加推理类 `providerOptions`，需注意会静默夺权。

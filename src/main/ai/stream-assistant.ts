@@ -93,6 +93,8 @@ export function streamAssistantReply(
   });
   const result = streamText({
     model: resolved.model,
+    // 顶层 reasoning（v7）：SDK 按 provider 翻译成各自原生推理配置；undefined = provider 默认。
+    reasoning: resolved.reasoningEffort,
     instructions: cached.system,
     messages: cached.messages,
     tools,

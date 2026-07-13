@@ -365,6 +365,12 @@ export default {
   "settings.reading.autoSummarize": "开章自动生成本章摘要",
   "settings.reading.autoSummarizeDesc":
     "打开 / 切换章节时后台生成本章摘要，就绪后随提问一并提供给 AI（会产生模型调用）。关闭时可在 AI 面板的摘要 pill 里手动生成。",
+  "settings.reasoningEffort": "推理强度",
+  "settings.reasoningEffort.default": "默认",
+  "settings.reasoningEffort.high": "高",
+  "settings.reasoningEffort.low": "低",
+  "settings.reasoningEffort.medium": "中",
+  "settings.reasoningEffort.none": "关闭",
   "settings.summaryModel": "摘要模型",
   "settings.summaryModel.desc": "用于章节/全书摘要与会话自动命名",
   "settings.system": "跟随系统",

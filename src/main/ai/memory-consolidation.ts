@@ -268,6 +268,7 @@ export async function maybeConsolidateMemory(
     const { text } = await runBackground(() =>
       generateText({
         model: resolved.model,
+        reasoning: resolved.reasoningEffort, // v7 顶层 reasoning；undefined = provider 默认
         instructions: CONSOLIDATION_SYSTEM,
         prompt: input,
         maxOutputTokens: MEMORY_PASS_MAX_TOKENS,

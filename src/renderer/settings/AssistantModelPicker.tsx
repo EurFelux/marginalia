@@ -18,6 +18,7 @@ export function AssistantModelPicker() {
   // 切回已存 provider 时恢复已存 model；切到别家才显空 placeholder
   const model =
     draftProvider != null && draftProvider !== stored?.providerId ? "" : (stored?.model ?? "");
+  const effort = stored?.reasoningEffort;
 
   return (
     <ModelPickerSection
@@ -27,8 +28,16 @@ export function AssistantModelPicker() {
       onProviderChange={setDraftProvider}
       onModelChange={(m) => {
         if (!providerId) return;
-        setChatModel({ providerId, model: m });
+        // 改模型保留当前档位（档位与 provider 无关，跨家沿用）。
+        setChatModel({ providerId, model: m, reasoningEffort: effort });
         setDraftProvider(null);
+      }}
+      reasoningEffort={effort}
+      // 未落盘模型 / 正在切 provider（model 未定）时禁用——无处可挂。
+      reasoningEffortDisabled={stored == null || draftProvider != null}
+      onReasoningEffortChange={(e) => {
+        if (!stored) return;
+        setChatModel({ providerId: stored.providerId, model: stored.model, reasoningEffort: e });
       }}
     />
   );
