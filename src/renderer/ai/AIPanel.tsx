@@ -96,6 +96,7 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
 
     const scrollBehavior = messageScrollBehavior({
       following: followBottomRef.current,
+      openingConversation: isOpeningRef.current,
       previousLength: prev.length,
       prependedHistory,
       lastMessageChanged,

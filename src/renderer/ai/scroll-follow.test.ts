@@ -6,6 +6,7 @@ import {
 } from "./scroll-follow";
 
 const streamingUpdate = {
+  openingConversation: false,
   previousLength: 2,
   prependedHistory: false,
   lastMessageChanged: false,
@@ -34,6 +35,17 @@ describe("messageScrollBehavior", () => {
 
   it("does not scroll after the viewport leaves the bottom", () => {
     expect(messageScrollBehavior({ ...streamingUpdate, following: false })).toBe(null);
+  });
+
+  it("defers scrolling while an existing conversation is opening", () => {
+    expect(
+      messageScrollBehavior({
+        ...streamingUpdate,
+        following: true,
+        openingConversation: true,
+        lastMessageChanged: true,
+      }),
+    ).toBe(null);
   });
 
   it("resumes instant scrolling after the viewport reaches the bottom", () => {

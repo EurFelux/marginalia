@@ -12,6 +12,7 @@
 
 - Every message-update scroll, including streaming chunks, must use `behavior: "instant"`.
 - Only the one-shot scroll after opening and rendering conversation history may use `behavior: "smooth"`.
+- While a conversation is opening, the ordinary message-update policy must not request a scroll.
 - Keep the existing `stop()` call and 100ms layout delay; do not add a `scrollend` state machine or correction timer.
 - Do not add `useCallback` or `useMemo`; React Compiler handles memoization.
 
@@ -90,7 +91,7 @@ pnpm format:check
 pnpm test
 ```
 
-Expected: 8 focused tests pass; type checking, lint, formatting, and the full suite all exit successfully.
+Expected: 9 focused tests pass; type checking, lint, formatting, and the full suite all exit successfully.
 
 - [ ] **Step 6: Commit the implementation**
 
@@ -98,3 +99,38 @@ Expected: 8 focused tests pass; type checking, lint, formatting, and the full su
 git add src/renderer/ai/scroll-follow.test.ts src/renderer/ai/scroll-follow.ts src/renderer/ai/AIPanel.tsx docs/superpowers/plans/2026-07-13-smooth-initial-conversation-scroll.md
 git commit -m "fix(ai): smooth initial conversation scroll"
 ```
+
+### Task 2: Prevent an earlier instant scroll during conversation switching
+
+**Files:**
+
+- Modify: `src/renderer/ai/scroll-follow.test.ts`
+- Modify: `src/renderer/ai/scroll-follow.ts`
+- Modify: `src/renderer/ai/AIPanel.tsx`
+
+**Interfaces:**
+
+- Consumes: `isOpeningRef.current: boolean`
+- Produces: required `MessageScrollUpdate.openingConversation: boolean`
+
+- [x] **Step 1: Reproduce the race in the policy test**
+
+Pass `openingConversation: true` with a changed last message and assert that
+`messageScrollBehavior()` returns `null` rather than `"instant"`.
+
+- [x] **Step 2: Verify RED**
+
+Run: `pnpm test src/renderer/ai/scroll-follow.test.ts`
+
+Observed: FAIL because the policy returned `"instant"`; the other 8 tests passed.
+
+- [x] **Step 3: Add the opening gate and require component wiring**
+
+Add the required `openingConversation` field to `MessageScrollUpdate`, reject scrolling when it is
+true, and pass `isOpeningRef.current` from the `AIPanel` message-update effect.
+
+- [x] **Step 4: Verify GREEN and type safety**
+
+Run: `pnpm test src/renderer/ai/scroll-follow.test.ts && pnpm typecheck`
+
+Observed: 9 tests passed and type checking exited successfully.

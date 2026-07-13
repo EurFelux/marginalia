@@ -51,7 +51,9 @@ Opening a conversation is a separate, one-shot navigation path. It stops the cur
 history, waits 100ms for React and Markdown layout to stabilize, then uses `behavior: "smooth"` to
 move from the first screen to the latest message. With no concurrent chunk updates, intermediate
 scroll frames cannot repeatedly cancel streaming follow; the final scroll event restores the bottom
-state. No additional `scrollend` state machine or correction timer is introduced.
+state. While this path is opening, the ordinary message-update effect still records the latest
+messages as its comparison baseline but does not request an `instant` scroll before the delayed
+smooth navigation. No additional `scrollend` state machine or correction timer is introduced.
 
 Bottom detection and the message-update decision will be small pure functions in the renderer AI
 module. This keeps the DOM effect thin and makes the regression behavior testable without mounting
@@ -73,6 +75,8 @@ Unit tests will cover:
 5. Prepending older history still never requests a bottom scroll.
 6. Every allowed automatic message update requests `instant`, never `smooth`, scrolling.
 7. Opening a rendered conversation uses the separate one-shot `smooth` path.
+8. Replacing a non-empty conversation history while opening does not request an earlier `instant`
+   scroll.
 
 Verification will run the focused regression test, renderer type checking, linting, formatting checks,
 and the full test suite.

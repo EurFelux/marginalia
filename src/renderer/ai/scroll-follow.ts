@@ -8,6 +8,7 @@ export interface ScrollPosition {
 
 export interface MessageScrollUpdate {
   following: boolean;
+  openingConversation: boolean;
   previousLength: number;
   prependedHistory: boolean;
   lastMessageChanged: boolean;
@@ -28,12 +29,14 @@ export function isScrollAtBottom({
 
 export function messageScrollBehavior({
   following,
+  openingConversation,
   previousLength,
   prependedHistory,
   lastMessageChanged,
   streamingAssistant,
 }: MessageScrollUpdate): "instant" | null {
   return following &&
+    !openingConversation &&
     previousLength > 0 &&
     !prependedHistory &&
     (lastMessageChanged || streamingAssistant)
