@@ -72,7 +72,7 @@ Apply these rules in order:
 2. If chat status is not `streaming`, return `null`.
 3. Examine the last assistant message only. If it has visible answer text, return `null`.
 4. If its latest active visible operation is a tool part, return `null`; the existing tool row communicates the activity.
-5. If it contains a reasoning part and no later answer text or active tool has taken over, return `reasoning`. A completed reasoning part remains the displayed phase during the short gap before the next meaningful part, preventing a flicker back to `preparing` or an empty bubble.
+5. If the latest meaningful part is reasoning, return `reasoning` only while that part is `streaming`. Once it is `done`, return `preparing` during the short gap before the next meaningful part so the UI does not claim that completed reasoning is still active.
 6. If streaming has begun but only structural chunks are present, return `preparing`.
 
 The selector receives no reasoning text and produces no content derived from reasoning text.
@@ -82,13 +82,13 @@ The selector receives no reasoning text and produces no content derived from rea
 A direct answer follows:
 
 ```text
-submitted: preparing → reasoning: thinking → text: answer streaming → ready
+submitted: preparing → reasoning: thinking → reasoning done: preparing → text: answer streaming → ready
 ```
 
 A tool-assisted answer may follow:
 
 ```text
-preparing → thinking → tool row: reading → completed tool row + thinking below it → answer below the completed tool row
+preparing → thinking → reasoning done: preparing → tool row: reading → completed tool row + preparing → thinking below it → answer below the completed tool row
 ```
 
 Each later reasoning phase can show the reasoning indicator again. When reasoning resumes after a tool call, keep the completed tool row in place and render the reasoning indicator immediately below it inside the same assistant bubble. When answer text starts, replace that indicator with the answer below the completed tool row. Do not create another assistant bubble or repeat the avatar and name. The indicator is not permanently latched after the first reasoning event and is not shown simultaneously with an active tool row.
@@ -141,7 +141,7 @@ Add focused unit tests for the pure selector:
 
 - `submitted` returns `preparing`;
 - a streaming reasoning part returns `reasoning` regardless of its text;
-- a completed reasoning part with no later meaningful part remains `reasoning` during the transition gap;
+- a completed reasoning part with no later meaningful part returns `preparing` during the transition gap;
 - an active later tool suppresses the standalone indicator;
 - a later text part suppresses the indicator;
 - structural-only streaming returns `preparing`;
@@ -152,7 +152,7 @@ Manual Electron verification covers geometry and transitions:
 
 - avatar and name appear immediately on submit when enabled;
 - the no-avatar preference remains respected;
-- the bubble changes from preparation to reasoning to answer without duplicate identity rows or obvious layout jumps;
+- the bubble changes from preparation to reasoning, briefly back to preparation after reasoning ends, and then to the next tool or answer without duplicate identity rows or layout gaps;
 - tool-assisted, non-reasoning, cancellation, and error flows leave no stale indicator;
 - reduced-motion mode retains readable status text.
 

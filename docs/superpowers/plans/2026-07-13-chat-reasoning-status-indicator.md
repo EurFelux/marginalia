@@ -87,9 +87,12 @@ describe("assistantActivity", () => {
     expect(assistantActivity("streaming", [stepStart, text("")])).toBe("preparing");
   });
 
-  it("shows reasoning for streaming and completed reasoning parts", () => {
+  it("shows reasoning while the reasoning part is streaming", () => {
     expect(assistantActivity("streaming", [reasoning("streaming")])).toBe("reasoning");
-    expect(assistantActivity("streaming", [reasoning("done")])).toBe("reasoning");
+  });
+
+  it("returns to preparing when reasoning finishes before the next part arrives", () => {
+    expect(assistantActivity("streaming", [reasoning("done")])).toBe("preparing");
   });
 
   it("does not derive anything from reasoning text", () => {
@@ -156,19 +159,25 @@ export function assistantActivity(
   for (let index = (parts?.length ?? 0) - 1; index >= 0; index -= 1) {
     const part = parts?.[index];
     if (!part) continue;
-    if (part.type === "reasoning") return "reasoning";
+    if (part.type === "reasoning") {
+      return part.state === "streaming" ? "reasoning" : "preparing";
+    }
     if (part.type === "text") {
       if (part.text.length > 0) return null;
       continue;
     }
-    if (isToolUIPart(part)) return null;
+    if (isToolUIPart(part)) {
+      return part.state === "output-available" || part.state === "output-error"
+        ? "preparing"
+        : null;
+    }
   }
 
   return "preparing";
 }
 ```
 
-This reverse scan defines the visible precedence without reading `reasoning.text`: the latest meaningful reasoning part shows the indicator, while later text or a later tool part takes over. A later reasoning part after a completed tool restores the indicator.
+This reverse scan defines the visible precedence without reading `reasoning.text`: active reasoning shows the reasoning indicator, completed reasoning returns to preparation, later text or an active tool takes over, and a completed tool returns to preparation while waiting for the next model chunk. A later streaming reasoning part after a completed tool restores the reasoning indicator.
 
 - [ ] **Step 4: Run the focused test and verify it passes**
 
@@ -448,7 +457,7 @@ pnpm i18n:lint
 pnpm format:check
 ```
 
-Expected: every command exits 0; the focused test reports 9 passing tests; i18n reports no missing keys.
+Expected: every command exits 0; the focused test reports 11 passing tests; i18n reports no missing keys.
 
 - [ ] **Step 8: Perform Electron UI smoke verification**
 
@@ -461,8 +470,8 @@ pnpm start
 Verify in the running app, then stop it with `Ctrl-C`:
 
 1. Enable the assistant avatar and choose a reasoning-capable chat model with reasoning effort `high`.
-2. Send a direct question. Confirm the avatar and name appear immediately with “Preparing a response…”, then the same bubble shows “Thinking…”, then answer text replaces the status.
-3. Ask a book-context question that requires reading a chapter or page. Confirm the active tool row replaces the thinking status; after the tool completes, later “Thinking…” appears directly below the completed tool row; answer text then appears below that row in the same bubble.
+2. Send a direct question. Confirm the avatar and name appear immediately with “Preparing a response…”, then the same bubble shows “Thinking…”. Once reasoning ends, confirm it returns to “Preparing a response…” until answer text replaces the status.
+3. Ask a book-context question that requires reading a chapter or page. Confirm completed reasoning returns to “Preparing a response…” before the active tool row replaces the status; after the tool completes, preparation remains below the completed tool row until later “Thinking…” or answer text takes over.
 4. Disable the assistant avatar and send again. Confirm the status bubble remains but avatar and name are absent.
 5. Stop one request and provoke one provider error. Confirm neither path leaves a stale preparation or reasoning indicator.
 6. Enable the operating-system reduced-motion preference. Confirm the dots become static while the full status label remains visible.

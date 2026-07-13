@@ -34,9 +34,12 @@ describe("assistantActivity", () => {
     expect(assistantActivity("streaming", [stepStart, text("")])).toBe("preparing");
   });
 
-  it("shows reasoning for streaming and completed reasoning parts", () => {
+  it("shows reasoning while the reasoning part is streaming", () => {
     expect(assistantActivity("streaming", [reasoning("streaming")])).toBe("reasoning");
-    expect(assistantActivity("streaming", [reasoning("done")])).toBe("reasoning");
+  });
+
+  it("returns to preparing when reasoning finishes before the next part arrives", () => {
+    expect(assistantActivity("streaming", [reasoning("done")])).toBe("preparing");
   });
 
   it("does not derive anything from reasoning text", () => {

@@ -17,7 +17,9 @@ export function assistantActivity(
   for (let index = (parts?.length ?? 0) - 1; index >= 0; index -= 1) {
     const part = parts?.[index];
     if (!part) continue;
-    if (part.type === "reasoning") return "reasoning";
+    if (part.type === "reasoning") {
+      return part.state === "streaming" ? "reasoning" : "preparing";
+    }
     if (part.type === "text") {
       if (part.text.length > 0) return null;
       continue;
