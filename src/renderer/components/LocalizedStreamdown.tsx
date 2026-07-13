@@ -1,4 +1,5 @@
 import type { TFunction } from "i18next";
+import { createMathPlugin } from "@streamdown/math";
 import { useTranslation } from "react-i18next";
 import {
   defaultTranslations,
@@ -6,6 +7,8 @@ import {
   type StreamdownProps,
   type StreamdownTranslations,
 } from "streamdown";
+
+const math = createMathPlugin({ singleDollarTextMath: true });
 
 export function buildStreamdownTranslations(t: TFunction): StreamdownTranslations {
   return {
@@ -62,9 +65,15 @@ export function buildStreamdownTranslations(t: TFunction): StreamdownTranslation
   };
 }
 
-export function LocalizedStreamdown({ translations, ...props }: StreamdownProps) {
+export function LocalizedStreamdown({ translations, plugins, ...props }: StreamdownProps) {
   const { t } = useTranslation();
   // 不手写 useMemo：渲染层启用 React Compiler，自动记忆化。
   const localized = buildStreamdownTranslations(t);
-  return <Streamdown translations={{ ...localized, ...translations }} {...props} />;
+  return (
+    <Streamdown
+      plugins={{ math, ...plugins }}
+      translations={{ ...localized, ...translations }}
+      {...props}
+    />
+  );
 }

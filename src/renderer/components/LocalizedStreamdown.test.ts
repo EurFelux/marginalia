@@ -1,7 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it, vi } from "vitest";
 import type { TFunction } from "i18next";
 import { defaultTranslations, type StreamdownTranslations } from "streamdown";
-import { buildStreamdownTranslations } from "./LocalizedStreamdown";
+import { buildStreamdownTranslations, LocalizedStreamdown } from "./LocalizedStreamdown";
+
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({
+    t: (_key: string, fallback: string) => fallback,
+  }),
+}));
 
 const streamdownKeys: Array<keyof StreamdownTranslations> = [
   "close",
@@ -50,5 +58,20 @@ describe("buildStreamdownTranslations", () => {
     const t = ((_: string, fallback: string) => fallback) as TFunction;
 
     expect(buildStreamdownTranslations(t)).toEqual(defaultTranslations);
+  });
+});
+
+describe("LocalizedStreamdown", () => {
+  it("renders inline and display formulas alongside ordinary Markdown", () => {
+    const html = renderToStaticMarkup(
+      createElement(LocalizedStreamdown, {
+        children: "**Equation:** $E = mc^2$\n\n$$\n\\int_0^1 x^2 \\, dx\n$$",
+      }),
+    );
+
+    expect(html).toContain('data-streamdown="strong">Equation:</span>');
+    expect(html).toContain('data-streamdown="strong">Equation:</span> <span class="katex">');
+    expect(html).not.toContain("$E = mc^2$");
+    expect(html).toContain('class="katex-display"');
   });
 });
