@@ -23,8 +23,10 @@ bottom must remain.
 - Following resumes only after the user scrolls all the way back to the bottom. A four-pixel tolerance
   is allowed solely for fractional DOM measurements and zoom/rounding effects; being merely near the
   bottom does not count.
-- Automatic bottom following never uses smooth scrolling. Its intermediate animation frames must not
-  participate in follow-state detection.
+- Automatic scrolling caused by message updates never uses smooth scrolling. Its intermediate
+  animation frames must not participate in follow-state detection.
+- The one-shot scroll after opening and rendering conversation history may remain smooth because that
+  path stops any active stream before loading and does not compete with incoming chunks.
 - Loading older messages continues to preserve its existing visible-message anchor and never enables
   bottom following accidentally.
 
@@ -38,13 +40,18 @@ The message-update effect retains its current distinctions between initial load,
 new message append, and streaming growth. Every incremental bottom scroll, including the first
 assistant chunk arriving as a newly appended message, requires the follow ref to be enabled. Sending
 a message explicitly enables following before handing the turn to `useChat`; opening a conversation
-keeps its dedicated instant bottom positioning. If the user scrolls away after sending but before the
+keeps its dedicated one-shot smooth bottom positioning. If the user scrolls away after sending but before the
 first assistant chunk, that chunk therefore respects the suspended state.
 
 Every automatic message-update scroll uses `behavior: "instant"`. Streaming already arrives in small,
 frequent increments, so the content continues to advance naturally without a competing scroll
-animation. Smooth scrolling is reserved for a future explicit, one-shot navigation action such as a
-“jump to latest” button; no current automatic path uses it.
+animation.
+
+Opening a conversation is a separate, one-shot navigation path. It stops the current stream, loads
+history, waits 100ms for React and Markdown layout to stabilize, then uses `behavior: "smooth"` to
+move from the first screen to the latest message. With no concurrent chunk updates, intermediate
+scroll frames cannot repeatedly cancel streaming follow; the final scroll event restores the bottom
+state. No additional `scrollend` state machine or correction timer is introduced.
 
 Bottom detection and the message-update decision will be small pure functions in the renderer AI
 module. This keeps the DOM effect thin and makes the regression behavior testable without mounting
@@ -65,6 +72,7 @@ Unit tests will cover:
 4. Reaching the bottom resumes following for the next chunk.
 5. Prepending older history still never requests a bottom scroll.
 6. Every allowed automatic message update requests `instant`, never `smooth`, scrolling.
+7. Opening a rendered conversation uses the separate one-shot `smooth` path.
 
 Verification will run the focused regression test, renderer type checking, linting, formatting checks,
 and the full test suite.
