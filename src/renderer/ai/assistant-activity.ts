@@ -22,7 +22,11 @@ export function assistantActivity(
       if (part.text.length > 0) return null;
       continue;
     }
-    if (isToolUIPart(part)) return null;
+    if (isToolUIPart(part)) {
+      return part.state === "output-available" || part.state === "output-error"
+        ? "preparing"
+        : null;
+    }
   }
 
   return "preparing";

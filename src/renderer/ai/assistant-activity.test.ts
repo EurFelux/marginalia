@@ -49,6 +49,12 @@ describe("assistantActivity", () => {
     expect(assistantActivity("streaming", [reasoning("done"), tool("input-available")])).toBe(null);
   });
 
+  it("shows preparing after a completed tool while waiting for the next model chunk", () => {
+    expect(assistantActivity("streaming", [reasoning("done"), tool("output-available")])).toBe(
+      "preparing",
+    );
+  });
+
   it("shows later reasoning below a completed tool row", () => {
     expect(
       assistantActivity("streaming", [
