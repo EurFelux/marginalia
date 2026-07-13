@@ -46,9 +46,7 @@ describe("assistantActivity", () => {
   });
 
   it("lets a later tool row take over", () => {
-    expect(assistantActivity("streaming", [reasoning("done"), tool("input-available")])).toBe(
-      null,
-    );
+    expect(assistantActivity("streaming", [reasoning("done"), tool("input-available")])).toBe(null);
   });
 
   it("shows later reasoning below a completed tool row", () => {

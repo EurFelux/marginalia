@@ -36,10 +36,12 @@
 ### Task 1: Derive display-only assistant activity
 
 **Files:**
+
 - Create: `src/renderer/ai/assistant-activity.ts`
 - Create: `src/renderer/ai/assistant-activity.test.ts`
 
 **Interfaces:**
+
 - Consumes: `ChatStatus` from `ai` and `ChatUIMessage["parts"]` from `@renderer/ai/types`.
 - Produces: `AssistantActivity = "preparing" | "reasoning" | null` and `assistantActivity(status, parts)` for `MessageList`.
 
@@ -96,9 +98,7 @@ describe("assistantActivity", () => {
   });
 
   it("lets a later tool row take over", () => {
-    expect(assistantActivity("streaming", [reasoning("done"), tool("input-available")])).toBe(
-      null,
-    );
+    expect(assistantActivity("streaming", [reasoning("done"), tool("input-available")])).toBe(null);
   });
 
   it("shows later reasoning below a completed tool row", () => {
@@ -200,11 +200,13 @@ git commit -m "feat(ai): derive assistant activity from stream parts (#101)"
 ### Task 2: Render shared assistant identity and localized status
 
 **Files:**
+
 - Modify: `src/renderer/ai/MessageList.tsx:1-210`
 - Modify: `src/shared/i18n/locales/en.ts:1-60`
 - Modify: `src/shared/i18n/locales/zh-CN.ts:1-60`
 
 **Interfaces:**
+
 - Consumes: `assistantActivity(status, parts)` and `AssistantActivity` from Task 1; existing `showAgentAvatar`, assistant name, `segments()`, and tool rows.
 - Produces: an immediate submitted assistant shell, phase-specific live status, and stable post-tool placement within the real assistant bubble.
 
@@ -233,10 +235,7 @@ import { useState, type ReactNode } from "react";
 import type { ChatStatus } from "ai";
 import { getToolName } from "ai";
 // existing imports remain
-import {
-  assistantActivity,
-  type AssistantActivity,
-} from "@renderer/ai/assistant-activity";
+import { assistantActivity, type AssistantActivity } from "@renderer/ai/assistant-activity";
 ```
 
 - [ ] **Step 3: Derive one activity value for the live tail message**
@@ -244,35 +243,35 @@ import {
 Replace the existing `lastId` declaration with:
 
 ```ts
-  const lastMessage = messages.at(-1);
-  const lastId = lastMessage?.id;
-  const activity = assistantActivity(
-    status,
-    lastMessage?.role === "assistant" ? lastMessage.parts : undefined,
-  );
+const lastMessage = messages.at(-1);
+const lastId = lastMessage?.id;
+const activity = assistantActivity(
+  status,
+  lastMessage?.role === "assistant" ? lastMessage.parts : undefined,
+);
 ```
 
 Pass it only to the live assistant tail:
 
 ```tsx
-          <AssistantBubble
-            key={m.id}
-            m={m}
-            streaming={status === "streaming" && m.id === lastId}
-            activity={m.id === lastId ? activity : null}
-            chapters={chapters}
-            showAvatar={showAvatar}
-            agentName={agentName}
-            groupHead={i === 0 || messages[i - 1].role !== "assistant"}
-          />
+<AssistantBubble
+  key={m.id}
+  m={m}
+  streaming={status === "streaming" && m.id === lastId}
+  activity={m.id === lastId ? activity : null}
+  chapters={chapters}
+  showAvatar={showAvatar}
+  agentName={agentName}
+  groupHead={i === 0 || messages[i - 1].role !== "assistant"}
+/>
 ```
 
 Replace the submitted placeholder mount with the identity-aware version:
 
 ```tsx
-      {status === "submitted" && (
-        <PendingBubble showAvatar={showAvatar} agentName={agentName} />
-      )}
+{
+  status === "submitted" && <PendingBubble showAvatar={showAvatar} agentName={agentName} />;
+}
 ```
 
 - [ ] **Step 4: Replace the cursor placeholder with the accessible activity indicator**
@@ -383,33 +382,33 @@ Add `activity` to the `AssistantBubble` parameters and props:
 Replace the current `bubble` variable plus the avatar/no-avatar return branches with:
 
 ```tsx
-  return (
-    <AssistantShell
-      showAvatar={showAvatar}
-      agentName={agentName}
-      groupHead={groupHead}
-      messageId={m.id}
-    >
-      <div className="max-w-full space-y-2 rounded-2xl rounded-bl-sm bg-muted px-3.5 py-2 text-sm leading-relaxed text-foreground">
-        {segs.map((s, i) =>
-          s.kind === "text" ? (
-            <LocalizedStreamdown key={i}>{s.text}</LocalizedStreamdown>
-          ) : (
-            <ToolStepRow key={i} part={s.part} chapters={chapters} />
-          ),
-        )}
-        {activity && <AssistantActivityIndicator activity={activity} />}
-      </div>
-      {!streaming && <MessageToolbar m={m} />}
-    </AssistantShell>
-  );
+return (
+  <AssistantShell
+    showAvatar={showAvatar}
+    agentName={agentName}
+    groupHead={groupHead}
+    messageId={m.id}
+  >
+    <div className="max-w-full space-y-2 rounded-2xl rounded-bl-sm bg-muted px-3.5 py-2 text-sm leading-relaxed text-foreground">
+      {segs.map((s, i) =>
+        s.kind === "text" ? (
+          <LocalizedStreamdown key={i}>{s.text}</LocalizedStreamdown>
+        ) : (
+          <ToolStepRow key={i} part={s.part} chapters={chapters} />
+        ),
+      )}
+      {activity && <AssistantActivityIndicator activity={activity} />}
+    </div>
+    {!streaming && <MessageToolbar m={m} />}
+  </AssistantShell>
+);
 ```
 
 Keep the existing guard immediately above this return:
 
 ```ts
-  const segs = segments(m.parts);
-  if (segs.length === 0 && !streaming) return null;
+const segs = segments(m.parts);
+if (segs.length === 0 && !streaming) return null;
 ```
 
 Delete the now-unused `hasText` declaration. Because the activity indicator is rendered after `segs`, a later reasoning part after a completed tool produces `completed tool row → Thinking…` in the same bubble. When later answer text arrives, Task 1 returns `null`, leaving the answer below the completed tool row without duplicating identity.
