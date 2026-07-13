@@ -4,10 +4,12 @@
 
 ## Problem
 
-`AIPanel` currently calls `scrollTo()` for every streamed assistant-message update. Because each
-chunk replaces the `messages` value while the chat remains in `streaming` status, the panel starts a
-new smooth scroll on every chunk. This overrides user scrolling and interferes with selecting or
-clicking content while a response is arriving.
+`AIPanel` originally called `scrollTo()` for every streamed assistant-message update. Because each
+chunk replaces the `messages` value while the chat remains in `streaming` status, the panel started a
+new smooth scroll on every chunk. Gating those calls on bottom position stopped the panel from
+reclaiming an intentionally scrolled-away viewport, but exposed a second problem: the intermediate
+frames of an allowed smooth scroll report a non-bottom position and immediately suspend the follow
+state again.
 
 The existing behavior of positioning a newly opened conversation or a newly submitted turn at the
 bottom must remain.
@@ -18,9 +20,11 @@ bottom must remain.
 - Sending a new user message opts the panel into following the new turn from the bottom.
 - While streaming, new chunks scroll to the bottom only while the viewport is already at the bottom.
 - Any user scroll away from the bottom suspends following immediately.
-- Following resumes only after the user scrolls all the way back to the bottom. A one-pixel tolerance
-  is allowed solely for fractional DOM scroll measurements; being merely near the bottom does not
-  count.
+- Following resumes only after the user scrolls all the way back to the bottom. A four-pixel tolerance
+  is allowed solely for fractional DOM measurements and zoom/rounding effects; being merely near the
+  bottom does not count.
+- Automatic bottom following never uses smooth scrolling. Its intermediate animation frames must not
+  participate in follow-state detection.
 - Loading older messages continues to preserve its existing visible-message anchor and never enables
   bottom following accidentally.
 
@@ -37,6 +41,11 @@ a message explicitly enables following before handing the turn to `useChat`; ope
 keeps its dedicated instant bottom positioning. If the user scrolls away after sending but before the
 first assistant chunk, that chunk therefore respects the suspended state.
 
+Every automatic message-update scroll uses `behavior: "instant"`. Streaming already arrives in small,
+frequent increments, so the content continues to advance naturally without a competing scroll
+animation. Smooth scrolling is reserved for a future explicit, one-shot navigation action such as a
+“jump to latest” button; no current automatic path uses it.
+
 Bottom detection and the message-update decision will be small pure functions in the renderer AI
 module. This keeps the DOM effect thin and makes the regression behavior testable without mounting
 the full chat panel.
@@ -51,9 +60,11 @@ Unit tests will cover:
 
 1. A streaming chunk follows while the viewport is at the bottom.
 2. A streaming chunk does not follow after the viewport leaves the bottom.
-3. A near-bottom position outside the one-pixel tolerance does not resume following.
+3. A position within the four-pixel measurement tolerance counts as the bottom, while a position just
+   outside it does not.
 4. Reaching the bottom resumes following for the next chunk.
 5. Prepending older history still never requests a bottom scroll.
+6. Every allowed automatic message update requests `instant`, never `smooth`, scrolling.
 
 Verification will run the focused regression test, renderer type checking, linting, formatting checks,
 and the full test suite.
