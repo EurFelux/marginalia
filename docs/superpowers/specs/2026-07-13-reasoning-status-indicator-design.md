@@ -88,10 +88,10 @@ submitted: preparing → reasoning: thinking → text: answer streaming → read
 A tool-assisted answer may follow:
 
 ```text
-preparing → thinking → tool row: reading → thinking → answer streaming
+preparing → thinking → tool row: reading → completed tool row + thinking below it → answer below the completed tool row
 ```
 
-Each later reasoning phase can show the reasoning indicator again. The indicator is not permanently latched after the first reasoning event and is not shown simultaneously with an active tool row.
+Each later reasoning phase can show the reasoning indicator again. When reasoning resumes after a tool call, keep the completed tool row in place and render the reasoning indicator immediately below it inside the same assistant bubble. When answer text starts, replace that indicator with the answer below the completed tool row. Do not create another assistant bubble or repeat the avatar and name. The indicator is not permanently latched after the first reasoning event and is not shown simultaneously with an active tool row.
 
 Providers that do not emit reasoning parts follow:
 
@@ -115,7 +115,7 @@ For a submitted placeholder, the shell is always the head of a new assistant gro
 
 ### Activity indicator
 
-A small renderer component maps `AssistantActivity` to localized copy and decorative dots. It renders no reasoning part or reasoning text.
+A small renderer component maps `AssistantActivity` to localized copy and decorative dots. It renders no reasoning part or reasoning text. Within a real assistant message, place it after all currently visible segments so a post-tool reasoning phase appears directly below the completed tool row.
 
 ### Existing message rendering
 
