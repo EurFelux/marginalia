@@ -87,6 +87,10 @@ typings/
 
 # Vite
 .vite/
+/dist/
+
+# Repository-local pnpm store
+/.pnpm-store/
 
 # Electron-Forge
 out/
