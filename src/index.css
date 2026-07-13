@@ -1,8 +1,10 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "katex/dist/katex.min.css";
 @plugin '@tailwindcss/typography';
 /* Streamdown 在其打包产物里用 Tailwind 工具类渲染 markdown——让 Tailwind 扫描它以生成这些类 */
 @source "../node_modules/streamdown/dist/*.js";
+@source "../node_modules/@streamdown/math/dist/*.js";
 
 @custom-variant dark (&:is(.dark *));
 
