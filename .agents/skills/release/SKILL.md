@@ -100,7 +100,7 @@ cd ~/dev/homebrew-tap && git add Casks/marginalia.rb && git commit -m "marginali
 ```
 
 > **dmg 文件名陷阱**：`out/make` 不自动清理、积累多版本 dmg，`find … | head -1` / `*.dmg` 会拿到旧版本（实录差点用成上个版本的哈希）。务必锚定确切文件名 `marginalia-<新版本>-arm64.dmg`，并用 `gh release download` 交叉核验。
-> **tap commit 风格**：简洁单行 `marginalia X.Y.Z`，**不加 Co-Authored-By**（私人 CLAUDE.md 的 co-author 约束仅对 marginalia 项目生效，tap 按自身规范）。
+> **tap commit 风格**：简洁单行 `marginalia X.Y.Z`，**不加 Co-Authored-By**（私人 AGENTS.md 的 co-author 约束仅对 marginalia 项目生效，tap 按自身规范）。
 
 ## 已知坑（`forge.config.ts` 配置固化，勿"优化")
 

@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash '/Users/heracles/dev/marginalia/.codex/hooks/format-edited-file.sh'",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}
