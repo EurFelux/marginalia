@@ -144,7 +144,7 @@ export async function maybeCompactConversation(
     const { text } = await deps.runBackground(() =>
       generateText({
         model: resolved.model,
-        system: COMPACTION_SYSTEM,
+        instructions: COMPACTION_SYSTEM,
         prompt: `${prior}New exchanges:\n${transcript}`,
         maxOutputTokens: SUMMARY_MAX_TOKENS,
         maxRetries: 1,

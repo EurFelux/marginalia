@@ -1,7 +1,8 @@
 // src/main/ai/stream-assistant.ts
 import {
-  stepCountIs,
+  isStepCount,
   streamText,
+  toUIMessageStream,
   type LanguageModelUsage,
   type ModelMessage,
   type UIMessageChunk,
@@ -92,16 +93,17 @@ export function streamAssistantReply(
   });
   const result = streamText({
     model: resolved.model,
-    system: cached.system,
+    instructions: cached.system,
     messages: cached.messages,
     tools,
     providerOptions: providerCallOptions(resolved.providerType),
-    stopWhen: limit === 0 ? () => false : stepCountIs(limit),
+    stopWhen: limit === 0 ? () => false : isStepCount(limit),
     abortSignal: opts?.abortSignal,
-    onFinish: ({ totalUsage }) => {
-      capturedUsage = totalUsage;
+    // v7: onFinish→onEnd；事件的 usage 现为全步累计（= v6 的 totalUsage），语义不变。
+    onEnd: ({ usage }) => {
+      capturedUsage = usage;
     },
-    onStepFinish: ({ finishReason, toolCalls, text }) => {
+    onStepEnd: ({ finishReason, toolCalls, text }) => {
       log.debug(
         `step finished (finishReason=${finishReason}, toolCalls=${toolCalls.length}, textChars=${text.length})`,
       );
@@ -115,7 +117,8 @@ export function streamAssistantReply(
 
   let streamHadError = false;
   let errorInfo: { name: string; message: string } | undefined;
-  const uiStream = result.toUIMessageStream({
+  const uiStream = toUIMessageStream({
+    stream: result.stream,
     onError: (err) => {
       streamHadError = true;
       errorInfo = {

@@ -123,7 +123,7 @@ export async function runSend(
     },
   });
 
-  // 将首个 system 消息提取出来，通过 system: 参数传给 streamText（避免 allowSystemInMessages 警告）
+  // 将首个 system 消息提取出来，通过 instructions: 参数传给 streamText（避免 allowSystemInMessages 警告）
   let systemPrompt: string | undefined;
   let messages: ModelMessage[];
   if (allMessages.length > 0 && allMessages[0].role === "system") {

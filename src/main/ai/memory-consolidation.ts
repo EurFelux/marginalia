@@ -268,7 +268,7 @@ export async function maybeConsolidateMemory(
     const { text } = await runBackground(() =>
       generateText({
         model: resolved.model,
-        system: CONSOLIDATION_SYSTEM,
+        instructions: CONSOLIDATION_SYSTEM,
         prompt: input,
         maxOutputTokens: MEMORY_PASS_MAX_TOKENS,
         maxRetries: 1,

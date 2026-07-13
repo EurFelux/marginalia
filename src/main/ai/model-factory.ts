@@ -1,5 +1,5 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createGoogle } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import type { LanguageModelV4, SharedV4ProviderOptions } from "@ai-sdk/provider";
@@ -68,7 +68,7 @@ export function resolveLanguageModel(p: ResolveModelParams): ChatModel {
     case "anthropic":
       return createAnthropic({ apiKey: p.apiKey, fetch, ...withBase(p.baseUrl) })(p.model);
     case "google-generate-content":
-      return createGoogleGenerativeAI({ apiKey: p.apiKey, fetch, ...withBase(p.baseUrl) })(p.model);
+      return createGoogle({ apiKey: p.apiKey, fetch, ...withBase(p.baseUrl) })(p.model);
     case "openai-chat-completions":
       if (!p.baseUrl) throw new Error("openai-chat-completions provider requires a baseUrl");
       return createOpenAICompatible({

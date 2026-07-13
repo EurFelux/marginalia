@@ -112,7 +112,7 @@ export async function ensureChapterSummary(
       });
       const generated = await generateText({
         model: resolved.model,
-        system: SUMMARY_SYSTEM,
+        instructions: SUMMARY_SYSTEM,
         prompt: slice.text,
         maxOutputTokens: 512,
         maxRetries: 1,
@@ -207,7 +207,7 @@ export async function ensureBookSummary(
       let hadError = false;
       const result = streamText({
         model: resolved.model,
-        system: BOOK_SUMMARY_SYSTEM,
+        instructions: BOOK_SUMMARY_SYSTEM,
         prompt: text,
         maxOutputTokens: 4096, // 全书摘要（主题/人物/结构、多段）比单章长，给足额度避免输出截断
         maxRetries: 1,

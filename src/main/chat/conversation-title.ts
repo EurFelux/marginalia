@@ -78,7 +78,7 @@ export async function nameConversation(
     const { text } = await deps.runBackground(() =>
       generateText({
         model: resolved.model,
-        system: NAMING_SYSTEM,
+        instructions: NAMING_SYSTEM,
         prompt: `用户：${userText}\n\n助手：${assistantText}`,
       }),
     );
