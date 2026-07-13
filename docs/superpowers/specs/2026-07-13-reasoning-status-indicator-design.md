@@ -115,7 +115,7 @@ For a submitted placeholder, the shell is always the head of a new assistant gro
 
 ### Activity indicator
 
-A small renderer component maps `AssistantActivity` to localized copy and decorative dots. It renders no reasoning part or reasoning text. Within a real assistant message, place it after all currently visible segments so a post-tool reasoning phase appears directly below the completed tool row.
+A small renderer component maps `AssistantActivity` to localized copy and decorative dots. It renders no reasoning part or reasoning text. Within a real assistant message, place it after all currently visible segments so a post-tool reasoning phase appears directly below the completed tool row. The dots share one semantic color and run the same 1.2-second ease-in-out opacity-and-scale breath with 0 ms, 150 ms, and 300 ms phase offsets, producing a left-to-right flow rather than a synchronized pulse.
 
 ### Existing message rendering
 
@@ -125,7 +125,7 @@ A small renderer component maps `AssistantActivity` to localized copy and decora
 
 - Put the readable status in a container with `role="status"` and `aria-live="polite"`.
 - Mark decorative dots `aria-hidden="true"`.
-- Use Tailwind motion utilities that respect reduced-motion preferences; status meaning must not depend on animation.
+- Apply the per-dot animation through Tailwind's `motion-safe` variant. Under Reduced Motion the three dots remain static and the readable status text remains unchanged, so status meaning never depends on animation.
 - Add English and Simplified Chinese locale keys and validate them with the repository i18n checks.
 - Do not repeatedly announce reasoning deltas. The live-region text changes only when the phase changes.
 
@@ -161,6 +161,7 @@ Run the proportional repository checks: the focused unit test, `pnpm typecheck`,
 ## 11. Expected change surface
 
 - `src/renderer/ai/MessageList.tsx`: shared assistant shell and activity rendering.
+- `src/index.css`: Tailwind animation theme token and keyframes for the staggered thinking dots.
 - A small renderer helper and focused test for activity derivation, colocated under `src/renderer/ai/`.
 - `src/shared/i18n/locales/en.ts` and `src/shared/i18n/locales/zh-CN.ts`: activity labels.
 

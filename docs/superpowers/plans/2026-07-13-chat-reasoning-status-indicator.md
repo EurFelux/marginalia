@@ -29,6 +29,7 @@
 
 - Create `src/renderer/ai/assistant-activity.ts`: pure activity projection from `ChatStatus` plus assistant parts; never imports React or reads reasoning content.
 - Create `src/renderer/ai/assistant-activity.test.ts`: focused precedence and transition-gap tests for the projection.
+- Modify `src/index.css`: define the Tailwind animation token and keyframes for staggered thinking dots.
 - Modify `src/renderer/ai/MessageList.tsx`: consume the projection, share assistant identity geometry, render accessible status, and remove the cursor placeholder.
 - Modify `src/shared/i18n/locales/en.ts`: English preparation and reasoning labels.
 - Modify `src/shared/i18n/locales/zh-CN.ts`: Simplified Chinese preparation and reasoning labels.
@@ -201,6 +202,7 @@ git commit -m "feat(ai): derive assistant activity from stream parts (#101)"
 
 **Files:**
 
+- Modify: `src/index.css`
 - Modify: `src/renderer/ai/MessageList.tsx:1-210`
 - Modify: `src/shared/i18n/locales/en.ts:1-60`
 - Modify: `src/shared/i18n/locales/zh-CN.ts:1-60`
@@ -276,6 +278,25 @@ Replace the submitted placeholder mount with the identity-aware version:
 
 - [ ] **Step 4: Replace the cursor placeholder with the accessible activity indicator**
 
+Add the animation token inside the existing `@theme inline` block in `src/index.css`, followed by the keyframes:
+
+```css
+--animate-thinking-dot: thinking-dot 1.2s ease-in-out infinite;
+
+@keyframes thinking-dot {
+  0%,
+  70%,
+  100% {
+    opacity: 0.28;
+    transform: scale(0.82);
+  }
+  35% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+```
+
 Delete `ThinkingCursor` and replace `PendingBubble` with these components:
 
 ```tsx
@@ -292,10 +313,10 @@ function AssistantActivityIndicator({ activity }: { activity: Exclude<AssistantA
       role="status"
       aria-live="polite"
     >
-      <span className="inline-flex gap-1 motion-safe:animate-pulse" aria-hidden="true">
-        <span className="size-1.5 rounded-full bg-primary/80" />
-        <span className="size-1.5 rounded-full bg-primary/60" />
-        <span className="size-1.5 rounded-full bg-primary/40" />
+      <span className="inline-flex gap-1" aria-hidden="true">
+        <span className="size-1.5 rounded-full bg-primary/80 motion-safe:animate-thinking-dot" />
+        <span className="size-1.5 rounded-full bg-primary/80 motion-safe:animate-thinking-dot [animation-delay:150ms]" />
+        <span className="size-1.5 rounded-full bg-primary/80 motion-safe:animate-thinking-dot [animation-delay:300ms]" />
       </span>
       <span>{label}</span>
     </div>
@@ -313,7 +334,7 @@ function PendingBubble({ showAvatar, agentName }: { showAvatar: boolean; agentNa
 }
 ```
 
-`motion-safe:animate-pulse` means the dots animate only when the operating-system reduced-motion preference is not enabled. The readable label remains unchanged in either mode.
+Each dot runs the same opacity-and-scale breath with 150 ms phase offsets, producing a left-to-right flow. `motion-safe:animate-thinking-dot` means the animation runs only when the operating-system reduced-motion preference is not enabled; otherwise all three dots remain static. The readable label remains unchanged in either mode.
 
 - [ ] **Step 5: Extract the shared assistant identity shell**
 
