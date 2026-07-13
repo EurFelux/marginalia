@@ -14,6 +14,11 @@ import { MessageList } from "@renderer/ai/MessageList";
 import { Composer } from "@renderer/ai/Composer";
 import { ConversationsTab } from "@renderer/ai/ConversationsTab";
 import { messagesToUI } from "@renderer/ai/message-history";
+import {
+  conversationOpenScrollBehavior,
+  isScrollAtBottom,
+  messageScrollBehavior,
+} from "@renderer/ai/scroll-follow";
 import { conversationsQuery } from "@renderer/query/conversation-queries";
 import type { Chip, MessageDto } from "@shared/chat";
 import { openPanelAndFocusComposer } from "@renderer/ai/composer-focus";
@@ -55,6 +60,7 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
     : null;
   const qc = useQueryClient();
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const followBottomRef = useRef(true);
   const prevStatus = useRef(status);
   const [pagination, setPagination] = useState<PaginationState>({
     hasMore: false,
@@ -83,22 +89,37 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
 
     const prev = prevMessagesRef.current;
     prevMessagesRef.current = messages;
-
-    // 历史消息 prepend（长度增加且首条 id 变化）时不自动滚底，避免把用户拉回底部。
-    if (prev.length > 0 && messages.length > prev.length && messages[0]?.id !== prev[0]?.id) {
-      return;
-    }
-
-    // 初始加载由打开会话的 effect 负责滚底，这里不处理。
-    if (prev.length === 0) return;
-
-    // 新消息追加或 streaming assistant 增长时滚底。
-    const lastIdChanged = messages.at(-1)?.id !== prev.at(-1)?.id;
+    const prependedHistory =
+      prev.length > 0 && messages.length > prev.length && messages[0]?.id !== prev[0]?.id;
+    const lastMessageChanged = messages.at(-1)?.id !== prev.at(-1)?.id;
     const streamingAssistant = status === "streaming" && messages.at(-1)?.role === "assistant";
-    if (lastIdChanged || streamingAssistant) {
-      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+
+    const scrollBehavior = messageScrollBehavior({
+      following: followBottomRef.current,
+      openingConversation: isOpeningRef.current,
+      previousLength: prev.length,
+      prependedHistory,
+      lastMessageChanged,
+      streamingAssistant,
+    });
+    if (scrollBehavior) {
+      el.scrollTo({ top: el.scrollHeight, behavior: scrollBehavior });
     }
   }, [messages, status]);
+
+  // 用户离开底部后暂停 streaming 跟随；只有真正回到底部才恢复。
+  // showList 切换会卸载/重建 viewport，依赖它以确保监听器挂到新元素。
+  useEffect(() => {
+    if (showList) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    const updateFollowState = () => {
+      followBottomRef.current = isScrollAtBottom(el);
+    };
+    updateFollowState();
+    el.addEventListener("scroll", updateFollowState, { passive: true });
+    return () => el.removeEventListener("scroll", updateFollowState);
+  }, [showList]);
 
   // 重开会话：openCommand.nonce 变 → 先中止在跑的流（避免增量灌入将被替换的历史、streamId 串台）→ 载历史 → setMessages。
   // 只认 openCommand（一次性命令信号），不认 activeConversationId——后者也被发消息 ack 写入，监听它会在发完消息后误重载。
@@ -110,6 +131,7 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
     const conversationId = resolveOpenCommandTarget(openCommand, ctxKey);
     if (!conversationId) return;
     let cancelled = false;
+    followBottomRef.current = true;
     setShowList(false); // 从列表选中一条会话 → 回到聊天视图
     resetPagination();
     isOpeningRef.current = true;
@@ -121,12 +143,15 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
         updateSeqMap(dtos);
         setMessages(messagesToUI(dtos));
         setPagination({ hasMore, loadingMore: false, oldestSeq: dtos[0]?.seq ?? null });
-        // 等 React 渲染 + Streamdown/markdown 高度稳定后再 instant 滚底，
-        // 避免 smooth 动画与 content 高度变化竞争导致停在中间。
+        // 等 React 渲染 + Streamdown/markdown 高度基本稳定后再单次 smooth 滚底；
+        // 该路径已停止当前流，不会与 chunk 跟随竞争。
         setTimeout(() => {
           if (cancelled) return;
           const el = scrollRef.current;
-          if (el) el.scrollTo({ top: el.scrollHeight, behavior: "instant" });
+          if (el) {
+            followBottomRef.current = true;
+            el.scrollTo({ top: el.scrollHeight, behavior: conversationOpenScrollBehavior() });
+          }
           isOpeningRef.current = false;
         }, 100);
       })
@@ -268,12 +293,17 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
   }, [pagination.hasMore, pagination.loadingMore, pagination.oldestSeq, activeConversationId]);
 
   const actions: ChatActions = {
-    regenerate: (a) => void regenerate({ messageId: a.id }),
+    regenerate: (a) => {
+      followBottomRef.current = true;
+      void regenerate({ messageId: a.id });
+    },
     resend: (u) => {
+      followBottomRef.current = true;
       const aId = nextAssistantId(messages, u.id);
       void regenerate(aId ? { messageId: aId } : undefined);
     },
     editAndResend: (u, newText) => {
+      followBottomRef.current = true;
       flushSync(() =>
         setMessages((ms) =>
           ms.map((m) => (m.id === u.id ? { ...m, parts: [{ type: "text", text: newText }] } : m)),
@@ -286,6 +316,7 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
   };
 
   const handleSend = (text: string, chips: Chip[]) => {
+    followBottomRef.current = true;
     void sendMessage({ text, metadata: { contextChips: chips } });
   };
 
