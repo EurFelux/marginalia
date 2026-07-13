@@ -1,4 +1,4 @@
-const BOTTOM_TOLERANCE_PX = 1;
+const BOTTOM_TOLERANCE_PX = 4;
 
 export interface ScrollPosition {
   scrollHeight: number;
@@ -22,17 +22,17 @@ export function isScrollAtBottom({
   return scrollHeight - scrollTop - clientHeight <= BOTTOM_TOLERANCE_PX;
 }
 
-export function shouldScrollToBottom({
+export function messageScrollBehavior({
   following,
   previousLength,
   prependedHistory,
   lastMessageChanged,
   streamingAssistant,
-}: MessageScrollUpdate): boolean {
-  return (
-    following &&
+}: MessageScrollUpdate): "instant" | null {
+  return following &&
     previousLength > 0 &&
     !prependedHistory &&
     (lastMessageChanged || streamingAssistant)
-  );
+    ? "instant"
+    : null;
 }

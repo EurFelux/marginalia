@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isScrollAtBottom, shouldScrollToBottom } from "./scroll-follow";
+import { isScrollAtBottom, messageScrollBehavior } from "./scroll-follow";
 
 const streamingUpdate = {
   previousLength: 2,
@@ -9,58 +9,61 @@ const streamingUpdate = {
 };
 
 describe("isScrollAtBottom", () => {
-  it("accepts the bottom and fractional measurements within one pixel", () => {
+  it("accepts the bottom and measurements within four pixels", () => {
     expect(isScrollAtBottom({ scrollHeight: 1000, scrollTop: 600, clientHeight: 400 })).toBe(true);
-    expect(isScrollAtBottom({ scrollHeight: 1000, scrollTop: 599.25, clientHeight: 400 })).toBe(
+    expect(isScrollAtBottom({ scrollHeight: 1000, scrollTop: 596.25, clientHeight: 400 })).toBe(
       true,
     );
   });
 
-  it("does not treat a merely near-bottom viewport as the bottom", () => {
-    expect(isScrollAtBottom({ scrollHeight: 1000, scrollTop: 598.9, clientHeight: 400 })).toBe(
+  it("does not treat a position outside the tolerance as the bottom", () => {
+    expect(isScrollAtBottom({ scrollHeight: 1000, scrollTop: 595.9, clientHeight: 400 })).toBe(
       false,
     );
   });
 });
 
-describe("shouldScrollToBottom", () => {
-  it("follows a streaming chunk only while bottom following is enabled", () => {
-    expect(shouldScrollToBottom({ ...streamingUpdate, following: true })).toBe(true);
-    expect(shouldScrollToBottom({ ...streamingUpdate, following: false })).toBe(false);
+describe("messageScrollBehavior", () => {
+  it("uses instant scrolling for an allowed streaming chunk", () => {
+    expect(messageScrollBehavior({ ...streamingUpdate, following: true })).toBe("instant");
   });
 
-  it("resumes streaming follow only after the viewport reaches the bottom", () => {
+  it("does not scroll after the viewport leaves the bottom", () => {
+    expect(messageScrollBehavior({ ...streamingUpdate, following: false })).toBe(null);
+  });
+
+  it("resumes instant scrolling after the viewport reaches the bottom", () => {
     const away = isScrollAtBottom({ scrollHeight: 1000, scrollTop: 500, clientHeight: 400 });
-    expect(shouldScrollToBottom({ ...streamingUpdate, following: away })).toBe(false);
+    expect(messageScrollBehavior({ ...streamingUpdate, following: away })).toBe(null);
 
     const bottom = isScrollAtBottom({ scrollHeight: 1000, scrollTop: 600, clientHeight: 400 });
-    expect(shouldScrollToBottom({ ...streamingUpdate, following: bottom })).toBe(true);
+    expect(messageScrollBehavior({ ...streamingUpdate, following: bottom })).toBe("instant");
   });
 
   it("never scrolls for initial loads or prepended history", () => {
     expect(
-      shouldScrollToBottom({
+      messageScrollBehavior({
         ...streamingUpdate,
         following: true,
         previousLength: 0,
       }),
-    ).toBe(false);
+    ).toBe(null);
     expect(
-      shouldScrollToBottom({
+      messageScrollBehavior({
         ...streamingUpdate,
         following: true,
         prependedHistory: true,
       }),
-    ).toBe(false);
+    ).toBe(null);
   });
 
   it("requires follow state for a newly appended assistant message too", () => {
     expect(
-      shouldScrollToBottom({
+      messageScrollBehavior({
         ...streamingUpdate,
         following: false,
         lastMessageChanged: true,
       }),
-    ).toBe(false);
+    ).toBe(null);
   });
 });

@@ -14,7 +14,7 @@ import { MessageList } from "@renderer/ai/MessageList";
 import { Composer } from "@renderer/ai/Composer";
 import { ConversationsTab } from "@renderer/ai/ConversationsTab";
 import { messagesToUI } from "@renderer/ai/message-history";
-import { isScrollAtBottom, shouldScrollToBottom } from "@renderer/ai/scroll-follow";
+import { isScrollAtBottom, messageScrollBehavior } from "@renderer/ai/scroll-follow";
 import { conversationsQuery } from "@renderer/query/conversation-queries";
 import type { Chip, MessageDto } from "@shared/chat";
 import { openPanelAndFocusComposer } from "@renderer/ai/composer-focus";
@@ -90,16 +90,15 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
     const lastMessageChanged = messages.at(-1)?.id !== prev.at(-1)?.id;
     const streamingAssistant = status === "streaming" && messages.at(-1)?.role === "assistant";
 
-    if (
-      shouldScrollToBottom({
-        following: followBottomRef.current,
-        previousLength: prev.length,
-        prependedHistory,
-        lastMessageChanged,
-        streamingAssistant,
-      })
-    ) {
-      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    const scrollBehavior = messageScrollBehavior({
+      following: followBottomRef.current,
+      previousLength: prev.length,
+      prependedHistory,
+      lastMessageChanged,
+      streamingAssistant,
+    });
+    if (scrollBehavior) {
+      el.scrollTo({ top: el.scrollHeight, behavior: scrollBehavior });
     }
   }, [messages, status]);
 
