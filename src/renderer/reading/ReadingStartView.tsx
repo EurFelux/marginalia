@@ -23,12 +23,21 @@ export function ReadingStartView({ book }: { book: BookSummaryDto }) {
           <CoverImage book={book} />
         </div>
         <div>
-          <h1 className="text-2xl font-semibold">{book.title ?? book.id}</h1>
+          <p className="text-sm font-medium text-primary">
+            {t("readingStart.title", "开始这次阅读")}
+          </p>
+          <h1 className="mt-1 text-2xl font-semibold">{book.title ?? book.id}</h1>
           <p className="mt-2 text-muted-foreground">
             {book.author ?? t("library.unknownAuthor", "未知作者")}
           </p>
+          <p className="mt-4 text-sm text-muted-foreground">
+            {t(
+              "readingStart.description",
+              "标记开始，让 Marginalia 将这次阅读的时间和痕迹归在一起。",
+            )}
+          </p>
         </div>
-        <Button onClick={() => void start()}>{t("reading.start", "开始阅读")}</Button>
+        <Button onClick={() => void start()}>{t("readingStart.action", "开始阅读")}</Button>
       </div>
     </main>
   );

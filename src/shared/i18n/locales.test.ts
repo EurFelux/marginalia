@@ -2,16 +2,19 @@ import { describe, expect, it } from "vitest";
 import en from "@shared/i18n/locales/en";
 import zhCN from "@shared/i18n/locales/zh-CN";
 
-const task5ReadingKeys = [
-  "reading.complete",
-  "reading.completeConfirm",
+const readingCompletionKeys = [
+  "reader.completeReading.action",
+  "reader.completeReading.completed",
+  "reader.completeReading.confirmTitle",
   "reading.openReference",
   "reading.referenceMode",
   "reading.routeLoadError",
   "reading.routeLoading",
   "reading.routeNotFound",
   "reading.routeSelectBook",
-  "reading.start",
+  "readingStart.action",
+  "readingStart.description",
+  "readingStart.title",
 ] as const;
 
 const task6ReadingKeys = [
@@ -67,8 +70,11 @@ describe("locale completeness", () => {
     expect(value.trim()).not.toBe("");
   }
 
-  it("provides non-empty English copy for Task 5 reading flow", () => {
-    for (const key of task5ReadingKeys) expectNonEmptyString(en, key);
+  it("provides non-empty copy for the reading completion flow", () => {
+    for (const key of readingCompletionKeys) {
+      expectNonEmptyString(en, key);
+      expectNonEmptyString(zhCN, key);
+    }
   });
 
   it("provides non-empty copy for Task 6 reading report flow", () => {

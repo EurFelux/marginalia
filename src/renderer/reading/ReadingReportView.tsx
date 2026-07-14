@@ -146,7 +146,7 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
             </div>
             <div className="flex flex-col gap-1">
               <p className="text-sm font-medium text-primary">
-                {t("reading.complete", "阅读完成")}
+                {t("reader.completeReading.completed", "阅读完成")}
               </p>
               <h1 className="font-serif text-3xl leading-tight">{book.title ?? book.id}</h1>
               <p className="text-sm text-muted-foreground">

@@ -27,17 +27,19 @@ export function CompleteReadingDialog({ bookId }: { bookId: string }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
-        {t("reading.complete", "完成阅读")}
+        {t("reader.completeReading.action", "完成阅读")}
       </Button>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{t("reading.completeConfirm", "完成这次阅读？")}</DialogTitle>
+          <DialogTitle>{t("reader.completeReading.confirmTitle", "完成这次阅读？")}</DialogTitle>
         </DialogHeader>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t("common.cancel", "取消")}
           </Button>
-          <Button onClick={() => void complete()}>{t("reading.complete", "完成阅读")}</Button>
+          <Button onClick={() => void complete()}>
+            {t("reader.completeReading.action", "完成阅读")}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
