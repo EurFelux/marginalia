@@ -14,6 +14,37 @@ const task5ReadingKeys = [
   "reading.start",
 ] as const;
 
+const task6ReadingKeys = [
+  "readingReport.edit",
+  "readingReport.empty",
+  "readingReport.generate",
+  "readingReport.generateFailed",
+  "readingReport.generating",
+  "readingReport.insufficientEvidence",
+  "readingReport.loadFailed",
+  "readingReport.reference",
+  "readingReport.regenerate",
+  "readingReport.reread",
+  "readingReport.rereadConfirmDescription",
+  "readingReport.rereadConfirmTitle",
+  "readingReport.rereadFailed",
+  "readingReport.retry",
+  "readingReport.saveFailed",
+  "readingReport.session",
+  "readingReport.sessionHistory",
+  "readingReport.title",
+  "readingSession.activeTime",
+  "readingSession.completedAt",
+  "readingSession.elapsedDays",
+  "readingSession.startedAt",
+  "time.hourShort",
+  "time.minuteShort",
+] as const;
+
+const englishTask6PluralKeys = ["readingSession.days_one", "readingSession.days_other"] as const;
+
+const chineseTask6PluralKeys = ["readingSession.days"] as const;
+
 const restoreKindKeys = ["settings.backup.kindCompact", "settings.backup.kindFull"] as const;
 
 const englishRestoreConfirmationKeys = [
@@ -38,6 +69,15 @@ describe("locale completeness", () => {
 
   it("provides non-empty English copy for Task 5 reading flow", () => {
     for (const key of task5ReadingKeys) expectNonEmptyString(en, key);
+  });
+
+  it("provides non-empty copy for Task 6 reading report flow", () => {
+    for (const key of task6ReadingKeys) {
+      expectNonEmptyString(en, key);
+      expectNonEmptyString(zhCN, key);
+    }
+    for (const key of englishTask6PluralKeys) expectNonEmptyString(en, key);
+    for (const key of chineseTask6PluralKeys) expectNonEmptyString(zhCN, key);
   });
 
   it("keeps restore confirmation keys used by both locales", () => {

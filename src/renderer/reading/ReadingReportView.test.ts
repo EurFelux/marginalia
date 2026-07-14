@@ -22,7 +22,7 @@ vi.mock("@tanstack/react-query", () => ({
 }));
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
-    t: (_key: string, fallback: string) => fallback,
+    t: (key: string) => key,
     i18n: { language: "en" },
   }),
 }));
@@ -105,7 +105,7 @@ describe("ReadingReportView", () => {
     );
 
     const edit = [...host.querySelectorAll("button")].find(
-      (button) => button.textContent === "编辑 Markdown",
+      (button) => button.textContent === "readingReport.edit",
     )!;
     act(() => edit.click());
 

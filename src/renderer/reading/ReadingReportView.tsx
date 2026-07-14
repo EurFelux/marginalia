@@ -61,8 +61,8 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
     enabled: selectedSession != null,
   });
 
-  const showError = (message: string, error: unknown) => {
-    toast.error(t(message, "操作失败：{{error}}", { error: (error as Error).message }), {
+  const showError = (message: string) => {
+    toast.error(message, {
       closeButton: true,
       duration: Infinity,
     });
@@ -76,13 +76,11 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
       });
       if (result.outcome === "insufficient-evidence") {
         setEditing(true);
-        toast.info(
-          t("readingReport.insufficientEvidence", "还没有足够的阅读痕迹，可以先手写这份报告。"),
-        );
+        toast.info(t("readingReport.insufficientEvidence"));
       }
       await qc.invalidateQueries({ queryKey: qk.readingSession(selectedSession.id) });
     } catch (error) {
-      showError("readingReport.generateFailed", error);
+      showError(t("readingReport.generateFailed", { error: (error as Error).message }));
     }
   };
 
@@ -96,7 +94,7 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
       qc.setQueryData(qk.readingSession(selectedSession.id), saved);
       setEditing(false);
     } catch (error) {
-      showError("readingReport.saveFailed", error);
+      showError(t("readingReport.saveFailed", { error: (error as Error).message }));
     }
   };
 
@@ -112,7 +110,7 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
       ]);
       openBook(book.id);
     } catch (error) {
-      showError("readingReport.rereadFailed", error);
+      showError(t("readingReport.rereadFailed", { error: (error as Error).message }));
     }
   };
 
@@ -120,7 +118,7 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
     return <ReportMessage>{t("reading.routeLoading", "载入阅读档案中…")}</ReportMessage>;
   }
   if (sessions.isError || detail.isError || !selectedSession || !detail.data) {
-    return <ReportMessage>{t("readingReport.loadFailed", "无法读取这份阅读档案。")}</ReportMessage>;
+    return <ReportMessage>{t("readingReport.loadFailed")}</ReportMessage>;
   }
 
   const model = reportViewModel(detail.data.report);
@@ -128,10 +126,10 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
   const date = new Intl.DateTimeFormat(i18n.language, { dateStyle: "long" });
   const generateLabel =
     detail.data.report.status === "ready" || detail.data.report.status === "regeneration-failed"
-      ? t("readingReport.regenerate", "重新生成")
+      ? t("readingReport.regenerate")
       : detail.data.report.status === "generation-failed"
-        ? t("readingReport.retry", "重试")
-        : t("readingReport.generate", "生成报告");
+        ? t("readingReport.retry")
+        : t("readingReport.generate");
 
   return (
     <main className="min-h-screen bg-background px-4 py-5 font-sans sm:px-8 sm:py-8">
@@ -158,7 +156,7 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
 
             <div className="flex flex-col gap-2 border-y py-4">
               <p className="text-xs font-medium tracking-wide text-muted-foreground">
-                {t("readingReport.session", "本次阅读")}
+                {t("readingReport.session")}
               </p>
               <Select
                 value={selectedSession.id}
@@ -170,7 +168,7 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    <SelectLabel>{t("readingReport.sessionHistory", "阅读题签")}</SelectLabel>
+                    <SelectLabel>{t("readingReport.sessionHistory")}</SelectLabel>
                     {completedSessions.map((session) => (
                       <SelectItem key={session.id} value={session.id}>
                         {date.format(session.completedAt!)}
@@ -183,25 +181,22 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
 
             <dl className="grid grid-cols-2 gap-x-3 gap-y-4 text-sm lg:grid-cols-1">
               <Fact
-                label={t("readingSession.startedAt", "开始阅读")}
+                label={t("readingSession.startedAt")}
                 value={date.format(selectedSession.startedAt)}
               />
+              <Fact label={t("readingSession.completedAt")} value={date.format(completedAt)} />
               <Fact
-                label={t("readingSession.completedAt", "完成阅读")}
-                value={date.format(completedAt)}
-              />
-              <Fact
-                label={t("readingSession.elapsedDays", "经历天数")}
-                value={t("readingSession.days", "{{count}} 天", {
+                label={t("readingSession.elapsedDays")}
+                value={t("readingSession.days", {
                   count: elapsedDays(selectedSession.startedAt, completedAt),
                 })}
               />
               <Fact
-                label={t("readingSession.activeTime", "活跃阅读")}
+                label={t("readingSession.activeTime")}
                 value={formatDuration(
                   selectedSession.activeSeconds,
-                  t("time.hourShort", "小时"),
-                  t("time.minuteShort", "分钟"),
+                  t("time.hourShort"),
+                  t("time.minuteShort"),
                 )}
               />
             </dl>
@@ -209,11 +204,11 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={() => openBookReference(book.id)}>
                 <BookOpen data-icon="inline-start" />
-                {t("readingReport.reference", "打开正文参考")}
+                {t("readingReport.reference")}
               </Button>
               <Button variant="ghost" onClick={() => setRereadOpen(true)}>
                 <RotateCcw data-icon="inline-start" />
-                {t("readingReport.reread", "再读一次")}
+                {t("readingReport.reread")}
               </Button>
             </div>
           </aside>
@@ -221,7 +216,7 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
           <Card className="min-h-[34rem] bg-card/70">
             <CardHeader>
               <CardTitle className="font-serif text-2xl font-normal">
-                {t("readingReport.title", "阅读报告")}
+                {t("readingReport.title")}
               </CardTitle>
             </CardHeader>
             <CardContent className="flex flex-1 flex-col gap-4">
@@ -244,9 +239,7 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
                 </LocalizedStreamdown>
               ) : (
                 <div className="flex flex-1 items-center justify-center text-center text-sm text-muted-foreground">
-                  {model.busy
-                    ? t("readingReport.generating", "正在整理这次阅读留下的思考…")
-                    : t("readingReport.empty", "这次阅读还没有保存报告。")}
+                  {model.busy ? t("readingReport.generating") : t("readingReport.empty")}
                 </div>
               )}
             </CardContent>
@@ -254,13 +247,13 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
               {!editing && model.canEdit ? (
                 <Button variant="outline" onClick={() => setEditing(true)}>
                   <FilePenLine data-icon="inline-start" />
-                  {t("readingReport.edit", "编辑 Markdown")}
+                  {t("readingReport.edit")}
                 </Button>
               ) : null}
               {!editing ? (
                 <Button onClick={() => void generate()} disabled={!model.canGenerate}>
                   <Sparkles data-icon="inline-start" />
-                  {model.busy ? t("readingReport.generating", "生成中…") : generateLabel}
+                  {model.busy ? t("readingReport.generating") : generateLabel}
                 </Button>
               ) : null}
             </CardFooter>
@@ -270,20 +263,15 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
 
       <AlertDialog open={rereadOpen} onOpenChange={setRereadOpen}>
         <AlertDialogContent>
-          <AlertDialogTitle>
-            {t("readingReport.rereadConfirmTitle", "重新开始阅读？")}
-          </AlertDialogTitle>
+          <AlertDialogTitle>{t("readingReport.rereadConfirmTitle")}</AlertDialogTitle>
           <AlertDialogDescription>
-            {t(
-              "readingReport.rereadConfirmDescription",
-              "当前阅读进度将从头开始，并创建新的阅读题签。",
-            )}
+            {t("readingReport.rereadConfirmDescription")}
           </AlertDialogDescription>
           <AlertDialogFooter>
             <Button variant="outline" onClick={() => setRereadOpen(false)}>
               {t("common.cancel", "取消")}
             </Button>
-            <Button onClick={() => void reread()}>{t("readingReport.reread", "再读一次")}</Button>
+            <Button onClick={() => void reread()}>{t("readingReport.reread")}</Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
