@@ -306,10 +306,10 @@ getReadingReport(sessionId)
 
 升级策略：
 
-- 不根据旧 `isFinished` 生成 session，也不伪造开始/完成时间。
+- 为每本有旧阅读痕迹的书创建一个真实 legacy session，并把其旧 `reading_daily` 行关联到该 session；没有任何阅读痕迹的书不创建 session。
+- `started_at` 优先取该书最早的 message 时间；没有 message 时才从 progress、标注、笔记、会话和按日计时的最早可用时间兜底。`is_finished` 为真时，`completed_at` 取不早于开始时间的最晚可用痕迹时间；否则保留 active session。
+- 在 Drizzle 生成的 DDL 前，以私有持久 staging 表快照 legacy 候选和 uuidv7 session id；DDL 后在一个事务中插入 session、回填 daily FK 并删除 staging。staging 已存在时复用，故 pre-DDL、DDL 后和 post-DDL 中断均可在下次启动恢复，且不重复创建。
 - 保留旧阅读进度、标注、笔记、对话和全书摘要。
-- 旧 `reading_daily` 行的 `reading_session_id` 为 `NULL`，继续计入全局和按书统计，但不计入任何 session。
-- 升级后，所有书籍在 session 状态机中均从“未开始”进入；用户首次点击开始时，旧书继续原进度，新导入书从开头开始。
 
 迁移文件必须由 `pnpm db:generate` 生成，不手写。
 
@@ -364,5 +364,5 @@ getReadingReport(sessionId)
 3. 完成阅读不依赖 AI 成功，也不会因生成失败而回滚。
 4. 报告围绕读者痕迹生成、可编辑、按 session 永久保存。
 5. 普通聊天 AI 能通过工具按需读取任意已有报告。
-6. 迁移不伪造历史 session，且不丢失旧进度、痕迹或阅读时长。
+6. 有痕迹的旧书迁为一个真实 legacy session，且不丢失旧进度、痕迹或阅读时长。
 7. 所有运行时报告状态通过 discriminated union 表达，渲染层可以穷尽处理。

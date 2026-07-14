@@ -40,7 +40,8 @@ vi.mock("react-i18next", () => ({
 vi.mock("sonner", () => ({ toast }));
 vi.mock("@renderer/logger", () => ({ createLogger: () => log }));
 vi.mock("@renderer/components/LocalizedStreamdown", () => ({
-  LocalizedStreamdown: ({ children }: { children: string }) => children,
+  LocalizedStreamdown: ({ children, className }: { children: string; className?: string }) =>
+    createElement("div", { "data-testid": "report-body", className }, children),
 }));
 vi.mock("@renderer/components/ui/alert-dialog", () => ({
   AlertDialog: ({ children }: { children: React.ReactNode }) => children,
@@ -55,16 +56,6 @@ vi.mock("@renderer/components/ui/card", () => ({
   CardFooter: ({ children }: { children: React.ReactNode }) => children,
   CardHeader: ({ children }: { children: React.ReactNode }) => children,
   CardTitle: ({ children }: { children: React.ReactNode }) => children,
-}));
-vi.mock("@renderer/components/ui/select", () => ({
-  Select: ({ children }: { children: React.ReactNode }) => children,
-  SelectContent: ({ children }: { children: React.ReactNode }) => children,
-  SelectGroup: ({ children }: { children: React.ReactNode }) => children,
-  SelectItem: ({ children }: { children: React.ReactNode }) => children,
-  SelectLabel: ({ children }: { children: React.ReactNode }) => children,
-  SelectTrigger: (props: React.ComponentProps<"button">) =>
-    createElement("button", { "data-slot": "select-trigger", ...props }),
-  SelectValue: () => null,
 }));
 vi.mock("@renderer/library/CoverImage", () => ({ CoverImage: () => null }));
 vi.mock("@renderer/query/reading-session-queries", () => ({
@@ -110,6 +101,33 @@ afterEach(() => {
 });
 
 describe("ReadingReportView", () => {
+  it("clamps a long book title to two lines without constraining the report body", () => {
+    act(() =>
+      root.render(
+        createElement(ReadingReportView, {
+          book: {
+            id: "book-1",
+            title:
+              "A title deliberately long enough to overflow the report sidebar without truncation",
+            author: null,
+            hasCover: false,
+            format: "epub",
+            pageCount: null,
+            hasTextLayer: false,
+            readingState: "finished",
+          },
+        }),
+      ),
+    );
+
+    const title = host.querySelector("h1")!;
+    expect(title.className).toContain("line-clamp-2");
+    expect(title.className).toContain("min-w-0");
+    expect(host.querySelector("[data-testid='report-body']")?.className).not.toContain(
+      "line-clamp",
+    );
+  });
+
   it("locks the session selector while editing to preserve the draft", () => {
     act(() =>
       root.render(
@@ -136,6 +154,29 @@ describe("ReadingReportView", () => {
     expect(host.querySelector<HTMLButtonElement>('[data-slot="select-trigger"]')?.disabled).toBe(
       true,
     );
+  });
+
+  it("shows the selected session date rather than its UUID in the real select trigger", () => {
+    act(() =>
+      root.render(
+        createElement(ReadingReportView, {
+          book: {
+            id: "book-1",
+            title: null,
+            author: null,
+            hasCover: false,
+            format: "epub",
+            pageCount: null,
+            hasTextLayer: false,
+            readingState: "finished",
+          },
+        }),
+      ),
+    );
+
+    const trigger = host.querySelector('[data-slot="select-trigger"]')!;
+    expect(trigger.textContent).toContain("January 1, 1970");
+    expect(trigger.textContent).not.toContain("session-1");
   });
 
   it("keeps rejected save details out of the localized failure toast", async () => {

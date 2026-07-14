@@ -130,6 +130,10 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
   const model = reportViewModel(detail.data.report);
   const completedAt = selectedSession.completedAt!;
   const date = new Intl.DateTimeFormat(i18n.language, { dateStyle: "long" });
+  const sessionItems = completedSessions.map((session) => ({
+    value: session.id,
+    label: date.format(session.completedAt!),
+  }));
   const generateLabel =
     detail.data.report.status === "ready" || detail.data.report.status === "regeneration-failed"
       ? t("readingReport.regenerate")
@@ -154,7 +158,9 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
               <p className="text-sm font-medium text-primary">
                 {t("reader.completeReading.completed", "阅读完成")}
               </p>
-              <h1 className="font-serif text-3xl leading-tight">{book.title ?? book.id}</h1>
+              <h1 className="min-w-0 line-clamp-2 font-serif text-3xl leading-tight">
+                {book.title ?? book.id}
+              </h1>
               <p className="text-sm text-muted-foreground">
                 {book.author ?? t("library.unknownAuthor", "未知作者")}
               </p>
@@ -165,6 +171,7 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
                 {t("readingReport.session")}
               </p>
               <Select
+                items={sessionItems}
                 value={selectedSession.id}
                 onValueChange={(value) => setSelectedSessionId(value)}
                 disabled={editing}
@@ -175,9 +182,9 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
                 <SelectContent>
                   <SelectGroup>
                     <SelectLabel>{t("readingReport.sessionHistory")}</SelectLabel>
-                    {completedSessions.map((session) => (
-                      <SelectItem key={session.id} value={session.id}>
-                        {date.format(session.completedAt!)}
+                    {sessionItems.map((session) => (
+                      <SelectItem key={session.value} value={session.value}>
+                        {session.label}
                       </SelectItem>
                     ))}
                   </SelectGroup>

@@ -1020,7 +1020,7 @@ Run:
 pnpm db:generate --name derive_reading_state
 ```
 
-Expected: a generated migration that rebuilds affected SQLite tables, preserves existing `reading_daily` rows with `reading_session_id = NULL`, removes `is_finished`, and adds the partial unique index. Do not edit generated files.
+Expected: generated migrations rebuild affected SQLite tables and remove `is_finished`; the protected application data-migration staging step then creates one real legacy session for each book with traces and backfills its legacy `reading_daily` rows to that session. Do not edit generated files.
 
 - [ ] **Step 5: Update reading-time writes and aggregation**
 
@@ -1146,14 +1146,14 @@ Create `migrate-reading-sessions.test.ts`. Copy migration directories only throu
 Then run the full current migrations directory and assert:
 
 ```ts
-expect(db.all(sql`select * from reading_sessions`)).toEqual([]);
+expect(db.get(sql`select * from reading_sessions where book_id = 'legacy-book'`)).toBeDefined();
 expect(db.get(sql`select locator from progress where book_id = 'legacy-book'`)).toBeDefined();
 expect(
   db.get(sql`select selected_text from annotations where book_id = 'legacy-book'`),
 ).toBeDefined();
 expect(
   db.get(sql`select reading_session_id from reading_daily where book_id = 'legacy-book'`),
-).toMatchObject({ reading_session_id: null });
+).toMatchObject({ reading_session_id: expect.any(String) });
 expect(db.all<{ name: string }>(sql`pragma table_info(books)`).map((c) => c.name)).not.toContain(
   "is_finished",
 );

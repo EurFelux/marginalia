@@ -59,7 +59,21 @@ describe("reading session migrations", () => {
 
       runMigrations(db, MIGRATIONS);
 
-      expect(db.all(sql`SELECT * FROM reading_sessions`)).toEqual([]);
+      const legacySession = db.get<{
+        id: string;
+        book_id: string;
+        started_at: number;
+        completed_at: number | null;
+      }>(sql`
+        SELECT id, book_id, started_at, completed_at FROM reading_sessions WHERE book_id = 'legacy-book'
+      `);
+      expect(legacySession).toMatchObject({
+        book_id: "legacy-book",
+        started_at: 9,
+        completed_at:
+          Temporal.PlainDate.from("2026-07-01").toZonedDateTime("UTC").epochMilliseconds,
+      });
+      expect(legacySession?.id).toEqual(expect.any(String));
       expect(db.get(sql`SELECT locator FROM progress WHERE book_id = 'legacy-book'`)).toEqual({
         locator: "epubcfi(/6/2)",
       });
@@ -82,12 +96,30 @@ describe("reading session migrations", () => {
           SELECT book_id, reading_session_id, seconds
           FROM reading_daily WHERE id = 'legacy-daily'
         `),
-      ).toEqual({ book_id: "legacy-book", reading_session_id: null, seconds: 42 });
+      ).toEqual({ book_id: "legacy-book", reading_session_id: legacySession?.id, seconds: 42 });
       expect(
         db.all<{ name: string }>(sql`PRAGMA table_info(books)`).map((column) => column.name),
       ).not.toContain("is_finished");
+
+      runMigrations(db, MIGRATIONS);
+      expect(
+        db.all(sql`SELECT id FROM reading_sessions WHERE book_id = 'legacy-book'`),
+      ).toHaveLength(1);
     } finally {
       fs.rmSync(legacyMigrations, { recursive: true, force: true });
     }
+  });
+
+  it("does not leave legacy staging state for a fresh empty database", () => {
+    const db = createDb(":memory:");
+
+    runMigrations(db, MIGRATIONS);
+
+    expect(
+      db.get(sql`
+        SELECT name FROM sqlite_master WHERE type = 'table'
+          AND name = '__marginalia_legacy_reading_sessions'
+      `),
+    ).toBeUndefined();
   });
 });
