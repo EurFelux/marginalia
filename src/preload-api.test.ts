@@ -66,3 +66,27 @@ describe("preload api coverage", () => {
     expect(notBound).toEqual(KNOWN_MAIN_ONLY);
   });
 });
+
+describe("readingSessions", () => {
+  it("forwards lifecycle calls to their IPC contracts", async () => {
+    const invoke = vi.fn(() => Promise.resolve());
+    const api = createApi({
+      invoke,
+      on: vi.fn(() => () => {}),
+      getPathForFile: () => "",
+      prefsSnapshot: {},
+      appLocale: "en",
+    });
+
+    await api.readingSessions.start({ mode: "continue", bookId: "b1" });
+    await api.readingSessions.complete({ bookId: "b1" });
+    await api.readingSessions.list({ bookId: "b1" });
+
+    expect(invoke).toHaveBeenNthCalledWith(1, C.readingSessionsStart.channel, {
+      mode: "continue",
+      bookId: "b1",
+    });
+    expect(invoke).toHaveBeenNthCalledWith(2, C.readingSessionsComplete.channel, { bookId: "b1" });
+    expect(invoke).toHaveBeenNthCalledWith(3, C.readingSessionsList.channel, { bookId: "b1" });
+  });
+});

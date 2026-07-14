@@ -21,6 +21,7 @@ import { registerStatsHandlers } from "@main/ipc/stats-handlers";
 import { registerBackupHandlers } from "@main/ipc/backup-handlers";
 import { registerMemoryHandlers } from "@main/ipc/memory-handlers";
 import { registerAgentHandlers } from "@main/ipc/agent-handlers";
+import { registerReadingSessionHandlers } from "@main/ipc/reading-sessions-handlers";
 import { initReadingClock, bindWindowToClock } from "@main/stats/clock-wiring";
 import { registerCoverProtocol, registerCoverProtocolScheme } from "@main/library/cover-protocol";
 import { registerMediaProtocol, registerMediaProtocolScheme } from "@main/media/media-protocol";
@@ -161,6 +162,7 @@ app.on("ready", async () => {
   registerStatsHandlers();
   registerBackupHandlers();
   registerMemoryHandlers();
+  registerReadingSessionHandlers();
   initReadingClock();
   // 首启自动导入内置样书（幂等；建窗前完成，使首帧渲染时书已在库）
   await maybeSeedSampleBook(getDb(), lang, appService.getPath("booksDir"));

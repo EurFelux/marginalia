@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { setBookFinishedInput, updateBookInput } from "@shared/library";
+import { readingReportStateSchema, startReadingInput } from "@shared/reading-sessions";
 
 describe("updateBookInput", () => {
   it("accepts valid input and trims fields", () => {
@@ -53,5 +54,33 @@ describe("setBookFinishedInput", () => {
   it("rejects non-boolean / missing finished (not a patch)", () => {
     expect(setBookFinishedInput.safeParse({ bookId: "b1", finished: "yes" }).success).toBe(false);
     expect(setBookFinishedInput.safeParse({ bookId: "b1" }).success).toBe(false);
+  });
+});
+
+describe("reading session contracts", () => {
+  it("parses start-reading modes as a discriminated union", () => {
+    expect(startReadingInput.parse({ mode: "continue", bookId: "b1" })).toEqual({
+      mode: "continue",
+      bookId: "b1",
+    });
+    expect(startReadingInput.parse({ mode: "restart", bookId: "b1" })).toEqual({
+      mode: "restart",
+      bookId: "b1",
+    });
+    expect(startReadingInput.safeParse({ mode: "continue", bookId: "" }).success).toBe(false);
+  });
+
+  it("requires content only in report states that preserve a report", () => {
+    expect(readingReportStateSchema.parse({ status: "empty" })).toEqual({ status: "empty" });
+    expect(
+      readingReportStateSchema.safeParse({ status: "regenerating", content: "" }).success,
+    ).toBe(false);
+    expect(
+      readingReportStateSchema.parse({
+        status: "regeneration-failed",
+        content: "# Kept",
+        reason: "offline",
+      }),
+    ).toEqual({ status: "regeneration-failed", content: "# Kept", reason: "offline" });
   });
 });

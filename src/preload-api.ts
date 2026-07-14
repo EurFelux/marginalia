@@ -63,6 +63,12 @@ export function createApi(d: PreloadDeps) {
       save: inv(C.progressSave),
     },
 
+    readingSessions: {
+      start: inv(C.readingSessionsStart),
+      complete: inv(C.readingSessionsComplete),
+      list: inv(C.readingSessionsList),
+    },
+
     content: {
       toc: inv(C.contentToc),
       chapters: inv(C.contentChapters),

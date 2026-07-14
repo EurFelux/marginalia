@@ -63,6 +63,12 @@ import { backupExportInput, backupRestoreInput } from "@shared/backup";
 import type { MemoryDto } from "@shared/memory";
 import { deleteMemoryInput, updateMemoryInput } from "@shared/memory";
 import type { AvatarPickResult } from "@shared/agent";
+import type { ReadingSessionSummaryDto } from "@shared/reading-sessions";
+import {
+  completeReadingInput,
+  listReadingSessionsInput,
+  startReadingInput,
+} from "@shared/reading-sessions";
 
 /** ping —— 演示"带入参且经 Zod 校验"的往返 */
 export const pingInput = z.object({ msg: z.string().min(1) });
@@ -181,6 +187,26 @@ export const C = {
   // progress
   progressGet: def("progress:get", "invoke", bookIdInput, out<{ locator: string } | null>()),
   progressSave: def("progress:save", "invoke", saveProgressInput, out<void>()),
+
+  // reading sessions
+  readingSessionsStart: def(
+    "reading-sessions:start",
+    "invoke",
+    startReadingInput,
+    out<ReadingSessionSummaryDto>(),
+  ),
+  readingSessionsComplete: def(
+    "reading-sessions:complete",
+    "invoke",
+    completeReadingInput,
+    out<ReadingSessionSummaryDto>(),
+  ),
+  readingSessionsList: def(
+    "reading-sessions:list",
+    "invoke",
+    listReadingSessionsInput,
+    out<ReadingSessionSummaryDto[]>(),
+  ),
 
   // content
   contentToc: def("content:toc", "invoke", bookIdInput, out<TocNode[]>()),

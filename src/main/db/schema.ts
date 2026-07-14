@@ -8,6 +8,7 @@ import {
   sqliteTable,
   text,
   unique,
+  uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 import { v7 as uuidv7 } from "uuid";
@@ -81,6 +82,33 @@ export const books = sqliteTable(
     isFinished: integer("is_finished", { mode: "boolean" }).notNull().default(false),
   },
   (t) => [check("books_format_check", sql`${t.format} in ('epub','pdf')`)],
+);
+
+export const readingSessions = sqliteTable(
+  "reading_sessions",
+  {
+    id: pkUuid(),
+    bookId: text("book_id")
+      .notNull()
+      .references(() => books.id, { onDelete: "cascade" }),
+    startedAt: integer("started_at").notNull(),
+    completedAt: integer("completed_at"),
+    report: text("report"),
+  },
+  (t) => [
+    check(
+      "reading_sessions_completed_after_start_check",
+      sql`${t.completedAt} is null or ${t.completedAt} >= ${t.startedAt}`,
+    ),
+    check(
+      "reading_sessions_report_requires_completion_check",
+      sql`${t.report} is null or ${t.completedAt} is not null`,
+    ),
+    uniqueIndex("reading_sessions_one_active_per_book")
+      .on(t.bookId)
+      .where(sql`${t.completedAt} is null`),
+    index("reading_sessions_book_id_idx").on(t.bookId),
+  ],
 );
 
 export const chapters = sqliteTable(
@@ -263,6 +291,9 @@ export const readingDaily = sqliteTable(
   {
     id: pkUuid(),
     bookId: text("book_id").references(() => books.id, { onDelete: "set null" }),
+    readingSessionId: text("reading_session_id").references(() => readingSessions.id, {
+      onDelete: "set null",
+    }),
     day: text("day").notNull(), // 本地日期 'YYYY-MM-DD'
     seconds: integer("seconds").notNull().default(0),
   },
