@@ -18,7 +18,6 @@ import {
   readChapterTextInput,
   reorderBooksInput,
   saveProgressInput,
-  setBookFinishedInput,
   updateBookInput,
 } from "@shared/library";
 import type { ListModelsResult, ProviderDto, RevealResult, TestResult } from "@shared/providers";
@@ -181,12 +180,6 @@ export const C = {
   libraryRelink: def("library:relink", "invoke", bookIdInput, out<RelinkResult>()),
   libraryDelete: def("library:delete", "invoke", bookIdInput, out<void>()),
   libraryUpdate: def("library:update", "invoke", updateBookInput, out<BookSummaryDto>()),
-  librarySetFinished: def(
-    "library:set-finished",
-    "invoke",
-    setBookFinishedInput,
-    out<BookSummaryDto>(),
-  ),
   libraryRecentlyRead: def("library:recently-read", "invoke", z.void(), out<RecentlyReadDto[]>()),
   libraryReorder: def("library:reorder", "invoke", reorderBooksInput, out<void>()),
 

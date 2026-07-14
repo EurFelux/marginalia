@@ -13,7 +13,7 @@ beforeEach(() => {
   useChatStore.setState(CHAT_INITIAL);
   usePrefsStore.setState(PREFS_INITIAL);
   // active 派生 + 记忆槽依赖 currentBookId，测试默认置于某本书的 reader 态
-  useNavigationStore.setState({ ...NAVIGATION_INITIAL, view: "reader", currentBookId: BOOK });
+  useNavigationStore.setState({ ...NAVIGATION_INITIAL, view: "book", currentBookId: BOOK });
 });
 
 describe("chat-store: active = activeByBook 派生", () => {

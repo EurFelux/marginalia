@@ -4,7 +4,15 @@ import { tmpdir } from "node:os";
 import { describe, expect, it, vi } from "vitest";
 import { asc, eq } from "drizzle-orm";
 import { createDb, runMigrations } from "@main/db/client";
-import { annotations, books, chapters, conversations, messages, progress } from "@main/db/schema";
+import {
+  annotations,
+  books,
+  chapters,
+  conversations,
+  messages,
+  progress,
+  readingSessions,
+} from "@main/db/schema";
 import {
   deleteBook,
   getBook,
@@ -15,7 +23,6 @@ import {
   resolveChapterByHref,
   resolveChapter,
   reindexBookIfStale,
-  setBookFinished,
   updateBook,
   CURRENT_PARSER_VERSION,
 } from "@main/library/repository";
@@ -199,38 +206,37 @@ describe("library repository", () => {
     expect(Boolean(item.hasCover)).toBe(false);
   });
 
-  it("imports a book with isFinished=false by default", async () => {
+  it("derives not-started state for a book without sessions", async () => {
+    const db = freshDb();
+    await importBook(db, { bytes: makeFixtureEpub() });
+    expect(listBooks(db)[0].readingState).toBe("not-started");
+  });
+
+  it("derives reading and finished state from sessions", async () => {
     const db = freshDb();
     const book = await importBook(db, { bytes: makeFixtureEpub() });
-    expect(listBooks(db)[0].isFinished).toBe(false);
-    expect(book.isFinished).toBe(false);
+    const { readingSessions } = await import("@main/db/schema");
+    const session = db
+      .insert(readingSessions)
+      .values({ bookId: book.id, startedAt: 1 })
+      .returning()
+      .get();
+    expect(listBooks(db)[0].readingState).toBe("reading");
+    db.update(readingSessions)
+      .set({ completedAt: 2 })
+      .where(eq(readingSessions.id, session.id))
+      .run();
+    expect(listBooks(db)[0].readingState).toBe("finished");
   });
 
-  it("setBookFinished toggles the flag and returns the updated row", async () => {
-    const db = freshDb();
-    const book = await importBook(db, { bytes: makeFixtureEpub() });
-
-    const marked = setBookFinished(db, book.id, true);
-    expect(marked.isFinished).toBe(true);
-    expect(listBooks(db)[0].isFinished).toBe(true);
-
-    const unmarked = setBookFinished(db, book.id, false);
-    expect(unmarked.isFinished).toBe(false);
-    expect(listBooks(db)[0].isFinished).toBe(false);
-  });
-
-  it("setBookFinished throws when the book does not exist", () => {
-    const db = freshDb();
-    expect(() => setBookFinished(db, "nope", true)).toThrow(/not found/);
-  });
-
-  it("listRecentlyRead excludes finished books", async () => {
+  it("listRecentlyRead includes only books with active sessions", async () => {
     const db = freshDb();
     const book = await importBook(db, { bytes: makeFixtureEpub() });
     saveProgress(db, book.id, "loc-1", 0.5);
-    expect(listRecentlyRead(db)).toHaveLength(1); // 未读完时出现在 shelf
-    setBookFinished(db, book.id, true);
-    expect(listRecentlyRead(db)).toHaveLength(0); // 标记已读完后从「继续阅读」移除
+    expect(listRecentlyRead(db)).toHaveLength(0);
+    const { readingSessions } = await import("@main/db/schema");
+    db.insert(readingSessions).values({ bookId: book.id, startedAt: 1 }).run();
+    expect(listRecentlyRead(db)).toHaveLength(1);
   });
 });
 
@@ -388,6 +394,7 @@ describe("listRecentlyRead (#48)", () => {
   const touch = (db: ReturnType<typeof createDb>, id: string, at: number, percent?: number) => {
     saveProgress(db, id, "epubcfi(/6/2!/4/1:0)", percent);
     db.update(progress).set({ updatedAt: at }).where(eq(progress.bookId, id)).run();
+    db.insert(readingSessions).values({ bookId: id, startedAt: at }).run();
   };
 
   it("returns only read books, most recent first", () => {

@@ -1,6 +1,6 @@
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { CircleCheck, CircleDashed, NotebookPen, Pencil, Trash2 } from "lucide-react";
+import { NotebookPen, Pencil, Trash2 } from "lucide-react";
 import type { BookSummaryDto } from "@shared/library";
 import { Button } from "@renderer/components/ui/button";
 import {
@@ -33,13 +33,11 @@ export function BookCover({
   onOpen,
   onDelete,
   onUpdate,
-  onToggleFinished,
 }: {
   book: BookSummaryDto;
   onOpen: () => void;
   onDelete: () => void;
   onUpdate: (patch: { title: string; author: string | null }) => void;
-  onToggleFinished: () => void;
 }) {
   const { t } = useTranslation();
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -82,12 +80,6 @@ export function BookCover({
           <CoverImage book={book} />
         </ContextMenuTrigger>
         <ContextMenuContent>
-          <ContextMenuItem onClick={onToggleFinished}>
-            {book.isFinished ? <CircleDashed /> : <CircleCheck />}
-            {book.isFinished
-              ? t("library.menu.unmarkFinished", "取消已读完")
-              : t("library.menu.markFinished", "标记已读完")}
-          </ContextMenuItem>
           <ContextMenuItem onClick={openEdit}>
             <Pencil />
             {t("library.menu.edit", "编辑信息")}

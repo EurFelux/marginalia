@@ -3,14 +3,22 @@ import type { DB } from "@main/db/client";
 import { books, readingDaily } from "@main/db/schema";
 import type { BookReadingTotal, DailyPoint } from "@shared/stats";
 
-/** 累加某书某本地日的阅读秒数（upsert on (bookId, day)）。非正秒数忽略。 */
-export function addSeconds(db: DB, bookId: string, day: string, seconds: number): void {
-  if (seconds <= 0) return;
+export interface AddReadingSecondsInput {
+  bookId: string;
+  readingSessionId: string;
+  day: string;
+  seconds: number;
+}
+
+/** 累加某轮次某本地日的阅读秒数。非正秒数忽略。 */
+export function addSeconds(db: DB, input: AddReadingSecondsInput): void {
+  if (input.seconds <= 0) return;
   db.insert(readingDaily)
-    .values({ bookId, day, seconds })
+    .values(input)
     .onConflictDoUpdate({
-      target: [readingDaily.bookId, readingDaily.day],
-      set: { seconds: sql`${readingDaily.seconds} + ${seconds}` },
+      target: [readingDaily.readingSessionId, readingDaily.day],
+      targetWhere: sql`${readingDaily.readingSessionId} is not null`,
+      set: { seconds: sql`${readingDaily.seconds} + ${input.seconds}` },
     })
     .run();
 }

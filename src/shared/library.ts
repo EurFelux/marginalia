@@ -7,11 +7,6 @@ export const bookIdInput = z.object({ bookId: z.string().min(1) });
 export type BookIdInput = z.infer<typeof bookIdInput>;
 
 /** #70 「已读完」标记切换。finished 必传（非 patch；缺键拒绝），独立于 progress。 */
-export const setBookFinishedInput = z.object({
-  bookId: z.string().min(1),
-  finished: z.boolean(),
-});
-export type SetBookFinishedInput = z.infer<typeof setBookFinishedInput>;
 
 /** #29 书籍信息编辑。put 语义：两字段必传；author=null 显式清空（回「未知作者」显示）。空串收敛（""→null）由 renderer 表单完成，此处 min(1) 拒空串防绕过 UI 的脏输入。 */
 export const updateBookInput = z.object({
@@ -55,7 +50,7 @@ export interface BookSummaryDto {
   format: "epub" | "pdf";
   pageCount: number | null;
   hasTextLayer: boolean;
-  isFinished: boolean;
+  readingState: import("@shared/reading-sessions").BookReadingState;
 }
 
 export const reorderBooksInput = z.object({

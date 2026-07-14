@@ -4,6 +4,7 @@ import { createReadingClock, type ReadingClock } from "@main/stats/clock";
 import { localDayKey } from "@main/stats/day-key";
 import { addSeconds } from "@main/stats/reading-daily";
 import { createLogger } from "@main/logger";
+import { getActiveReadingSession } from "@main/reading-sessions/repository";
 
 const log = createLogger("stats");
 
@@ -25,7 +26,13 @@ export function initReadingClock(): void {
     now: () => Date.now(),
     commit: (bookId, atMs, seconds) => {
       try {
-        addSeconds(getDb(), bookId, localDayKey(atMs), seconds);
+        const db = getDb();
+        const session = getActiveReadingSession(db, bookId);
+        if (!session) {
+          log.warn(`dropping reading time without active session for book ${bookId}`);
+          return;
+        }
+        addSeconds(db, { bookId, readingSessionId: session.id, day: localDayKey(atMs), seconds });
       } catch (err) {
         log.warn("commit reading time failed", err);
       }

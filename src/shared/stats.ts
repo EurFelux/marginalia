@@ -2,7 +2,10 @@ import { z } from "zod";
 
 /** 渲染层 → 主进程的 fire-and-forget **写**（非 getter）：上报「现在在读哪本书」，
  * 进/出 reader 时调用；设置弹窗遮挡 reader 时上报 null（暂停计时）。 */
-export const statsReadingStateInput = z.object({ bookId: z.string().min(1).nullable() });
+export const statsReadingStateInput = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("idle") }),
+  z.object({ status: z.literal("active"), bookId: z.string().min(1) }),
+]);
 export type StatsReadingStateInput = z.infer<typeof statsReadingStateInput>;
 
 /** 统计页取数；dailyDays 控制每日柱图窗口（省略时由 handler 兜底 30——

@@ -15,15 +15,16 @@ export function CoverImage({
   withText?: boolean;
 }) {
   const { t } = useTranslation();
-  const finishedBadge = book.isFinished ? (
-    <span
-      aria-label={t("library.finishedBadge", "已读完")}
-      title={t("library.finishedBadge", "已读完")}
-      className="absolute right-1.5 top-1.5 flex size-5 items-center justify-center rounded-full bg-emerald-600 text-white shadow-md"
-    >
-      <Check className="size-3.5" strokeWidth={3} />
-    </span>
-  ) : null;
+  const finishedBadge =
+    book.readingState === "finished" ? (
+      <span
+        aria-label={t("library.finishedBadge", "已读完")}
+        title={t("library.finishedBadge", "已读完")}
+        className="absolute right-1.5 top-1.5 flex size-5 items-center justify-center rounded-full bg-emerald-600 text-white shadow-md"
+      >
+        <Check className="size-3.5" strokeWidth={3} />
+      </span>
+    ) : null;
 
   if (book.hasCover) {
     return (

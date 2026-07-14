@@ -5,10 +5,14 @@ import { aggregateStats, aggregateReadingStats } from "@main/stats/aggregate";
 import { localDayKey } from "@main/stats/day-key";
 import { dailyTotals, perBookTotals } from "@main/stats/reading-daily";
 import { getReadingClock } from "@main/stats/clock-wiring";
+import { getActiveReadingSession } from "@main/reading-sessions/repository";
 import { bind, register, type Binding } from "@main/ipc/registry";
 
 export const statsBindings: Binding[] = [
   bind(C.statsReadingState, (input) => {
+    if (input.status === "idle") return getReadingClock().setReadingBook(null);
+    if (!getActiveReadingSession(getDb(), input.bookId))
+      throw new Error(`stats:reading-state — book ${input.bookId} has no active reading session`);
     getReadingClock().setReadingBook(input.bookId);
   }),
   bind(C.statsGet, (input): ReadingStatsDto => {

@@ -18,13 +18,11 @@ export function SortableBook({
   onOpen,
   onDelete,
   onUpdate,
-  onToggleFinished,
 }: {
   book: BookSummaryDto;
   onOpen: () => void;
   onDelete: () => void;
   onUpdate: (patch: { title: string; author: string | null }) => void;
-  onToggleFinished: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: book.id,
@@ -38,13 +36,7 @@ export function SortableBook({
       {...attributes}
       {...guard.listeners}
     >
-      <BookCover
-        book={book}
-        onOpen={onOpen}
-        onDelete={onDelete}
-        onUpdate={onUpdate}
-        onToggleFinished={onToggleFinished}
-      />
+      <BookCover book={book} onOpen={onOpen} onDelete={onDelete} onUpdate={onUpdate} />
     </li>
   );
 }

@@ -3,7 +3,7 @@ import { useNavigationStore } from "@renderer/store/navigation-store";
 import { TooltipProvider } from "@renderer/components/ui/tooltip";
 import { hydratePreferences } from "@renderer/store/hydrate-preferences";
 import { AppShell } from "@renderer/shell/AppShell";
-import { ReaderView } from "@renderer/reader/ReaderView";
+import { BookRoute } from "@renderer/reading/BookRoute";
 import { SettingsShell } from "@renderer/settings/SettingsShell";
 import { ThemeController } from "@renderer/theme/ThemeController";
 import { Toaster } from "@renderer/components/ui/sonner";
@@ -21,7 +21,7 @@ export function App() {
   return (
     <TooltipProvider>
       <ThemeController />
-      {view === "reader" ? <ReaderView /> : <AppShell />}
+      {view === "book" ? <BookRoute /> : <AppShell />}
       <SettingsShell />
       <Toaster />
     </TooltipProvider>

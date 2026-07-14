@@ -37,6 +37,7 @@ const log = createLogger("pdf");
 interface Props {
   bookId: string;
   chapters: ChapterRefDto[];
+  persistProgress: boolean;
 }
 
 const SAVE_DEBOUNCE_MS = 1000; // 对齐 EpubReader
@@ -47,7 +48,7 @@ const ZOOM_GESTURE_GAP_MS = 250;
 /** 同页缩放重渲的 debounce：停止缩放此毫秒后才渲到新分辨率；过程中 CSS 拉伸旧画面（不闪不卡）。 */
 const RENDER_DEBOUNCE_MS = 140;
 
-export function PdfReader({ bookId, chapters }: Props) {
+export function PdfReader({ bookId, chapters, persistProgress }: Props) {
   const { t } = useTranslation();
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
   const qc = useQueryClient();
@@ -251,6 +252,7 @@ export function PdfReader({ bookId, chapters }: Props) {
   }, [closeStyleBar, setSelection, closeNoteHover]);
 
   const saveAt = (page: number, scrollRatio: number, percent: number) => {
+    if (!persistProgress) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       const locator = makePdfLocator({ page, scrollRatio });

@@ -45,12 +45,13 @@ function firstTextNode(node: Node): Text | null {
 interface Props {
   bookId: string;
   chapters: ChapterRefDto[];
+  persistProgress: boolean;
 }
 
 const SAVE_DEBOUNCE_MS = 1000;
 const CURRENT_EPUB_READ_CHARS = 4_000;
 
-export function EpubReader({ bookId, chapters }: Props) {
+export function EpubReader({ bookId, chapters, persistProgress }: Props) {
   const { t } = useTranslation();
   const vRef = useRef<VirtualDocsHandle | null>(null);
   const { book, parseError, bytesError, bytesMissing } = useEpubSession();
@@ -284,7 +285,7 @@ export function EpubReader({ bookId, chapters }: Props) {
       if (chId !== currentChapterId) setCurrentChapter(chId);
     }
     // 防抖存进度（section 级 CFI）
-    if (cfi) {
+    if (cfi && persistProgress) {
       if (saveTimer.current) clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(() => {
         void window.api.progress

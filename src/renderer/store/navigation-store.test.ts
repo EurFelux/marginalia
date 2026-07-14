@@ -8,12 +8,21 @@ beforeEach(() => {
 });
 
 describe("navigation-store", () => {
-  it("openBook switches to reader view with ids", () => {
+  it("openBook switches to book view in auto mode with ids", () => {
     useNavigationStore.getState().openBook("b1", "c1");
     const s = useNavigationStore.getState();
-    expect(s.view).toBe("reader");
+    expect(s.view).toBe("book");
+    expect(s.bookMode).toBe("auto");
     expect(s.currentBookId).toBe("b1");
     expect(s.currentChapterId).toBe("c1");
+  });
+  it("openBookReference sets reference mode", () => {
+    useNavigationStore.getState().openBookReference("b1");
+    expect(useNavigationStore.getState()).toMatchObject({
+      view: "book",
+      currentBookId: "b1",
+      bookMode: "reference",
+    });
   });
   it("openBook with only bookId leaves currentChapterId null", () => {
     useNavigationStore.getState().openBook("b1");

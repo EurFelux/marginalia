@@ -3,9 +3,10 @@ import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import { parseEpub, type TocNode } from "@marginalia/epub-parser";
 import { parsePdf, renderPageImage } from "@marginalia/pdf-parser";
 import type { DB } from "@main/db/client";
-import { books, chapters, progress } from "@main/db/schema";
+import { books, chapters, progress, readingSessions } from "@main/db/schema";
 import { deleteBookFile } from "@main/library/book-files";
 import { createLogger } from "@main/logger";
+import { getBookReadingState } from "@main/reading-sessions/repository";
 
 const log = createLogger("library");
 
@@ -184,11 +185,11 @@ export function listBooks(db: DB) {
       format: books.format,
       pageCount: books.pageCount,
       hasTextLayer: books.hasTextLayer,
-      isFinished: books.isFinished,
     })
     .from(books)
     .orderBy(asc(books.position), asc(books.addedAt))
-    .all();
+    .all()
+    .map((book) => ({ ...book, readingState: getBookReadingState(db, book.id) }));
 }
 
 /**
@@ -207,16 +208,19 @@ export function listRecentlyRead(db: DB, limit = RECENT_SHELF_LIMIT) {
       format: books.format,
       pageCount: books.pageCount,
       hasTextLayer: books.hasTextLayer,
-      isFinished: books.isFinished,
       percent: progress.percent,
       lastReadAt: progress.updatedAt,
     })
     .from(books)
     .innerJoin(progress, eq(progress.bookId, books.id))
-    .where(eq(books.isFinished, false))
+    .innerJoin(
+      readingSessions,
+      and(eq(readingSessions.bookId, books.id), isNull(readingSessions.completedAt)),
+    )
     .orderBy(desc(progress.updatedAt))
     .limit(limit)
-    .all();
+    .all()
+    .map((book) => ({ ...book, readingState: "reading" as const }));
 }
 
 /** 手动排序全量重写（#48）：position = orderedIds 下标。未知 id 的 UPDATE 是 no-op，无害。 */
@@ -249,17 +253,6 @@ export function updateBook(
   return row;
 }
 
-/** #70 切换「已读完」标记。独立于 progress；命中 0 行（书不存在）抛错（镜像 updateBook）。 */
-export function setBookFinished(db: DB, bookId: string, finished: boolean): BookRow {
-  const row = db
-    .update(books)
-    .set({ isFinished: finished })
-    .where(eq(books.id, bookId))
-    .returning()
-    .get();
-  if (!row) throw new Error(`library: book ${bookId} not found`);
-  return row;
-}
 export function resolveChapterByHref(db: DB, bookId: string, href: string): ChapterRow | undefined {
   return db
     .select()

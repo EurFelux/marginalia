@@ -104,27 +104,6 @@ export function LibraryView() {
     },
   });
 
-  // 切换「已读完」（#70）：成功静默（角标即时刷新即反馈）；失败 toast 透传真实错误。
-  // qk.book(bookId) 一并失效——reader 侧栏 BookCard 共用且 staleTime=∞；shelf 也显示角标故失效 recentlyRead。
-  const setFinished = useMutation({
-    mutationFn: (v: { bookId: string; finished: boolean }) => window.api.library.setFinished(v),
-    onSuccess: (_r, v) => {
-      void qc.invalidateQueries({ queryKey: qk.library });
-      void qc.invalidateQueries({ queryKey: qk.book(v.bookId) });
-      void qc.invalidateQueries({ queryKey: qk.recentlyRead });
-    },
-    onError: (e, v) => {
-      const b = books.data?.find((x) => x.id === v.bookId);
-      toast.error(
-        t("library.setFinishedFailed", "{{title}} 标记失败：{{error}}", {
-          title: b?.title ?? v.bookId,
-          error: (e as Error).message,
-        }),
-        { closeButton: true, duration: Infinity },
-      );
-    },
-  });
-
   // 拖拽排序（#48 spec §6.2）：8px 位移激活（与点击打开互斥）；乐观更新缓存后全量 reorder，
   // 失败 invalidate 恢复真序 + toast 透传真实错误（honest-error）。
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
@@ -268,9 +247,6 @@ export function LibraryView() {
                     onOpen={() => openBook(b.id)}
                     onDelete={() => deleteBook.mutate(b)}
                     onUpdate={(patch) => updateBook.mutate({ bookId: b.id, ...patch })}
-                    onToggleFinished={() =>
-                      setFinished.mutate({ bookId: b.id, finished: !b.isFinished })
-                    }
                   />
                 ))}
               </ul>
@@ -282,7 +258,6 @@ export function LibraryView() {
                   onOpen={() => {}}
                   onDelete={() => {}}
                   onUpdate={() => {}}
-                  onToggleFinished={() => {}}
                 />
               ) : null}
             </DragOverlay>

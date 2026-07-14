@@ -11,13 +11,13 @@ export function useReadingClock(bookId: string | null): void {
   useEffect(() => {
     const target = bookId != null && !settingsOpen ? bookId : null;
     void window.api.stats
-      .readingState({ bookId: target })
+      .readingState(target ? { status: "active", bookId: target } : { status: "idle" })
       .catch((err: unknown) => log.warn("reading-state report failed", err));
   }, [bookId, settingsOpen]);
   // 卸载（离开 reader）时复位 null。
   useEffect(
     () => () => {
-      void window.api.stats.readingState({ bookId: null }).catch(() => {});
+      void window.api.stats.readingState({ status: "idle" }).catch(() => {});
     },
     [],
   );

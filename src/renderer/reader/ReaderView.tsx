@@ -41,11 +41,12 @@ import { TtsControlBar } from "@renderer/reader/TtsControlBar";
 import { ttsController } from "@renderer/reader/tts/tts-controller";
 import { useTtsStore } from "@renderer/store/tts-store";
 import { EpubSessionProvider } from "@renderer/reader/epub-session";
+import { CompleteReadingDialog } from "@renderer/reading/CompleteReadingDialog";
 
-export function ReaderView() {
+export function ReaderView({ mode }: { mode: "active" | "reference" }) {
   const { t } = useTranslation();
   const bookId = useNavigationStore((s) => s.currentBookId);
-  useReadingClock(bookId);
+  useReadingClock(mode === "active" ? bookId : null);
   useRestoreConversation(bookId ? { kind: "book", bookId } : null);
   const chapterId = useNavigationStore((s) => s.currentChapterId);
   const backToLibrary = useNavigationStore((s) => s.backToLibrary);
@@ -164,6 +165,13 @@ export function ReaderView() {
             )}
           </div>
           <div className="flex shrink-0 items-center gap-1">
+            {mode === "active" ? (
+              <CompleteReadingDialog bookId={bookId} />
+            ) : (
+              <span className="px-2 text-xs text-muted-foreground">
+                {t("reading.referenceMode", "参考模式")}
+              </span>
+            )}
             {!book.isPending && (book.data?.format === "pdf" ? <PdfPrefs /> : <ReaderPrefs />)}
             {!book.isPending && book.data?.format !== "pdf" && (
               <Tooltip>
@@ -266,9 +274,17 @@ export function ReaderView() {
             {/* 按格式分发：book 查询就绪前不渲染（避免 PDF 书闪挂 EpubReader）。
                 EpubReader 自管载入/错误态，并据 CFI 进度恢复初始位置。 */}
             {book.isPending ? null : book.data?.format === "pdf" ? (
-              <PdfReader bookId={bookId} chapters={chapters.data ?? []} />
+              <PdfReader
+                bookId={bookId}
+                chapters={chapters.data ?? []}
+                persistProgress={mode === "active"}
+              />
             ) : (
-              <EpubReader bookId={bookId} chapters={chapters.data ?? []} />
+              <EpubReader
+                bookId={bookId}
+                chapters={chapters.data ?? []}
+                persistProgress={mode === "active"}
+              />
             )}
             <TtsControlBar />
           </main>

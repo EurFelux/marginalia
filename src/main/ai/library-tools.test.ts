@@ -1,7 +1,14 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { createDb, runMigrations } from "@main/db/client";
-import { books, progress, annotations, bookNotes, readingDaily } from "@main/db/schema";
+import {
+  books,
+  progress,
+  annotations,
+  bookNotes,
+  readingDaily,
+  readingSessions,
+} from "@main/db/schema";
 import { createLibraryTools } from "@main/ai/library-tools";
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
@@ -17,13 +24,12 @@ async function run(tool: unknown, args: unknown = {}) {
 }
 
 describe("createLibraryTools", () => {
-  it("listBooks returns the catalog with progress + finished flags", async () => {
+  it("listBooks returns the catalog with derived reading state", async () => {
     const db = freshDb();
-    db.insert(books)
-      .values({ id: "b1", title: "Stoicism", author: "M.A.", isFinished: false })
-      .run();
-    db.insert(books).values({ id: "b2", title: "Done", isFinished: true }).run();
+    db.insert(books).values({ id: "b1", title: "Stoicism", author: "M.A." }).run();
+    db.insert(books).values({ id: "b2", title: "Done" }).run();
     db.insert(progress).values({ bookId: "b1", locator: "loc", percent: 0.4 }).run();
+    db.insert(readingSessions).values({ bookId: "b1", startedAt: 1 }).run();
     const tools = createLibraryTools({ db });
     const list = (await run(tools.listBooks)) as Array<Record<string, unknown>>;
     expect(list.map((b) => b.id).sort((a, b) => String(a).localeCompare(String(b)))).toEqual([
@@ -33,7 +39,7 @@ describe("createLibraryTools", () => {
     const b1 = list.find((b) => b.id === "b1")!;
     expect(b1.title).toBe("Stoicism");
     expect(b1.progressPercent).toBe(0.4);
-    expect(b1.isFinished).toBe(false);
+    expect(b1.readingState).toBe("reading");
   });
   it("getBook returns details; unknown id returns an error hint", async () => {
     const db = freshDb();

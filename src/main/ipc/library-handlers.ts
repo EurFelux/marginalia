@@ -12,7 +12,6 @@ import {
   listRecentlyRead,
   reindexBookIfStale,
   reorderBooks,
-  setBookFinished,
   updateBook,
   CURRENT_PARSER_VERSION,
 } from "@main/library/repository";
@@ -35,6 +34,7 @@ import {
 import { makeSummaryDeps } from "@main/ai/send-deps";
 import { bind, register, type Binding } from "@main/ipc/registry";
 import { createLogger } from "@main/logger";
+import { getActiveReadingSession, getBookReadingState } from "@main/reading-sessions/repository";
 
 const log = createLogger("library");
 
@@ -60,7 +60,7 @@ const toDto = (b: {
   format: "epub" | "pdf";
   pageCount: number | null;
   hasTextLayer: boolean;
-  isFinished: boolean;
+  readingState: import("@shared/reading-sessions").BookReadingState;
 }): BookSummaryDto => ({
   id: b.id,
   title: b.title,
@@ -69,7 +69,7 @@ const toDto = (b: {
   format: b.format,
   pageCount: b.pageCount,
   hasTextLayer: Boolean(b.hasTextLayer),
-  isFinished: Boolean(b.isFinished),
+  readingState: b.readingState,
 });
 
 export const libraryBindings: Binding[] = [
@@ -78,7 +78,11 @@ export const libraryBindings: Binding[] = [
     const book = await importBook(getDb(), { bytes, fileName: path.basename(input.filePath) });
     await writeBookFile(appService.getPath("booksDir"), book.id, book.format, bytes); // 复制进 app 自有位置（relink/重导即覆盖）
     log.info(`book imported: ${book.id} (${book.format}, ${Math.round(bytes.length / 1024)}KB)`);
-    return toDto({ ...book, hasCover: book.cover != null && book.cover.length > 0 });
+    return toDto({
+      ...book,
+      hasCover: book.cover != null && book.cover.length > 0,
+      readingState: getBookReadingState(getDb(), book.id),
+    });
   }),
 
   bind(C.libraryPickBook, async () => {
@@ -95,7 +99,13 @@ export const libraryBindings: Binding[] = [
 
   bind(C.libraryGet, (input) => {
     const b = getBook(getDb(), input.bookId);
-    return b ? toDto({ ...b, hasCover: b.cover != null && b.cover.length > 0 }) : null;
+    return b
+      ? toDto({
+          ...b,
+          hasCover: b.cover != null && b.cover.length > 0,
+          readingState: getBookReadingState(getDb(), b.id),
+        })
+      : null;
   }),
 
   bind(C.libraryReadBookBytes, async (input) => {
@@ -135,12 +145,11 @@ export const libraryBindings: Binding[] = [
 
   bind(C.libraryUpdate, (input) => {
     const book = updateBook(getDb(), input);
-    return toDto({ ...book, hasCover: book.cover != null && book.cover.length > 0 });
-  }),
-
-  bind(C.librarySetFinished, (input) => {
-    const book = setBookFinished(getDb(), input.bookId, input.finished);
-    return toDto({ ...book, hasCover: book.cover != null && book.cover.length > 0 });
+    return toDto({
+      ...book,
+      hasCover: book.cover != null && book.cover.length > 0,
+      readingState: getBookReadingState(getDb(), book.id),
+    });
   }),
 
   // shelf 数据：toDto 复用保证 hasCover 布尔化等口径一致，percent/lastReadAt 原样透传。
@@ -163,6 +172,8 @@ export const libraryBindings: Binding[] = [
     const db = getDb();
     if (!getBook(db, input.bookId))
       throw new Error(`progress:save — book ${input.bookId} not found`);
+    if (!getActiveReadingSession(db, input.bookId))
+      throw new Error(`progress:save — book ${input.bookId} has no active reading session`);
     saveProgress(db, input.bookId, input.locator, input.percent);
   }),
 

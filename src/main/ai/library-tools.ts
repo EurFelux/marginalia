@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { DB } from "@main/db/client";
 import { runTool } from "@main/ai/tools";
 import { listBooks, listRecentlyRead, getBook } from "@main/library/repository";
+import { getBookReadingState } from "@main/reading-sessions/repository";
 import { getBookSummaryView } from "@main/ai/summary";
 import { listBookNotesByBook } from "@main/library/book-notes";
 import { listAnnotationsByBook } from "@main/library/annotations";
@@ -19,7 +20,7 @@ export function createLibraryTools(deps: LibraryToolsDeps) {
   return {
     listBooks: tool({
       description:
-        "List every book in the reader's library with reading state. Returns id, title, author, format, isFinished, progressPercent (0–1 or null), lastReadAt (ms or null). Start here to ground any recommendation or discussion.",
+        "List every book in the reader's library with reading state. Returns id, title, author, format, readingState, progressPercent (0–1 or null), lastReadAt (ms or null). Start here to ground any recommendation or discussion.",
       inputSchema: z.object({}),
       execute: async () => {
         const recent = new Map(listRecentlyRead(db, Number.MAX_SAFE_INTEGER).map((r) => [r.id, r]));
@@ -30,7 +31,7 @@ export function createLibraryTools(deps: LibraryToolsDeps) {
             title: b.title,
             author: b.author,
             format: b.format,
-            isFinished: b.isFinished,
+            readingState: b.readingState,
             progressPercent: r?.percent ?? null,
             lastReadAt: r?.lastReadAt ?? null,
           };
@@ -39,7 +40,7 @@ export function createLibraryTools(deps: LibraryToolsDeps) {
     }),
     getBook: tool({
       description:
-        "Get one book's details by its id (from listBooks): title, author, format, pageCount, isFinished, addedAt, and its AI book summary (status + text if ready).",
+        "Get one book's details by its id (from listBooks): title, author, format, pageCount, readingState, addedAt, and its AI book summary (status + text if ready).",
       inputSchema: z.object({ bookId: z.string().min(1) }),
       execute: async ({ bookId }) =>
         runTool("getBook", () => {
@@ -53,7 +54,7 @@ export function createLibraryTools(deps: LibraryToolsDeps) {
             author: book.author,
             format: book.format,
             pageCount: book.pageCount,
-            isFinished: book.isFinished,
+            readingState: getBookReadingState(db, bookId),
             addedAt: book.addedAt,
             summaryStatus: summaryView.status,
             // summary 直接读 book 列：getBookSummaryView.summary 与 book.summary 等价（无 inFlight 时），

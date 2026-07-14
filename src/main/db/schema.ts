@@ -78,8 +78,6 @@ export const books = sqliteTable(
     position: integer("position").notNull().default(0),
     // 解析器版本：低于 CURRENT_PARSER_VERSION 的书开书时惰性重建索引（锚点级章节升级）。null/0 = 旧。
     parserVersion: integer("parser_version").notNull().default(0),
-    // 「已读完」手动标记（#70）：独立布尔，不从 progress 派生、不影响进度。默认未读完。
-    isFinished: integer("is_finished", { mode: "boolean" }).notNull().default(false),
   },
   (t) => [check("books_format_check", sql`${t.format} in ('epub','pdf')`)],
 );
@@ -298,11 +296,12 @@ export const readingDaily = sqliteTable(
     seconds: integer("seconds").notNull().default(0),
   },
   (t) => [
-    // upsert 只以**非空** bookId 命中 (bookId, day)；null 仅由删书 set null 产生（SQLite 视多个
-    // NULL 相异，故同一天可有多条 null 行——均计入每日合计求和，无碍）。勿用可空 bookId 做 upsert。
-    unique("reading_daily_book_day_unique").on(t.bookId, t.day),
+    uniqueIndex("reading_daily_session_day_unique")
+      .on(t.readingSessionId, t.day)
+      .where(sql`${t.readingSessionId} is not null`),
     index("reading_daily_day_idx").on(t.day),
     index("reading_daily_book_id_idx").on(t.bookId),
+    index("reading_daily_session_id_idx").on(t.readingSessionId),
   ],
 );
 
