@@ -13,6 +13,7 @@ import {
 import { ReadingReportRuntime } from "@main/reading-report/runtime";
 import { setPreference } from "@main/preferences/repository";
 import {
+  cancelReadingReportGeneration,
   getReadingSessionDetail,
   saveUserReadingReport,
   startReadingReportGeneration,
@@ -200,6 +201,79 @@ describe("reading report service", () => {
       content: "# Manual",
     });
     expect(deps.runtime.inFlight.has(session.id)).toBe(false);
+  });
+
+  it("cancels initial generation without accepting a late result", async () => {
+    warn.mockClear();
+    const { deps, session, task, drain } = setup();
+    let signal: AbortSignal | undefined;
+    deps.resolveModel = () => ({ ok: true, model: {} as never, modelId: "summary" });
+    deps.runAgent = vi.fn((input) => {
+      signal = input.abortSignal;
+      return task.promise;
+    });
+
+    startReadingReportGeneration(deps, session.id);
+    expect(cancelReadingReportGeneration(deps, session.id)).toEqual({ outcome: "canceled" });
+    expect(signal?.aborted).toBe(true);
+    expect(getReadingSessionDetail(deps, session.id).report).toEqual({ status: "empty" });
+    expect(cancelReadingReportGeneration(deps, session.id)).toEqual({ outcome: "idle" });
+
+    task.resolve("# Late result");
+    await drain();
+    expect(getReadingSessionDetail(deps, session.id).report).toEqual({ status: "empty" });
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("cancels regeneration while preserving the old report", async () => {
+    warn.mockClear();
+    const { deps, session, task, drain } = setup({ report: "# Old" });
+    let signal: AbortSignal | undefined;
+    deps.resolveModel = () => ({ ok: true, model: {} as never, modelId: "summary" });
+    deps.runAgent = vi.fn((input) => {
+      signal = input.abortSignal;
+      return task.promise;
+    });
+
+    startReadingReportGeneration(deps, session.id);
+    expect(cancelReadingReportGeneration(deps, session.id)).toEqual({ outcome: "canceled" });
+    expect(signal?.aborted).toBe(true);
+    expect(getReadingSessionDetail(deps, session.id).report).toEqual({
+      status: "ready",
+      content: "# Old",
+    });
+
+    task.resolve("# Late result");
+    await drain();
+    expect(getReadingSessionDetail(deps, session.id).report).toEqual({
+      status: "ready",
+      content: "# Old",
+    });
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("discards staged memory when cancellation races with completion", async () => {
+    const { deps, session, drain } = setup({ report: "# Old" });
+    const staged = deferred<void>();
+    const finish = deferred<string>();
+    deps.resolveModel = () => ({ ok: true, model: {} as never, modelId: "summary" });
+    deps.runAgent = vi.fn(async (input) => {
+      await executeAgentTool(input, "saveMemory", memoryInput);
+      staged.resolve();
+      return finish.promise;
+    });
+
+    startReadingReportGeneration(deps, session.id);
+    await staged.promise;
+    cancelReadingReportGeneration(deps, session.id);
+    finish.resolve("# Late result");
+    await drain();
+
+    expect(getMemoryBySlug(deps.db, "durable-insight")).toBeNull();
+    expect(getReadingSessionDetail(deps, session.id).report).toEqual({
+      status: "ready",
+      content: "# Old",
+    });
   });
 
   it("rebuilds assistant identity and reader instructions for every generation", async () => {

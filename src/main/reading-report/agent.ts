@@ -13,6 +13,7 @@ export interface RunReadingReportAgentInput {
   startedAt: number;
   completedAt: number;
   activeSeconds: number;
+  abortSignal: AbortSignal;
 }
 
 export async function runReadingReportAgent(input: RunReadingReportAgentInput): Promise<string> {
@@ -23,6 +24,7 @@ export async function runReadingReportAgent(input: RunReadingReportAgentInput): 
     prompt: `Write the completion report for ${input.bookTitle ?? "this book"}. This reading ran from ${input.startedAt} to ${input.completedAt} and has ${input.activeSeconds} active reading seconds. Inspect reader traces before writing.`,
     tools: input.tools,
     providerOptions: providerCallOptions(input.resolved.providerType),
+    abortSignal: input.abortSignal,
     stopWhen: isStepCount(10),
     maxOutputTokens: 4096,
     maxRetries: 1,

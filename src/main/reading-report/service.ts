@@ -74,10 +74,11 @@ export function startReadingReportGeneration(
     deps.runtime.fail(sessionId, { kind });
     return { outcome: "unavailable" };
   }
-  const generation = deps.runtime.claim(sessionId, kind);
-  if (generation == null) return { outcome: "accepted" };
+  const claim = deps.runtime.claim(sessionId, kind);
+  if (claim == null) return { outcome: "accepted" };
   void deps
     .runBackground(async () => {
+      claim.signal.throwIfAborted();
       const title =
         deps.db.select({ title: books.title }).from(books).where(eq(books.id, session.bookId)).get()
           ?.title ?? null;
@@ -96,23 +97,33 @@ export function startReadingReportGeneration(
         startedAt: session.startedAt,
         completedAt: session.completedAt!,
         activeSeconds: readingSessionSeconds(deps.db, session.id),
+        abortSignal: claim.signal,
       });
       return { content, memoryMutations: memoryWorkspace.mutations() };
     })
     .then((result) => {
-      if (!deps.runtime.isCurrent(session.id, generation)) return;
+      if (!deps.runtime.isCurrent(session.id, claim.generation)) return;
       const committedAt = deps.now().epochMilliseconds;
       deps.db.transaction((tx) => {
         saveReadingReportInTransaction(tx, session.id, result.content);
         applyReadingReportMemoryMutations(tx, result.memoryMutations, committedAt);
       });
-      deps.runtime.succeed(session.id, generation);
+      deps.runtime.succeed(session.id, claim.generation);
     })
     .catch((err: unknown) => {
+      if (!deps.runtime.isCurrent(session.id, claim.generation)) return;
       log.warn(`generation failed for session ${session.id}`, err);
-      deps.runtime.fail(session.id, { kind }, generation);
+      deps.runtime.fail(session.id, { kind }, claim.generation);
     });
   return { outcome: "accepted" };
+}
+
+export function cancelReadingReportGeneration(
+  deps: Pick<ReadingReportServiceDeps, "db" | "runtime">,
+  sessionId: string,
+) {
+  completedSession(deps.db, sessionId);
+  return deps.runtime.cancel(sessionId) ? { outcome: "canceled" as const } : { outcome: "idle" as const };
 }
 
 export function saveUserReadingReport(
