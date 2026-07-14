@@ -1469,7 +1469,7 @@ Tasks 1–7 above are already implemented on `codex/reading-completion-reports`.
 - Preserves: `renderAgentContext(db)` output order and `getAgentContext(db, conversationId)` snapshot behavior for normal chat.
 - Consumes: `getPreference()`, `listMemories()`, `DEFAULT_SOUL`, and the existing report service lifecycle.
 
-- [ ] **Step 1: Write failing prompt-composition tests**
+- [x] **Step 1: Write failing prompt-composition tests**
 
 Create `src/main/reading-report/prompt.test.ts` with a migrated in-memory DB and these assertions:
 
@@ -1524,7 +1524,7 @@ expect(renderAgentContext(db)).toBe(
 );
 ```
 
-- [ ] **Step 2: Run the prompt tests and verify RED**
+- [x] **Step 2: Run the prompt tests and verify RED**
 
 Run:
 
@@ -1534,7 +1534,7 @@ pnpm test src/main/reading-report/prompt.test.ts src/main/ai/agent-context.test.
 
 Expected: FAIL because `@main/reading-report/prompt` and the three composable context renderers do not exist.
 
-- [ ] **Step 3: Extract composable live context renderers without changing chat snapshots**
+- [x] **Step 3: Extract composable live context renderers without changing chat snapshots**
 
 In `src/main/ai/agent-context.ts`, extract these exact functions and rebuild `renderAgentContext` from them:
 
@@ -1567,7 +1567,7 @@ export function renderAgentContext(db: DB): string {
 
 Do not change `getAgentContext`, invalidation, or snapshot keys.
 
-- [ ] **Step 4: Implement the report-specific prompt composer**
+- [x] **Step 4: Implement the report-specific prompt composer**
 
 Create `src/main/reading-report/prompt.ts` with a fixed core, optional memory guidance, live identity/index, and reader instructions last:
 
@@ -1604,7 +1604,7 @@ export function buildReadingReportSystemPrompt(db: DB): string {
 }
 ```
 
-- [ ] **Step 5: Pass a freshly built prompt into every agent run**
+- [x] **Step 5: Pass a freshly built prompt into every agent run**
 
 Change `RunReadingReportAgentInput` in `src/main/reading-report/agent.ts` to include `instructions: string`, delete the old `READING_REPORT_SYSTEM`, and pass `input.instructions` to `generateText`.
 
@@ -1633,7 +1633,7 @@ expect(prompts[1]).toContain("Your name is Mia. New voice.");
 expect(prompts[1]).toContain("Use bullets.");
 ```
 
-- [ ] **Step 6: Run focused tests and typecheck**
+- [x] **Step 6: Run focused tests and typecheck**
 
 Run:
 
@@ -1644,7 +1644,7 @@ pnpm typecheck
 
 Expected: PASS, and normal chat snapshot tests remain unchanged.
 
-- [ ] **Step 7: Commit the live prompt slice**
+- [x] **Step 7: Commit the live prompt slice**
 
 ```bash
 git add src/main/ai/agent-context.ts src/main/ai/agent-context.test.ts src/main/reading-report/agent.ts src/main/reading-report/prompt.ts src/main/reading-report/prompt.test.ts src/main/reading-report/service.ts src/main/reading-report/service.test.ts
@@ -1675,7 +1675,7 @@ git commit -m "feat: personalize reading completion reports"
 - `createReadingReportMemoryWorkspace(db)` returns `{ tools, mutations }`; `mutations()` returns a fresh deterministic array reflecting the final staged overlay.
 - The service composes evidence tools and memory tools for the agent, then commits final Markdown plus `mutations()` in one `db.transaction` after the generation token is revalidated.
 
-- [ ] **Step 1: Write failing memory-workspace tests**
+- [x] **Step 1: Write failing memory-workspace tests**
 
 Create `src/main/reading-report/memory-workspace.test.ts`. Use real AI tool `execute` functions and cover these behaviors:
 
@@ -1744,7 +1744,7 @@ it("returns no tools or mutations when memory is disabled", () => {
 
 Also assert that overlay `readMemory` reports outgoing, incoming, and dangling links from the staged map rather than stale `memory_links` rows.
 
-- [ ] **Step 2: Run the workspace test and verify RED**
+- [x] **Step 2: Run the workspace test and verify RED**
 
 Run:
 
@@ -1754,7 +1754,7 @@ pnpm test src/main/reading-report/memory-workspace.test.ts
 
 Expected: FAIL because `@main/reading-report/memory-workspace` does not exist.
 
-- [ ] **Step 3: Implement the in-memory overlay and report-scoped tools**
+- [x] **Step 3: Implement the in-memory overlay and report-scoped tools**
 
 Create `src/main/reading-report/memory-workspace.ts` with this discriminated mutation type:
 
@@ -1782,7 +1782,7 @@ Snapshot `listMemories(db)` into `baseBySlug` and clone it into `currentBySlug`.
 
 Tool descriptions must retain the existing durable-memory criteria, must say writes are staged until the report succeeds, and must not mention or expose delete/SOUL capabilities.
 
-- [ ] **Step 4: Write failing repository transaction tests**
+- [x] **Step 4: Write failing repository transaction tests**
 
 Add tests to `src/main/memory/repository.test.ts` and `src/main/reading-sessions/repository.test.ts`:
 
@@ -1832,7 +1832,7 @@ it("rejects an optimistic update when the original memory changed", () => {
 
 For `saveReadingReportInTransaction`, open a transaction, save a report, throw a sentinel error, and assert after rollback that the session still contains the old report.
 
-- [ ] **Step 5: Add transaction-aware repository primitives**
+- [x] **Step 5: Add transaction-aware repository primitives**
 
 In `src/main/db/client.ts`, export the already-compatible executor shape used by Drizzle callbacks:
 
@@ -1864,7 +1864,7 @@ export function saveReadingReportInTransaction(
 
 Keep the existing `saveReadingReport(db, sessionId, content)` public behavior by delegating to the new function.
 
-- [ ] **Step 6: Run repository and workspace tests**
+- [x] **Step 6: Run repository and workspace tests**
 
 Run:
 
@@ -1874,7 +1874,7 @@ pnpm test src/main/reading-report/memory-workspace.test.ts src/main/memory/repos
 
 Expected: PASS.
 
-- [ ] **Step 7: Write failing service atomicity tests**
+- [x] **Step 7: Write failing service atomicity tests**
 
 Extend `src/main/reading-report/service.test.ts` with four cases using a `runAgent` stub that executes staged memory tools before resolving or rejecting:
 
@@ -1966,7 +1966,7 @@ it("rolls back the report when an optimistic memory update conflicts", async () 
 });
 ```
 
-- [ ] **Step 8: Compose tools and commit report plus memory in the service**
+- [x] **Step 8: Compose tools and commit report plus memory in the service**
 
 Change `RunReadingReportAgentInput.tools` to AI SDK `ToolSet` so the service can pass:
 
@@ -1991,7 +1991,7 @@ Add `now: () => Temporal.Instant` to `ReadingReportServiceDeps`. Tests inject a 
 
 Any transaction error follows the existing generation failure path and logs at `warn`; it must not mark the runtime successful.
 
-- [ ] **Step 9: Run service tests and typecheck**
+- [x] **Step 9: Run service tests and typecheck**
 
 Run:
 
@@ -2002,7 +2002,7 @@ pnpm typecheck
 
 Expected: PASS.
 
-- [ ] **Step 10: Commit the atomic memory slice**
+- [x] **Step 10: Commit the atomic memory slice**
 
 ```bash
 git add src/main/db/client.ts src/main/memory/repository.ts src/main/memory/repository.test.ts src/main/reading-sessions/repository.ts src/main/reading-sessions/repository.test.ts src/main/reading-report/agent.ts src/main/reading-report/memory-workspace.ts src/main/reading-report/memory-workspace.test.ts src/main/reading-report/service.ts src/main/reading-report/service.test.ts src/main/ai/send-deps.ts
@@ -2026,7 +2026,7 @@ git commit -m "feat: let reading reports organize memory"
 - Changes: `readSessionConversation(db, session, conversationId, options)` returns a discriminated result instead of an unbounded message array.
 - Preserves: conversation ownership validation, session timestamp filtering, and at most one adjacent message before/after the session excerpt.
 
-- [ ] **Step 1: Write failing compaction and pagination tests**
+- [x] **Step 1: Write failing compaction and pagination tests**
 
 Extend `src/main/reading-report/evidence.test.ts` with fixtures that set `contextSummary` and `summarizedThroughSeq` on the existing conversation:
 
@@ -2113,7 +2113,7 @@ it("does not return a neighboring message at the compaction frontier", () => {
 
 In `src/main/reading-report/tools.test.ts`, assert `readConversation.inputSchema` defaults `limit` to 20, caps it at 50, accepts a non-negative `afterSeq`, and rejects 51.
 
-- [ ] **Step 2: Run evidence and tool tests and verify RED**
+- [x] **Step 2: Run evidence and tool tests and verify RED**
 
 Run:
 
@@ -2123,7 +2123,7 @@ pnpm test src/main/reading-report/evidence.test.ts src/main/reading-report/tools
 
 Expected: FAIL because the current function has no options, returns an array, crosses the compaction frontier, and exposes no bounded cursor schema.
 
-- [ ] **Step 3: Define the discriminated conversation result**
+- [x] **Step 3: Define the discriminated conversation result**
 
 In `src/main/reading-report/evidence.ts`, add:
 
@@ -2159,7 +2159,7 @@ export type SessionConversationReadResult =
 
 The summary is included only on the first page (`afterSeq === undefined`) because prior tool results remain in the model context; later pages set `compactedContext` to `null`.
 
-- [ ] **Step 4: Implement frontier-safe SQL, pagination, neighbors, and text budget**
+- [x] **Step 4: Implement frontier-safe SQL, pagination, neighbors, and text budget**
 
 Load only conversation metadata (`id`, `contextSummary`, `summarizedThroughSeq`) first. Build the raw predicate from all of:
 
@@ -2177,7 +2177,7 @@ Apply a cumulative 24,000-character budget after `textOfParts`. When a single in
 
 When no raw in-window row remains, use an ID-only/count query to distinguish “the session had messages, but they are compacted” from “the conversation has no session messages.” Return `compacted-only` only when a non-empty summary and numeric frontier exist; otherwise retain the existing no-session-messages error.
 
-- [ ] **Step 5: Expose the cursor through the report tool**
+- [x] **Step 5: Expose the cursor through the report tool**
 
 Replace the `readConversation` input schema in `src/main/reading-report/tools.ts` with:
 
@@ -2191,7 +2191,7 @@ inputSchema: z.object({
 
 Pass `{ afterSeq, limit }` to `readSessionConversation`. Update the description to state that compacted history is returned only as a rolling summary and raw messages are paginated strictly after the frontier.
 
-- [ ] **Step 6: Run focused tests and typecheck**
+- [x] **Step 6: Run focused tests and typecheck**
 
 Run:
 
@@ -2202,7 +2202,7 @@ pnpm typecheck
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit the bounded conversation slice**
+- [x] **Step 7: Commit the bounded conversation slice**
 
 ```bash
 git add src/main/reading-report/evidence.ts src/main/reading-report/evidence.test.ts src/main/reading-report/tools.ts src/main/reading-report/tools.test.ts
@@ -2222,7 +2222,7 @@ git commit -m "fix: bound reading report conversation context"
 - Consumes: live report prompt, staged memory workspace, atomic persistence, and bounded conversation evidence.
 - Produces: automated evidence that the refinement does not regress ordinary chat context, report runtime states, or existing reading-session behavior.
 
-- [ ] **Step 1: Run the complete report and memory test set**
+- [x] **Step 1: Run the complete report and memory test set**
 
 Run:
 
@@ -2232,7 +2232,7 @@ pnpm test src/main/ai/agent-context.test.ts src/main/ai/base-prompt.test.ts src/
 
 Expected: PASS with no unhandled rejection or logger output.
 
-- [ ] **Step 2: Run the repository quality gates**
+- [x] **Step 2: Run the repository quality gates**
 
 Run each separately:
 
@@ -2246,7 +2246,7 @@ pnpm i18n:lint
 
 Expected: tests, typecheck, lint, and format exit 0. `i18n:lint` must introduce no new findings; the known baseline is 12 pre-existing findings in ErrorBoundary (2), StreakCard (1), ChatPerfMonitor (8), and PdfReader (1).
 
-- [ ] **Step 3: Inspect the final diff for scope and forbidden capabilities**
+- [x] **Step 3: Inspect the final diff for scope and forbidden capabilities**
 
 Run:
 
@@ -2258,7 +2258,7 @@ rg -n "deleteMemory|updateSoul|in the reader's first person" src/main/reading-re
 
 Expected: `git diff --check` is clean; changes are limited to the planned main-process/tests/docs files; the final `rg` returns no report-agent exposure of `deleteMemory`, `updateSoul`, or the old reader-first-person prompt.
 
-- [ ] **Step 4: Record the completed incremental plan**
+- [x] **Step 4: Record the completed incremental plan**
 
 Mark Tasks 8–11 checkboxes complete only after their commands have produced the expected evidence, then commit the plan bookkeeping separately:
 
