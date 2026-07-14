@@ -17,7 +17,9 @@ export function useReadingClock(bookId: string | null): void {
   // 卸载（离开 reader）时复位 null。
   useEffect(
     () => () => {
-      void window.api.stats.readingState({ status: "idle" }).catch(() => {});
+      void window.api.stats
+        .readingState({ status: "idle" })
+        .catch((err: unknown) => log.warn("reading-state cleanup failed", err));
     },
     [],
   );
