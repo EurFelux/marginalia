@@ -409,7 +409,7 @@ const cancelGeneration = async () => {
 };
 ```
 
-The footer action uses `model.canCancel ? cancelGeneration : requestGenerate`, stays enabled while busy, uses an outline stop treatment and `Square` icon while cancelable, and chooses `stopGenerating` versus `stopRegenerating` from whether `model.content` exists.
+The footer action uses `model.canCancel ? cancelGeneration : requestGenerate`, stays enabled while busy, uses the shared `destructive` button treatment and `Square` icon while cancelable, and chooses `stopGenerating` versus `stopRegenerating` from whether `model.content` exists.
 
 Add a second controlled `AlertDialog` after the reread dialog. Its copy explains that successful regeneration replaces the existing report, its secondary action closes the dialog and keeps the current report, and its primary action closes the dialog before calling `generate()`.
 
