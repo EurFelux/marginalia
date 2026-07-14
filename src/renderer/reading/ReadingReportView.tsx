@@ -79,8 +79,8 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
         toast.info(t("readingReport.insufficientEvidence"));
       }
       await qc.invalidateQueries({ queryKey: qk.readingSession(selectedSession.id) });
-    } catch (error) {
-      showError(t("readingReport.generateFailed", { error: (error as Error).message }));
+    } catch {
+      showError(t("readingReport.generateFailed"));
     }
   };
 
@@ -222,7 +222,7 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
             <CardContent className="flex flex-1 flex-col gap-4">
               {model.error ? (
                 <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                  {model.error}
+                  {t("readingReport.generateFailed", "暂时无法生成这份报告，请重试。")}
                 </p>
               ) : null}
               {editing ? (

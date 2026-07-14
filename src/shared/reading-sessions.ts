@@ -21,13 +21,12 @@ const markdown = z.string().trim().min(1);
 export const readingReportStateSchema = z.discriminatedUnion("status", [
   z.object({ status: z.literal("empty") }),
   z.object({ status: z.literal("generating") }),
-  z.object({ status: z.literal("generation-failed"), reason: z.string().min(1) }),
+  z.object({ status: z.literal("generation-failed") }),
   z.object({ status: z.literal("ready"), content: markdown }),
   z.object({ status: z.literal("regenerating"), content: markdown }),
   z.object({
     status: z.literal("regeneration-failed"),
     content: markdown,
-    reason: z.string().min(1),
   }),
 ]);
 export type ReadingReportState = z.infer<typeof readingReportStateSchema>;
@@ -35,6 +34,7 @@ export type ReadingReportState = z.infer<typeof readingReportStateSchema>;
 export const generateReadingReportResultSchema = z.discriminatedUnion("outcome", [
   z.object({ outcome: z.literal("accepted") }),
   z.object({ outcome: z.literal("insufficient-evidence") }),
+  z.object({ outcome: z.literal("unavailable") }),
 ]);
 export type GenerateReadingReportResult = z.infer<typeof generateReadingReportResultSchema>;
 

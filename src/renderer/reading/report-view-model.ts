@@ -5,7 +5,7 @@ export interface ReportViewModel {
   busy: boolean;
   canGenerate: boolean;
   canEdit: boolean;
-  error: string | null;
+  error: "generation-failed" | "regeneration-failed" | null;
 }
 
 export function reportViewModel(state: ReadingReportState): ReportViewModel {
@@ -15,7 +15,13 @@ export function reportViewModel(state: ReadingReportState): ReportViewModel {
     case "generating":
       return { content: null, busy: true, canGenerate: false, canEdit: false, error: null };
     case "generation-failed":
-      return { content: null, busy: false, canGenerate: true, canEdit: true, error: state.reason };
+      return {
+        content: null,
+        busy: false,
+        canGenerate: true,
+        canEdit: true,
+        error: "generation-failed",
+      };
     case "ready":
       return { content: state.content, busy: false, canGenerate: true, canEdit: true, error: null };
     case "regenerating":
@@ -32,7 +38,7 @@ export function reportViewModel(state: ReadingReportState): ReportViewModel {
         busy: false,
         canGenerate: true,
         canEdit: true,
-        error: state.reason,
+        error: "regeneration-failed",
       };
     default:
       return assertNever(state);

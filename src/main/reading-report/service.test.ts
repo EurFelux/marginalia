@@ -105,7 +105,6 @@ describe("reading report service", () => {
     expect(getReadingSessionDetail(deps, session.id).report).toEqual({
       status: "regeneration-failed",
       content: "# Old",
-      reason: "Unable to generate reading report",
     });
   });
 
@@ -129,12 +128,11 @@ describe("reading report service", () => {
 
   it("clears a prior failure when evidence is unavailable", () => {
     const { deps, session } = setup({ report: "# Existing", evidence: false });
-    deps.runtime.fail(session.id, { kind: "regeneration", reason: "old failure" });
+    deps.runtime.fail(session.id, { kind: "regeneration" });
 
     expect(getReadingSessionDetail(deps, session.id).report).toEqual({
       status: "regeneration-failed",
       content: "# Existing",
-      reason: "old failure",
     });
     expect(startReadingReportGeneration(deps, session.id)).toEqual({
       outcome: "insufficient-evidence",
@@ -145,13 +143,12 @@ describe("reading report service", () => {
     });
   });
 
-  it("records missing-model failures, throws the honest reason, and a user save clears it", () => {
+  it("records missing-model failures without exposing their internal reason, and a user save clears it", () => {
     warn.mockClear();
     const { deps, session } = setup();
-    expect(() => startReadingReportGeneration(deps, session.id)).toThrow("missing model");
+    expect(startReadingReportGeneration(deps, session.id)).toEqual({ outcome: "unavailable" });
     expect(getReadingSessionDetail(deps, session.id).report).toEqual({
       status: "generation-failed",
-      reason: "missing model",
     });
     expect(saveUserReadingReport(deps, session.id, " # Written ").report).toEqual({
       status: "ready",

@@ -15,8 +15,8 @@ describe("reportViewModel", () => {
     ],
     [
       "generation-failed",
-      { status: "generation-failed", reason: "model unavailable" },
-      { content: null, busy: false, canGenerate: true, canEdit: true, error: "model unavailable" },
+      { status: "generation-failed" },
+      { content: null, busy: false, canGenerate: true, canEdit: true, error: "generation-failed" },
     ],
     [
       "ready",
@@ -30,13 +30,13 @@ describe("reportViewModel", () => {
     ],
     [
       "regeneration-failed",
-      { status: "regeneration-failed", content: "# Earlier report", reason: "network error" },
+      { status: "regeneration-failed", content: "# Earlier report" },
       {
         content: "# Earlier report",
         busy: false,
         canGenerate: true,
         canEdit: true,
-        error: "network error",
+        error: "regeneration-failed",
       },
     ],
   ] as const)("projects %s state", (_status, state, expected) => {

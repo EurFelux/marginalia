@@ -1,5 +1,8 @@
 import { useTranslation } from "react-i18next";
+import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { LoaderCircle } from "lucide-react";
+import { toast } from "sonner";
 import type { BookSummaryDto } from "@shared/library";
 import { Button } from "@renderer/components/ui/button";
 import { CoverImage } from "@renderer/library/CoverImage";
@@ -8,13 +11,25 @@ import { qk } from "@renderer/query/keys";
 export function ReadingStartView({ book }: { book: BookSummaryDto }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
+  const [pending, setPending] = useState(false);
   const start = async () => {
-    await window.api.readingSessions.start({ mode: "continue", bookId: book.id });
-    await Promise.all([
-      qc.invalidateQueries({ queryKey: qk.book(book.id) }),
-      qc.invalidateQueries({ queryKey: qk.library }),
-      qc.invalidateQueries({ queryKey: qk.recentlyRead }),
-    ]);
+    if (pending) return;
+    setPending(true);
+    try {
+      await window.api.readingSessions.start({ mode: "continue", bookId: book.id });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: qk.book(book.id) }),
+        qc.invalidateQueries({ queryKey: qk.library }),
+        qc.invalidateQueries({ queryKey: qk.recentlyRead }),
+      ]);
+    } catch {
+      toast.error(t("readingStart.failed", "无法开始这次阅读，请重试。"), {
+        closeButton: true,
+        duration: Infinity,
+      });
+    } finally {
+      setPending(false);
+    }
   };
   return (
     <main className="flex h-screen items-center justify-center bg-background p-8 font-sans">
@@ -37,7 +52,10 @@ export function ReadingStartView({ book }: { book: BookSummaryDto }) {
             )}
           </p>
         </div>
-        <Button onClick={() => void start()}>{t("readingStart.action", "开始阅读")}</Button>
+        <Button onClick={() => void start()} disabled={pending}>
+          {pending ? <LoaderCircle className="animate-spin" data-icon="inline-start" /> : null}
+          {t("readingStart.action", "开始阅读")}
+        </Button>
       </div>
     </main>
   );

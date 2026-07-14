@@ -6,6 +6,7 @@ export interface ReadingClockDeps {
 }
 
 export interface ReadingClock {
+  getReadingBook: () => string | null;
   setReadingBook: (bookId: string | null) => void;
   setFocused: (focused: boolean) => void;
   setAwake: (awake: boolean) => void;
@@ -41,6 +42,7 @@ export function createReadingClock(deps: ReadingClockDeps): ReadingClock {
   }
 
   return {
+    getReadingBook: () => currentBookId,
     setReadingBook: (bookId) => {
       if (currentBookId !== bookId) transition(() => (currentBookId = bookId));
     },

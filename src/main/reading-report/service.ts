@@ -22,7 +22,6 @@ import type {
 } from "@shared/reading-sessions";
 
 const log = createLogger("report");
-const SAFE_FAILURE_REASON = "Unable to generate reading report";
 
 export interface ReadingReportServiceDeps {
   db: DB;
@@ -67,8 +66,8 @@ export function startReadingReportGeneration(
   if (!resolved.ok) {
     const error = new Error(resolved.reason);
     log.warn("summary model unavailable", error);
-    deps.runtime.fail(sessionId, { kind, reason: resolved.reason });
-    throw error;
+    deps.runtime.fail(sessionId, { kind });
+    return { outcome: "unavailable" };
   }
   const generation = deps.runtime.claim(sessionId, kind);
   if (generation == null) return { outcome: "accepted" };
@@ -99,7 +98,7 @@ export function startReadingReportGeneration(
     })
     .catch((err: unknown) => {
       log.warn(`generation failed for session ${session.id}`, err);
-      deps.runtime.fail(session.id, { kind, reason: SAFE_FAILURE_REASON }, generation);
+      deps.runtime.fail(session.id, { kind }, generation);
     });
   return { outcome: "accepted" };
 }

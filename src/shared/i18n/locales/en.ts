@@ -195,6 +195,7 @@ export default {
   "reader.completeReading.action": "Complete reading",
   "reader.completeReading.completed": "Reading complete",
   "reader.completeReading.confirmTitle": "Complete this reading?",
+  "reader.completeReading.failed": "Unable to complete this reading. Please try again.",
   "reader.conversation.deleteAction": "Delete conversation",
   "reader.conversation.deleteConfirm.body":
     "This will permanently delete the conversation and all of its messages. This cannot be undone.",
@@ -276,7 +277,7 @@ export default {
   "readingReport.edit": "Edit Markdown",
   "readingReport.empty": "No report has been saved for this reading session.",
   "readingReport.generate": "Generate report",
-  "readingReport.generateFailed": "Failed to generate report: {{error}}",
+  "readingReport.generateFailed": "Unable to generate this report. Please try again.",
   "readingReport.generating": "Reviewing the thoughts left by this reading…",
   "readingReport.insufficientEvidence":
     "There are not enough reading traces yet. You can write this report yourself.",
@@ -302,6 +303,7 @@ export default {
   "readingStart.action": "Start reading",
   "readingStart.description":
     "Mark the beginning so Marginalia can keep this reading's time and traces together.",
+  "readingStart.failed": "Unable to start this reading. Please try again.",
   "readingStart.title": "Begin this reading",
   "settings.advanced": "Advanced",
   "settings.advanced.about": "About",

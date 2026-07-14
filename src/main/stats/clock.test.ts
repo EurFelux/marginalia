@@ -97,6 +97,15 @@ describe("createReadingClock", () => {
     expect(commits).toHaveLength(1);
   });
 
+  it("reports the book currently owned by the clock", () => {
+    const { clock } = setup();
+    expect(clock.getReadingBook()).toBeNull();
+    clock.setReadingBook("b1");
+    expect(clock.getReadingBook()).toBe("b1");
+    clock.setReadingBook(null);
+    expect(clock.getReadingBook()).toBeNull();
+  });
+
   it("ignores idempotent same-value setters (no extra commit, no time lost)", () => {
     const { clock, commits, advance } = setup();
     clock.setAwake(true);

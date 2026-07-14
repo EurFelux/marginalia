@@ -53,7 +53,7 @@ describe("reading session contracts", () => {
     expect(startReadingInput.safeParse({ mode: "continue", bookId: "" }).success).toBe(false);
   });
 
-  it("requires content only in report states that preserve a report", () => {
+  it("requires content only in report states that preserve a report and drops failure details", () => {
     expect(readingReportStateSchema.parse({ status: "empty" })).toEqual({ status: "empty" });
     expect(
       readingReportStateSchema.safeParse({ status: "regenerating", content: "" }).success,
@@ -64,6 +64,6 @@ describe("reading session contracts", () => {
         content: "# Kept",
         reason: "offline",
       }),
-    ).toEqual({ status: "regeneration-failed", content: "# Kept", reason: "offline" });
+    ).toEqual({ status: "regeneration-failed", content: "# Kept" });
   });
 });

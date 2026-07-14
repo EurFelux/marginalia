@@ -1,7 +1,7 @@
 import type { ReadingReportState } from "@shared/reading-sessions";
 
 export type GenerationKind = "initial" | "regeneration";
-export type Failure = { kind: GenerationKind; reason: string };
+export type Failure = { kind: GenerationKind };
 
 const hasReport = (report: string | null): report is string => Boolean(report?.trim());
 
@@ -21,8 +21,8 @@ export class ReadingReportRuntime {
     const failure = this.failures.get(sessionId);
     if (failure) {
       return hasReport(storedReport)
-        ? { status: "regeneration-failed", content: storedReport.trim(), reason: failure.reason }
-        : { status: "generation-failed", reason: failure.reason };
+        ? { status: "regeneration-failed", content: storedReport.trim() }
+        : { status: "generation-failed" };
     }
     return hasReport(storedReport)
       ? { status: "ready", content: storedReport.trim() }

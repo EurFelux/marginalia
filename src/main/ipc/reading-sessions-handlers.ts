@@ -2,6 +2,7 @@ import { C } from "@shared/ipc";
 import { getDb } from "@main/db/instance";
 import {
   completeReading,
+  getActiveReadingSession,
   listReadingSessions,
   startReading,
   toReadingSessionSummary,
@@ -24,9 +25,16 @@ export const readingSessionBindings: Binding[] = [
     );
   }),
   bind(C.readingSessionsComplete, (input) => {
-    getReadingClock().setReadingBook(null);
     const db = getDb();
-    return toReadingSessionSummary(db, completeReading(db, input.bookId, Temporal.Now.instant()));
+    if (!getActiveReadingSession(db, input.bookId)) {
+      throw new Error(`book ${input.bookId} has no active reading session`);
+    }
+    const clock = getReadingClock();
+    const ownsTargetBook = clock.getReadingBook() === input.bookId;
+    if (ownsTargetBook) clock.tick();
+    const completed = completeReading(db, input.bookId, Temporal.Now.instant());
+    if (ownsTargetBook) clock.setReadingBook(null);
+    return toReadingSessionSummary(db, completed);
   }),
   bind(C.readingSessionsList, (input) => listReadingSessions(getDb(), input.bookId)),
   bind(C.readingSessionsGet, (input) =>
