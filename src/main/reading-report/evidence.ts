@@ -74,12 +74,7 @@ export function listSessionAnnotations(db: DB, session: ReadingSessionRow): Anno
   return db
     .select()
     .from(annotations)
-    .where(
-      and(
-        eq(annotations.bookId, session.bookId),
-        or(createdInside, updatedInside),
-      ),
-    )
+    .where(and(eq(annotations.bookId, session.bookId), or(createdInside, updatedInside)))
     .orderBy(desc(annotations.createdAt))
     .all()
     .map(annotationDto);
@@ -154,9 +149,7 @@ export function readSessionConversation(
   const excerptIndexes = new Set(inWindowIndexes);
   if (first > 0) excerptIndexes.add(first - 1);
   if (last < rows.length - 1) excerptIndexes.add(last + 1);
-  return [...excerptIndexes]
-    .sort((a, b) => a - b)
-    .map((index) => messageExcerpt(rows[index]!));
+  return [...excerptIndexes].sort((a, b) => a - b).map((index) => messageExcerpt(rows[index]!));
 }
 
 export function hasReaderEvidence(db: DB, session: ReadingSessionRow): boolean {
@@ -185,9 +178,7 @@ export function hasReaderEvidence(db: DB, session: ReadingSessionRow): boolean {
     db
       .select({ id: bookNotes.id })
       .from(bookNotes)
-      .where(
-        and(eq(bookNotes.bookId, session.bookId), or(noteCreatedInside!, noteUpdatedInside!)),
-      )
+      .where(and(eq(bookNotes.bookId, session.bookId), or(noteCreatedInside!, noteUpdatedInside!)))
       .limit(1)
       .get()
   ) {
@@ -197,12 +188,12 @@ export function hasReaderEvidence(db: DB, session: ReadingSessionRow): boolean {
   const messageCreatedInside = isInWindow(messages.createdAt, session);
   return Boolean(
     messageCreatedInside &&
-      db
-        .select({ id: messages.id })
-        .from(messages)
-        .innerJoin(conversations, eq(conversations.id, messages.conversationId))
-        .where(and(eq(conversations.bookId, session.bookId), messageCreatedInside))
-        .limit(1)
-        .get(),
+    db
+      .select({ id: messages.id })
+      .from(messages)
+      .innerJoin(conversations, eq(conversations.id, messages.conversationId))
+      .where(and(eq(conversations.bookId, session.bookId), messageCreatedInside))
+      .limit(1)
+      .get(),
   );
 }

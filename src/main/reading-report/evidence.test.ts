@@ -27,7 +27,9 @@ const after = Temporal.Instant.from("2026-07-10T00:00:01Z").epochMilliseconds;
 function setup() {
   const db = createDb(":memory:");
   runMigrations(db, MIGRATIONS);
-  db.insert(books).values([{ id: "book-1" }, { id: "book-2" }]).run();
+  db.insert(books)
+    .values([{ id: "book-1" }, { id: "book-2" }])
+    .run();
   const session = db
     .insert(readingSessions)
     .values({ bookId: "book-1", startedAt, completedAt })
@@ -104,12 +106,48 @@ function setup() {
     .get();
   db.insert(messages)
     .values([
-      { conversationId: inWindow.id, role: "user", parts: [{ type: "text", text: "before" }], seq: 0, createdAt: before },
-      { conversationId: inWindow.id, role: "assistant", parts: [{ type: "text", text: "inside one" }], seq: 1, createdAt: inside },
-      { conversationId: inWindow.id, role: "user", parts: [{ type: "text", text: "inside two" }], seq: 2, createdAt: inside },
-      { conversationId: inWindow.id, role: "assistant", parts: [{ type: "text", text: "after" }], seq: 3, createdAt: after },
-      { conversationId: outOfWindow.id, role: "user", parts: [{ type: "text", text: "outside" }], seq: 0, createdAt: before },
-      { conversationId: otherBook.id, role: "user", parts: [{ type: "text", text: "other book" }], seq: 0, createdAt: inside },
+      {
+        conversationId: inWindow.id,
+        role: "user",
+        parts: [{ type: "text", text: "before" }],
+        seq: 0,
+        createdAt: before,
+      },
+      {
+        conversationId: inWindow.id,
+        role: "assistant",
+        parts: [{ type: "text", text: "inside one" }],
+        seq: 1,
+        createdAt: inside,
+      },
+      {
+        conversationId: inWindow.id,
+        role: "user",
+        parts: [{ type: "text", text: "inside two" }],
+        seq: 2,
+        createdAt: inside,
+      },
+      {
+        conversationId: inWindow.id,
+        role: "assistant",
+        parts: [{ type: "text", text: "after" }],
+        seq: 3,
+        createdAt: after,
+      },
+      {
+        conversationId: outOfWindow.id,
+        role: "user",
+        parts: [{ type: "text", text: "outside" }],
+        seq: 0,
+        createdAt: before,
+      },
+      {
+        conversationId: otherBook.id,
+        role: "user",
+        parts: [{ type: "text", text: "other book" }],
+        seq: 0,
+        createdAt: inside,
+      },
     ])
     .run();
   return { db, session, otherBook };
@@ -146,6 +184,8 @@ describe("session evidence", () => {
   it("rejects a conversation from another book", () => {
     const { db, session, otherBook } = setup();
 
-    expect(() => readSessionConversation(db, session, otherBook.id)).toThrow(/not found for this book/);
+    expect(() => readSessionConversation(db, session, otherBook.id)).toThrow(
+      /not found for this book/,
+    );
   });
 });
