@@ -1,5 +1,12 @@
 # marginalia
 
+## 0.18.0
+
+### Minor Changes
+
+- d603bb3: Add compact backups that keep all app data while omitting heavyweight original book files, with database-only restore that preserves local book files.
+- cc4de23: Add explicit reading sessions with session-aware reading time and editable AI-generated completion reports grounded in the reader's annotations, notes, and conversations. Reports use the current assistant context, organize durable memory, hide internal metadata, and can be safely regenerated or stopped without losing existing content.
+
 ## 0.17.0
 
 ### Minor Changes
