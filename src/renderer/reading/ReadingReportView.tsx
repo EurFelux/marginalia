@@ -299,7 +299,7 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
               ) : null}
               {!editing ? (
                 <Button
-                  variant={model.canCancel ? "outline" : "default"}
+                  variant={model.canCancel ? "destructive" : "default"}
                   onClick={model.canCancel ? () => void cancelGeneration() : requestGenerate}
                   disabled={!model.canCancel && !model.canGenerate}
                 >

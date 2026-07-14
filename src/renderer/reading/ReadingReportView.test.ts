@@ -201,6 +201,8 @@ describe("ReadingReportView", () => {
     const stop = [...host.querySelectorAll<HTMLButtonElement>("button")].find(
       (button) => button.textContent === "readingReport.stopRegenerating",
     )!;
+    expect(stop.className).toContain("text-destructive");
+    expect(stop.className).toContain("bg-destructive/10");
     await act(async () => stop.click());
 
     expect(cancelReport).toHaveBeenCalledWith({ sessionId: "session-1" });
