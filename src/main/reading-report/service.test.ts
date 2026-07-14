@@ -1,7 +1,10 @@
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
+import type { ToolSet } from "ai";
+import { eq } from "drizzle-orm";
 import { createDb, runMigrations } from "@main/db/client";
-import { annotations, books } from "@main/db/schema";
+import { annotations, books, memories } from "@main/db/schema";
+import { createMemory, getMemoryBySlug } from "@main/memory/repository";
 import {
   completeReading,
   saveReadingReport,
@@ -15,6 +18,7 @@ import {
   startReadingReportGeneration,
   type ReadingReportServiceDeps,
 } from "@main/reading-report/service";
+import type { RunReadingReportAgentInput } from "@main/reading-report/agent";
 
 const { warn } = vi.hoisted(() => ({ warn: vi.fn() }));
 
@@ -24,6 +28,23 @@ vi.mock("@main/logger", () => ({
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
 const instant = (value: string) => Temporal.Instant.from(value);
+const toolOptions = { toolCallId: "report-memory", messages: [] } as never;
+const memoryInput = {
+  slug: "durable-insight",
+  title: "Durable insight",
+  description: "A lasting insight from the reading.",
+  body: "A durable insight.",
+};
+
+async function executeAgentTool(
+  input: RunReadingReportAgentInput,
+  name: string,
+  toolInput: unknown,
+) {
+  const candidate = (input.tools as ToolSet)[name];
+  if (!candidate?.execute) throw new Error(`${name} tool missing`);
+  return candidate.execute(toolInput as never, toolOptions);
+}
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -72,6 +93,7 @@ function setup(options: { report?: string; evidence?: boolean } = {}) {
     },
     runAgent,
     runtime: new ReadingReportRuntime(),
+    now: () => instant("2026-07-03T00:00:00Z"),
   };
   return { deps, session, task, runAgent, drain: async () => Promise.all(background) };
 }
@@ -200,5 +222,108 @@ describe("reading report service", () => {
 
     expect(prompts[1]).toContain("Your name is Mia. New voice.");
     expect(prompts[1]).toContain("Use bullets.");
+  });
+
+  it("commits the generated report and staged memory together", async () => {
+    const { deps, session, drain } = setup();
+    let memoryToolAvailable = false;
+    deps.resolveModel = () => ({ ok: true, model: {} as never, modelId: "summary" });
+    deps.runAgent = vi.fn(async (input) => {
+      memoryToolAvailable = "saveMemory" in input.tools;
+      if (memoryToolAvailable) await executeAgentTool(input, "saveMemory", memoryInput);
+      return "# Report";
+    });
+
+    startReadingReportGeneration(deps, session.id);
+    await drain();
+
+    expect(memoryToolAvailable).toBe(true);
+    expect(getReadingSessionDetail(deps, session.id).report).toEqual({
+      status: "ready",
+      content: "# Report",
+    });
+    expect(getMemoryBySlug(deps.db, "durable-insight")?.body).toBe("A durable insight.");
+  });
+
+  it("discards staged memory when report generation fails", async () => {
+    const { deps, session, drain } = setup();
+    let memoryToolAvailable = false;
+    deps.resolveModel = () => ({ ok: true, model: {} as never, modelId: "summary" });
+    deps.runAgent = vi.fn(async (input) => {
+      memoryToolAvailable = "saveMemory" in input.tools;
+      if (memoryToolAvailable) await executeAgentTool(input, "saveMemory", memoryInput);
+      throw new Error("model failed");
+    });
+
+    startReadingReportGeneration(deps, session.id);
+    await drain();
+
+    expect(memoryToolAvailable).toBe(true);
+    expect(getMemoryBySlug(deps.db, "durable-insight")).toBeNull();
+    expect(getReadingSessionDetail(deps, session.id).report.status).toBe("generation-failed");
+  });
+
+  it("discards staged memory from a generation invalidated by a manual save", async () => {
+    const { deps, session, drain } = setup();
+    const staged = deferred<void>();
+    const finish = deferred<string>();
+    let memoryToolAvailable = false;
+    deps.resolveModel = () => ({ ok: true, model: {} as never, modelId: "summary" });
+    deps.runAgent = vi.fn(async (input) => {
+      memoryToolAvailable = "saveMemory" in input.tools;
+      if (memoryToolAvailable) await executeAgentTool(input, "saveMemory", memoryInput);
+      staged.resolve();
+      return finish.promise;
+    });
+
+    startReadingReportGeneration(deps, session.id);
+    await staged.promise;
+    saveUserReadingReport(deps, session.id, "# Manual");
+    finish.resolve("# Generated");
+    await drain();
+
+    expect(memoryToolAvailable).toBe(true);
+    expect(getMemoryBySlug(deps.db, "durable-insight")).toBeNull();
+    expect(getReadingSessionDetail(deps, session.id).report).toEqual({
+      status: "ready",
+      content: "# Manual",
+    });
+  });
+
+  it("rolls back the report when an optimistic memory update conflicts", async () => {
+    const { deps, session, drain } = setup({ report: "# Old" });
+    const existing = createMemory(deps.db, memoryInput);
+    const staged = deferred<void>();
+    const finish = deferred<string>();
+    let memoryToolAvailable = false;
+    deps.resolveModel = () => ({ ok: true, model: {} as never, modelId: "summary" });
+    deps.runAgent = vi.fn(async (input) => {
+      memoryToolAvailable = "updateMemory" in input.tools;
+      if (memoryToolAvailable) {
+        await executeAgentTool(input, "updateMemory", {
+          slug: existing.slug,
+          body: "Report update.",
+        });
+      }
+      staged.resolve();
+      return finish.promise;
+    });
+
+    startReadingReportGeneration(deps, session.id);
+    await staged.promise;
+    deps.db
+      .update(memories)
+      .set({ body: "External update.", updatedAt: existing.updatedAt + 1 })
+      .where(eq(memories.id, existing.id))
+      .run();
+    finish.resolve("# Generated");
+    await drain();
+
+    expect(memoryToolAvailable).toBe(true);
+    expect(getReadingSessionDetail(deps, session.id).report).toEqual({
+      status: "regeneration-failed",
+      content: "# Old",
+    });
+    expect(getMemoryBySlug(deps.db, "durable-insight")?.body).toBe("External update.");
   });
 });

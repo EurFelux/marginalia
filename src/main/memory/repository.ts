@@ -1,10 +1,11 @@
 // src/main/memory/repository.ts —— 全局记忆 CRUD + 互链边表同步（spec 2026-06-10 §2）。
 // 纯函数注入 DB；不触 Electron。边表是派生索引：任何 body 写入路径都过 syncLinks。
-import { asc, eq, inArray } from "drizzle-orm";
-import type { DB } from "@main/db/client";
+import { and, asc, eq, inArray } from "drizzle-orm";
+import type { DB, DBTransaction } from "@main/db/client";
 import { memories, memoryLinks } from "@main/db/schema";
 import { extractLinks } from "@main/memory/links";
 import type { MemoryDto, UpdateMemoryInput } from "@shared/memory";
+import type { ReadingReportMemoryMutation } from "@main/reading-report/memory-workspace";
 
 type MemoryRow = typeof memories.$inferSelect;
 
@@ -28,7 +29,7 @@ export interface CreateMemoryInput {
   body: string;
 }
 
-function syncLinks(tx: Omit<DB, "$client">, fromId: string, body: string): void {
+function syncLinks(tx: DBTransaction, fromId: string, body: string): void {
   tx.delete(memoryLinks).where(eq(memoryLinks.fromId, fromId)).run();
   const slugs = extractLinks(body);
   if (slugs.length === 0) return;
@@ -123,4 +124,44 @@ export function listMemories(db: DB): MemoryDto[] {
     .from(memories)
     .orderBy(asc(memories.createdAt), asc(memories.id))
     .all();
+}
+
+export function applyReadingReportMemoryMutations(
+  tx: DBTransaction,
+  mutations: readonly ReadingReportMemoryMutation[],
+  committedAt: number,
+): void {
+  const changed: Array<{ id: string; body: string }> = [];
+  for (const mutation of mutations) {
+    if (mutation.kind === "create") {
+      const row = tx
+        .insert(memories)
+        .values({
+          slug: mutation.slug,
+          title: mutation.title,
+          description: mutation.description,
+          body: mutation.body,
+          createdAt: committedAt,
+          updatedAt: committedAt,
+        })
+        .returning({ id: memories.id, body: memories.body })
+        .get();
+      changed.push(row);
+      continue;
+    }
+    const row = tx
+      .update(memories)
+      .set({
+        title: mutation.title,
+        description: mutation.description,
+        body: mutation.body,
+        updatedAt: committedAt,
+      })
+      .where(and(eq(memories.id, mutation.id), eq(memories.updatedAt, mutation.expectedUpdatedAt)))
+      .returning({ id: memories.id, body: memories.body })
+      .get();
+    if (!row) throw new Error(`memory ${mutation.slug} changed during reading report generation`);
+    changed.push(row);
+  }
+  for (const row of changed) syncLinks(tx, row.id, row.body);
 }

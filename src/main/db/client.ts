@@ -6,6 +6,7 @@ import { v7 as uuidv7 } from "uuid";
 import * as schema from "@main/db/schema";
 
 export type DB = BetterSQLite3Database<typeof schema> & { $client: InstanceType<typeof Database> };
+export type DBTransaction = Omit<DB, "$client">;
 
 const LEGACY_READING_SESSIONS_STAGING = "__marginalia_legacy_reading_sessions";
 

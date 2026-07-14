@@ -75,5 +75,6 @@ export function makeReadingReportDeps(): ReadingReportServiceDeps {
     runBackground: backgroundLimiter.run,
     runAgent: runReadingReportAgent,
     runtime: readingReportRuntime,
+    now: () => Temporal.Now.instant(),
   };
 }

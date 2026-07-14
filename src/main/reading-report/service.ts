@@ -4,17 +4,20 @@ import type { RunBackground } from "@main/ai/background-limiter";
 import type { DB } from "@main/db/client";
 import { books } from "@main/db/schema";
 import { createLogger } from "@main/logger";
+import { applyReadingReportMemoryMutations } from "@main/memory/repository";
 import { supportsImageToolResults } from "@main/ai/model-factory";
 import type { LoadBytes } from "@main/ai/tools";
 import { hasReaderEvidence } from "@main/reading-report/evidence";
 import { runReadingReportAgent } from "@main/reading-report/agent";
 import { buildReadingReportSystemPrompt } from "@main/reading-report/prompt";
+import { createReadingReportMemoryWorkspace } from "@main/reading-report/memory-workspace";
 import { ReadingReportRuntime, type GenerationKind } from "@main/reading-report/runtime";
 import { createReadingReportTools } from "@main/reading-report/tools";
 import {
   getReadingSession,
   readingSessionSeconds,
   saveReadingReport,
+  saveReadingReportInTransaction,
   toReadingSessionSummary,
 } from "@main/reading-sessions/repository";
 import type {
@@ -31,6 +34,7 @@ export interface ReadingReportServiceDeps {
   runBackground: RunBackground;
   runAgent: typeof runReadingReportAgent;
   runtime: ReadingReportRuntime;
+  now: () => Temporal.Instant;
 }
 
 function completedSession(db: DB, sessionId: string) {
@@ -83,19 +87,25 @@ export function startReadingReportGeneration(
         loadBytes: deps.loadBytes,
         imageToolResults: supportsImageToolResults(resolved.providerType),
       });
-      return deps.runAgent({
+      const memoryWorkspace = createReadingReportMemoryWorkspace(deps.db);
+      const content = await deps.runAgent({
         resolved,
-        tools,
+        tools: { ...tools, ...memoryWorkspace.tools },
         instructions: buildReadingReportSystemPrompt(deps.db),
         bookTitle: title,
         startedAt: session.startedAt,
         completedAt: session.completedAt!,
         activeSeconds: readingSessionSeconds(deps.db, session.id),
       });
+      return { content, memoryMutations: memoryWorkspace.mutations() };
     })
-    .then((content) => {
+    .then((result) => {
       if (!deps.runtime.isCurrent(session.id, generation)) return;
-      saveReadingReport(deps.db, session.id, content);
+      const committedAt = deps.now().epochMilliseconds;
+      deps.db.transaction((tx) => {
+        saveReadingReportInTransaction(tx, session.id, result.content);
+        applyReadingReportMemoryMutations(tx, result.memoryMutations, committedAt);
+      });
       deps.runtime.succeed(session.id, generation);
     })
     .catch((err: unknown) => {

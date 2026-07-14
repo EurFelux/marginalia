@@ -1,7 +1,10 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
 import { createDb, runMigrations } from "@main/db/client";
+import { memories } from "@main/db/schema";
 import {
+  applyReadingReportMemoryMutations,
   createMemory,
   deleteMemoryById,
   getMemoryBySlug,
@@ -105,5 +108,60 @@ describe("memories repository", () => {
     createMemory(db, { slug: "m1", title: "t1", description: "d1", body: "b" });
     createMemory(db, { slug: "m2", title: "t2", description: "d2", body: "b" });
     expect(listMemories(db).map((m) => m.slug)).toEqual(["m1", "m2"]);
+  });
+
+  it("applies a report memory batch with links at one injected timestamp", () => {
+    const db = freshDb();
+    const committedAt = 1_783_459_200_000;
+
+    db.transaction((tx) => {
+      applyReadingReportMemoryMutations(
+        tx,
+        [
+          { kind: "create", slug: "a", title: "A", description: "A", body: "[[b]]" },
+          { kind: "create", slug: "b", title: "B", description: "B", body: "B" },
+        ],
+        committedAt,
+      );
+    });
+
+    expect(getMemoryBySlug(db, "a")?.outgoing.map((memory) => memory.slug)).toEqual(["b"]);
+    expect(getMemoryBySlug(db, "a")?.createdAt).toBe(committedAt);
+    expect(getMemoryBySlug(db, "a")?.updatedAt).toBe(committedAt);
+  });
+
+  it("rejects an optimistic report update when the original memory changed", () => {
+    const db = freshDb();
+    const original = createMemory(db, {
+      slug: "durable-insight",
+      title: "Durable insight",
+      description: "Description.",
+      body: "Original body.",
+    });
+    db.update(memories)
+      .set({ body: "Changed elsewhere.", updatedAt: original.updatedAt + 1 })
+      .where(eq(memories.id, original.id))
+      .run();
+
+    expect(() =>
+      db.transaction((tx) =>
+        applyReadingReportMemoryMutations(
+          tx,
+          [
+            {
+              kind: "update",
+              id: original.id,
+              slug: original.slug,
+              expectedUpdatedAt: original.updatedAt,
+              title: original.title,
+              description: original.description,
+              body: "Report update.",
+            },
+          ],
+          original.updatedAt + 10,
+        ),
+      ),
+    ).toThrow(/changed during reading report generation/);
+    expect(getMemoryBySlug(db, original.slug)?.body).toBe("Changed elsewhere.");
   });
 });

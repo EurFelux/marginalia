@@ -1,14 +1,13 @@
-import { generateText, isStepCount } from "ai";
+import { generateText, isStepCount, type ToolSet } from "ai";
 import type { ResolvedModel } from "@main/ai/assistant-model";
 import { providerCallOptions } from "@main/ai/model-factory";
 import { createLogger } from "@main/logger";
-import { createReadingReportTools } from "@main/reading-report/tools";
 
 const log = createLogger("report");
 
 export interface RunReadingReportAgentInput {
   resolved: Extract<ResolvedModel, { ok: true }>;
-  tools: ReturnType<typeof createReadingReportTools>;
+  tools: ToolSet;
   instructions: string;
   bookTitle: string | null;
   startedAt: number;

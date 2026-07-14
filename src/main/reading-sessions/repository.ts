@@ -1,5 +1,5 @@
 import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
-import type { DB } from "@main/db/client";
+import type { DB, DBTransaction } from "@main/db/client";
 import { books, progress, readingDaily, readingSessions } from "@main/db/schema";
 import type {
   BookReadingState,
@@ -94,13 +94,21 @@ export function completeReading(
 }
 
 export function saveReadingReport(db: DB, sessionId: string, content: string): ReadingSessionRow {
+  return saveReadingReportInTransaction(db, sessionId, content);
+}
+
+export function saveReadingReportInTransaction(
+  tx: DBTransaction,
+  sessionId: string,
+  content: string,
+): ReadingSessionRow {
   const report = content.trim();
   if (!report) throw new Error("reading report must be non-empty");
-  const session = getReadingSession(db, sessionId);
+  const session = tx.select().from(readingSessions).where(eq(readingSessions.id, sessionId)).get();
   if (!session) throw new Error(`reading session not found: ${sessionId}`);
   if (session.completedAt == null)
     throw new Error("cannot save a report for an active reading session");
-  return db
+  return tx
     .update(readingSessions)
     .set({ report })
     .where(eq(readingSessions.id, sessionId))

@@ -10,6 +10,7 @@ import {
   listReadingSessions,
   readingSessionSeconds,
   saveReadingReport,
+  saveReadingReportInTransaction,
   startReading,
 } from "@main/reading-sessions/repository";
 import { getProgress, saveProgress } from "@main/library/progress";
@@ -128,5 +129,24 @@ describe("reading sessions repository", () => {
       { id: active.id, bookId: "b1", reportAvailable: true, activeSeconds: 0 },
     ]);
     expect(readingSessionSeconds(db, active.id)).toBe(0);
+  });
+
+  it("rolls back a report saved through an outer transaction", () => {
+    const db = freshDb();
+    const session = startReading(db, {
+      bookId: "b1",
+      mode: "continue",
+      startedAt: Temporal.Instant.from("2026-07-01T00:00:00Z"),
+    });
+    completeReading(db, "b1", Temporal.Instant.from("2026-07-02T00:00:00Z"));
+    saveReadingReport(db, session.id, "# Old");
+
+    expect(() =>
+      db.transaction((tx) => {
+        saveReadingReportInTransaction(tx, session.id, "# New");
+        throw new Error("rollback sentinel");
+      }),
+    ).toThrow("rollback sentinel");
+    expect(getReadingSession(db, session.id)?.report).toBe("# Old");
   });
 });
