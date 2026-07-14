@@ -11,6 +11,7 @@ const noopLoad: LoadBytes = async () => new Uint8Array();
 
 const READING_KEYS = ["getToc", "readChapterText", "getChapterSummary", "getBookSummary"];
 const LIBRARY_KEYS = ["listBooks", "getBook", "getBookNotes", "listAnnotations", "getReadingStats"];
+const READING_SESSION_KEYS = ["listReadingSessions", "getReadingReport"];
 
 describe("createContextTools", () => {
   it("reader context (bookId set) exposes both reading and library tools", async () => {
@@ -21,6 +22,7 @@ describe("createContextTools", () => {
     const keys = Object.keys(tools);
     expect(keys).toEqual(expect.arrayContaining(READING_KEYS));
     expect(keys).toEqual(expect.arrayContaining(LIBRARY_KEYS));
+    expect(keys).toEqual(expect.arrayContaining(READING_SESSION_KEYS));
   });
 
   it("library context (bookId null) exposes only library tools", () => {
@@ -29,6 +31,7 @@ describe("createContextTools", () => {
     const tools = createContextTools({ db, bookId: null, loadBytes: noopLoad });
     const keys = Object.keys(tools);
     expect(keys).toEqual(expect.arrayContaining(LIBRARY_KEYS));
+    expect(keys).toEqual(expect.arrayContaining(READING_SESSION_KEYS));
     for (const k of READING_KEYS) expect(keys).not.toContain(k);
   });
 });

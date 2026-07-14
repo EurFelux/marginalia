@@ -4,6 +4,7 @@
 import type { DB } from "@main/db/client";
 import { createReadingTools, type LoadBytes } from "@main/ai/tools";
 import { createLibraryTools } from "@main/ai/library-tools";
+import { createReadingSessionTools } from "@main/ai/reading-session-tools";
 
 export interface ContextToolsDeps {
   db: DB;
@@ -17,9 +18,11 @@ export interface ContextToolsDeps {
 export function createContextTools(deps: ContextToolsDeps) {
   const { db, bookId, loadBytes, imageToolResults } = deps;
   const library = createLibraryTools({ db });
-  if (bookId == null) return library;
+  const readingSessions = createReadingSessionTools({ db, scopedBookId: bookId });
+  if (bookId == null) return { ...library, ...readingSessions };
   return {
     ...createReadingTools({ db, bookId, loadBytes, imageToolResults }),
     ...library,
+    ...readingSessions,
   };
 }
