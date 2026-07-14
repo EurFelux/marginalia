@@ -45,6 +45,11 @@ async function setupEpub() {
     .values({ bookId: book.id, startedAt: before - 10, completedAt: before, report: "# Earlier" })
     .returning()
     .get();
+  const later = db
+    .insert(readingSessions)
+    .values({ bookId: book.id, startedAt: after, completedAt: after + 1, report: "# Later" })
+    .returning()
+    .get();
   const reportless = db
     .insert(readingSessions)
     .values({ bookId: book.id, startedAt: before - 20, completedAt: before - 11 })
@@ -52,13 +57,34 @@ async function setupEpub() {
     .get();
   const otherSession = db
     .insert(readingSessions)
-    .values({ bookId: "other-book", startedAt: before - 20, completedAt: before, report: "# Other" })
+    .values({
+      bookId: "other-book",
+      startedAt: before - 20,
+      completedAt: before,
+      report: "# Other",
+    })
     .returning()
     .get();
   db.insert(annotations)
     .values([
-      { bookId: book.id, style: "yellow", note: "", selectedText: "inside", locatorRange: "a", createdAt: inside, updatedAt: inside },
-      { bookId: book.id, style: "yellow", note: "", selectedText: "outside", locatorRange: "b", createdAt: after, updatedAt: after },
+      {
+        bookId: book.id,
+        style: "yellow",
+        note: "",
+        selectedText: "inside",
+        locatorRange: "a",
+        createdAt: inside,
+        updatedAt: inside,
+      },
+      {
+        bookId: book.id,
+        style: "yellow",
+        note: "",
+        selectedText: "outside",
+        locatorRange: "b",
+        createdAt: after,
+        updatedAt: after,
+      },
     ])
     .run();
   db.insert(bookNotes)
@@ -79,8 +105,20 @@ async function setupEpub() {
     .get();
   db.insert(messages)
     .values([
-      { conversationId: insideConversation.id, role: "user", parts: [{ type: "text", text: "inside message" }], seq: 0, createdAt: inside },
-      { conversationId: outsideConversation.id, role: "user", parts: [{ type: "text", text: "outside message" }], seq: 0, createdAt: after },
+      {
+        conversationId: insideConversation.id,
+        role: "user",
+        parts: [{ type: "text", text: "inside message" }],
+        seq: 0,
+        createdAt: inside,
+      },
+      {
+        conversationId: outsideConversation.id,
+        role: "user",
+        parts: [{ type: "text", text: "outside message" }],
+        seq: 0,
+        createdAt: after,
+      },
     ])
     .run();
   const loadBytes = vi.fn<LoadBytes>(async (bookId) => {
@@ -88,41 +126,67 @@ async function setupEpub() {
     return bytes;
   });
   const tools = createReadingReportTools({ db, session, loadBytes, imageToolResults: false });
-  return { db, book, session, previous, reportless, otherSession, otherChapter, loadBytes, tools };
+  return {
+    db,
+    book,
+    session,
+    previous,
+    later,
+    reportless,
+    otherSession,
+    otherChapter,
+    loadBytes,
+    tools,
+  };
 }
 
 describe("createReadingReportTools", () => {
   it("keeps annotations, notes, and conversations inside the target session window", async () => {
     const { tools } = await setupEpub();
-    const annotationsPage = (await tools.listAnnotations.execute!({ offset: 0, limit: 50 }, opts)) as { items: Array<{ selectedText: string }> };
-    const notesPage = (await tools.listBookNotes.execute!({ offset: 0, limit: 50 }, opts)) as { items: Array<{ content: string }> };
-    const conversationsPage = (await tools.listConversations.execute!({ offset: 0, limit: 50 }, opts)) as { items: Array<{ title: string | null }> };
+    const annotationsPage = (await tools.listAnnotations.execute!(
+      { offset: 0, limit: 50 },
+      opts,
+    )) as { items: Array<{ selectedText: string }> };
+    const notesPage = (await tools.listBookNotes.execute!({ offset: 0, limit: 50 }, opts)) as {
+      items: Array<{ content: string }>;
+    };
+    const conversationsPage = (await tools.listConversations.execute!(
+      { offset: 0, limit: 50 },
+      opts,
+    )) as { items: Array<{ title: string | null }> };
     expect(annotationsPage.items.map((item) => item.selectedText)).toEqual(["inside"]);
     expect(notesPage.items.map((item) => item.content)).toEqual(["inside note"]);
     expect(conversationsPage.items.map((item) => item.title)).toEqual(["inside conversation"]);
   });
 
   it("returns only previous report content from this book", async () => {
-    const { tools, session, previous, reportless, otherSession } = await setupEpub();
+    const { tools, session, previous, later, reportless, otherSession } = await setupEpub();
     expect(await tools.getPreviousReadingReport.execute!({ sessionId: previous.id }, opts)).toEqual(
       expect.objectContaining({ id: previous.id, content: "# Earlier" }),
     );
-    for (const sessionId of [session.id, otherSession.id, reportless.id]) {
-      const out = (await tools.getPreviousReadingReport.execute!({ sessionId }, opts)) as { error?: string };
+    for (const sessionId of [session.id, later.id, otherSession.id, reportless.id]) {
+      const out = (await tools.getPreviousReadingReport.execute!({ sessionId }, opts)) as {
+        error?: string;
+      };
       expect(out.error).toMatch(/previous reading session (not found|has no report)/);
     }
   });
 
   it("binds chapter reads to the target book", async () => {
     const { tools, otherChapter, loadBytes } = await setupEpub();
-    const out = (await tools.readChapterText.execute!({ chapterId: otherChapter.id }, opts)) as { error?: string };
+    const out = (await tools.readChapterText.execute!({ chapterId: otherChapter.id }, opts)) as {
+      error?: string;
+    };
     expect(out.error).toMatch(/not found/);
     expect(loadBytes).not.toHaveBeenCalled();
   });
 
   it("defaults list paging to 50 and caps the schema at 100", async () => {
     const { tools } = await setupEpub();
-    const schema = tools.listAnnotations.inputSchema as { parse(input: unknown): { offset: number; limit: number }; safeParse(input: unknown): { success: boolean } };
+    const schema = tools.listAnnotations.inputSchema as {
+      parse(input: unknown): { offset: number; limit: number };
+      safeParse(input: unknown): { success: boolean };
+    };
     expect(schema.parse({})).toEqual({ offset: 0, limit: 50 });
     expect(schema.parse({ offset: 0, limit: 100 })).toEqual({ offset: 0, limit: 100 });
     expect(schema.safeParse({ offset: 0, limit: 101 }).success).toBe(false);
@@ -148,7 +212,9 @@ describe("PDF report tools", () => {
     if (!("readPage" in tools)) throw new Error("readPage missing");
 
     expect("listAnnotations" in tools).toBe(true);
-    const out = (await tools.readPage.execute!({ page: 1, mode: "text" }, opts)) as { error?: string };
+    const out = (await tools.readPage.execute!({ page: 1, mode: "text" }, opts)) as {
+      error?: string;
+    };
     expect(out.error).toMatch(/scanned|text layer/);
     expect(loadBytes).toHaveBeenCalledWith(book.id);
   });

@@ -96,7 +96,13 @@ export function createReadingReportTools(deps: ReadingReportToolsDeps) {
       execute: async ({ sessionId }) =>
         runTool("getPreviousReadingReport", () => {
           const row = getReadingSession(deps.db, sessionId);
-          if (!row || row.bookId !== deps.session.bookId || row.id === deps.session.id) {
+          if (
+            !row ||
+            row.bookId !== deps.session.bookId ||
+            row.id === deps.session.id ||
+            row.completedAt === null ||
+            row.completedAt > deps.session.startedAt
+          ) {
             throw new Error("previous reading session not found for this book");
           }
           const content = row.report?.trim();
