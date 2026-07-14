@@ -66,7 +66,7 @@ export function createReadingReportTools(deps: ReadingReportToolsDeps) {
     }),
     readConversation: tool({
       description:
-        "Read a bounded page of in-session turns from one listed conversation. Compacted history is returned only as a rolling summary; raw messages are strictly after the compaction frontier.",
+        "Read a bounded page of in-session turns from one listed conversation. Compacted history is returned only as a rolling background summary that may include discussion before this reading; raw messages are strictly after the compaction frontier.",
       inputSchema: z.object({
         conversationId: z.string().min(1),
         afterSeq: z.number().int().nonnegative().optional(),

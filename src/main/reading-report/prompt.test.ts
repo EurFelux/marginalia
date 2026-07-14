@@ -31,6 +31,9 @@ describe("buildReadingReportSystemPrompt", () => {
     expect(prompt).toContain("Your name is Mia. Warm, precise, and curious.");
     expect(prompt).toContain("[systems-thinking] Systems thinking");
     expect(prompt).toContain("Use short titled sections.");
+    expect(prompt).toContain(
+      "A compacted conversation summary may include discussion from before this reading",
+    );
     expect(prompt.indexOf("Use short titled sections.")).toBeGreaterThan(
       prompt.indexOf("from your own first-person perspective as the assistant"),
     );
