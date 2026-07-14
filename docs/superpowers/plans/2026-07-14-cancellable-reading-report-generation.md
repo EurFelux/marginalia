@@ -23,12 +23,14 @@
 ### Task 1: Make report generations abortable and race-safe
 
 **Files:**
+
 - Modify: `src/main/reading-report/runtime.ts`
 - Modify: `src/main/reading-report/agent.ts`
 - Modify: `src/main/reading-report/service.ts`
 - Test: `src/main/reading-report/service.test.ts`
 
 **Interfaces:**
+
 - Produces: `GenerationClaim = { generation: number; signal: AbortSignal }` from `ReadingReportRuntime.claim(sessionId, kind)`.
 - Produces: `ReadingReportRuntime.cancel(sessionId): boolean`, which invalidates first, aborts second, and returns whether work existed.
 - Produces: `cancelReadingReportGeneration(deps, sessionId)` with the inferred discriminated result `{ outcome: "canceled" } | { outcome: "idle" }`; Task 2 promotes that result to the shared Zod contract.
@@ -211,6 +213,7 @@ git commit -m "feat: cancel reading report generation"
 ### Task 2: Expose typed idempotent cancellation over IPC
 
 **Files:**
+
 - Modify: `src/shared/reading-sessions.ts`
 - Modify: `src/shared/ipc.ts`
 - Modify: `src/main/reading-report/service.ts`
@@ -220,6 +223,7 @@ git commit -m "feat: cancel reading report generation"
 - Modify: `src/preload-api.test.ts`
 
 **Interfaces:**
+
 - Consumes: `cancelReadingReportGeneration(deps, sessionId)` from Task 1.
 - Produces: `cancelReadingReportResultSchema` and `CancelReadingReportResult`, discriminated by `outcome: "canceled" | "idle"`.
 - Produces: contract `C.readingSessionsCancelReport` on channel `reading-sessions:cancel-report`.
@@ -301,6 +305,7 @@ git commit -m "feat: expose reading report cancellation"
 ### Task 3: Confirm regeneration and turn busy generation into a stop action
 
 **Files:**
+
 - Modify: `src/renderer/reading/report-view-model.ts`
 - Test: `src/renderer/reading/report-view-model.test.ts`
 - Modify: `src/renderer/reading/ReadingReportView.tsx`
@@ -310,6 +315,7 @@ git commit -m "feat: expose reading report cancellation"
 - Modify: `src/shared/i18n/locales.test.ts`
 
 **Interfaces:**
+
 - Consumes: `window.api.readingSessions.cancelReport({ sessionId })` from Task 2.
 - Changes: `ReportViewModel` adds `canCancel: boolean`; it is true only for `generating` and `regenerating`.
 - UI behavior: ready/regeneration-failed regeneration opens confirmation; initial/retry starts immediately; busy action invokes cancellation.
@@ -378,8 +384,10 @@ Add `Square` to the Lucide imports and `regenerateOpen` state. Split the current
 
 ```ts
 const requestGenerate = () => {
-  if (detail.data?.report.status === "ready" ||
-      detail.data?.report.status === "regeneration-failed") {
+  if (
+    detail.data?.report.status === "ready" ||
+    detail.data?.report.status === "regeneration-failed"
+  ) {
     setRegenerateOpen(true);
     return;
   }
@@ -438,9 +446,11 @@ git commit -m "feat: protect and stop reading report regeneration"
 ### Task 4: Verify the complete UX refinement
 
 **Files:**
+
 - Modify only if verification exposes a defect in files already listed above.
 
 **Interfaces:**
+
 - Consumes: all behavior produced by Tasks 1–3.
 - Produces: a verified branch where cancellation is typed, race-safe, localized, and usable.
 
