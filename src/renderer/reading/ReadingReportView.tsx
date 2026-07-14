@@ -130,9 +130,13 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
   const model = reportViewModel(detail.data.report);
   const completedAt = selectedSession.completedAt!;
   const date = new Intl.DateTimeFormat(i18n.language, { dateStyle: "long" });
+  const sessionDateTime = new Intl.DateTimeFormat(i18n.language, {
+    dateStyle: "long",
+    timeStyle: "short",
+  });
   const sessionItems = completedSessions.map((session) => ({
     value: session.id,
-    label: date.format(session.completedAt!),
+    label: sessionDateTime.format(session.completedAt!),
   }));
   const generateLabel =
     detail.data.report.status === "ready" || detail.data.report.status === "regeneration-failed"
@@ -176,7 +180,11 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
                 onValueChange={(value) => setSelectedSessionId(value)}
                 disabled={editing}
               >
-                <SelectTrigger className="w-full" disabled={editing}>
+                <SelectTrigger
+                  className="w-full"
+                  aria-label={t("readingReport.session")}
+                  disabled={editing}
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

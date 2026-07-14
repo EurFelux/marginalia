@@ -11,7 +11,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@renderer/components/ui/dialog";
+import { createLogger } from "@renderer/logger";
 import { qk } from "@renderer/query/keys";
+
+const log = createLogger("reading");
 
 export function CompleteReadingDialog({ bookId }: { bookId: string }) {
   const { t } = useTranslation();
@@ -29,7 +32,8 @@ export function CompleteReadingDialog({ bookId }: { bookId: string }) {
         qc.invalidateQueries({ queryKey: qk.recentlyRead }),
       ]);
       setOpen(false);
-    } catch {
+    } catch (error) {
+      log.warn("complete reading failed", error);
       toast.error(t("reader.completeReading.failed", "无法完成这次阅读，请重试。"), {
         closeButton: true,
         duration: Infinity,

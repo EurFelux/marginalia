@@ -6,7 +6,10 @@ import { toast } from "sonner";
 import type { BookSummaryDto } from "@shared/library";
 import { Button } from "@renderer/components/ui/button";
 import { CoverImage } from "@renderer/library/CoverImage";
+import { createLogger } from "@renderer/logger";
 import { qk } from "@renderer/query/keys";
+
+const log = createLogger("reading");
 
 export function ReadingStartView({ book }: { book: BookSummaryDto }) {
   const { t } = useTranslation();
@@ -22,7 +25,8 @@ export function ReadingStartView({ book }: { book: BookSummaryDto }) {
         qc.invalidateQueries({ queryKey: qk.library }),
         qc.invalidateQueries({ queryKey: qk.recentlyRead }),
       ]);
-    } catch {
+    } catch (error) {
+      log.warn("start reading failed", error);
       toast.error(t("readingStart.failed", "无法开始这次阅读，请重试。"), {
         closeButton: true,
         duration: Infinity,

@@ -73,8 +73,8 @@ vi.mock("@renderer/reading/ReportEditor", () => ({
 
 const session = {
   id: "session-1",
-  startedAt: 0,
-  completedAt: 0,
+  startedAt: Temporal.ZonedDateTime.from("2000-07-01T08:15:00+00:00[UTC]").epochMilliseconds,
+  completedAt: Temporal.ZonedDateTime.from("2000-07-01T12:30:00+00:00[UTC]").epochMilliseconds,
   activeSeconds: 0,
 };
 
@@ -156,7 +156,7 @@ describe("ReadingReportView", () => {
     );
   });
 
-  it("shows the selected session date rather than its UUID in the real select trigger", () => {
+  it("labels the real session trigger and shows its localized date and time rather than its UUID", () => {
     act(() =>
       root.render(
         createElement(ReadingReportView, {
@@ -175,7 +175,9 @@ describe("ReadingReportView", () => {
     );
 
     const trigger = host.querySelector('[data-slot="select-trigger"]')!;
-    expect(trigger.textContent).toContain("January 1, 1970");
+    expect(trigger.getAttribute("aria-label")).toBe("readingReport.session");
+    expect(trigger.textContent).toContain("July 1, 2000");
+    expect(trigger.textContent).toMatch(/\d{1,2}:\d{2}/);
     expect(trigger.textContent).not.toContain("session-1");
   });
 
