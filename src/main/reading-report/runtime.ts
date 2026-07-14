@@ -9,6 +9,7 @@ const hasReport = (report: string | null): report is string => Boolean(report?.t
 export class ReadingReportRuntime {
   readonly inFlight = new Map<string, GenerationKind>();
   readonly failures = new Map<string, Failure>();
+  readonly #generations = new Map<string, number>();
 
   state(sessionId: string, storedReport: string | null): ReadingReportState {
     const kind = this.inFlight.get(sessionId);
@@ -28,24 +29,41 @@ export class ReadingReportRuntime {
       : { status: "empty" };
   }
 
-  claim(sessionId: string, kind: GenerationKind): boolean {
-    if (this.inFlight.has(sessionId)) return false;
+  claim(sessionId: string, kind: GenerationKind): number | undefined {
+    if (this.inFlight.has(sessionId)) return undefined;
+    const generation = (this.#generations.get(sessionId) ?? 0) + 1;
+    this.#generations.set(sessionId, generation);
     this.failures.delete(sessionId);
     this.inFlight.set(sessionId, kind);
+    return generation;
+  }
+
+  isCurrent(sessionId: string, generation: number): boolean {
+    return this.inFlight.has(sessionId) && this.#generations.get(sessionId) === generation;
+  }
+
+  fail(sessionId: string, failure: Failure, generation?: number): boolean {
+    if (generation != null && !this.isCurrent(sessionId, generation)) return false;
+    this.inFlight.delete(sessionId);
+    this.failures.set(sessionId, failure);
     return true;
   }
 
-  fail(sessionId: string, failure: Failure): void {
-    this.inFlight.delete(sessionId);
-    this.failures.set(sessionId, failure);
-  }
-
-  succeed(sessionId: string): void {
+  succeed(sessionId: string, generation?: number): boolean {
+    if (generation != null && !this.isCurrent(sessionId, generation)) return false;
     this.inFlight.delete(sessionId);
     this.failures.delete(sessionId);
+    return true;
   }
 
   clearFailure(sessionId: string): void {
+    this.failures.delete(sessionId);
+  }
+
+  /** A user-authored save supersedes every previously claimed background generation. */
+  invalidate(sessionId: string): void {
+    this.#generations.set(sessionId, (this.#generations.get(sessionId) ?? 0) + 1);
+    this.inFlight.delete(sessionId);
     this.failures.delete(sessionId);
   }
 }

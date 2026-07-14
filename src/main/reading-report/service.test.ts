@@ -15,6 +15,12 @@ import {
   type ReadingReportServiceDeps,
 } from "@main/reading-report/service";
 
+const { warn } = vi.hoisted(() => ({ warn: vi.fn() }));
+
+vi.mock("@main/logger", () => ({
+  createLogger: () => ({ warn, debug: vi.fn(), error: vi.fn(), info: vi.fn() }),
+}));
+
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
 const instant = (value: string) => Temporal.Instant.from(value);
 
@@ -121,7 +127,26 @@ describe("reading report service", () => {
     ).toEqual({ status: "empty" });
   });
 
+  it("clears a prior failure when evidence is unavailable", () => {
+    const { deps, session } = setup({ report: "# Existing", evidence: false });
+    deps.runtime.fail(session.id, { kind: "regeneration", reason: "old failure" });
+
+    expect(getReadingSessionDetail(deps, session.id).report).toEqual({
+      status: "regeneration-failed",
+      content: "# Existing",
+      reason: "old failure",
+    });
+    expect(startReadingReportGeneration(deps, session.id)).toEqual({
+      outcome: "insufficient-evidence",
+    });
+    expect(getReadingSessionDetail(deps, session.id).report).toEqual({
+      status: "ready",
+      content: "# Existing",
+    });
+  });
+
   it("records missing-model failures, throws the honest reason, and a user save clears it", () => {
+    warn.mockClear();
     const { deps, session } = setup();
     expect(() => startReadingReportGeneration(deps, session.id)).toThrow("missing model");
     expect(getReadingSessionDetail(deps, session.id).report).toEqual({
@@ -132,5 +157,28 @@ describe("reading report service", () => {
       status: "ready",
       content: "# Written",
     });
+    expect(warn).toHaveBeenCalledWith(
+      "summary model unavailable",
+      expect.objectContaining({ message: "missing model" }),
+    );
+  });
+
+  it("keeps a manual save when an older generation completes", async () => {
+    const { deps, session, task, drain } = setup();
+    deps.resolveModel = () => ({ ok: true, model: {} as never, modelId: "summary" });
+
+    startReadingReportGeneration(deps, session.id);
+    expect(saveUserReadingReport(deps, session.id, "# Manual").report).toEqual({
+      status: "ready",
+      content: "# Manual",
+    });
+    task.resolve("# Generated");
+    await drain();
+
+    expect(getReadingSessionDetail(deps, session.id).report).toEqual({
+      status: "ready",
+      content: "# Manual",
+    });
+    expect(deps.runtime.inFlight.has(session.id)).toBe(false);
   });
 });

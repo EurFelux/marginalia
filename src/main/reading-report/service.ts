@@ -58,14 +58,20 @@ export function startReadingReportGeneration(
 ): GenerateReadingReportResult {
   const session = completedSession(deps.db, sessionId);
   if (deps.runtime.inFlight.has(sessionId)) return { outcome: "accepted" };
-  if (!hasReaderEvidence(deps.db, session)) return { outcome: "insufficient-evidence" };
+  if (!hasReaderEvidence(deps.db, session)) {
+    deps.runtime.clearFailure(sessionId);
+    return { outcome: "insufficient-evidence" };
+  }
   const resolved = deps.resolveModel();
   const kind: GenerationKind = session.report?.trim() ? "regeneration" : "initial";
   if (!resolved.ok) {
+    const error = new Error(resolved.reason);
+    log.warn("summary model unavailable", error);
     deps.runtime.fail(sessionId, { kind, reason: resolved.reason });
-    throw new Error(resolved.reason);
+    throw error;
   }
-  if (!deps.runtime.claim(sessionId, kind)) return { outcome: "accepted" };
+  const generation = deps.runtime.claim(sessionId, kind);
+  if (generation == null) return { outcome: "accepted" };
   void deps
     .runBackground(async () => {
       const title =
@@ -87,12 +93,13 @@ export function startReadingReportGeneration(
       });
     })
     .then((content) => {
+      if (!deps.runtime.isCurrent(session.id, generation)) return;
       saveReadingReport(deps.db, session.id, content);
-      deps.runtime.succeed(session.id);
+      deps.runtime.succeed(session.id, generation);
     })
     .catch((err: unknown) => {
       log.warn(`generation failed for session ${session.id}`, err);
-      deps.runtime.fail(session.id, { kind, reason: SAFE_FAILURE_REASON });
+      deps.runtime.fail(session.id, { kind, reason: SAFE_FAILURE_REASON }, generation);
     });
   return { outcome: "accepted" };
 }
@@ -103,6 +110,6 @@ export function saveUserReadingReport(
   content: string,
 ): ReadingSessionDetailDto {
   saveReadingReport(deps.db, sessionId, content);
-  deps.runtime.clearFailure(sessionId);
+  deps.runtime.invalidate(sessionId);
   return getReadingSessionDetail(deps, sessionId);
 }
