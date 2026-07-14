@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add explicit reading sessions, session-aware reading time, and editable AI-generated completion reports centered on the reader's own traces.
+**Goal:** Add explicit reading sessions, session-aware reading time, and editable AI-generated completion reports written by the reader's configured assistant from the reader's traces and durable memory.
 
-**Architecture:** Introduce `reading_sessions` as the durable lifecycle boundary while keeping `reading_daily` as the only reading-time fact table. Main-process repositories own session state, evidence queries, report generation, and AI tools; shared Zod contracts drive IPC; renderer routes a book to start, active-reader, reference-reader, or completion-report views from derived session state.
+**Architecture:** Introduce `reading_sessions` as the durable lifecycle boundary while keeping `reading_daily` as the only reading-time fact table. Main-process repositories own session state, evidence queries, report generation, staged memory writes, and AI tools; shared Zod contracts drive IPC; renderer routes a book to start, active-reader, reference-reader, or completion-report views from derived session state. Report generation reads live assistant preferences without changing chat snapshots, commits report and memory changes together, and never reloads raw conversation messages at or before a persisted compaction boundary.
 
 **Tech Stack:** Electron 41.7.1, TypeScript 6, React 19 with React Compiler, Zustand, TanStack Query, Zod 4, Drizzle ORM 1.0.0-rc.3, SQLite/better-sqlite3, Vercel AI SDK 7, Vitest 4, Tailwind CSS 4, CodeMirror 6, Streamdown.
 
@@ -12,6 +12,10 @@
 
 - Keep all business logic in `src/main/`; renderer code only displays shared DTOs and invokes IPC.
 - Use the configured summary model for report generation; never fall back to the chat model.
+- Build report context from the current SOUL, reader instructions, memory setting, and memory index on every generation or regeneration; do not use a conversation snapshot.
+- Default to the assistant's first-person perspective addressing the reader as “you”; reader instructions may override writing style, perspective, structure, and content, but not evidence or tool boundaries.
+- Expose only `readMemory`, `saveMemory`, and `updateMemory` to the report agent. Stage writes and commit them in the same transaction as the final report; never expose `deleteMemory` or `updateSoul`.
+- Never return raw conversation messages with `seq <= summarizedThroughSeq`; paginate and text-budget the uncompacted tail.
 - Persist only final non-empty Markdown in `reading_sessions.report`; do not persist partial output, tool traces, provenance, or report versions.
 - Derive reading state from session timestamps; do not add a session `status` column.
 - Use `Temporal` for every new timestamp read or calendar calculation. Read the system clock only in Electron glue and inject it into pure functions.
@@ -41,6 +45,10 @@
 - `src/main/reading-report/runtime.ts` — in-memory generating/failed state mapped to the six report DTO variants.
 - `src/main/reading-report/service.ts` — preflight, deduplication, background execution, and atomic report replacement.
 - `src/main/reading-report/service.test.ts` — runtime, failure, restart, and atomicity tests.
+- `src/main/reading-report/prompt.ts` — live report-specific composition of core rules, SOUL, memory index, and reader instructions.
+- `src/main/reading-report/prompt.test.ts` — perspective, precedence, live preference, and memory-gating tests.
+- `src/main/reading-report/memory-workspace.ts` — in-memory overlay and report-scoped read/save/update tools.
+- `src/main/reading-report/memory-workspace.test.ts` — overlay reads, mutation collapse, tool scope, and memory gating tests.
 - `src/main/ai/reading-session-tools.ts` — normal chat tools `listReadingSessions` and `getReadingReport`.
 - `src/main/ai/reading-session-tools.test.ts` — reader/library scope and cross-book isolation tests.
 - `src/main/db/migrate-reading-sessions.test.ts` — real legacy-data migration preservation test.
@@ -1436,3 +1444,825 @@ git commit -m "chore: document reading completion reports"
 - [ ] **Step 8: Update the kanban only after the implementation is integrated**
 
 Use the repository `kanban` skill to update Issue #78 with the design and implementation-plan links. Move it to Done and close it only when the implementation branch is merged or otherwise integrated into the project truth source.
+
+---
+
+## Incremental Plan: Assistant Voice, Durable Memory, and Bounded Conversations
+
+Tasks 1–7 above are already implemented on `codex/reading-completion-reports`. The following tasks implement the approved 2026-07-14 design refinement without changing the database schema, shared IPC contracts, or renderer UI.
+
+### Task 8: Compose a Live Report-Specific Assistant Prompt
+
+**Files:**
+
+- Create: `src/main/reading-report/prompt.ts`
+- Create: `src/main/reading-report/prompt.test.ts`
+- Modify: `src/main/ai/agent-context.ts`
+- Modify: `src/main/ai/agent-context.test.ts`
+- Modify: `src/main/reading-report/agent.ts`
+- Modify: `src/main/reading-report/service.ts`
+- Modify: `src/main/reading-report/service.test.ts`
+
+**Interfaces:**
+
+- Produces: `renderReaderInstructions(db)`, `renderAssistantIdentity(db)`, `renderMemoryIndex(db)`, `buildReadingReportSystemPrompt(db)`, and `RunReadingReportAgentInput.instructions`.
+- Preserves: `renderAgentContext(db)` output order and `getAgentContext(db, conversationId)` snapshot behavior for normal chat.
+- Consumes: `getPreference()`, `listMemories()`, `DEFAULT_SOUL`, and the existing report service lifecycle.
+
+- [ ] **Step 1: Write failing prompt-composition tests**
+
+Create `src/main/reading-report/prompt.test.ts` with a migrated in-memory DB and these assertions:
+
+```ts
+it("writes as the configured assistant and places reader instructions last", () => {
+  setPreference(db, "soul", { name: "Mia", persona: "Warm, precise, and curious." });
+  setPreference(db, "instructions", "Use short titled sections.");
+  createMemory(db, {
+    slug: "systems-thinking",
+    title: "Systems thinking",
+    description: "The reader connects mechanisms across books.",
+    body: "Stable context.",
+  });
+
+  const prompt = buildReadingReportSystemPrompt(db);
+
+  expect(prompt).toContain("from your own first-person perspective as the assistant");
+  expect(prompt).toContain("Your name is Mia. Warm, precise, and curious.");
+  expect(prompt).toContain("[systems-thinking] Systems thinking");
+  expect(prompt).toContain("Use short titled sections.");
+  expect(prompt.indexOf("Use short titled sections.")).toBeGreaterThan(
+    prompt.indexOf("from your own first-person perspective as the assistant"),
+  );
+  expect(prompt).not.toContain("in the reader's first person");
+});
+
+it("omits memory guidance and index when memory is disabled", () => {
+  setPreference(db, "memoryEnabled", false);
+  createMemory(db, {
+    slug: "hidden",
+    title: "Hidden",
+    description: "Must not be injected.",
+    body: "Hidden body.",
+  });
+
+  const prompt = buildReadingReportSystemPrompt(db);
+
+  expect(prompt).not.toContain("## Memory index");
+  expect(prompt).not.toContain("saveMemory");
+  expect(prompt).not.toContain("[hidden]");
+  expect(prompt).toContain("## Who you are");
+});
+```
+
+Extend `src/main/ai/agent-context.test.ts` to assert that the new composable renderers reproduce the existing chat context byte-for-byte:
+
+```ts
+expect(renderAgentContext(db)).toBe(
+  [renderReaderInstructions(db), renderAssistantIdentity(db), renderMemoryIndex(db)]
+    .filter((section): section is string => section !== null)
+    .join("\n\n"),
+);
+```
+
+- [ ] **Step 2: Run the prompt tests and verify RED**
+
+Run:
+
+```bash
+pnpm test src/main/reading-report/prompt.test.ts src/main/ai/agent-context.test.ts
+```
+
+Expected: FAIL because `@main/reading-report/prompt` and the three composable context renderers do not exist.
+
+- [ ] **Step 3: Extract composable live context renderers without changing chat snapshots**
+
+In `src/main/ai/agent-context.ts`, extract these exact functions and rebuild `renderAgentContext` from them:
+
+```ts
+export function renderReaderInstructions(db: DB): string | null {
+  const instructions = getPreference(db, "instructions")?.trim();
+  return instructions ? `## Reader instructions\n\n${instructions}` : null;
+}
+
+export function renderAssistantIdentity(db: DB): string {
+  const soul = getPreference(db, "soul") ?? DEFAULT_SOUL;
+  return `## Who you are\n\nYour name is ${soul.name}. ${soul.persona}`.trimEnd();
+}
+
+export function renderMemoryIndex(db: DB): string | null {
+  if (!(getPreference(db, "memoryEnabled") ?? true)) return null;
+  const all = listMemories(db);
+  if (all.length === 0) return null;
+  return `## Memory index\n\n${all
+    .map((memory) => `- [${memory.slug}] ${memory.title} — ${memory.description}`)
+    .join("\n")}`;
+}
+
+export function renderAgentContext(db: DB): string {
+  return [renderReaderInstructions(db), renderAssistantIdentity(db), renderMemoryIndex(db)]
+    .filter((section): section is string => section !== null)
+    .join("\n\n");
+}
+```
+
+Do not change `getAgentContext`, invalidation, or snapshot keys.
+
+- [ ] **Step 4: Implement the report-specific prompt composer**
+
+Create `src/main/reading-report/prompt.ts` with a fixed core, optional memory guidance, live identity/index, and reader instructions last:
+
+```ts
+import type { DB } from "@main/db/client";
+import {
+  renderAssistantIdentity,
+  renderMemoryIndex,
+  renderReaderInstructions,
+} from "@main/ai/agent-context";
+import { getPreference } from "@main/preferences/repository";
+
+export const READING_REPORT_CORE = `You write an editable Markdown completion report from your own first-person perspective as the assistant, addressing the reader as "you". Focus on the reader's questions, judgments, changes, connections, and what they want to retain. Ground every claim about the reader in traces available through tools; omit unsupported sections instead of inventing completeness. Do not turn the report into a book summary. You may compare a previous reading report only when you clearly label it as a cross-reading change rather than evidence from this reading. Long-term memory may explain or connect current traces only when clearly identified as your prior understanding of the reader, never as a direct observation from this reading. Evidence, target-session scope, and tool permissions cannot be overridden.`;
+
+const REPORT_MEMORY_GUIDANCE = `## Memory guidance for this report
+
+Use readMemory when an indexed memory may clarify the reader's durable viewpoint. Use saveMemory only for a new lasting preference, viewpoint, recurring concept, framework, correction, or cross-book connection. Use updateMemory instead of creating a near-duplicate. Never store book content, the complete report, or a one-off thought. Memory content follows the reader's language; slugs use English kebab-case.`;
+
+export function buildReadingReportSystemPrompt(db: DB): string {
+  const memoryEnabled = getPreference(db, "memoryEnabled") ?? true;
+  const readerInstructions = renderReaderInstructions(db);
+  const prioritizedInstructions = readerInstructions
+    ? `${readerInstructions}\n\nThese are the highest-priority report-writing preferences and may override the default perspective, structure, or content guidance above. They cannot override evidence, target-session scope, or tool permissions.`
+    : null;
+  return [
+    READING_REPORT_CORE,
+    renderAssistantIdentity(db),
+    renderMemoryIndex(db),
+    memoryEnabled ? REPORT_MEMORY_GUIDANCE : null,
+    prioritizedInstructions,
+  ]
+    .filter((section): section is string => section !== null)
+    .join("\n\n");
+}
+```
+
+- [ ] **Step 5: Pass a freshly built prompt into every agent run**
+
+Change `RunReadingReportAgentInput` in `src/main/reading-report/agent.ts` to include `instructions: string`, delete the old `READING_REPORT_SYSTEM`, and pass `input.instructions` to `generateText`.
+
+In the background callback in `src/main/reading-report/service.ts`, call `buildReadingReportSystemPrompt(deps.db)` immediately before `deps.runAgent(...)` and pass the resulting string. This call must happen for initial generation and every regeneration; do not cache it in `ReadingReportRuntime`.
+
+Add a service test that starts two generations with changed preferences between them and captures the two `instructions` values:
+
+```ts
+const prompts: string[] = [];
+deps.runAgent = vi.fn(async (input) => {
+  prompts.push(input.instructions);
+  return prompts.length === 1 ? "# First" : "# Second";
+});
+deps.resolveModel = () => ({ ok: true, model: {} as never, modelId: "summary" });
+
+startReadingReportGeneration(deps, session.id);
+await drain();
+expect(prompts[0]).toContain("Your name is Lia");
+
+setPreference(deps.db, "soul", { name: "Mia", persona: "New voice." });
+setPreference(deps.db, "instructions", "Use bullets.");
+startReadingReportGeneration(deps, session.id);
+await drain();
+
+expect(prompts[1]).toContain("Your name is Mia. New voice.");
+expect(prompts[1]).toContain("Use bullets.");
+```
+
+- [ ] **Step 6: Run focused tests and typecheck**
+
+Run:
+
+```bash
+pnpm test src/main/reading-report/prompt.test.ts src/main/ai/agent-context.test.ts src/main/reading-report/service.test.ts
+pnpm typecheck
+```
+
+Expected: PASS, and normal chat snapshot tests remain unchanged.
+
+- [ ] **Step 7: Commit the live prompt slice**
+
+```bash
+git add src/main/ai/agent-context.ts src/main/ai/agent-context.test.ts src/main/reading-report/agent.ts src/main/reading-report/prompt.ts src/main/reading-report/prompt.test.ts src/main/reading-report/service.ts src/main/reading-report/service.test.ts
+git commit -m "feat: personalize reading completion reports"
+```
+
+---
+
+### Task 9: Stage Report Memory Tools and Commit Them Atomically
+
+**Files:**
+
+- Create: `src/main/reading-report/memory-workspace.ts`
+- Create: `src/main/reading-report/memory-workspace.test.ts`
+- Modify: `src/main/db/client.ts`
+- Modify: `src/main/memory/repository.ts`
+- Modify: `src/main/memory/repository.test.ts`
+- Modify: `src/main/reading-sessions/repository.ts`
+- Modify: `src/main/reading-sessions/repository.test.ts`
+- Modify: `src/main/reading-report/agent.ts`
+- Modify: `src/main/reading-report/service.ts`
+- Modify: `src/main/reading-report/service.test.ts`
+- Modify: `src/main/ai/send-deps.ts`
+
+**Interfaces:**
+
+- Produces: `DBTransaction`, `ReadingReportMemoryMutation`, `createReadingReportMemoryWorkspace(db)`, `applyReadingReportMemoryMutations(tx, mutations, committedAt)`, and `saveReadingReportInTransaction(tx, sessionId, content)`.
+- `createReadingReportMemoryWorkspace(db)` returns `{ tools, mutations }`; `mutations()` returns a fresh deterministic array reflecting the final staged overlay.
+- The service composes evidence tools and memory tools for the agent, then commits final Markdown plus `mutations()` in one `db.transaction` after the generation token is revalidated.
+
+- [ ] **Step 1: Write failing memory-workspace tests**
+
+Create `src/main/reading-report/memory-workspace.test.ts`. Use real AI tool `execute` functions and cover these behaviors:
+
+```ts
+it("exposes only read, save, and update tools when memory is enabled", () => {
+  const workspace = createReadingReportMemoryWorkspace(db);
+  expect(Object.keys(workspace.tools).sort()).toEqual(["readMemory", "saveMemory", "updateMemory"]);
+});
+
+it("stages saves and lets later reads observe the overlay without touching the database", async () => {
+  const workspace = createReadingReportMemoryWorkspace(db);
+  await workspace.tools.saveMemory!.execute!(
+    {
+      slug: "attention-pattern",
+      title: "Attention pattern",
+      description: "The reader follows changes in attention.",
+      body: "Connected to [[systems-thinking]].",
+    },
+    toolOptions,
+  );
+  const read = await workspace.tools.readMemory!.execute!(
+    { slug: "attention-pattern" },
+    toolOptions,
+  );
+  expect(read).toEqual(expect.objectContaining({ found: true, body: expect.any(String) }));
+  expect(getMemoryBySlug(db, "attention-pattern")).toBeNull();
+  expect(workspace.mutations()).toEqual([
+    expect.objectContaining({ kind: "create", slug: "attention-pattern" }),
+  ]);
+});
+
+it("collapses repeated updates into one optimistic mutation", async () => {
+  const existing = createMemory(db, {
+    slug: "systems-thinking",
+    title: "Systems thinking",
+    description: "Old description.",
+    body: "Old body.",
+  });
+  const workspace = createReadingReportMemoryWorkspace(db);
+  await workspace.tools.updateMemory!.execute!(
+    { slug: existing.slug, description: "New description." },
+    toolOptions,
+  );
+  await workspace.tools.updateMemory!.execute!(
+    { slug: existing.slug, body: "New body." },
+    toolOptions,
+  );
+  expect(workspace.mutations()).toEqual([
+    expect.objectContaining({
+      kind: "update",
+      id: existing.id,
+      expectedUpdatedAt: existing.updatedAt,
+      description: "New description.",
+      body: "New body.",
+    }),
+  ]);
+});
+
+it("returns no tools or mutations when memory is disabled", () => {
+  setPreference(db, "memoryEnabled", false);
+  const workspace = createReadingReportMemoryWorkspace(db);
+  expect(workspace.tools).toEqual({});
+  expect(workspace.mutations()).toEqual([]);
+});
+```
+
+Also assert that overlay `readMemory` reports outgoing, incoming, and dangling links from the staged map rather than stale `memory_links` rows.
+
+- [ ] **Step 2: Run the workspace test and verify RED**
+
+Run:
+
+```bash
+pnpm test src/main/reading-report/memory-workspace.test.ts
+```
+
+Expected: FAIL because `@main/reading-report/memory-workspace` does not exist.
+
+- [ ] **Step 3: Implement the in-memory overlay and report-scoped tools**
+
+Create `src/main/reading-report/memory-workspace.ts` with this discriminated mutation type:
+
+```ts
+export type ReadingReportMemoryMutation =
+  | {
+      kind: "create";
+      slug: string;
+      title: string;
+      description: string;
+      body: string;
+    }
+  | {
+      kind: "update";
+      id: string;
+      slug: string;
+      expectedUpdatedAt: number;
+      title: string;
+      description: string;
+      body: string;
+    };
+```
+
+Snapshot `listMemories(db)` into `baseBySlug` and clone it into `currentBySlug`. `saveMemory` rejects an existing slug, adds a new overlay row, and marks the slug dirty. `updateMemory` rejects a missing slug, merges provided fields into the overlay, and marks the slug dirty. `readMemory` derives outgoing links with `extractLinks(body)`, incoming links by scanning the current overlay, and dangling links from missing targets. `mutations()` sorts dirty slugs lexically, emits full final values, and collapses a create followed by updates into one `create` mutation.
+
+Tool descriptions must retain the existing durable-memory criteria, must say writes are staged until the report succeeds, and must not mention or expose delete/SOUL capabilities.
+
+- [ ] **Step 4: Write failing repository transaction tests**
+
+Add tests to `src/main/memory/repository.test.ts` and `src/main/reading-sessions/repository.test.ts`:
+
+```ts
+it("applies a report memory batch with links at one injected timestamp", () => {
+  db.transaction((tx) => {
+    applyReadingReportMemoryMutations(
+      tx,
+      [
+        { kind: "create", slug: "a", title: "A", description: "A", body: "[[b]]" },
+        { kind: "create", slug: "b", title: "B", description: "B", body: "B" },
+      ],
+      1_783_459_200_000,
+    );
+  });
+  expect(getMemoryBySlug(db, "a")?.outgoing.map((memory) => memory.slug)).toEqual(["b"]);
+  expect(getMemoryBySlug(db, "a")?.createdAt).toBe(1_783_459_200_000);
+});
+
+it("rejects an optimistic update when the original memory changed", () => {
+  const original = createMemory(db, memoryInput);
+  db.update(memories)
+    .set({ body: "Changed elsewhere.", updatedAt: original.updatedAt + 1 })
+    .where(eq(memories.id, original.id))
+    .run();
+  expect(() =>
+    db.transaction((tx) =>
+      applyReadingReportMemoryMutations(
+        tx,
+        [
+          {
+            kind: "update",
+            id: original.id,
+            slug: original.slug,
+            expectedUpdatedAt: original.updatedAt,
+            title: original.title,
+            description: original.description,
+            body: "Report update.",
+          },
+        ],
+        original.updatedAt + 10,
+      ),
+    ),
+  ).toThrow(/changed during reading report generation/);
+});
+```
+
+For `saveReadingReportInTransaction`, open a transaction, save a report, throw a sentinel error, and assert after rollback that the session still contains the old report.
+
+- [ ] **Step 5: Add transaction-aware repository primitives**
+
+In `src/main/db/client.ts`, export the already-compatible executor shape used by Drizzle callbacks:
+
+```ts
+export type DBTransaction = Omit<DB, "$client">;
+```
+
+In `src/main/memory/repository.ts`, export:
+
+```ts
+export function applyReadingReportMemoryMutations(
+  tx: DBTransaction,
+  mutations: readonly ReadingReportMemoryMutation[],
+  committedAt: number,
+): void;
+```
+
+Apply all inserts and optimistic updates first, setting `createdAt`/`updatedAt` to `committedAt`, then call the existing `syncLinks` for every changed body so links between two memories created in the same batch resolve. Update mutations must use both `id` and `expectedUpdatedAt` in the `WHERE` clause and throw `memory <slug> changed during reading report generation` when no row is returned. Unique-slug insert errors propagate and roll back the outer transaction.
+
+In `src/main/reading-sessions/repository.ts`, move current validation and update logic into:
+
+```ts
+export function saveReadingReportInTransaction(
+  tx: DBTransaction,
+  sessionId: string,
+  content: string,
+): ReadingSessionRow;
+```
+
+Keep the existing `saveReadingReport(db, sessionId, content)` public behavior by delegating to the new function.
+
+- [ ] **Step 6: Run repository and workspace tests**
+
+Run:
+
+```bash
+pnpm test src/main/reading-report/memory-workspace.test.ts src/main/memory/repository.test.ts src/main/reading-sessions/repository.test.ts
+```
+
+Expected: PASS.
+
+- [ ] **Step 7: Write failing service atomicity tests**
+
+Extend `src/main/reading-report/service.test.ts` with four cases using a `runAgent` stub that executes staged memory tools before resolving or rejecting:
+
+```ts
+const toolOptions = { toolCallId: "report-memory", messages: [] } as never;
+const memoryInput = {
+  slug: "durable-insight",
+  title: "Durable insight",
+  description: "A lasting insight from the reading.",
+  body: "A durable insight.",
+};
+
+async function stageMemory(input: Parameters<typeof runReadingReportAgent>[0]) {
+  const saveMemory = input.tools.saveMemory;
+  if (!saveMemory?.execute) throw new Error("saveMemory tool missing");
+  await saveMemory.execute(memoryInput, toolOptions);
+}
+
+it("commits the generated report and staged memory together", async () => {
+  deps.runAgent = vi.fn(async (input) => {
+    await stageMemory(input);
+    return "# Report";
+  });
+  startReadingReportGeneration(deps, session.id);
+  await drain();
+  expect(getReadingSessionDetail(deps, session.id).report).toEqual({
+    status: "ready",
+    content: "# Report",
+  });
+  expect(getMemoryBySlug(deps.db, "durable-insight")?.body).toBe("A durable insight.");
+});
+
+it("discards staged memory when report generation fails", async () => {
+  deps.runAgent = vi.fn(async (input) => {
+    await stageMemory(input);
+    throw new Error("model failed");
+  });
+  startReadingReportGeneration(deps, session.id);
+  await drain();
+  expect(getMemoryBySlug(deps.db, "durable-insight")).toBeNull();
+});
+
+it("discards staged memory from a generation invalidated by a manual save", async () => {
+  const staged = deferred<void>();
+  const finish = deferred<string>();
+  deps.runAgent = vi.fn(async (input) => {
+    await stageMemory(input);
+    staged.resolve();
+    return finish.promise;
+  });
+  startReadingReportGeneration(deps, session.id);
+  await staged.promise;
+  saveUserReadingReport(deps, session.id, "# Manual");
+  finish.resolve("# Generated");
+  await drain();
+  expect(getMemoryBySlug(deps.db, "durable-insight")).toBeNull();
+  expect(getReadingSessionDetail(deps, session.id).report).toEqual({
+    status: "ready",
+    content: "# Manual",
+  });
+});
+
+it("rolls back the report when an optimistic memory update conflicts", async () => {
+  const existing = createMemory(deps.db, memoryInput);
+  saveReadingReport(deps.db, session.id, "# Old");
+  const staged = deferred<void>();
+  const finish = deferred<string>();
+  deps.runAgent = vi.fn(async (input) => {
+    const updateMemory = input.tools.updateMemory;
+    if (!updateMemory?.execute) throw new Error("updateMemory tool missing");
+    await updateMemory.execute({ slug: existing.slug, body: "Report update." }, toolOptions);
+    staged.resolve();
+    return finish.promise;
+  });
+  startReadingReportGeneration(deps, session.id);
+  await staged.promise;
+  deps.db
+    .update(memories)
+    .set({ body: "External update.", updatedAt: existing.updatedAt + 1 })
+    .where(eq(memories.id, existing.id))
+    .run();
+  finish.resolve("# Generated");
+  await drain();
+  expect(getReadingSessionDetail(deps, session.id).report).toEqual({
+    status: "regeneration-failed",
+    content: "# Old",
+  });
+  expect(getMemoryBySlug(deps.db, "durable-insight")?.body).toBe("External update.");
+});
+```
+
+- [ ] **Step 8: Compose tools and commit report plus memory in the service**
+
+Change `RunReadingReportAgentInput.tools` to AI SDK `ToolSet` so the service can pass:
+
+```ts
+const memoryWorkspace = createReadingReportMemoryWorkspace(deps.db);
+const tools = {
+  ...createReadingReportTools(reportToolDeps),
+  ...memoryWorkspace.tools,
+};
+```
+
+Change the background result to `{ content, memoryMutations }`. After `runtime.isCurrent(...)` succeeds, commit with one synchronous transaction:
+
+```ts
+deps.db.transaction((tx) => {
+  saveReadingReportInTransaction(tx, session.id, result.content);
+  applyReadingReportMemoryMutations(tx, result.memoryMutations, deps.now().epochMilliseconds);
+});
+```
+
+Add `now: () => Temporal.Instant` to `ReadingReportServiceDeps`. Tests inject a fixed instant; `makeReadingReportDeps()` in `src/main/ai/send-deps.ts` supplies `() => Temporal.Now.instant()`. Call `now()` only after the generation token is revalidated, immediately before the transaction.
+
+Any transaction error follows the existing generation failure path and logs at `warn`; it must not mark the runtime successful.
+
+- [ ] **Step 9: Run service tests and typecheck**
+
+Run:
+
+```bash
+pnpm test src/main/reading-report/service.test.ts src/main/reading-report/memory-workspace.test.ts src/main/memory/repository.test.ts src/main/reading-sessions/repository.test.ts src/main/ai/send-deps.test.ts
+pnpm typecheck
+```
+
+Expected: PASS.
+
+- [ ] **Step 10: Commit the atomic memory slice**
+
+```bash
+git add src/main/db/client.ts src/main/memory/repository.ts src/main/memory/repository.test.ts src/main/reading-sessions/repository.ts src/main/reading-sessions/repository.test.ts src/main/reading-report/agent.ts src/main/reading-report/memory-workspace.ts src/main/reading-report/memory-workspace.test.ts src/main/reading-report/service.ts src/main/reading-report/service.test.ts src/main/ai/send-deps.ts
+git commit -m "feat: let reading reports organize memory"
+```
+
+---
+
+### Task 10: Bound Conversation Evidence at the Compaction Frontier
+
+**Files:**
+
+- Modify: `src/main/reading-report/evidence.ts`
+- Modify: `src/main/reading-report/evidence.test.ts`
+- Modify: `src/main/reading-report/tools.ts`
+- Modify: `src/main/reading-report/tools.test.ts`
+
+**Interfaces:**
+
+- Produces: `SessionConversationReadResult`, `SessionConversationReadOptions`, `SESSION_CONVERSATION_DEFAULT_LIMIT`, and `SESSION_CONVERSATION_TEXT_BUDGET`.
+- Changes: `readSessionConversation(db, session, conversationId, options)` returns a discriminated result instead of an unbounded message array.
+- Preserves: conversation ownership validation, session timestamp filtering, and at most one adjacent message before/after the session excerpt.
+
+- [ ] **Step 1: Write failing compaction and pagination tests**
+
+Extend `src/main/reading-report/evidence.test.ts` with fixtures that set `contextSummary` and `summarizedThroughSeq` on the existing conversation:
+
+```ts
+it("returns the compacted summary but never raw messages at or before its frontier", () => {
+  db.update(conversations)
+    .set({ contextSummary: "EARLY SUMMARY", summarizedThroughSeq: 1 })
+    .where(eq(conversations.id, "conversation-in-window"))
+    .run();
+
+  const result = readSessionConversation(db, session, "conversation-in-window", {});
+
+  if (result.status !== "messages") throw new Error("expected raw tail messages");
+  expect(result.compactedContext).toEqual({ summary: "EARLY SUMMARY", throughSeq: 1 });
+  expect(JSON.stringify(result)).not.toContain('"text":"before"');
+  expect(JSON.stringify(result)).not.toContain('"text":"inside one"');
+  expect(result.messages.map((message) => message.seq)).toEqual([2, 3]);
+});
+
+it("returns a compacted-only result when every in-session message is behind the frontier", () => {
+  db.update(conversations)
+    .set({ contextSummary: "ALL SESSION TURNS", summarizedThroughSeq: 2 })
+    .where(eq(conversations.id, "conversation-in-window"))
+    .run();
+
+  expect(readSessionConversation(db, session, "conversation-in-window", {})).toEqual({
+    status: "compacted-only",
+    compactedContext: { summary: "ALL SESSION TURNS", throughSeq: 2 },
+    messages: [],
+  });
+});
+
+it("paginates uncompacted in-session messages with an exclusive seq cursor", () => {
+  const first = readSessionConversation(db, session, "conversation-in-window", { limit: 1 });
+  expect(first).toEqual(
+    expect.objectContaining({ status: "messages", hasMore: true, nextAfterSeq: 1 }),
+  );
+  const second = readSessionConversation(db, session, "conversation-in-window", {
+    afterSeq: 1,
+    limit: 1,
+  });
+  expect(second).toEqual(
+    expect.objectContaining({ status: "messages", hasMore: false, nextAfterSeq: null }),
+  );
+});
+```
+
+Add one fixture with a message longer than `SESSION_CONVERSATION_TEXT_BUDGET` and a neighbor assertion:
+
+```ts
+it("caps returned message text and marks truncation", () => {
+  db.insert(messages)
+    .values({
+      conversationId: "conversation-in-window",
+      role: "assistant",
+      parts: [{ type: "text", text: "x".repeat(SESSION_CONVERSATION_TEXT_BUDGET + 100) }],
+      seq: 4,
+      createdAt: inside,
+    })
+    .run();
+  const result = readSessionConversation(db, session, "conversation-in-window", {
+    afterSeq: 3,
+  });
+  if (result.status !== "messages") throw new Error("expected raw tail messages");
+  expect(result.messages[0]).toEqual(
+    expect.objectContaining({
+      seq: 4,
+      truncated: true,
+      text: "x".repeat(SESSION_CONVERSATION_TEXT_BUDGET),
+    }),
+  );
+});
+
+it("does not return a neighboring message at the compaction frontier", () => {
+  db.update(conversations)
+    .set({ contextSummary: "EARLY SUMMARY", summarizedThroughSeq: 1 })
+    .where(eq(conversations.id, "conversation-in-window"))
+    .run();
+  const result = readSessionConversation(db, session, "conversation-in-window", {});
+  if (result.status !== "messages") throw new Error("expected raw tail messages");
+  expect(result.messages.some((message) => message.seq <= 1)).toBe(false);
+});
+```
+
+In `src/main/reading-report/tools.test.ts`, assert `readConversation.inputSchema` defaults `limit` to 20, caps it at 50, accepts a non-negative `afterSeq`, and rejects 51.
+
+- [ ] **Step 2: Run evidence and tool tests and verify RED**
+
+Run:
+
+```bash
+pnpm test src/main/reading-report/evidence.test.ts src/main/reading-report/tools.test.ts
+```
+
+Expected: FAIL because the current function has no options, returns an array, crosses the compaction frontier, and exposes no bounded cursor schema.
+
+- [ ] **Step 3: Define the discriminated conversation result**
+
+In `src/main/reading-report/evidence.ts`, add:
+
+```ts
+export const SESSION_CONVERSATION_DEFAULT_LIMIT = 20;
+export const SESSION_CONVERSATION_MAX_LIMIT = 50;
+export const SESSION_CONVERSATION_TEXT_BUDGET = 24_000;
+
+export interface SessionConversationReadOptions {
+  afterSeq?: number;
+  limit?: number;
+}
+
+export interface SessionConversationMessage extends SessionMessageExcerpt {
+  context: "session" | "neighbor";
+  truncated: boolean;
+}
+
+export type SessionConversationReadResult =
+  | {
+      status: "compacted-only";
+      compactedContext: { summary: string; throughSeq: number };
+      messages: [];
+    }
+  | {
+      status: "messages";
+      compactedContext: { summary: string; throughSeq: number } | null;
+      messages: SessionConversationMessage[];
+      hasMore: boolean;
+      nextAfterSeq: number | null;
+    };
+```
+
+The summary is included only on the first page (`afterSeq === undefined`) because prior tool results remain in the model context; later pages set `compactedContext` to `null`.
+
+- [ ] **Step 4: Implement frontier-safe SQL, pagination, neighbors, and text budget**
+
+Load only conversation metadata (`id`, `contextSummary`, `summarizedThroughSeq`) first. Build the raw predicate from all of:
+
+```ts
+eq(messages.conversationId, conversation.id),
+gt(messages.seq, conversation.summarizedThroughSeq ?? -1),
+gt(messages.seq, options.afterSeq ?? conversation.summarizedThroughSeq ?? -1),
+gte(messages.createdAt, session.startedAt),
+lte(messages.createdAt, session.completedAt!),
+```
+
+Query `limit + 1` ascending rows to derive `hasMore`; return only the first `limit`. On the first page, query at most one preceding neighbor whose seq is still greater than the compaction frontier. On the final page, query at most one following neighbor whose seq is greater than the frontier. Mark neighbors with `context: "neighbor"` and in-window rows with `context: "session"`.
+
+Apply a cumulative 24,000-character budget after `textOfParts`. When a single included message exceeds remaining capacity, slice its text to the remaining characters and set `truncated: true`; never include another message after the budget is exhausted. Cursor progression uses the last in-session row selected from SQL, not a neighbor seq.
+
+When no raw in-window row remains, use an ID-only/count query to distinguish “the session had messages, but they are compacted” from “the conversation has no session messages.” Return `compacted-only` only when a non-empty summary and numeric frontier exist; otherwise retain the existing no-session-messages error.
+
+- [ ] **Step 5: Expose the cursor through the report tool**
+
+Replace the `readConversation` input schema in `src/main/reading-report/tools.ts` with:
+
+```ts
+inputSchema: z.object({
+  conversationId: z.string().min(1),
+  afterSeq: z.number().int().nonnegative().optional(),
+  limit: z.number().int().positive().max(50).default(20),
+}),
+```
+
+Pass `{ afterSeq, limit }` to `readSessionConversation`. Update the description to state that compacted history is returned only as a rolling summary and raw messages are paginated strictly after the frontier.
+
+- [ ] **Step 6: Run focused tests and typecheck**
+
+Run:
+
+```bash
+pnpm test src/main/reading-report/evidence.test.ts src/main/reading-report/tools.test.ts src/main/reading-report/service.test.ts
+pnpm typecheck
+```
+
+Expected: PASS.
+
+- [ ] **Step 7: Commit the bounded conversation slice**
+
+```bash
+git add src/main/reading-report/evidence.ts src/main/reading-report/evidence.test.ts src/main/reading-report/tools.ts src/main/reading-report/tools.test.ts
+git commit -m "fix: bound reading report conversation context"
+```
+
+---
+
+### Task 11: Verify the Integrated Report Agent Refinement
+
+**Files:**
+
+- Modify only if a check exposes a defect: files changed in Tasks 8–10.
+
+**Interfaces:**
+
+- Consumes: live report prompt, staged memory workspace, atomic persistence, and bounded conversation evidence.
+- Produces: automated evidence that the refinement does not regress ordinary chat context, report runtime states, or existing reading-session behavior.
+
+- [ ] **Step 1: Run the complete report and memory test set**
+
+Run:
+
+```bash
+pnpm test src/main/ai/agent-context.test.ts src/main/ai/base-prompt.test.ts src/main/ai/memory-tools.test.ts src/main/memory/repository.test.ts src/main/reading-sessions/repository.test.ts src/main/reading-report/prompt.test.ts src/main/reading-report/memory-workspace.test.ts src/main/reading-report/evidence.test.ts src/main/reading-report/tools.test.ts src/main/reading-report/service.test.ts src/main/ai/send-deps.test.ts
+```
+
+Expected: PASS with no unhandled rejection or logger output.
+
+- [ ] **Step 2: Run the repository quality gates**
+
+Run each separately:
+
+```bash
+pnpm test
+pnpm typecheck
+pnpm lint
+pnpm format:check
+pnpm i18n:lint
+```
+
+Expected: tests, typecheck, lint, and format exit 0. `i18n:lint` must introduce no new findings; the known baseline is 12 pre-existing findings in ErrorBoundary (2), StreakCard (1), ChatPerfMonitor (8), and PdfReader (1).
+
+- [ ] **Step 3: Inspect the final diff for scope and forbidden capabilities**
+
+Run:
+
+```bash
+git diff --check c9267eb..HEAD
+git diff --stat c9267eb..HEAD
+rg -n "deleteMemory|updateSoul|in the reader's first person" src/main/reading-report
+```
+
+Expected: `git diff --check` is clean; changes are limited to the planned main-process/tests/docs files; the final `rg` returns no report-agent exposure of `deleteMemory`, `updateSoul`, or the old reader-first-person prompt.
+
+- [ ] **Step 4: Record the completed incremental plan**
+
+Mark Tasks 8–11 checkboxes complete only after their commands have produced the expected evidence, then commit the plan bookkeeping separately:
+
+```bash
+git add docs/superpowers/plans/2026-07-14-reading-sessions-completion-reports.md
+git commit -m "docs: complete reading report agent refinement plan"
+```
