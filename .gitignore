@@ -103,3 +103,6 @@ out/
 
 # Workspace package build output (tsup)
 packages/*/dist/
+
+# Local task reports
+task-6-report

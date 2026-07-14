@@ -14,6 +14,10 @@ export function ReportEditor({ initialContent, disabled, onSave, onCancel }: Rep
   const { t } = useTranslation();
   const [content, setContent] = useState(initialContent);
   const trimmed = content.trim();
+  const save = (value: string) => {
+    const trimmedValue = value.trim();
+    if (!disabled && trimmedValue) onSave(trimmedValue);
+  };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
@@ -24,7 +28,7 @@ export function ReportEditor({ initialContent, disabled, onSave, onCancel }: Rep
         <MarkdownEditor
           defaultValue={initialContent}
           onChange={setContent}
-          onSubmit={(value) => onSave(value.trim())}
+          onSubmit={save}
           onCancel={onCancel}
           autoFocus
           className="min-h-80"
@@ -34,7 +38,7 @@ export function ReportEditor({ initialContent, disabled, onSave, onCancel }: Rep
         <Button variant="ghost" onClick={onCancel} disabled={disabled}>
           {t("common.cancel", "取消")}
         </Button>
-        <Button onClick={() => onSave(trimmed)} disabled={disabled || !trimmed}>
+        <Button onClick={() => save(content)} disabled={disabled || !trimmed}>
           {t("common.save", "保存")}
         </Button>
       </div>

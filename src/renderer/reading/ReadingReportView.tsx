@@ -163,8 +163,9 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
               <Select
                 value={selectedSession.id}
                 onValueChange={(value) => setSelectedSessionId(value)}
+                disabled={editing}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full" disabled={editing}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
