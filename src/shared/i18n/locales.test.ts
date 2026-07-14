@@ -7,6 +7,10 @@ const task5ReadingKeys = [
   "reading.completeConfirm",
   "reading.openReference",
   "reading.referenceMode",
+  "reading.routeLoadError",
+  "reading.routeLoading",
+  "reading.routeNotFound",
+  "reading.routeSelectBook",
   "reading.start",
 ] as const;
 
@@ -25,16 +29,23 @@ const chineseRestoreConfirmationKeys = [
 ] as const;
 
 describe("locale completeness", () => {
+  function expectNonEmptyString(locale: Record<string, unknown>, key: string) {
+    const value = locale[key];
+    expect(typeof value).toBe("string");
+    if (typeof value !== "string") return;
+    expect(value.trim()).not.toBe("");
+  }
+
   it("provides non-empty English copy for Task 5 reading flow", () => {
-    for (const key of task5ReadingKeys) expect(en[key]).not.toBe("");
+    for (const key of task5ReadingKeys) expectNonEmptyString(en, key);
   });
 
   it("keeps restore confirmation keys used by both locales", () => {
     for (const key of restoreKindKeys) {
-      expect(en[key]).not.toBe("");
-      expect(zhCN[key]).not.toBe("");
+      expectNonEmptyString(en, key);
+      expectNonEmptyString(zhCN, key);
     }
-    for (const key of englishRestoreConfirmationKeys) expect(en[key]).not.toBe("");
-    for (const key of chineseRestoreConfirmationKeys) expect(zhCN[key]).not.toBe("");
+    for (const key of englishRestoreConfirmationKeys) expectNonEmptyString(en, key);
+    for (const key of chineseRestoreConfirmationKeys) expectNonEmptyString(zhCN, key);
   });
 });

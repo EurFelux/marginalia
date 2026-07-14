@@ -6,12 +6,12 @@ export function contextKey(ctx: ChatContext): string {
   return ctx.kind === "book" ? `book:${ctx.bookId}` : "library";
 }
 
-/** 由导航派生上下文：阅读器且有书 ⇒ book；否则 ⇒ library。 */
+/** 由导航派生上下文：书籍路由且有书 ⇒ book；否则 ⇒ library。 */
 export function deriveChatContext(
-  view: "library" | "stats" | "reader",
+  view: "library" | "stats" | "book",
   currentBookId: string | null,
 ): ChatContext {
-  return view === "reader" && currentBookId
+  return view === "book" && currentBookId
     ? { kind: "book", bookId: currentBookId }
     : { kind: "library" };
 }
