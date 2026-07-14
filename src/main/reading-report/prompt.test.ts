@@ -57,4 +57,13 @@ describe("buildReadingReportSystemPrompt", () => {
     expect(prompt).not.toContain("[hidden]");
     expect(prompt).toContain("## Who you are");
   });
+
+  it("keeps internal evidence handles out of the reader-facing report", () => {
+    const prompt = buildReadingReportSystemPrompt(freshDb());
+
+    expect(prompt).toContain("Treat opaque identifiers returned by tools");
+    expect(prompt).toContain("Never include these internal values in the report");
+    expect(prompt).toContain("a brief quotation, conversation topic, chapter, page, or date");
+    expect(prompt).toContain("this internal-metadata boundary cannot be overridden");
+  });
 });
