@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { Download, FolderOpen, Upload } from "lucide-react";
+import { FolderOpen, Upload } from "lucide-react";
 import { Button } from "@renderer/components/ui/button";
 import { Input } from "@renderer/components/ui/input";
 import { Checkbox } from "@renderer/components/ui/checkbox";
@@ -12,10 +12,11 @@ import {
   AlertDialogFooter,
   AlertDialogTitle,
 } from "@renderer/components/ui/alert-dialog";
+import { BackupExportButton } from "@renderer/settings/BackupExportButton";
 import { usePrefsStore } from "@renderer/store/prefs-store";
 import { clampBackgroundConcurrency, clampStepLimit } from "@renderer/settings/settings-logic";
 import { DEFAULT_STEP_LIMIT } from "@shared/preferences";
-import type { BackupInspection } from "@shared/backup";
+import type { BackupInspection, BackupKind } from "@shared/backup";
 
 export function AdvancedSettings() {
   const { t } = useTranslation();
@@ -63,12 +64,13 @@ export function AdvancedSettings() {
     }
   };
 
-  const onExport = async () => {
+  const onExport = async (kind: BackupKind) => {
     setBusy(true);
     try {
-      const res = await window.api.backup.export({ kind: "full" });
-      if (res)
+      const res = await window.api.backup.export({ kind });
+      if (res) {
         toast.success(t("settings.backup.exportDone", "备份已导出：{{path}}", { path: res.path }));
+      }
     } catch {
       toast.error(t("settings.backup.exportFailed", "备份导出失败"));
     } finally {
@@ -117,6 +119,10 @@ export function AdvancedSettings() {
       setBusy(false);
     }
   };
+
+  const backupWhen = pendingRestore
+    ? Temporal.Instant.fromEpochMilliseconds(pendingRestore.manifest.createdAt).toLocaleString()
+    : "";
 
   return (
     <>
@@ -220,14 +226,11 @@ export function AdvancedSettings() {
           <p className="text-[11px] leading-relaxed text-muted-foreground">
             {t(
               "settings.backup.warning",
-              "备份包含全部书籍、标注、进度、会话与设置；其中 API key 以明文随包导出，请妥善保管。",
+              "精简备份包含全部应用数据但不含书籍原文件，适合在设备间传递；完整备份额外包含所有 EPUB / PDF。两种备份都含明文 API key，请妥善保管。",
             )}
           </p>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={busy} onClick={() => void onExport()}>
-              <Download />
-              {t("settings.backup.export", "导出备份")}
-            </Button>
+            <BackupExportButton disabled={busy} onExport={(kind) => void onExport(kind)} />
             <Button
               variant="outline"
               size="sm"
@@ -248,17 +251,25 @@ export function AdvancedSettings() {
         }}
       >
         <AlertDialogContent>
-          <AlertDialogTitle>{t("settings.backup.restoreTitle", "还原备份？")}</AlertDialogTitle>
+          <AlertDialogTitle>
+            {pendingRestore?.manifest.kind === "compact"
+              ? t("settings.backup.kindCompact", "精简备份")
+              : t("settings.backup.kindFull", "完整备份")}
+            {` · ${t("settings.backup.restoreTitle", "还原备份？")}`}
+          </AlertDialogTitle>
           <AlertDialogDescription>
             {pendingRestore
-              ? t(
-                  "settings.backup.confirmRestore",
-                  "将用此备份整体替换当前全部数据（{{count}} 本书，导出于 {{when}}）。替换前会自动保留一份当前数据的备份，随后应用将重启。",
-                  {
-                    count: pendingRestore.manifest.bookCount,
-                    when: new Date(pendingRestore.manifest.createdAt).toLocaleString(),
-                  },
-                )
+              ? pendingRestore.manifest.kind === "compact"
+                ? t(
+                    "settings.backup.confirmCompactRestore",
+                    "将用此精简备份整体替换当前应用数据（{{count}} 本书，导出于 {{when}}）。本机现有书籍原文件不会被删除或覆盖；缺少本地文件的书可在恢复后重新连接。当前数据库会先保留安全副本，随后应用将重启。",
+                    { count: pendingRestore.manifest.bookCount, when: backupWhen },
+                  )
+                : t(
+                    "settings.backup.confirmFullRestore",
+                    "将用此完整备份整体替换当前全部数据与书籍原文件（{{count}} 本书，导出于 {{when}}）。替换前会自动保留一份当前数据的备份，随后应用将重启。",
+                    { count: pendingRestore.manifest.bookCount, when: backupWhen },
+                  )
               : ""}
           </AlertDialogDescription>
           <AlertDialogFooter>

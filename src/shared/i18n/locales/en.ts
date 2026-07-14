@@ -304,21 +304,30 @@ export default {
   "settings.appearance": "Appearance",
   "settings.assistantModel": "Chat model",
   "settings.backup.cancel": "Cancel",
-  "settings.backup.confirmRestore_one":
-    "This will replace all current data with this backup ({{count}} book, exported {{when}}). A backup of your current data is kept first, then the app relaunches.",
-  "settings.backup.confirmRestore_other":
-    "This will replace all current data with this backup ({{count}} books, exported {{when}}). A backup of your current data is kept first, then the app relaunches.",
-  "settings.backup.export": "Export Backup",
+  "settings.backup.confirmCompactRestore_one":
+    "This will replace all current app data with this compact backup ({{count}} book, exported {{when}}). This device's original book files are kept; books without local files can be reconnected after restoration. Your current database is kept as a safety copy first, then the app relaunches.",
+  "settings.backup.confirmCompactRestore_other":
+    "This will replace all current app data with this compact backup ({{count}} books, exported {{when}}). This device's original book files are kept; books without local files can be reconnected after restoration. Your current database is kept as a safety copy first, then the app relaunches.",
+  "settings.backup.confirmFullRestore_one":
+    "This will replace all current data and original book files with this full backup ({{count}} book, exported {{when}}). Your current data is kept as a safety copy first, then the app relaunches.",
+  "settings.backup.confirmFullRestore_other":
+    "This will replace all current data and original book files with this full backup ({{count}} books, exported {{when}}). Your current data is kept as a safety copy first, then the app relaunches.",
+  "settings.backup.exportCompact": "Export Compact Backup",
   "settings.backup.exportDone": "Backup exported: {{path}}",
   "settings.backup.exportFailed": "Backup export failed",
+  "settings.backup.exportFull": "Export Full Backup",
+  "settings.backup.exportFullDesc": "Includes every original EPUB / PDF file",
+  "settings.backup.exportOptions": "Choose backup type",
   "settings.backup.incompatible": "Cannot restore: backup is from a newer app version ({{reason}})",
+  "settings.backup.kindCompact": "Compact backup",
+  "settings.backup.kindFull": "Full backup",
   "settings.backup.readFailed": "Couldn't read this backup",
   "settings.backup.restore": "Restore Backup",
   "settings.backup.restoreFailed": "Restore failed",
   "settings.backup.restoreTitle": "Restore backup?",
   "settings.backup.title": "Backup & Restore",
   "settings.backup.warning":
-    "Backups include all books, annotations, reading progress, conversations, and settings. API keys are exported in plaintext — keep the file private.",
+    "Compact backups include all app data but omit original book files, making them easier to move between devices. Full backups also include every EPUB / PDF. Both contain plaintext API keys — keep them private.",
   "settings.close": "Close settings",
   "settings.colorMode": "Color mode",
   "settings.dark": "Dark",
