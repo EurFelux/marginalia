@@ -8,6 +8,7 @@ import { supportsImageToolResults } from "@main/ai/model-factory";
 import type { LoadBytes } from "@main/ai/tools";
 import { hasReaderEvidence } from "@main/reading-report/evidence";
 import { runReadingReportAgent } from "@main/reading-report/agent";
+import { buildReadingReportSystemPrompt } from "@main/reading-report/prompt";
 import { ReadingReportRuntime, type GenerationKind } from "@main/reading-report/runtime";
 import { createReadingReportTools } from "@main/reading-report/tools";
 import {
@@ -85,6 +86,7 @@ export function startReadingReportGeneration(
       return deps.runAgent({
         resolved,
         tools,
+        instructions: buildReadingReportSystemPrompt(deps.db),
         bookTitle: title,
         startedAt: session.startedAt,
         completedAt: session.completedAt!,

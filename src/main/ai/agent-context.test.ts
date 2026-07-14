@@ -7,7 +7,10 @@ import {
   dropAgentContext,
   getAgentContext,
   invalidateAllAgentContexts,
+  renderAssistantIdentity,
   renderAgentContext,
+  renderMemoryIndex,
+  renderReaderInstructions,
 } from "@main/ai/agent-context";
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
@@ -38,6 +41,11 @@ describe("renderAgentContext", () => {
     expect(text).toContain("be brief");
     expect(text.indexOf("[m1]")).toBeLessThan(text.indexOf("[m2]"));
     expect(text).toContain("[m1] T1 — D1");
+    expect(text).toBe(
+      [renderReaderInstructions(db), renderAssistantIdentity(db), renderMemoryIndex(db)]
+        .filter((section): section is string => section !== null)
+        .join("\n\n"),
+    );
   });
 
   it("omits memory index when memoryEnabled=false (soul still present)", () => {

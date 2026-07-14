@@ -8,6 +8,7 @@ import {
   startReading,
 } from "@main/reading-sessions/repository";
 import { ReadingReportRuntime } from "@main/reading-report/runtime";
+import { setPreference } from "@main/preferences/repository";
 import {
   getReadingSessionDetail,
   saveUserReadingReport,
@@ -177,5 +178,27 @@ describe("reading report service", () => {
       content: "# Manual",
     });
     expect(deps.runtime.inFlight.has(session.id)).toBe(false);
+  });
+
+  it("rebuilds assistant identity and reader instructions for every generation", async () => {
+    const { deps, session, drain } = setup();
+    const prompts: string[] = [];
+    deps.resolveModel = () => ({ ok: true, model: {} as never, modelId: "summary" });
+    deps.runAgent = vi.fn(async (input) => {
+      prompts.push(input.instructions);
+      return prompts.length === 1 ? "# First" : "# Second";
+    });
+
+    startReadingReportGeneration(deps, session.id);
+    await drain();
+    expect(prompts[0]).toContain("Your name is Lia");
+
+    setPreference(deps.db, "soul", { name: "Mia", persona: "New voice." });
+    setPreference(deps.db, "instructions", "Use bullets.");
+    startReadingReportGeneration(deps, session.id);
+    await drain();
+
+    expect(prompts[1]).toContain("Your name is Mia. New voice.");
+    expect(prompts[1]).toContain("Use bullets.");
   });
 });

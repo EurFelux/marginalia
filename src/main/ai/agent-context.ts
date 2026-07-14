@@ -8,28 +8,30 @@ import { DEFAULT_SOUL } from "@shared/preferences";
 
 const snapshots = new Map<string, string>();
 
+export function renderReaderInstructions(db: DB): string | null {
+  const instructions = getPreference(db, "instructions")?.trim();
+  return instructions ? `## Reader instructions\n\n${instructions}` : null;
+}
+
+export function renderAssistantIdentity(db: DB): string {
+  const soul = getPreference(db, "soul") ?? DEFAULT_SOUL;
+  return `## Who you are\n\nYour name is ${soul.name}. ${soul.persona}`.trimEnd();
+}
+
+export function renderMemoryIndex(db: DB): string | null {
+  const memoryEnabled = getPreference(db, "memoryEnabled") ?? true;
+  if (!memoryEnabled) return null;
+  const all = listMemories(db); // 已按 (createdAt, id) 确定性排序
+  if (all.length === 0) return null;
+  const lines = all.map((memory) => `- [${memory.slug}] ${memory.title} — ${memory.description}`);
+  return `## Memory index\n\n${lines.join("\n")}`;
+}
+
 /** 纯渲染（测试直测）：instructions 段 + SOUL 段 + 记忆索引段；空段整体省略。 */
 export function renderAgentContext(db: DB): string {
-  const sections: string[] = [];
-
-  const instructions = getPreference(db, "instructions");
-  if (instructions && instructions.trim().length > 0) {
-    sections.push(`## Reader instructions\n\n${instructions.trim()}`);
-  }
-
-  const soul = getPreference(db, "soul") ?? DEFAULT_SOUL;
-  sections.push(`## Who you are\n\nYour name is ${soul.name}. ${soul.persona}`.trimEnd());
-
-  const memoryEnabled = getPreference(db, "memoryEnabled") ?? true;
-  if (memoryEnabled) {
-    const all = listMemories(db); // 已按 (createdAt, id) 确定性排序
-    if (all.length > 0) {
-      const lines = all.map((m) => `- [${m.slug}] ${m.title} — ${m.description}`);
-      sections.push(`## Memory index\n\n${lines.join("\n")}`);
-    }
-  }
-
-  return sections.join("\n\n");
+  return [renderReaderInstructions(db), renderAssistantIdentity(db), renderMemoryIndex(db)]
+    .filter((section): section is string => section !== null)
+    .join("\n\n");
 }
 
 /** 会话快照：首轮渲染并冻结，本会话每轮逐字复用（保 provider prompt cache 前缀稳定）。 */
