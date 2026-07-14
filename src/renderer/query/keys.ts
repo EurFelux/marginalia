@@ -11,6 +11,8 @@ export const qk = {
     ["chapter-summary", bookId, chapterId] as const,
   book: (bookId: string) => ["book", bookId] as const,
   bookSummary: (bookId: string) => ["book-summary", bookId] as const,
+  readingSessions: (bookId: string) => ["reading-sessions", bookId] as const,
+  readingSession: (sessionId: string) => ["reading-session", sessionId] as const,
   recentlyRead: ["recently-read"] as const,
   providers: ["providers"] as const,
   conversations: (bookId: string) => ["conversations", bookId] as const,
