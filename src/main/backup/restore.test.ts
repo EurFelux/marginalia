@@ -1,8 +1,9 @@
 import { mkdtempSync, mkdirSync, writeFileSync, existsSync, readFileSync } from "node:fs";
+import { rename } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import Database from "better-sqlite3";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { storedBookPath } from "@main/library/book-files";
 import { applyRestore, verifyBookFiles, verifySqliteDatabase } from "@main/backup/restore";
 
@@ -114,5 +115,76 @@ describe("applyRestore", () => {
     expect(readFileSync(path.join(preRestoreTarget, "marginalia.db"), "utf8")).toBe("OLD-DB");
     expect(readFileSync(path.join(preRestoreTarget, "marginalia.db-wal"), "utf8")).toBe("OLD-WAL");
     expect(existsSync(path.join(preRestoreTarget, "books"))).toBe(false);
+  });
+
+  it("rolls back a compact swap when installing the staged database fails", async () => {
+    const dataDir = tmp("ar-compact-rollback-data-");
+    const booksDir = path.join(dataDir, "books");
+    mkdirSync(booksDir);
+    writeFileSync(path.join(dataDir, "marginalia.db"), "OLD-DB");
+    writeFileSync(path.join(dataDir, "marginalia.db-wal"), "OLD-WAL");
+    writeFileSync(path.join(booksDir, "keep.epub"), "KEEP-BOOK");
+    const stagingDir = tmp("ar-compact-rollback-stage-");
+    const stagedDb = path.join(stagingDir, "marginalia.db");
+    writeFileSync(stagedDb, "NEW-DB");
+    const preRestoreTarget = path.join(tmp("ar-compact-rollback-pre-"), "snap");
+    const move = vi.fn(async (source: string, destination: string) => {
+      if (source === stagedDb && destination === path.join(dataDir, "marginalia.db")) {
+        throw new Error("injected staged database failure");
+      }
+      await rename(source, destination);
+    });
+
+    await expect(
+      applyRestore({
+        kind: "compact",
+        dataDir,
+        booksDir,
+        stagingDir,
+        preRestoreTarget,
+        dbFileName: "marginalia.db",
+        rename: move,
+      }),
+    ).rejects.toThrow(/injected staged database failure/);
+
+    expect(readFileSync(path.join(dataDir, "marginalia.db"), "utf8")).toBe("OLD-DB");
+    expect(readFileSync(path.join(dataDir, "marginalia.db-wal"), "utf8")).toBe("OLD-WAL");
+    expect(readFileSync(path.join(booksDir, "keep.epub"), "utf8")).toBe("KEEP-BOOK");
+    expect(move).not.toHaveBeenCalledWith(booksDir, expect.any(String));
+  });
+
+  it("rolls back a full swap when installing staged books fails", async () => {
+    const dataDir = tmp("ar-full-rollback-data-");
+    const booksDir = path.join(dataDir, "books");
+    mkdirSync(booksDir);
+    writeFileSync(path.join(dataDir, "marginalia.db"), "OLD-DB");
+    writeFileSync(path.join(booksDir, "old.epub"), "OLD-BOOK");
+    const stagingDir = tmp("ar-full-rollback-stage-");
+    writeFileSync(path.join(stagingDir, "marginalia.db"), "NEW-DB");
+    const stagedBooks = path.join(stagingDir, "books");
+    mkdirSync(stagedBooks);
+    writeFileSync(path.join(stagedBooks, "new.epub"), "NEW-BOOK");
+    const preRestoreTarget = path.join(tmp("ar-full-rollback-pre-"), "snap");
+    const move = vi.fn(async (source: string, destination: string) => {
+      if (source === stagedBooks && destination === booksDir) {
+        throw new Error("injected staged books failure");
+      }
+      await rename(source, destination);
+    });
+
+    await expect(
+      applyRestore({
+        kind: "full",
+        dataDir,
+        booksDir,
+        stagingDir,
+        preRestoreTarget,
+        dbFileName: "marginalia.db",
+        rename: move,
+      }),
+    ).rejects.toThrow(/injected staged books failure/);
+
+    expect(readFileSync(path.join(dataDir, "marginalia.db"), "utf8")).toBe("OLD-DB");
+    expect(readFileSync(path.join(booksDir, "old.epub"), "utf8")).toBe("OLD-BOOK");
   });
 });

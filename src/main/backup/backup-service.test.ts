@@ -7,7 +7,7 @@ import { books } from "@main/db/schema";
 import { readBookFileResult, storedBookPath } from "@main/library/book-files";
 import { exportBackup, inspectBackup, restoreBackup } from "@main/backup/backup-service";
 import { latestMigrationDir, listMigrationDirs } from "@main/db/migrations-path";
-import { createBackupZip, extractZip } from "@main/backup/archive";
+import { createBackupZip, extractZip, sha256File } from "@main/backup/archive";
 
 const MIG = path.resolve(process.cwd(), "src/main/db/migrations");
 const HEAD = latestMigrationDir(MIG);
@@ -130,6 +130,63 @@ describe("backup-service roundtrip", () => {
     expect(ins.reason).toBeTruthy();
   });
 
+  it("refuses an archive replaced after compact inspection without touching live data", async () => {
+    await exportBackup({
+      kind: "compact",
+      createdAt: 5,
+      db: src.db,
+      rawSqlite: src.db.$client,
+      zipPath,
+      booksDir: src.booksDir,
+      tmpDir: src.tmpDir,
+      appVersion: "9.9.9",
+      schemaHead: HEAD,
+    });
+    const inspection = await inspectBackup({ zipPath, knownMigrationDirs: KNOWN });
+    expect(inspection.manifest.kind).toBe("compact");
+
+    // Simulate a full archive replacing the inspected compact archive before confirmation.
+    await exportBackup({
+      kind: "full",
+      createdAt: 6,
+      db: src.db,
+      rawSqlite: src.db.$client,
+      zipPath,
+      booksDir: src.booksDir,
+      tmpDir: src.tmpDir,
+      appVersion: "9.9.9",
+      schemaHead: HEAD,
+    });
+
+    const dataDir = tmp("svc-replaced-dst-");
+    const booksDir = path.join(dataDir, "books");
+    mkdirSync(booksDir);
+    writeFileSync(path.join(dataDir, "marginalia.db"), "LIVE-DB");
+    writeFileSync(storedBookPath(booksDir, "live", "epub"), "LIVE-BOOK");
+    let closed = false;
+
+    await expect(
+      restoreBackup({
+        zipPath,
+        archiveSha256: inspection.archiveSha256,
+        dataDir,
+        booksDir,
+        tmpDir: path.join(dataDir, "tmp"),
+        preRestoreDir: path.join(dataDir, "pre-restore"),
+        dbFileName: "marginalia.db",
+        knownMigrationDirs: KNOWN,
+        stamp: "replaced",
+        closeDb: () => {
+          closed = true;
+        },
+      }),
+    ).rejects.toThrow(/archive checksum changed/);
+
+    expect(closed).toBe(false);
+    expect(readFileSync(path.join(dataDir, "marginalia.db"), "utf8")).toBe("LIVE-DB");
+    expect(readFileSync(storedBookPath(booksDir, "live", "epub"), "utf8")).toBe("LIVE-BOOK");
+  });
+
   it("restores the bundle into a fresh dataDir and preserves old data", async () => {
     await exportBackup({
       kind: "full",
@@ -156,6 +213,7 @@ describe("backup-service roundtrip", () => {
     let closed = false;
     await restoreBackup({
       zipPath,
+      archiveSha256: await sha256File(zipPath),
       dataDir,
       booksDir,
       tmpDir,
@@ -210,6 +268,7 @@ describe("backup-service roundtrip", () => {
 
     await restoreBackup({
       zipPath,
+      archiveSha256: await sha256File(zipPath),
       dataDir,
       booksDir,
       tmpDir: path.join(dataDir, "tmp"),
@@ -259,6 +318,7 @@ describe("backup-service roundtrip", () => {
 
     await restoreBackup({
       zipPath,
+      archiveSha256: await sha256File(zipPath),
       dataDir,
       booksDir,
       tmpDir: path.join(dataDir, "tmp"),
@@ -314,6 +374,7 @@ describe("backup-service roundtrip", () => {
     await expect(
       restoreBackup({
         zipPath: badZip,
+        archiveSha256: await sha256File(badZip),
         dataDir,
         booksDir: path.join(dataDir, "books"),
         tmpDir: path.join(dataDir, "tmp"),

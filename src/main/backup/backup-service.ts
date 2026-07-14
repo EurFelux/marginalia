@@ -1,4 +1,4 @@
-import { mkdir, rm, unlink } from "node:fs/promises";
+import { copyFile, mkdir, rm, unlink } from "node:fs/promises";
 import path from "node:path";
 import type Database from "better-sqlite3";
 import type { DB } from "@main/db/client";
@@ -63,18 +63,23 @@ export async function inspectBackup(opts: {
   zipPath: string;
   knownMigrationDirs: string[];
 }): Promise<BackupInspection> {
+  const archiveSha256 = await sha256File(opts.zipPath);
   const raw = await readZipEntryText(opts.zipPath, "manifest.json");
+  if (archiveSha256 !== (await sha256File(opts.zipPath))) {
+    throw new Error("backup inspection refused: archive changed while being inspected");
+  }
   const manifest = backupManifestSchema.parse(JSON.parse(raw));
   const { compatible, reason } = checkRestoreCompatibility(
     manifest.schemaHead,
     opts.knownMigrationDirs,
   );
-  return { path: opts.zipPath, manifest, compatible, reason };
+  return { path: opts.zipPath, archiveSha256, manifest, compatible, reason };
 }
 
 /** 还原（快照替换）：解包到 staging → 校验完整性/兼容性 → closeDb → applyRestore。relaunch 由 handler 做。 */
 export async function restoreBackup(opts: {
   zipPath: string;
+  archiveSha256: string;
   dataDir: string;
   booksDir: string;
   tmpDir: string;
@@ -88,10 +93,15 @@ export async function restoreBackup(opts: {
   await rm(stagingDir, { recursive: true, force: true });
   await mkdir(stagingDir, { recursive: true });
   try {
-    await extractZip(opts.zipPath, stagingDir);
+    const stagedArchive = path.join(stagingDir, "archive.zip");
+    await copyFile(opts.zipPath, stagedArchive);
+    if ((await sha256File(stagedArchive)) !== opts.archiveSha256) {
+      throw new Error("restore refused: archive checksum changed since inspection");
+    }
+    await extractZip(stagedArchive, stagingDir);
 
     // 兼容性（manifest 必在、schemaHead 已知）
-    const manifestRaw = await readZipEntryText(opts.zipPath, "manifest.json");
+    const manifestRaw = await readZipEntryText(stagedArchive, "manifest.json");
     const manifest = backupManifestSchema.parse(JSON.parse(manifestRaw));
     const compat = checkRestoreCompatibility(manifest.schemaHead, opts.knownMigrationDirs);
     if (!compat.compatible) throw new Error(`restore refused: ${compat.reason}`);
@@ -126,12 +136,9 @@ export async function restoreBackup(opts: {
         dbFileName: opts.dbFileName,
       });
     } catch (err) {
-      log.error(`restore failed mid-swap; original data preserved at ${preRestoreTarget}`, err);
-      const preserved =
-        manifest.kind === "full" ? "marginalia.db and the books folder" : "marginalia.db";
-      throw new Error(
-        `Restore failed while swapping files. Your original ${preserved} is preserved at ${preRestoreTarget}.`,
-      );
+      log.error("restore failed mid-swap", err);
+      const detail = err instanceof Error ? err.message : "unknown file swap error";
+      throw new Error(`Restore failed while swapping files. ${detail}`, { cause: err });
     }
   } finally {
     await rm(stagingDir, { recursive: true, force: true }).catch((e: NodeJS.ErrnoException) => {

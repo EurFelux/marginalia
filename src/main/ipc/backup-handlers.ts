@@ -58,6 +58,7 @@ export const backupBindings: Binding[] = [
   bind(C.backupRestore, async (input) => {
     await restoreBackup({
       zipPath: input.path,
+      archiveSha256: input.archiveSha256,
       dataDir: path.dirname(appService.getPath("dbFile")),
       booksDir: appService.getPath("booksDir"),
       tmpDir: appService.getPath("tmpDir"),

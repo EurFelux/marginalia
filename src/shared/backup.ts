@@ -29,11 +29,16 @@ export type BackupManifest = z.infer<typeof backupManifestSchema>;
 export const backupExportInput = z.object({ kind: backupKindSchema });
 export type BackupExportInput = z.infer<typeof backupExportInput>;
 
-export const backupRestoreInput = z.object({ path: z.string().min(1) });
+export const backupRestoreInput = z.object({
+  path: z.string().min(1),
+  archiveSha256: z.string().regex(/^[a-f0-9]{64}$/),
+});
 export type BackupRestoreInput = z.infer<typeof backupRestoreInput>;
 
 export interface BackupInspection {
   path: string;
+  /** Whole archive checksum used to bind this inspection to the later destructive restore. */
+  archiveSha256: string;
   manifest: BackupManifest;
   compatible: boolean;
   reason?: string;

@@ -140,7 +140,7 @@ export function createApi(d: PreloadDeps) {
       export: inv(C.backupExport),
       /** 选包并检视（主进程开 openDialog）；取消返回 null，含兼容性结论供确认弹窗。 */
       inspect: inv(C.backupInspect),
-      /** 整体替换还原；成功后主进程立即 relaunch（此调用不会正常 resolve）。 */
+      /** 以 inspect 返回的 archiveSha256 绑定整体替换还原；成功后主进程立即 relaunch。 */
       restore: inv(C.backupRestore),
     },
 

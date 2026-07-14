@@ -46,7 +46,7 @@ kind: "full" | "compact";
 - `formatVersion > BACKUP_FORMAT_VERSION` 明确拒绝，避免未来格式被旧恢复逻辑误判。
 - schemaHead 兼容判定继续负责“导出方 DB schema 是否可由当前 app 接受”；formatVersion 与 schemaHead 是两个独立门槛。
 
-`BackupInspection` 返回规范化后的 manifest，因此 renderer 不需要处理 legacy 分支。
+`BackupInspection` 返回规范化后的 manifest 与整个 zip 的 `archiveSha256`，因此 renderer 不需要处理 legacy 分支；确认恢复时必须把该 checksum 原样传回，绑定用户看到的包与实际恢复的字节。
 
 `backup:export` input 从空对象改为 `{ kind: "full" | "compact" }`；kind 由 renderer 的 split button 明确传入，主进程不维护隐式默认值。preload API 继续只暴露一个 `backup.export(input)`。
 
@@ -113,15 +113,15 @@ marginalia-compact-backup-YYYYMMDD-HHMMSS.zip
 1. 读取并校验 manifest；v1 规范化为 full。
 2. 拒绝未知/未来 formatVersion。
 3. 运行既有 schemaHead 兼容判定。
-4. 返回带规范化 `kind` 的 `BackupInspection`。
+4. 在读取 manifest 前后计算整个 zip 的 SHA-256，文件在 inspect 期间变化则拒绝；返回带规范化 `kind` 与稳定 `archiveSha256` 的 `BackupInspection`。
 
 ### 5.3 完整恢复
 
-保留现有行为：解包到 staging → 校验 DB sha256 → 校验 DB 引用的每本书均有包内文件 → 关闭 live DB → 当前 DB + `books/` 移入 pre-restore → staged DB + `books/` 换入正式位置 → 重启。
+先将用户选中的 zip 复制到 staging，校验其 SHA-256 等于 inspect token，之后只读取/解包这份稳定副本。校验通过后保留现有行为：校验 DB sha256 → 校验 DB 引用的每本书均有包内文件 → 关闭 live DB → 当前 DB + `books/` 移入 pre-restore → staged DB + `books/` 换入正式位置 → 重启。
 
 ### 5.4 精简恢复
 
-1. 解包到 staging；校验 manifest、schemaHead、DB sha256，并以只读连接执行 `PRAGMA quick_check`，结果必须为 `ok`。
+1. 先复制 zip 到 staging 并校验其 SHA-256 等于 inspect token；之后仅解包该稳定副本，校验 manifest、schemaHead、DB sha256，并以只读连接执行 `PRAGMA quick_check`，结果必须为 `ok`。
 2. **不调用** `verifyBookFiles`：精简包按定义没有 `books/`。
 3. 关闭 live DB，释放 WAL/文件锁。
 4. 把当前 `marginalia.db`、`-wal`、`-shm` 移入 `pre-restore/<timestamp>/`。
@@ -145,7 +145,7 @@ marginalia-compact-backup-YYYYMMDD-HHMMSS.zip
 - schemaHead 来自更新版本：拒绝恢复，当前数据不变。
 - DB checksum 不符或 SQLite 无法打开：触发安全网前拒绝。
 - 完整包缺书文件：继续按现有规则拒绝；精简包跳过此检查。
-- 文件换入阶段失败：错误必须指出 pre-restore 安全副本位置；logger 使用 `backup` module，IPC catch-all 负责最终错误落盘，handler 不重复记录。
+- 文件换入阶段失败：追踪已移动的 DB 三件套和（仅完整恢复的）books，反向换回原数据；回滚本身失败时绝不删除 pre-restore 中的原数据，错误必须指出该位置并保留 cause。service boundary 使用 `backup` logger，IPC catch-all 负责最终错误落盘，handler 不重复记录。
 - 精简恢复相关日志不得声称 `books/` 已备份或替换。
 
 ## 8. 测试
@@ -174,6 +174,8 @@ marginalia-compact-backup-YYYYMMDD-HHMMSS.zip
 - split button 主段调用 compact export；菜单项调用 full export。
 - inspect full/compact 选择对应确认文案。
 - IPC contract、preload API 与 handler coverage 保持无漂移。
+- inspect 后将同一路径替换为不同 kind 的包时，restore 因 archive checksum token 不符而在 `closeDb` 前拒绝，DB 与 books 均保持不变。
+- 注入换入 rename 失败时，完整与精简恢复都恢复 live 原 DB；精简恢复从不移动 local `books/`。
 - i18n extract/lint 通过，中英文文案均覆盖。
 
 ## 9. 非目标

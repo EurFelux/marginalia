@@ -109,7 +109,7 @@ export function AdvancedSettings() {
     if (!ins) return;
     setBusy(true);
     try {
-      await window.api.backup.restore({ path: ins.path });
+      await window.api.backup.restore({ path: ins.path, archiveSha256: ins.archiveSha256 });
     } catch (err) {
       const msg = err instanceof Error && err.message ? err.message : "";
       toast.error(msg || t("settings.backup.restoreFailed", "还原失败"), {

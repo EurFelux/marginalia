@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { BACKUP_FORMAT_VERSION, backupExportInput, backupManifestSchema } from "@shared/backup";
+import {
+  BACKUP_FORMAT_VERSION,
+  backupExportInput,
+  backupManifestSchema,
+  backupRestoreInput,
+} from "@shared/backup";
 
 const common = {
   appVersion: "0.9.0",
@@ -64,5 +69,16 @@ describe("backupExportInput", () => {
     expect(backupExportInput.parse({ kind: "compact" })).toEqual({ kind: "compact" });
     expect(backupExportInput.parse({ kind: "full" })).toEqual({ kind: "full" });
     expect(backupExportInput.safeParse({}).success).toBe(false);
+  });
+});
+
+describe("backupRestoreInput", () => {
+  it("requires the archive checksum returned by inspection", () => {
+    const archiveSha256 = "a".repeat(64);
+    expect(backupRestoreInput.parse({ path: "/tmp/backup.zip", archiveSha256 })).toEqual({
+      path: "/tmp/backup.zip",
+      archiveSha256,
+    });
+    expect(backupRestoreInput.safeParse({ path: "/tmp/backup.zip" }).success).toBe(false);
   });
 });
