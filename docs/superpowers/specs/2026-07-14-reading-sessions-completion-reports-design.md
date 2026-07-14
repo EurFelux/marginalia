@@ -309,6 +309,7 @@ getReadingReport(sessionId)
 - 为每本有旧阅读痕迹的书创建一个真实 legacy session，并把其旧 `reading_daily` 行关联到该 session；没有任何阅读痕迹的书不创建 session。
 - `started_at` 优先取该书最早的 message 时间；没有 message 时才从 progress、标注、笔记、会话和按日计时的最早可用时间兜底。`is_finished` 为真时，`completed_at` 取不早于开始时间的最晚可用痕迹时间；否则保留 active session。
 - 在 Drizzle 生成的 DDL 前，以私有持久 staging 表快照 legacy 候选和 uuidv7 session id；DDL 后在一个事务中插入 session、回填全部 legacy daily FK 并删除 staging。staging 已存在时复用，故 staging 后 DDL 前、DDL 后 post-apply 前、以及 post-apply 事务内中断均可在下次启动恢复，且不重复创建。
+- staging 兼容完成标记加入前、按日计时加入前和书籍笔记加入前的真实历史 schema：只有尚未创建 `reading_sessions` 的旧库才重新采集；每个痕迹来源均在对应表和时间列存在时才查询。完成标记尚不存在时，采集到的 session 视为 active；已完成当前迁移、没有 staging 的库不会重复采集。
 - 保留旧阅读进度、标注、笔记、对话和全书摘要。
 
 迁移文件必须由 `pnpm db:generate` 生成，不手写。

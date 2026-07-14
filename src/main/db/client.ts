@@ -32,60 +32,111 @@ function columnExists(db: DB, table: string, column: string): boolean {
 interface LegacyReadingSessionCandidate {
   bookId: string;
   isFinished: number;
+  addedAt: number | null;
+}
+
+interface LegacyReadingEvidence {
   firstMessageAt: number | null;
   fallbackStartedAt: number | null;
   lastEvidenceAt: number | null;
 }
 
+function hasColumns(db: DB, table: string, columns: string[]): boolean {
+  return columns.every((column) => columnExists(db, table, column));
+}
+
+function collectLegacyReadingEvidence(db: DB): Map<string, LegacyReadingEvidence> {
+  const evidence = new Map<string, LegacyReadingEvidence>();
+  const record = (bookId: string | null, timestamp: number | null, isMessage = false): void => {
+    if (bookId == null) return;
+    const current = evidence.get(bookId) ?? {
+      firstMessageAt: null,
+      fallbackStartedAt: null,
+      lastEvidenceAt: null,
+    };
+    if (timestamp != null) {
+      if (isMessage) {
+        current.firstMessageAt = Math.min(current.firstMessageAt ?? timestamp, timestamp);
+      }
+      if (!isMessage) {
+        current.fallbackStartedAt = Math.min(current.fallbackStartedAt ?? timestamp, timestamp);
+      }
+      current.lastEvidenceAt = Math.max(current.lastEvidenceAt ?? timestamp, timestamp);
+    }
+    evidence.set(bookId, current);
+  };
+  const recordRows = (query: string, isMessage = false): void => {
+    for (const row of db.$client.prepare(query).all() as Array<{
+      bookId: string | null;
+      timestamp: number | null;
+    }>) {
+      record(row.bookId, row.timestamp, isMessage);
+    }
+  };
+
+  if (
+    tableExists(db, "messages") &&
+    tableExists(db, "conversations") &&
+    hasColumns(db, "messages", ["conversation_id", "created_at"]) &&
+    hasColumns(db, "conversations", ["id", "book_id"])
+  ) {
+    recordRows(
+      `SELECT conversations.book_id AS bookId, messages.created_at AS timestamp
+       FROM messages INNER JOIN conversations ON conversations.id = messages.conversation_id`,
+      true,
+    );
+  }
+  if (tableExists(db, "progress") && hasColumns(db, "progress", ["book_id", "updated_at"])) {
+    recordRows("SELECT book_id AS bookId, updated_at AS timestamp FROM progress");
+  }
+  if (
+    tableExists(db, "annotations") &&
+    hasColumns(db, "annotations", ["book_id", "created_at", "updated_at"])
+  ) {
+    recordRows("SELECT book_id AS bookId, created_at AS timestamp FROM annotations");
+    recordRows("SELECT book_id AS bookId, updated_at AS timestamp FROM annotations");
+  }
+  if (
+    tableExists(db, "book_notes") &&
+    hasColumns(db, "book_notes", ["book_id", "created_at", "updated_at"])
+  ) {
+    recordRows("SELECT book_id AS bookId, created_at AS timestamp FROM book_notes");
+    recordRows("SELECT book_id AS bookId, updated_at AS timestamp FROM book_notes");
+  }
+  if (
+    tableExists(db, "conversations") &&
+    hasColumns(db, "conversations", ["book_id", "created_at", "updated_at"])
+  ) {
+    recordRows("SELECT book_id AS bookId, created_at AS timestamp FROM conversations");
+    recordRows("SELECT book_id AS bookId, updated_at AS timestamp FROM conversations");
+  }
+  if (tableExists(db, "reading_daily") && hasColumns(db, "reading_daily", ["book_id", "day"])) {
+    recordRows(
+      "SELECT book_id AS bookId, CAST(strftime('%s', day) AS INTEGER) * 1000 AS timestamp FROM reading_daily",
+    );
+  }
+  return evidence;
+}
+
 function stageLegacyReadingSessions(db: DB): void {
   if (tableExists(db, LEGACY_READING_SESSIONS_STAGING)) return;
-  if (!columnExists(db, "books", "is_finished")) return;
+  if (!tableExists(db, "books") || tableExists(db, "reading_sessions")) return;
 
+  const hasIsFinished = columnExists(db, "books", "is_finished");
+  const hasAddedAt = columnExists(db, "books", "added_at");
   const candidates = db.$client
-    .prepare(`
-      SELECT
-        books.id AS bookId,
-        books.is_finished AS isFinished,
-        (
-          SELECT MIN(messages.created_at)
-          FROM messages
-          INNER JOIN conversations ON conversations.id = messages.conversation_id
-          WHERE conversations.book_id = books.id
-        ) AS firstMessageAt,
-        (
-          SELECT MIN(timestamp) FROM (
-            SELECT progress.updated_at AS timestamp FROM progress WHERE progress.book_id = books.id
-            UNION ALL SELECT annotations.created_at FROM annotations WHERE annotations.book_id = books.id
-            UNION ALL SELECT annotations.updated_at FROM annotations WHERE annotations.book_id = books.id
-            UNION ALL SELECT book_notes.created_at FROM book_notes WHERE book_notes.book_id = books.id
-            UNION ALL SELECT book_notes.updated_at FROM book_notes WHERE book_notes.book_id = books.id
-            UNION ALL SELECT conversations.created_at FROM conversations WHERE conversations.book_id = books.id
-            UNION ALL SELECT conversations.updated_at FROM conversations WHERE conversations.book_id = books.id
-            UNION ALL SELECT CAST(strftime('%s', reading_daily.day) AS INTEGER) * 1000 FROM reading_daily WHERE reading_daily.book_id = books.id
-          )
-        ) AS fallbackStartedAt,
-        (
-          SELECT MAX(timestamp) FROM (
-            SELECT progress.updated_at AS timestamp FROM progress WHERE progress.book_id = books.id
-            UNION ALL SELECT annotations.created_at FROM annotations WHERE annotations.book_id = books.id
-            UNION ALL SELECT annotations.updated_at FROM annotations WHERE annotations.book_id = books.id
-            UNION ALL SELECT book_notes.created_at FROM book_notes WHERE book_notes.book_id = books.id
-            UNION ALL SELECT book_notes.updated_at FROM book_notes WHERE book_notes.book_id = books.id
-            UNION ALL SELECT conversations.created_at FROM conversations WHERE conversations.book_id = books.id
-            UNION ALL SELECT conversations.updated_at FROM conversations WHERE conversations.book_id = books.id
-            UNION ALL SELECT messages.created_at FROM messages INNER JOIN conversations ON conversations.id = messages.conversation_id WHERE conversations.book_id = books.id
-            UNION ALL SELECT CAST(strftime('%s', reading_daily.day) AS INTEGER) * 1000 FROM reading_daily WHERE reading_daily.book_id = books.id
-          )
-        ) AS lastEvidenceAt
-      FROM books
-      WHERE EXISTS (SELECT 1 FROM progress WHERE progress.book_id = books.id)
-        OR EXISTS (SELECT 1 FROM annotations WHERE annotations.book_id = books.id)
-        OR EXISTS (SELECT 1 FROM book_notes WHERE book_notes.book_id = books.id)
-        OR EXISTS (SELECT 1 FROM conversations WHERE conversations.book_id = books.id)
-        OR EXISTS (SELECT 1 FROM reading_daily WHERE reading_daily.book_id = books.id)
-    `)
+    .prepare(
+      hasIsFinished && hasAddedAt
+        ? "SELECT id AS bookId, is_finished AS isFinished, added_at AS addedAt FROM books"
+        : hasIsFinished
+          ? "SELECT id AS bookId, is_finished AS isFinished, NULL AS addedAt FROM books"
+          : hasAddedAt
+            ? "SELECT id AS bookId, 0 AS isFinished, added_at AS addedAt FROM books"
+            : "SELECT id AS bookId, 0 AS isFinished, NULL AS addedAt FROM books",
+    )
     .all() as LegacyReadingSessionCandidate[];
-  if (candidates.length === 0) return;
+  const evidence = collectLegacyReadingEvidence(db);
+  if (evidence.size === 0) return;
 
   const create = db.$client.prepare(`
     CREATE TABLE ${LEGACY_READING_SESSIONS_STAGING} (
@@ -104,14 +155,19 @@ function stageLegacyReadingSessions(db: DB): void {
       VALUES (?, ?, ?, ?, ?)
     `);
     for (const candidate of candidates) {
-      const startedAt = candidate.firstMessageAt ?? candidate.fallbackStartedAt;
+      const readingEvidence = evidence.get(candidate.bookId);
+      if (readingEvidence == null) continue;
+      const startedAt =
+        readingEvidence.firstMessageAt ?? readingEvidence.fallbackStartedAt ?? candidate.addedAt;
       if (startedAt == null) continue;
       insert.run(
         candidate.bookId,
         uuidv7(),
         candidate.isFinished,
         startedAt,
-        candidate.isFinished ? Math.max(startedAt, candidate.lastEvidenceAt ?? startedAt) : null,
+        candidate.isFinished
+          ? Math.max(startedAt, readingEvidence.lastEvidenceAt ?? startedAt)
+          : null,
       );
     }
   })();

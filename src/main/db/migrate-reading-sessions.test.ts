@@ -8,9 +8,9 @@ import { createDb, runMigrations, type RunMigrationsHooks } from "@main/db/clien
 const MIGRATIONS = path.resolve(__dirname, "migrations");
 const LEGACY_LAST_MIGRATION = "20260616082526_luxuriant_centennial";
 
-function copyLegacyMigrations(destination: string): void {
+function copyLegacyMigrations(destination: string, lastMigration = LEGACY_LAST_MIGRATION): void {
   for (const entry of fs.readdirSync(MIGRATIONS, { withFileTypes: true })) {
-    if (entry.isDirectory() && entry.name <= LEGACY_LAST_MIGRATION) {
+    if (entry.isDirectory() && entry.name <= lastMigration) {
       fs.cpSync(path.join(MIGRATIONS, entry.name), path.join(destination, entry.name), {
         recursive: true,
       });
@@ -18,7 +18,7 @@ function copyLegacyMigrations(destination: string): void {
   }
 }
 
-function makeDiskDatabase(): {
+function makeDiskDatabase(lastMigration = LEGACY_LAST_MIGRATION): {
   databaseFile: string;
   legacyMigrations: string;
   cleanup: () => void;
@@ -26,7 +26,7 @@ function makeDiskDatabase(): {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "marginalia-legacy-recovery-"));
   const legacyMigrations = path.join(directory, "legacy-migrations");
   fs.mkdirSync(legacyMigrations);
-  copyLegacyMigrations(legacyMigrations);
+  copyLegacyMigrations(legacyMigrations, lastMigration);
   return {
     databaseFile: path.join(directory, "marginalia.db"),
     legacyMigrations,
@@ -105,6 +105,144 @@ function expectLegacyRecovery(databaseFile: string): void {
 }
 
 describe("reading session migrations", () => {
+  it("stages an active session from a pre-is_finished database with a real reading trace", () => {
+    const fixture = makeDiskDatabase("20260608155900_clear_dreadnoughts");
+    try {
+      withDatabase(fixture.databaseFile, (db) => {
+        runMigrations(db, fixture.legacyMigrations);
+        db.run(sql`
+          INSERT INTO books (id, title, author, format, has_text_layer, added_at, position, parser_version)
+          VALUES ('legacy-book', 'Legacy book', 'Legacy author', 'epub', 1, 4, 0, 0)
+        `);
+        db.run(sql`
+          INSERT INTO books (id, title, author, format, has_text_layer, added_at, position, parser_version)
+          VALUES ('unread-book', 'Unread book', 'Legacy author', 'epub', 1, 5, 0, 0)
+        `);
+        db.run(sql`
+          INSERT INTO assistants (id, name, created_at)
+          VALUES ('legacy-assistant', 'Legacy assistant', 1)
+        `);
+        db.run(sql`
+          INSERT INTO conversations (id, book_id, assistant_id, title, created_at, updated_at)
+          VALUES ('legacy-conversation', 'legacy-book', 'legacy-assistant', 'Conversation', 7, 8)
+        `);
+        db.run(sql`
+          INSERT INTO messages (id, conversation_id, role, parts, status, seq, created_at)
+          VALUES ('legacy-message', 'legacy-conversation', 'user', '[{"type":"text","text":"Hello"}]', 'complete', 0, 9)
+        `);
+      });
+
+      withDatabase(fixture.databaseFile, (db) => runMigrations(db, MIGRATIONS));
+      withDatabase(fixture.databaseFile, (db) => {
+        expect(
+          db.get(sql`
+            SELECT started_at, completed_at FROM reading_sessions WHERE book_id = 'legacy-book'
+          `),
+        ).toEqual({ started_at: 9, completed_at: null });
+        expect(
+          db.get(sql`SELECT id FROM reading_sessions WHERE book_id = 'unread-book'`),
+        ).toBeUndefined();
+        expect(
+          db.get(
+            sql`SELECT name FROM sqlite_master WHERE name = '__marginalia_legacy_reading_sessions'`,
+          ),
+        ).toBeUndefined();
+        runMigrations(db, MIGRATIONS);
+        expect(
+          db.all(sql`SELECT id FROM reading_sessions WHERE book_id = 'legacy-book'`),
+        ).toHaveLength(1);
+      });
+    } finally {
+      fixture.cleanup();
+    }
+  });
+
+  it("upgrades an is_finished database from before reading_daily existed", () => {
+    const fixture = makeDiskDatabase("20260608172021_slippery_gorilla_man");
+    try {
+      withDatabase(fixture.databaseFile, (db) => {
+        runMigrations(db, fixture.legacyMigrations);
+        db.run(sql`
+          INSERT INTO books (
+            id, title, author, format, has_text_layer, added_at, position, parser_version, is_finished
+          ) VALUES ('legacy-book', 'Legacy book', 'Legacy author', 'epub', 1, 4, 0, 0, 1)
+        `);
+        db.run(sql`
+          INSERT INTO assistants (id, name, created_at)
+          VALUES ('legacy-assistant', 'Legacy assistant', 1)
+        `);
+        db.run(sql`
+          INSERT INTO conversations (id, book_id, assistant_id, title, created_at, updated_at)
+          VALUES ('legacy-conversation', 'legacy-book', 'legacy-assistant', 'Conversation', 7, 8)
+        `);
+        db.run(sql`
+          INSERT INTO messages (id, conversation_id, role, parts, status, seq, created_at)
+          VALUES ('legacy-message', 'legacy-conversation', 'user', '[{"type":"text","text":"Hello"}]', 'complete', 0, 9)
+        `);
+      });
+
+      withDatabase(fixture.databaseFile, (db) => runMigrations(db, MIGRATIONS));
+      withDatabase(fixture.databaseFile, (db) => {
+        expect(
+          db.get(sql`
+            SELECT started_at, completed_at FROM reading_sessions WHERE book_id = 'legacy-book'
+          `),
+        ).toEqual({ started_at: 9, completed_at: 9 });
+        expect(
+          db.get(sql`SELECT name FROM sqlite_master WHERE name = 'reading_daily'`),
+        ).toBeDefined();
+        expect(
+          db.get(
+            sql`SELECT name FROM sqlite_master WHERE name = '__marginalia_legacy_reading_sessions'`,
+          ),
+        ).toBeUndefined();
+      });
+    } finally {
+      fixture.cleanup();
+    }
+  });
+
+  it("upgrades a reading_daily database from before book_notes existed", () => {
+    const fixture = makeDiskDatabase("20260609051433_grey_gertrude_yorkes");
+    try {
+      withDatabase(fixture.databaseFile, (db) => {
+        runMigrations(db, fixture.legacyMigrations);
+        db.run(sql`
+          INSERT INTO books (
+            id, title, author, format, has_text_layer, added_at, position, parser_version, is_finished
+          ) VALUES ('legacy-book', 'Legacy book', 'Legacy author', 'epub', 1, 4, 0, 0, 1)
+        `);
+        db.run(sql`
+          INSERT INTO reading_daily (id, book_id, day, seconds)
+          VALUES ('legacy-daily', 'legacy-book', '2026-07-01', 42)
+        `);
+      });
+
+      withDatabase(fixture.databaseFile, (db) => runMigrations(db, MIGRATIONS));
+      withDatabase(fixture.databaseFile, (db) => {
+        const session = db.get<{ id: string; started_at: number; completed_at: number }>(sql`
+          SELECT id, started_at, completed_at FROM reading_sessions WHERE book_id = 'legacy-book'
+        `);
+        expect(session).toMatchObject({
+          started_at:
+            Temporal.PlainDate.from("2026-07-01").toZonedDateTime("UTC").epochMilliseconds,
+          completed_at:
+            Temporal.PlainDate.from("2026-07-01").toZonedDateTime("UTC").epochMilliseconds,
+        });
+        expect(
+          db.get(sql`SELECT reading_session_id FROM reading_daily WHERE id = 'legacy-daily'`),
+        ).toEqual({ reading_session_id: session?.id });
+        expect(
+          db.get(
+            sql`SELECT name FROM sqlite_master WHERE name = '__marginalia_legacy_reading_sessions'`,
+          ),
+        ).toBeUndefined();
+      });
+    } finally {
+      fixture.cleanup();
+    }
+  });
+
   it("preserves a populated legacy library while deriving reading state", () => {
     const legacyMigrations = fs.mkdtempSync(path.join(os.tmpdir(), "marginalia-legacy-"));
     try {
