@@ -13,6 +13,7 @@ import {
   AlertDialogTitle,
 } from "@renderer/components/ui/alert-dialog";
 import { BackupExportButton } from "@renderer/settings/BackupExportButton";
+import { restoreConfirmationCopy } from "@renderer/settings/restore-confirmation";
 import { usePrefsStore } from "@renderer/store/prefs-store";
 import { clampBackgroundConcurrency, clampStepLimit } from "@renderer/settings/settings-logic";
 import { DEFAULT_STEP_LIMIT } from "@shared/preferences";
@@ -123,6 +124,7 @@ export function AdvancedSettings() {
   const backupWhen = pendingRestore
     ? Temporal.Instant.fromEpochMilliseconds(pendingRestore.manifest.createdAt).toLocaleString()
     : "";
+  const restoreCopy = pendingRestore ? restoreConfirmationCopy(pendingRestore.manifest.kind) : null;
 
   return (
     <>
@@ -252,24 +254,15 @@ export function AdvancedSettings() {
       >
         <AlertDialogContent>
           <AlertDialogTitle>
-            {pendingRestore?.manifest.kind === "compact"
-              ? t("settings.backup.kindCompact", "精简备份")
-              : t("settings.backup.kindFull", "完整备份")}
+            {restoreCopy ? t(restoreCopy.kindKey, restoreCopy.kind) : ""}
             {` · ${t("settings.backup.restoreTitle", "还原备份？")}`}
           </AlertDialogTitle>
           <AlertDialogDescription>
-            {pendingRestore
-              ? pendingRestore.manifest.kind === "compact"
-                ? t(
-                    "settings.backup.confirmCompactRestore",
-                    "将用此精简备份整体替换当前应用数据（{{count}} 本书，导出于 {{when}}）。本机现有书籍原文件不会被删除或覆盖；缺少本地文件的书可在恢复后重新连接。当前数据库会先保留安全副本，随后应用将重启。",
-                    { count: pendingRestore.manifest.bookCount, when: backupWhen },
-                  )
-                : t(
-                    "settings.backup.confirmFullRestore",
-                    "将用此完整备份整体替换当前全部数据与书籍原文件（{{count}} 本书，导出于 {{when}}）。替换前会自动保留一份当前数据的备份，随后应用将重启。",
-                    { count: pendingRestore.manifest.bookCount, when: backupWhen },
-                  )
+            {restoreCopy && pendingRestore
+              ? t(restoreCopy.confirmationKey, restoreCopy.confirmation, {
+                  count: pendingRestore.manifest.bookCount,
+                  when: backupWhen,
+                })
               : ""}
           </AlertDialogDescription>
           <AlertDialogFooter>

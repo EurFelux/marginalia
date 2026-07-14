@@ -78,11 +78,7 @@ Update `src/shared/backup.test.ts` so the test data and assertions are exact:
 
 ```ts
 import { describe, expect, it } from "vitest";
-import {
-  BACKUP_FORMAT_VERSION,
-  backupExportInput,
-  backupManifestSchema,
-} from "@shared/backup";
+import { BACKUP_FORMAT_VERSION, backupExportInput, backupManifestSchema } from "@shared/backup";
 
 const common = {
   appVersion: "0.9.0",
@@ -357,9 +353,7 @@ describe("backup filenames", () => {
   });
 
   it("distinguishes compact and full exports", () => {
-    expect(backupFileName("compact", NOW)).toBe(
-      "marginalia-compact-backup-20260714-090807.zip",
-    );
+    expect(backupFileName("compact", NOW)).toBe("marginalia-compact-backup-20260714-090807.zip");
     expect(backupFileName("full", NOW)).toBe("marginalia-backup-20260714-090807.zip");
   });
 });
@@ -549,9 +543,7 @@ it("compact restore replaces only DB files and preserves books in place", async 
   expect(readFileSync(path.join(dataDir, "marginalia.db"), "utf8")).toBe("NEW-DB");
   expect(readFileSync(path.join(booksDir, "keep.epub"), "utf8")).toBe("KEEP-BOOK");
   expect(readFileSync(path.join(preRestoreTarget, "marginalia.db"), "utf8")).toBe("OLD-DB");
-  expect(readFileSync(path.join(preRestoreTarget, "marginalia.db-wal"), "utf8")).toBe(
-    "OLD-WAL",
-  );
+  expect(readFileSync(path.join(preRestoreTarget, "marginalia.db-wal"), "utf8")).toBe("OLD-WAL");
   expect(existsSync(path.join(preRestoreTarget, "books"))).toBe(false);
 });
 ```
@@ -593,10 +585,7 @@ if (opts.kind === "full" && existsSync(opts.booksDir)) {
   await rename(opts.booksDir, path.join(opts.preRestoreTarget, "books"));
 }
 
-await rename(
-  path.join(opts.stagingDir, opts.dbFileName),
-  path.join(opts.dataDir, opts.dbFileName),
-);
+await rename(path.join(opts.stagingDir, opts.dbFileName), path.join(opts.dataDir, opts.dbFileName));
 
 if (opts.kind === "full") {
   const stagedBooks = path.join(opts.stagingDir, "books");
@@ -651,12 +640,16 @@ it("compact restore replaces the DB and preserves all local book files", async (
 
   const restored = createDb(path.join(dataDir, "marginalia.db"));
   runMigrations(restored, MIG);
-  expect(restored.select().from(books).all().map((book) => book.id)).toEqual(["b1"]);
+  expect(
+    restored
+      .select()
+      .from(books)
+      .all()
+      .map((book) => book.id),
+  ).toEqual(["b1"]);
   restored.$client.close();
   expect(readFileSync(storedBookPath(booksDir, "b1", "epub"), "utf8")).toBe("LOCAL-B1");
-  expect(readFileSync(storedBookPath(booksDir, "orphan", "epub"), "utf8")).toBe(
-    "LOCAL-ORPHAN",
-  );
+  expect(readFileSync(storedBookPath(booksDir, "orphan", "epub"), "utf8")).toBe("LOCAL-ORPHAN");
   expect(existsSync(path.join(preRestoreDir, stamp, "marginalia.db"))).toBe(true);
   expect(existsSync(path.join(preRestoreDir, stamp, "books"))).toBe(false);
 });
@@ -698,14 +691,20 @@ it("compact restore reuses the existing missing-file fallback", async () => {
     closeDb: () => {},
   });
 
-const restored = createDb(path.join(dataDir, "marginalia.db"));
-runMigrations(restored, MIG);
-expect(restored.select().from(books).all().map((book) => book.id)).toContain("b1");
-restored.$client.close();
-await expect(readBookFileResult(booksDir, "b1", "epub")).resolves.toEqual({
-  ok: false,
-  error: { reason: "missing" },
-});
+  const restored = createDb(path.join(dataDir, "marginalia.db"));
+  runMigrations(restored, MIG);
+  expect(
+    restored
+      .select()
+      .from(books)
+      .all()
+      .map((book) => book.id),
+  ).toContain("b1");
+  restored.$client.close();
+  await expect(readBookFileResult(booksDir, "b1", "epub")).resolves.toEqual({
+    ok: false,
+    error: { reason: "missing" },
+  });
 });
 ```
 
@@ -741,10 +740,7 @@ await applyRestore({
 Make the mid-swap recovery message kind-aware:
 
 ```ts
-const preserved =
-  manifest.kind === "full"
-    ? "marginalia.db and the books folder"
-    : "marginalia.db";
+const preserved = manifest.kind === "full" ? "marginalia.db and the books folder" : "marginalia.db";
 throw new Error(
   `Restore failed while swapping files. Your original ${preserved} is preserved at ${preRestoreTarget}.`,
 );
@@ -966,10 +962,7 @@ export function BackupExportButton({ disabled, onExport }: Props) {
           <ChevronDown />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem
-            data-slot="backup-export-full"
-            onClick={() => onExport("full")}
-          >
+          <DropdownMenuItem data-slot="backup-export-full" onClick={() => onExport("full")}>
             <Archive />
             <span>
               <span className="block font-medium">
@@ -1028,19 +1021,21 @@ const backupWhen = pendingRestore
 In the dialog description, branch explicitly:
 
 ```tsx
-{pendingRestore
-  ? pendingRestore.manifest.kind === "compact"
-    ? t(
-        "settings.backup.confirmCompactRestore",
-        "将用此精简备份整体替换当前应用数据（{{count}} 本书，导出于 {{when}}）。本机现有书籍原文件不会被删除或覆盖；缺少本地文件的书可在恢复后重新连接。当前数据库会先保留安全副本，随后应用将重启。",
-        { count: pendingRestore.manifest.bookCount, when: backupWhen },
-      )
-    : t(
-        "settings.backup.confirmFullRestore",
-        "将用此完整备份整体替换当前全部数据与书籍原文件（{{count}} 本书，导出于 {{when}}）。替换前会自动保留一份当前数据的备份，随后应用将重启。",
-        { count: pendingRestore.manifest.bookCount, when: backupWhen },
-      )
-  : ""}
+{
+  pendingRestore
+    ? pendingRestore.manifest.kind === "compact"
+      ? t(
+          "settings.backup.confirmCompactRestore",
+          "将用此精简备份整体替换当前应用数据（{{count}} 本书，导出于 {{when}}）。本机现有书籍原文件不会被删除或覆盖；缺少本地文件的书可在恢复后重新连接。当前数据库会先保留安全副本，随后应用将重启。",
+          { count: pendingRestore.manifest.bookCount, when: backupWhen },
+        )
+      : t(
+          "settings.backup.confirmFullRestore",
+          "将用此完整备份整体替换当前全部数据与书籍原文件（{{count}} 本书，导出于 {{when}}）。替换前会自动保留一份当前数据的备份，随后应用将重启。",
+          { count: pendingRestore.manifest.bookCount, when: backupWhen },
+        )
+    : "";
+}
 ```
 
 Make the dialog title include the normalized type label exactly:
@@ -1064,7 +1059,7 @@ Update the settings paragraph default to:
 t(
   "settings.backup.warning",
   "精简备份包含全部应用数据但不含书籍原文件，适合在设备间传递；完整备份额外包含所有 EPUB / PDF。两种备份都含明文 API key，请妥善保管。",
-)
+);
 ```
 
 Run: `pnpm i18n:extract`
