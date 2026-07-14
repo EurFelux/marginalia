@@ -1,5 +1,5 @@
 // src/main/ai/context-tools.ts —— 按上下文组装"上下文工具集"（spec 2026-06-16-reader-library-tools §3.2）。
-// reader（bookId 非空）= 阅读工具 + 书库工具；library（bookId 为 null）= 仅书库工具。
+// reader（bookId 非空）= 阅读工具 + 书库/阅读记录工具；library（bookId 为 null）= 书库/阅读记录工具。
 // memory / search 工具在 stream-assistant 另行合并（各有门控），不在此处。
 import type { DB } from "@main/db/client";
 import { createReadingTools, type LoadBytes } from "@main/ai/tools";
