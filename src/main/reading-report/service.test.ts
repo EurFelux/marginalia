@@ -1,0 +1,136 @@
+import path from "node:path";
+import { describe, expect, it, vi } from "vitest";
+import { createDb, runMigrations } from "@main/db/client";
+import { annotations, books } from "@main/db/schema";
+import {
+  completeReading,
+  saveReadingReport,
+  startReading,
+} from "@main/reading-sessions/repository";
+import { ReadingReportRuntime } from "@main/reading-report/runtime";
+import {
+  getReadingSessionDetail,
+  saveUserReadingReport,
+  startReadingReportGeneration,
+  type ReadingReportServiceDeps,
+} from "@main/reading-report/service";
+
+const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
+const instant = (value: string) => Temporal.Instant.from(value);
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+function setup(options: { report?: string; evidence?: boolean } = {}) {
+  const db = createDb(":memory:");
+  runMigrations(db, MIGRATIONS);
+  db.insert(books).values({ id: "book", title: "The Book" }).run();
+  const session = startReading(db, {
+    bookId: "book",
+    mode: "continue",
+    startedAt: instant("2026-07-01T00:00:00Z"),
+  });
+  completeReading(db, "book", instant("2026-07-02T00:00:00Z"));
+  if (options.report) saveReadingReport(db, session.id, options.report);
+  if (options.evidence !== false) {
+    db.insert(annotations)
+      .values({
+        bookId: "book",
+        style: "yellow",
+        selectedText: "a trace",
+        locatorRange: "loc",
+        createdAt: instant("2026-07-01T12:00:00Z").epochMilliseconds,
+        updatedAt: instant("2026-07-01T12:00:00Z").epochMilliseconds,
+      })
+      .run();
+  }
+  const task = deferred<string>();
+  const runAgent = vi.fn(() => task.promise);
+  const background: Promise<unknown>[] = [];
+  const deps: ReadingReportServiceDeps = {
+    db,
+    loadBytes: async () => new Uint8Array(),
+    resolveModel: vi.fn(() => ({ ok: false as const, reason: "missing model" })),
+    runBackground: async (fn) => {
+      const work = fn();
+      background.push(work.catch(() => undefined));
+      return work;
+    },
+    runAgent,
+    runtime: new ReadingReportRuntime(),
+  };
+  return { deps, session, task, runAgent, drain: async () => Promise.all(background) };
+}
+
+describe("reading report service", () => {
+  it("derives empty, generating, and ready around a background generation", async () => {
+    const { deps, session, task, drain } = setup();
+    const resolved = { ok: true as const, model: {} as never, modelId: "summary" };
+    deps.resolveModel = () => resolved;
+
+    expect(getReadingSessionDetail(deps, session.id).report).toEqual({ status: "empty" });
+    expect(startReadingReportGeneration(deps, session.id)).toEqual({ outcome: "accepted" });
+    expect(getReadingSessionDetail(deps, session.id).report).toEqual({ status: "generating" });
+    task.resolve(" # What stayed with me ");
+    await drain();
+    expect(getReadingSessionDetail(deps, session.id).report).toEqual({
+      status: "ready",
+      content: "# What stayed with me",
+    });
+  });
+
+  it("keeps the old report through regeneration and records failures by kind", async () => {
+    const { deps, session, task, drain } = setup({ report: "# Old" });
+    deps.resolveModel = () => ({ ok: true, model: {} as never, modelId: "summary" });
+    expect(startReadingReportGeneration(deps, session.id)).toEqual({ outcome: "accepted" });
+    expect(getReadingSessionDetail(deps, session.id).report).toEqual({
+      status: "regenerating",
+      content: "# Old",
+    });
+    task.reject(new Error("network down"));
+    await drain();
+    expect(getReadingSessionDetail(deps, session.id).report).toEqual({
+      status: "regeneration-failed",
+      content: "# Old",
+      reason: "Unable to generate reading report",
+    });
+  });
+
+  it("deduplicates starts, returns insufficient evidence without resolving a model, and resets state on a fresh runtime", () => {
+    const noEvidence = setup({ evidence: false });
+    expect(startReadingReportGeneration(noEvidence.deps, noEvidence.session.id)).toEqual({
+      outcome: "insufficient-evidence",
+    });
+    expect(noEvidence.deps.resolveModel).not.toHaveBeenCalled();
+    expect(noEvidence.runAgent).not.toHaveBeenCalled();
+
+    const { deps, session } = setup();
+    deps.resolveModel = () => ({ ok: true, model: {} as never, modelId: "summary" });
+    expect(startReadingReportGeneration(deps, session.id)).toEqual({ outcome: "accepted" });
+    expect(startReadingReportGeneration(deps, session.id)).toEqual({ outcome: "accepted" });
+    expect(
+      getReadingSessionDetail({ db: deps.db, runtime: new ReadingReportRuntime() }, session.id)
+        .report,
+    ).toEqual({ status: "empty" });
+  });
+
+  it("records missing-model failures, throws the honest reason, and a user save clears it", () => {
+    const { deps, session } = setup();
+    expect(() => startReadingReportGeneration(deps, session.id)).toThrow("missing model");
+    expect(getReadingSessionDetail(deps, session.id).report).toEqual({
+      status: "generation-failed",
+      reason: "missing model",
+    });
+    expect(saveUserReadingReport(deps, session.id, " # Written ").report).toEqual({
+      status: "ready",
+      content: "# Written",
+    });
+  });
+});

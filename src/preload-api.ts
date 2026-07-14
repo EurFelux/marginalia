@@ -67,6 +67,9 @@ export function createApi(d: PreloadDeps) {
       start: inv(C.readingSessionsStart),
       complete: inv(C.readingSessionsComplete),
       list: inv(C.readingSessionsList),
+      get: inv(C.readingSessionsGet),
+      generateReport: inv(C.readingSessionsGenerateReport),
+      saveReport: inv(C.readingSessionsSaveReport),
     },
 
     content: {

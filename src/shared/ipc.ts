@@ -63,10 +63,16 @@ import { backupExportInput, backupRestoreInput } from "@shared/backup";
 import type { MemoryDto } from "@shared/memory";
 import { deleteMemoryInput, updateMemoryInput } from "@shared/memory";
 import type { AvatarPickResult } from "@shared/agent";
-import type { ReadingSessionSummaryDto } from "@shared/reading-sessions";
+import type {
+  GenerateReadingReportResult,
+  ReadingSessionDetailDto,
+  ReadingSessionSummaryDto,
+} from "@shared/reading-sessions";
 import {
   completeReadingInput,
   listReadingSessionsInput,
+  readingSessionIdInput,
+  saveReadingReportInput,
   startReadingInput,
 } from "@shared/reading-sessions";
 
@@ -206,6 +212,24 @@ export const C = {
     "invoke",
     listReadingSessionsInput,
     out<ReadingSessionSummaryDto[]>(),
+  ),
+  readingSessionsGet: def(
+    "reading-sessions:get",
+    "invoke",
+    readingSessionIdInput,
+    out<ReadingSessionDetailDto>(),
+  ),
+  readingSessionsGenerateReport: def(
+    "reading-sessions:generate-report",
+    "invoke",
+    readingSessionIdInput,
+    out<GenerateReadingReportResult>(),
+  ),
+  readingSessionsSaveReport: def(
+    "reading-sessions:save-report",
+    "invoke",
+    saveReadingReportInput,
+    out<ReadingSessionDetailDto>(),
   ),
 
   // content

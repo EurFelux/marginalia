@@ -6,6 +6,12 @@ import {
   startReading,
   toReadingSessionSummary,
 } from "@main/reading-sessions/repository";
+import {
+  getReadingSessionDetail,
+  saveUserReadingReport,
+  startReadingReportGeneration,
+} from "@main/reading-report/service";
+import { makeReadingReportDeps } from "@main/ai/send-deps";
 import { bind, register, type Binding } from "@main/ipc/registry";
 import { getReadingClock } from "@main/stats/clock-wiring";
 
@@ -23,6 +29,15 @@ export const readingSessionBindings: Binding[] = [
     return toReadingSessionSummary(db, completeReading(db, input.bookId, Temporal.Now.instant()));
   }),
   bind(C.readingSessionsList, (input) => listReadingSessions(getDb(), input.bookId)),
+  bind(C.readingSessionsGet, (input) =>
+    getReadingSessionDetail(makeReadingReportDeps(), input.sessionId),
+  ),
+  bind(C.readingSessionsGenerateReport, (input) =>
+    startReadingReportGeneration(makeReadingReportDeps(), input.sessionId),
+  ),
+  bind(C.readingSessionsSaveReport, (input) =>
+    saveUserReadingReport(makeReadingReportDeps(), input.sessionId, input.content),
+  ),
 ];
 
 export function registerReadingSessionHandlers(): void {

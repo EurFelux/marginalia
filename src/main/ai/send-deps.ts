@@ -13,11 +13,16 @@ import type { DB } from "@main/db/client";
 import type { SummaryDeps } from "@main/ai/summary";
 import type { LoadBytes } from "@main/ai/tools";
 import type { SendDeps } from "@main/ai/send";
+import { runReadingReportAgent } from "@main/reading-report/agent";
+import { ReadingReportRuntime } from "@main/reading-report/runtime";
+import type { ReadingReportServiceDeps } from "@main/reading-report/service";
 
 /** 进程级后台并发限流器。getLimit 惰性实时读 preference——改设置即时生效，模块加载期不碰 getDb。 */
 const backgroundLimiter = new Limiter(
   () => getPreference(getDb(), "backgroundConcurrency") ?? DEFAULT_BACKGROUND_CONCURRENCY,
 );
+
+const readingReportRuntime = new ReadingReportRuntime();
 
 /** (bookId) => 该书 app 自有副本字节；缺失抛 BookFileMissingError。注入 db/booksDir 以便单测。 */
 export function createLoadBytes(booksDir: string, db: DB): LoadBytes {
@@ -57,5 +62,18 @@ export function makeSummaryDeps(): SummaryDeps {
     loadBytes: createLoadBytes(appService.getPath("booksDir"), db),
     resolveModel: () => resolveSummaryModel(db),
     runBackground: backgroundLimiter.run,
+  };
+}
+
+/** 完成阅读报告使用唯一的进程内运行时，摘要模型与普通聊天模型严格分离。 */
+export function makeReadingReportDeps(): ReadingReportServiceDeps {
+  const db = getDb();
+  return {
+    db,
+    loadBytes: createLoadBytes(appService.getPath("booksDir"), db),
+    resolveModel: () => resolveSummaryModel(db),
+    runBackground: backgroundLimiter.run,
+    runAgent: runReadingReportAgent,
+    runtime: readingReportRuntime,
   };
 }
