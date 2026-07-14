@@ -4,7 +4,7 @@ import path from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createDb, runMigrations, type DB } from "@main/db/client";
 import { books } from "@main/db/schema";
-import { storedBookPath } from "@main/library/book-files";
+import { readBookFileResult, storedBookPath } from "@main/library/book-files";
 import { exportBackup, inspectBackup, restoreBackup } from "@main/backup/backup-service";
 import { latestMigrationDir, listMigrationDirs } from "@main/db/migrations-path";
 import { createBackupZip, extractZip } from "@main/backup/archive";
@@ -84,6 +84,35 @@ describe("backup-service roundtrip", () => {
     expect(inspection.manifest.kind).toBe("compact");
   });
 
+  it("normalizes a v1 manifest as a full backup during inspection", async () => {
+    const legacyDir = tmp("svc-v1-");
+    const snapshotPath = path.join(legacyDir, "marginalia.db");
+    const sqlite = createDb(snapshotPath);
+    runMigrations(sqlite, MIG);
+    sqlite.$client.close();
+    const booksDir = path.join(legacyDir, "books");
+    mkdirSync(booksDir);
+    const legacyZip = path.join(legacyDir, "legacy.zip");
+    await createBackupZip({
+      kind: "full",
+      zipPath: legacyZip,
+      snapshotPath,
+      booksDir,
+      manifest: {
+        formatVersion: 1,
+        appVersion: "1.0.0",
+        schemaHead: HEAD,
+        createdAt: 1,
+        bookCount: 0,
+        includesApiKeys: true,
+        dbSha256: "0".repeat(64),
+      },
+    });
+
+    const inspection = await inspectBackup({ zipPath: legacyZip, knownMigrationDirs: KNOWN });
+    expect(inspection.manifest.kind).toBe("full");
+  });
+
   it("inspect flags an incompatible (newer) backup", async () => {
     await exportBackup({
       kind: "full",
@@ -153,6 +182,109 @@ describe("backup-service roundtrip", () => {
     );
   });
 
+  it("compact restore replaces the DB and preserves all local book files", async () => {
+    await exportBackup({
+      kind: "compact",
+      createdAt: 3,
+      db: src.db,
+      rawSqlite: src.db.$client,
+      zipPath,
+      booksDir: src.booksDir,
+      tmpDir: src.tmpDir,
+      appVersion: "9.9.9",
+      schemaHead: HEAD,
+    });
+    src.db.$client.close();
+
+    const dataDir = tmp("svc-compact-dst-");
+    const oldDb = createDb(path.join(dataDir, "marginalia.db"));
+    runMigrations(oldDb, MIG);
+    oldDb.insert(books).values({ id: "old", format: "epub" }).run();
+    oldDb.$client.close();
+    const booksDir = path.join(dataDir, "books");
+    mkdirSync(booksDir);
+    writeFileSync(storedBookPath(booksDir, "b1", "epub"), "LOCAL-B1");
+    writeFileSync(storedBookPath(booksDir, "orphan", "epub"), "LOCAL-ORPHAN");
+    const preRestoreDir = path.join(dataDir, "pre-restore");
+    const stamp = "compact-swap";
+
+    await restoreBackup({
+      zipPath,
+      dataDir,
+      booksDir,
+      tmpDir: path.join(dataDir, "tmp"),
+      preRestoreDir,
+      dbFileName: "marginalia.db",
+      knownMigrationDirs: KNOWN,
+      stamp,
+      closeDb: () => {},
+    });
+
+    const restored = createDb(path.join(dataDir, "marginalia.db"));
+    runMigrations(restored, MIG);
+    expect(
+      restored
+        .select()
+        .from(books)
+        .all()
+        .map((book) => book.id),
+    ).toEqual(["b1"]);
+    restored.$client.close();
+    expect(readFileSync(storedBookPath(booksDir, "b1", "epub"), "utf8")).toBe("LOCAL-B1");
+    expect(readFileSync(storedBookPath(booksDir, "orphan", "epub"), "utf8")).toBe("LOCAL-ORPHAN");
+    expect(existsSync(path.join(preRestoreDir, stamp, "marginalia.db"))).toBe(true);
+    expect(existsSync(path.join(preRestoreDir, stamp, "books"))).toBe(false);
+  });
+
+  it("compact restore reuses the existing missing-file fallback", async () => {
+    await exportBackup({
+      kind: "compact",
+      createdAt: 4,
+      db: src.db,
+      rawSqlite: src.db.$client,
+      zipPath,
+      booksDir: src.booksDir,
+      tmpDir: src.tmpDir,
+      appVersion: "9.9.9",
+      schemaHead: HEAD,
+    });
+    src.db.$client.close();
+
+    const dataDir = tmp("svc-compact-missing-");
+    const oldDb = createDb(path.join(dataDir, "marginalia.db"));
+    runMigrations(oldDb, MIG);
+    oldDb.$client.close();
+    const booksDir = path.join(dataDir, "books");
+    mkdirSync(booksDir);
+
+    await restoreBackup({
+      zipPath,
+      dataDir,
+      booksDir,
+      tmpDir: path.join(dataDir, "tmp"),
+      preRestoreDir: path.join(dataDir, "pre-restore"),
+      dbFileName: "marginalia.db",
+      knownMigrationDirs: KNOWN,
+      stamp: "compact-missing",
+      closeDb: () => {},
+    });
+
+    const restored = createDb(path.join(dataDir, "marginalia.db"));
+    runMigrations(restored, MIG);
+    expect(
+      restored
+        .select()
+        .from(books)
+        .all()
+        .map((book) => book.id),
+    ).toContain("b1");
+    restored.$client.close();
+    await expect(readBookFileResult(booksDir, "b1", "epub")).resolves.toEqual({
+      ok: false,
+      error: { reason: "missing" },
+    });
+  });
+
   it("refuses restore on dbSha256 mismatch (corrupt bundle)", async () => {
     // craft a bundle whose manifest.dbSha256 deliberately does not match its db snapshot
     const craft = tmp("svc-corrupt-");
@@ -160,16 +292,14 @@ describe("backup-service roundtrip", () => {
     const cdb = createDb(snap);
     runMigrations(cdb, MIG);
     cdb.$client.close();
-    const cbooks = path.join(craft, "books");
-    mkdirSync(cbooks);
     const badZip = path.join(craft, "bad.zip");
     await createBackupZip({
-      kind: "full",
+      kind: "compact",
       zipPath: badZip,
       snapshotPath: snap,
-      booksDir: cbooks,
       manifest: {
-        formatVersion: 1,
+        formatVersion: 2,
+        kind: "compact",
         appVersion: "x",
         schemaHead: HEAD,
         createdAt: 1,

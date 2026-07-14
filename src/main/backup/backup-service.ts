@@ -12,7 +12,7 @@ import {
 import { buildManifest } from "@main/backup/manifest";
 import { checkRestoreCompatibility } from "@main/backup/compat";
 import { createBackupZip, extractZip, readZipEntryText, sha256File } from "@main/backup/archive";
-import { applyRestore, verifyBookFiles } from "@main/backup/restore";
+import { applyRestore, verifyBookFiles, verifySqliteDatabase } from "@main/backup/restore";
 
 const log = createLogger("backup");
 
@@ -72,7 +72,7 @@ export async function inspectBackup(opts: {
   return { path: opts.zipPath, manifest, compatible, reason };
 }
 
-/** 还原（整体替换）：解包到 staging → 校验完整性/兼容性 → closeDb → applyRestore。relaunch 由 handler 做。 */
+/** 还原（快照替换）：解包到 staging → 校验完整性/兼容性 → closeDb → applyRestore。relaunch 由 handler 做。 */
 export async function restoreBackup(opts: {
   zipPath: string;
   dataDir: string;
@@ -96,16 +96,21 @@ export async function restoreBackup(opts: {
     const compat = checkRestoreCompatibility(manifest.schemaHead, opts.knownMigrationDirs);
     if (!compat.compatible) throw new Error(`restore refused: ${compat.reason}`);
 
-    // 完整性：db sha256 + 书文件齐全
+    // 完整性：db sha256 + SQLite quick_check；完整包还须书文件齐全
     const stagedDb = path.join(stagingDir, opts.dbFileName);
     const stagedBooks = path.join(stagingDir, "books");
     const sha = await sha256File(stagedDb);
     if (sha !== manifest.dbSha256) {
       throw new Error("restore refused: backup database checksum mismatch (corrupt bundle)");
     }
-    const books = verifyBookFiles(stagedDb, stagedBooks);
-    if (!books.ok) {
-      throw new Error(`restore refused: backup is missing book files: ${books.missing.join(", ")}`);
+    verifySqliteDatabase(stagedDb);
+    if (manifest.kind === "full") {
+      const books = verifyBookFiles(stagedDb, stagedBooks);
+      if (!books.ok) {
+        throw new Error(
+          `restore refused: backup is missing book files: ${books.missing.join(", ")}`,
+        );
+      }
     }
 
     // 换库前关连接释放锁，再整体替换
@@ -113,6 +118,7 @@ export async function restoreBackup(opts: {
     opts.closeDb();
     try {
       await applyRestore({
+        kind: manifest.kind,
         dataDir: opts.dataDir,
         booksDir: opts.booksDir,
         stagingDir,
@@ -121,8 +127,10 @@ export async function restoreBackup(opts: {
       });
     } catch (err) {
       log.error(`restore failed mid-swap; original data preserved at ${preRestoreTarget}`, err);
+      const preserved =
+        manifest.kind === "full" ? "marginalia.db and the books folder" : "marginalia.db";
       throw new Error(
-        `Restore failed while swapping files. Your original data is preserved at ${preRestoreTarget} — copy marginalia.db and the books folder from there back into the app data folder to recover.`,
+        `Restore failed while swapping files. Your original ${preserved} is preserved at ${preRestoreTarget}.`,
       );
     }
   } finally {

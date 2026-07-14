@@ -4,7 +4,7 @@ import path from "node:path";
 import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 import { storedBookPath } from "@main/library/book-files";
-import { applyRestore, verifyBookFiles } from "@main/backup/restore";
+import { applyRestore, verifyBookFiles, verifySqliteDatabase } from "@main/backup/restore";
 
 function tmp(prefix: string): string {
   return mkdtempSync(path.join(tmpdir(), prefix));
@@ -42,6 +42,18 @@ describe("verifyBookFiles", () => {
   });
 });
 
+describe("verifySqliteDatabase", () => {
+  it("quick-check accepts SQLite and rejects a non-database file", () => {
+    const dir = tmp("quick-check-");
+    const dbFile = path.join(dir, "ok.db");
+    seedDb(dbFile, []);
+    expect(() => verifySqliteDatabase(dbFile)).not.toThrow();
+    const badFile = path.join(dir, "bad.db");
+    writeFileSync(badFile, "not sqlite");
+    expect(() => verifySqliteDatabase(badFile)).toThrow(/integrity check/i);
+  });
+});
+
 describe("applyRestore", () => {
   it("moves current data to pre-restore and staged into place", async () => {
     const dataDir = tmp("ar-data-");
@@ -59,6 +71,7 @@ describe("applyRestore", () => {
     const preRestoreTarget = path.join(tmp("ar-pre-"), "snap");
 
     await applyRestore({
+      kind: "full",
       dataDir,
       booksDir,
       stagingDir,
@@ -73,5 +86,33 @@ describe("applyRestore", () => {
     // old preserved in pre-restore
     expect(readFileSync(path.join(preRestoreTarget, "marginalia.db"), "utf8")).toBe("OLD-DB");
     expect(readFileSync(path.join(preRestoreTarget, "books", "old.epub"), "utf8")).toBe("OLD-BOOK");
+  });
+
+  it("compact restore replaces only DB files and preserves books in place", async () => {
+    const dataDir = tmp("ar-compact-data-");
+    const booksDir = path.join(dataDir, "books");
+    mkdirSync(booksDir);
+    writeFileSync(path.join(dataDir, "marginalia.db"), "OLD-DB");
+    writeFileSync(path.join(dataDir, "marginalia.db-wal"), "OLD-WAL");
+    writeFileSync(path.join(booksDir, "keep.epub"), "KEEP-BOOK");
+
+    const stagingDir = tmp("ar-compact-stage-");
+    writeFileSync(path.join(stagingDir, "marginalia.db"), "NEW-DB");
+    const preRestoreTarget = path.join(tmp("ar-compact-pre-"), "snap");
+
+    await applyRestore({
+      kind: "compact",
+      dataDir,
+      booksDir,
+      stagingDir,
+      preRestoreTarget,
+      dbFileName: "marginalia.db",
+    });
+
+    expect(readFileSync(path.join(dataDir, "marginalia.db"), "utf8")).toBe("NEW-DB");
+    expect(readFileSync(path.join(booksDir, "keep.epub"), "utf8")).toBe("KEEP-BOOK");
+    expect(readFileSync(path.join(preRestoreTarget, "marginalia.db"), "utf8")).toBe("OLD-DB");
+    expect(readFileSync(path.join(preRestoreTarget, "marginalia.db-wal"), "utf8")).toBe("OLD-WAL");
+    expect(existsSync(path.join(preRestoreTarget, "books"))).toBe(false);
   });
 });
