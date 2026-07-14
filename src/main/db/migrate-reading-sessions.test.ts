@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import { createDb, runMigrations } from "@main/db/client";
+import { createDb, runMigrations, type RunMigrationsHooks } from "@main/db/client";
 
 const MIGRATIONS = path.resolve(__dirname, "migrations");
 const LEGACY_LAST_MIGRATION = "20260616082526_luxuriant_centennial";
@@ -16,6 +16,92 @@ function copyLegacyMigrations(destination: string): void {
       });
     }
   }
+}
+
+function makeDiskDatabase(): {
+  databaseFile: string;
+  legacyMigrations: string;
+  cleanup: () => void;
+} {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "marginalia-legacy-recovery-"));
+  const legacyMigrations = path.join(directory, "legacy-migrations");
+  fs.mkdirSync(legacyMigrations);
+  copyLegacyMigrations(legacyMigrations);
+  return {
+    databaseFile: path.join(directory, "marginalia.db"),
+    legacyMigrations,
+    cleanup: () => fs.rmSync(directory, { recursive: true, force: true }),
+  };
+}
+
+function seedLegacyBook(databaseFile: string, legacyMigrations: string): void {
+  const db = createDb(databaseFile);
+  try {
+    runMigrations(db, legacyMigrations);
+    db.run(sql`
+      INSERT INTO books (
+        id, title, author, format, has_text_layer, added_at, position, parser_version, is_finished
+      ) VALUES ('legacy-book', 'Legacy book', 'Legacy author', 'epub', 1, 1, 0, 0, 1)
+    `);
+    db.run(sql`
+      INSERT INTO conversations (id, book_id, title, created_at, updated_at)
+      VALUES ('legacy-conversation', 'legacy-book', 'Conversation', 7, 8)
+    `);
+    db.run(sql`
+      INSERT INTO messages (id, conversation_id, role, parts, status, seq, created_at)
+      VALUES ('legacy-message', 'legacy-conversation', 'user', '[{"type":"text","text":"Hello"}]', 'complete', 0, 9)
+    `);
+    db.run(sql`
+      INSERT INTO reading_daily (id, book_id, day, seconds)
+      VALUES
+        ('legacy-daily-1', 'legacy-book', '2026-07-01', 42),
+        ('legacy-daily-2', 'legacy-book', '2026-07-02', 24)
+    `);
+  } finally {
+    db.$client.close();
+  }
+}
+
+function withDatabase<T>(databaseFile: string, fn: (db: ReturnType<typeof createDb>) => T): T {
+  const db = createDb(databaseFile);
+  try {
+    return fn(db);
+  } finally {
+    db.$client.close();
+  }
+}
+
+function expectLegacyRecovery(databaseFile: string): void {
+  withDatabase(databaseFile, (db) => {
+    const sessions = db.all<{
+      id: string;
+      started_at: number;
+      completed_at: number | null;
+    }>(
+      sql`SELECT id, started_at, completed_at FROM reading_sessions WHERE book_id = 'legacy-book'`,
+    );
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0]).toMatchObject({
+      started_at: 9,
+      completed_at: Temporal.PlainDate.from("2026-07-02").toZonedDateTime("UTC").epochMilliseconds,
+    });
+    expect(
+      db.all<{ reading_session_id: string | null }>(sql`
+        SELECT reading_session_id FROM reading_daily WHERE book_id = 'legacy-book' ORDER BY id
+      `),
+    ).toEqual([{ reading_session_id: sessions[0].id }, { reading_session_id: sessions[0].id }]);
+    expect(
+      db.get(sql`
+        SELECT name FROM sqlite_master WHERE type = 'table'
+          AND name = '__marginalia_legacy_reading_sessions'
+      `),
+    ).toBeUndefined();
+
+    runMigrations(db, MIGRATIONS);
+    expect(db.all(sql`SELECT id FROM reading_sessions WHERE book_id = 'legacy-book'`)).toHaveLength(
+      1,
+    );
+  });
 }
 
 describe("reading session migrations", () => {
@@ -122,4 +208,75 @@ describe("reading session migrations", () => {
       `),
     ).toBeUndefined();
   });
+
+  it.each([
+    [
+      "after staging and before DDL",
+      false,
+      {
+        afterLegacyReadingSessionsStaged: () => {
+          throw new Error("crash");
+        },
+      },
+    ],
+    [
+      "after DDL and before post-apply",
+      true,
+      {
+        afterMigrationDdl: () => {
+          throw new Error("crash");
+        },
+      },
+    ],
+    [
+      "after session insertion within post-apply",
+      true,
+      {
+        afterLegacyReadingSessionInsert: () => {
+          throw new Error("crash");
+        },
+      },
+    ],
+  ] as const)(
+    "recovers a disk database interrupted %s",
+    (_point, ddlApplied: boolean, hooks: RunMigrationsHooks) => {
+      const fixture = makeDiskDatabase();
+      try {
+        seedLegacyBook(fixture.databaseFile, fixture.legacyMigrations);
+
+        expect(() =>
+          withDatabase(fixture.databaseFile, (db) => runMigrations(db, MIGRATIONS, hooks)),
+        ).toThrow("crash");
+
+        withDatabase(fixture.databaseFile, (db) => {
+          expect(
+            db.get(sql`
+            SELECT name FROM sqlite_master WHERE type = 'table'
+              AND name = '__marginalia_legacy_reading_sessions'
+          `),
+          ).toBeDefined();
+          const bookColumns = db
+            .all<{ name: string }>(sql`PRAGMA table_info(books)`)
+            .map((column) => column.name);
+          expect(bookColumns.includes("is_finished")).toBe(!ddlApplied);
+          const hasReadingSessions = Boolean(
+            db.get(
+              sql`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'reading_sessions'`,
+            ),
+          );
+          expect(hasReadingSessions).toBe(ddlApplied);
+          if (hasReadingSessions) {
+            expect(
+              db.all(sql`SELECT id FROM reading_sessions WHERE book_id = 'legacy-book'`),
+            ).toHaveLength(0);
+          }
+        });
+
+        withDatabase(fixture.databaseFile, (db) => runMigrations(db, MIGRATIONS));
+        expectLegacyRecovery(fixture.databaseFile);
+      } finally {
+        fixture.cleanup();
+      }
+    },
+  );
 });

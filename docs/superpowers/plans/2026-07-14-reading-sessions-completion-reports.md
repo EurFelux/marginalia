@@ -1020,7 +1020,7 @@ Run:
 pnpm db:generate --name derive_reading_state
 ```
 
-Expected: generated migrations rebuild affected SQLite tables and remove `is_finished`; the protected application data-migration staging step then creates one real legacy session for each book with traces and backfills its legacy `reading_daily` rows to that session. Do not edit generated files.
+Expected: generated migrations rebuild affected SQLite tables and remove `is_finished`; the protected application data-migration staging step then creates one real legacy session for each book with traces and backfills every legacy `reading_daily` row for that book to the session. Do not edit generated files.
 
 - [ ] **Step 5: Update reading-time writes and aggregation**
 
@@ -1134,7 +1134,7 @@ Create `CompleteReadingDialog` in the active reader header. Confirming calls `re
 
 - [ ] **Step 11: Add the migration preservation test**
 
-Create `migrate-reading-sessions.test.ts`. Copy migration directories only through `20260616082526_luxuriant_centennial` into a temporary folder, migrate an in-memory DB to that legacy point, seed raw SQL rows for:
+Create `migrate-reading-sessions.test.ts`. Copy migration directories only through `20260616082526_luxuriant_centennial` into a temporary folder, migrate a disk-backed temporary DB to that legacy point, seed raw SQL rows for:
 
 - one `is_finished = true` book,
 - progress,
@@ -1143,7 +1143,7 @@ Create `migrate-reading-sessions.test.ts`. Copy migration directories only throu
 - conversation and message,
 - one `reading_daily` row.
 
-Then run the full current migrations directory and assert:
+Then close and reopen the DB, run the full current migrations directory, and assert:
 
 ```ts
 expect(db.get(sql`select * from reading_sessions where book_id = 'legacy-book'`)).toBeDefined();
@@ -1158,6 +1158,8 @@ expect(db.all<{ name: string }>(sql`pragma table_info(books)`).map((c) => c.name
   "is_finished",
 );
 ```
+
+Add three fault-injection recovery cases against the same disk-backed fixture: throw after staging commits but before DDL, after DDL commits but before post-apply, and inside post-apply immediately after session insertion. Each case closes/reopens the database, runs the normal migration path, and proves exactly one session has the correct start/completion timestamps, every legacy daily row points to that session, staging is removed, and a second run creates no duplicate.
 
 - [ ] **Step 12: Run the vertical-cutover verification**
 

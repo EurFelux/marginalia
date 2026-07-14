@@ -9,6 +9,13 @@ export type DB = BetterSQLite3Database<typeof schema> & { $client: InstanceType<
 
 const LEGACY_READING_SESSIONS_STAGING = "__marginalia_legacy_reading_sessions";
 
+/** Internal migration fault-injection seam used by recovery tests; production callers omit it. */
+export interface RunMigrationsHooks {
+  afterLegacyReadingSessionsStaged?: () => void;
+  afterMigrationDdl?: () => void;
+  afterLegacyReadingSessionInsert?: () => void;
+}
+
 function tableExists(db: DB, table: string): boolean {
   return Boolean(
     db.$client.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table),
@@ -110,7 +117,7 @@ function stageLegacyReadingSessions(db: DB): void {
   })();
 }
 
-function applyStagedLegacyReadingSessions(db: DB): void {
+function applyStagedLegacyReadingSessions(db: DB, hooks: RunMigrationsHooks | undefined): void {
   if (!tableExists(db, LEGACY_READING_SESSIONS_STAGING)) return;
   if (
     !tableExists(db, "reading_sessions") ||
@@ -127,6 +134,7 @@ function applyStagedLegacyReadingSessions(db: DB): void {
       WHERE NOT EXISTS (SELECT 1 FROM reading_sessions WHERE id = staged.session_id)
     `)
       .run();
+    hooks?.afterLegacyReadingSessionInsert?.();
     db.$client
       .prepare(`
       UPDATE reading_daily
@@ -165,13 +173,15 @@ export function createDb(filename: string): DB {
  * `SQLITE_CONSTRAINT_FOREIGNKEY`。在事务外先关 FK、迁移完再开即可——连接级 pragma
  * 跨越迁移事务持续生效；迁移保留同 id 行，整完后引用完整性自洽。
  */
-export function runMigrations(db: DB, migrationsFolder: string): void {
+export function runMigrations(db: DB, migrationsFolder: string, hooks?: RunMigrationsHooks): void {
   stageLegacyReadingSessions(db);
+  hooks?.afterLegacyReadingSessionsStaged?.();
   db.run(sql`PRAGMA foreign_keys = OFF`);
   try {
     migrate(db, { migrationsFolder });
   } finally {
     db.run(sql`PRAGMA foreign_keys = ON`);
   }
-  applyStagedLegacyReadingSessions(db);
+  hooks?.afterMigrationDdl?.();
+  applyStagedLegacyReadingSessions(db, hooks);
 }

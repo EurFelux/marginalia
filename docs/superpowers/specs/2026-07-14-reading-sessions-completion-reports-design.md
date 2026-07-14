@@ -34,7 +34,7 @@ Marginalia 目前用 `books.isFinished` 表示一本书是否读完。这个布�
 - 不复制或永久绑定标注、笔记、消息到某个 reading session。
 - 不保存报告生成时的证据清单或 provenance。
 - 不提供同一 session 内的报告版本历史。
-- 不为升级前的旧数据虚构 reading session。
+- 不为没有任何阅读痕迹的升级前旧书虚构 reading session。
 - 以“打开正文参考”方式阅读时不计时，也不写阅读进度。
 
 ## 领域模型
@@ -83,7 +83,7 @@ reading_session_id TEXT NULL
 
 其新数据粒度为“书籍 × 阅读轮次 × 本地日期”。迁移时移除原有 `(book_id, day)` unique index，并对 `reading_session_id IS NOT NULL` 的行建立 `(reading_session_id, day)` partial unique index；否则同一本书在同一天开始第二次阅读时无法产生独立记录。新发生的计时都必须归属当前 active session。
 
-`reading_session_id IS NULL` 只用于兼容迁移后的旧记录，或在关联 session 被删除后保留历史。它们不再承担 upsert 目标，因此不需要新的 unique 约束；按日和按书查询仍对所有匹配行求和。
+`reading_session_id IS NULL` 只保留给没有可归属 session 的历史（例如书或关联 session 已删除）。升级时，每本有阅读痕迹的旧书都会获得一个 legacy session，且它的旧 `reading_daily` 行全部回填到该 session。NULL 行不再承担 upsert 目标，因此不需要新的 unique 约束；按日和按书查询仍对所有匹配行求和。
 
 同一批事实支持三种聚合：
 
@@ -308,7 +308,7 @@ getReadingReport(sessionId)
 
 - 为每本有旧阅读痕迹的书创建一个真实 legacy session，并把其旧 `reading_daily` 行关联到该 session；没有任何阅读痕迹的书不创建 session。
 - `started_at` 优先取该书最早的 message 时间；没有 message 时才从 progress、标注、笔记、会话和按日计时的最早可用时间兜底。`is_finished` 为真时，`completed_at` 取不早于开始时间的最晚可用痕迹时间；否则保留 active session。
-- 在 Drizzle 生成的 DDL 前，以私有持久 staging 表快照 legacy 候选和 uuidv7 session id；DDL 后在一个事务中插入 session、回填 daily FK 并删除 staging。staging 已存在时复用，故 pre-DDL、DDL 后和 post-DDL 中断均可在下次启动恢复，且不重复创建。
+- 在 Drizzle 生成的 DDL 前，以私有持久 staging 表快照 legacy 候选和 uuidv7 session id；DDL 后在一个事务中插入 session、回填全部 legacy daily FK 并删除 staging。staging 已存在时复用，故 staging 后 DDL 前、DDL 后 post-apply 前、以及 post-apply 事务内中断均可在下次启动恢复，且不重复创建。
 - 保留旧阅读进度、标注、笔记、对话和全书摘要。
 
 迁移文件必须由 `pnpm db:generate` 生成，不手写。
@@ -329,7 +329,7 @@ getReadingReport(sessionId)
 - 全局、按书、按 session 聚合分别正确且不重复计数。
 - 完成前 flush 的最后一段时间归属旧 session。
 - 参考模式不启动时钟、不写进度。
-- legacy `reading_session_id = NULL` 仍计入全局和按书统计。
+- 删除关联 session 或已删除书留下的 `reading_session_id = NULL` 历史仍计入全局和按书统计；有阅读痕迹的 legacy daily 行在升级后不保留 NULL。
 
 ### 报告状态与生成测试
 
