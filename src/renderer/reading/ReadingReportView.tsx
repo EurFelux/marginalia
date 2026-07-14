@@ -26,10 +26,13 @@ import {
 import { CoverImage } from "@renderer/library/CoverImage";
 import { qk } from "@renderer/query/keys";
 import { readingSessionQuery, readingSessionsQuery } from "@renderer/query/reading-session-queries";
+import { createLogger } from "@renderer/logger";
 import { formatDuration } from "@renderer/stats/format-duration";
 import { useNavigationStore } from "@renderer/store/navigation-store";
 import { ReportEditor } from "./ReportEditor";
 import { reportViewModel } from "./report-view-model";
+
+const log = createLogger("reading");
 
 function localDate(epochMilliseconds: number): Temporal.PlainDate {
   return Temporal.Instant.fromEpochMilliseconds(epochMilliseconds)
@@ -79,7 +82,8 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
         toast.info(t("readingReport.insufficientEvidence"));
       }
       await qc.invalidateQueries({ queryKey: qk.readingSession(selectedSession.id) });
-    } catch {
+    } catch (error) {
+      log.warn("generate reading report failed", error);
       showError(t("readingReport.generateFailed"));
     }
   };
@@ -94,7 +98,8 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
       qc.setQueryData(qk.readingSession(selectedSession.id), saved);
       setEditing(false);
     } catch (error) {
-      showError(t("readingReport.saveFailed", { error: (error as Error).message }));
+      log.warn("save reading report failed", error);
+      showError(t("readingReport.saveFailed"));
     }
   };
 
@@ -110,7 +115,8 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
       ]);
       openBook(book.id);
     } catch (error) {
-      showError(t("readingReport.rereadFailed", { error: (error as Error).message }));
+      log.warn("restart reading failed", error);
+      showError(t("readingReport.rereadFailed"));
     }
   };
 

@@ -288,9 +288,9 @@ export default {
   "readingReport.rereadConfirmDescription":
     "Your current reading progress will restart from the beginning, creating a new reading session.",
   "readingReport.rereadConfirmTitle": "Start reading again?",
-  "readingReport.rereadFailed": "Failed to restart reading: {{error}}",
+  "readingReport.rereadFailed": "Unable to restart reading. Please try again.",
   "readingReport.retry": "Retry",
-  "readingReport.saveFailed": "Failed to save report: {{error}}",
+  "readingReport.saveFailed": "Unable to save this report. Please try again.",
   "readingReport.session": "This reading",
   "readingReport.sessionHistory": "Reading sessions",
   "readingReport.title": "Reading report",
