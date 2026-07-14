@@ -66,7 +66,7 @@ export function AdvancedSettings() {
   const onExport = async () => {
     setBusy(true);
     try {
-      const res = await window.api.backup.export();
+      const res = await window.api.backup.export({ kind: "full" });
       if (res)
         toast.success(t("settings.backup.exportDone", "备份已导出：{{path}}", { path: res.path }));
     } catch {

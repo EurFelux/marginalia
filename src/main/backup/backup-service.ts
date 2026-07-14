@@ -5,6 +5,7 @@ import type { DB } from "@main/db/client";
 import { createLogger } from "@main/logger";
 import {
   backupManifestSchema,
+  type BackupKind,
   type BackupExportResult,
   type BackupInspection,
 } from "@shared/backup";
@@ -17,6 +18,8 @@ const log = createLogger("backup");
 
 /** 导出：.backup() 一致快照 → 算 sha256 → buildManifest → 流式 zip → 清临时。 */
 export async function exportBackup(opts: {
+  kind: BackupKind;
+  createdAt: number;
   db: DB;
   rawSqlite: Database.Database;
   zipPath: string;
@@ -26,21 +29,27 @@ export async function exportBackup(opts: {
   schemaHead: string;
 }): Promise<BackupExportResult> {
   await mkdir(opts.tmpDir, { recursive: true });
-  const snapshotPath = path.join(opts.tmpDir, `export-${Date.now()}.db`);
+  const snapshotPath = path.join(opts.tmpDir, `export-${opts.createdAt}.db`);
   try {
     await opts.rawSqlite.backup(snapshotPath);
     const dbSha256 = await sha256File(snapshotPath);
     const manifest = buildManifest(opts.db, {
+      kind: opts.kind,
       appVersion: opts.appVersion,
       schemaHead: opts.schemaHead,
       dbSha256,
+      createdAt: opts.createdAt,
     });
-    await createBackupZip({
+    const archiveBase = {
       zipPath: opts.zipPath,
       snapshotPath,
-      booksDir: opts.booksDir,
       manifest,
-    });
+    };
+    await createBackupZip(
+      opts.kind === "full"
+        ? { ...archiveBase, kind: "full", booksDir: opts.booksDir }
+        : { ...archiveBase, kind: "compact" },
+    );
     return { path: opts.zipPath };
   } finally {
     await unlink(snapshotPath).catch((e: NodeJS.ErrnoException) => {

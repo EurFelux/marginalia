@@ -29,6 +29,7 @@ describe("archive helpers", () => {
 
     const zipPath = path.join(src, "out.zip");
     await createBackupZip({
+      kind: "full",
       zipPath,
       snapshotPath: snapshot,
       booksDir,
@@ -52,7 +53,36 @@ describe("archive helpers", () => {
     const booksDir = path.join(src, "books");
     mkdirSync(booksDir);
     const zipPath = path.join(src, "out.zip");
-    await createBackupZip({ zipPath, snapshotPath: snapshot, booksDir, manifest: {} });
+    await createBackupZip({
+      kind: "full",
+      zipPath,
+      snapshotPath: snapshot,
+      booksDir,
+      manifest: {},
+    });
     await expect(readZipEntryText(zipPath, "nope.json")).rejects.toThrow();
+  });
+
+  it("compact zip contains the database and manifest but no books", async () => {
+    const src = tmp("arch-compact-");
+    const snapshot = path.join(src, "snap.db");
+    writeFileSync(snapshot, "DBDATA");
+    const booksDir = path.join(src, "books");
+    mkdirSync(booksDir);
+    writeFileSync(path.join(booksDir, "a.epub"), "BOOK-A");
+    const zipPath = path.join(src, "compact.zip");
+
+    await createBackupZip({
+      kind: "compact",
+      zipPath,
+      snapshotPath: snapshot,
+      manifest: { kind: "compact" },
+    });
+
+    const dest = tmp("arch-compact-dest-");
+    await extractZip(zipPath, dest);
+    expect(readFileSync(path.join(dest, "marginalia.db"), "utf8")).toBe("DBDATA");
+    expect(existsSync(path.join(dest, "manifest.json"))).toBe(true);
+    expect(existsSync(path.join(dest, "books"))).toBe(false);
   });
 });

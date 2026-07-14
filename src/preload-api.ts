@@ -136,7 +136,7 @@ export function createApi(d: PreloadDeps) {
     },
 
     backup: {
-      /** 导出备份（主进程开 saveDialog）；用户取消返回 null。 */
+      /** 导出备份需要显式 kind（主进程开 saveDialog）；用户取消返回 null。 */
       export: inv(C.backupExport),
       /** 选包并检视（主进程开 openDialog）；取消返回 null，含兼容性结论供确认弹窗。 */
       inspect: inv(C.backupInspect),

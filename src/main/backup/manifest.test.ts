@@ -16,19 +16,34 @@ describe("buildManifest", () => {
     db.insert(books)
       .values([{ id: "b1" }, { id: "b2" }])
       .run();
-    const m = buildManifest(db, { appVersion: "1.2.3", schemaHead: "0009_x", dbSha256: "abc123" });
-    expect(m.bookCount).toBe(2);
-    expect(m.appVersion).toBe("1.2.3");
-    expect(m.schemaHead).toBe("0009_x");
-    expect(m.dbSha256).toBe("abc123");
-    expect(m.formatVersion).toBe(1);
-    expect(m.includesApiKeys).toBe(true);
-    expect(typeof m.createdAt).toBe("number");
+    const m = buildManifest(db, {
+      kind: "compact",
+      appVersion: "1.2.3",
+      schemaHead: "0009_x",
+      dbSha256: "abc123",
+      createdAt: 1_700_000_000_000,
+    });
+    expect(m).toMatchObject({
+      formatVersion: 2,
+      kind: "compact",
+      appVersion: "1.2.3",
+      schemaHead: "0009_x",
+      dbSha256: "abc123",
+      createdAt: 1_700_000_000_000,
+      bookCount: 2,
+      includesApiKeys: true,
+    });
   });
 
   it("bookCount is 0 on an empty library", () => {
-    expect(buildManifest(db, { appVersion: "1", schemaHead: "h", dbSha256: "x" }).bookCount).toBe(
-      0,
-    );
+    expect(
+      buildManifest(db, {
+        kind: "full",
+        appVersion: "1",
+        schemaHead: "h",
+        dbSha256: "x",
+        createdAt: 1,
+      }).bookCount,
+    ).toBe(0);
   });
 });

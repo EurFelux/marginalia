@@ -18,13 +18,14 @@ export function sha256File(filePath: string): Promise<string> {
   });
 }
 
-/** 写备份 zip：db 快照 → marginalia.db；books/ 目录；manifest.json。流式，大书库不入内存。 */
-export function createBackupZip(opts: {
+type CreateBackupZipOptions = {
   zipPath: string;
   snapshotPath: string;
-  booksDir: string;
   manifest: unknown;
-}): Promise<void> {
+} & ({ kind: "full"; booksDir: string } | { kind: "compact" });
+
+/** 写备份 zip：db 快照 → marginalia.db；完整包含 books/；manifest.json。流式，大书库不入内存。 */
+export function createBackupZip(opts: CreateBackupZipOptions): Promise<void> {
   return new Promise((resolve, reject) => {
     const output = createWriteStream(opts.zipPath);
     const archive = new ZipArchive({ zlib: { level: 9 } });
@@ -34,7 +35,9 @@ export function createBackupZip(opts: {
     archive.on("error", reject);
     archive.pipe(output);
     archive.file(opts.snapshotPath, { name: "marginalia.db" });
-    if (existsSync(opts.booksDir)) archive.directory(opts.booksDir, "books");
+    if (opts.kind === "full" && existsSync(opts.booksDir)) {
+      archive.directory(opts.booksDir, "books");
+    }
     archive.append(JSON.stringify(opts.manifest, null, 2), { name: "manifest.json" });
     void archive.finalize();
   });

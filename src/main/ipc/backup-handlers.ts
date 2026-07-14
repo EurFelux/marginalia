@@ -10,30 +10,25 @@ import {
 } from "@main/db/migrations-path";
 import { bind, register, type Binding } from "@main/ipc/registry";
 import { exportBackup, inspectBackup, restoreBackup } from "@main/backup/backup-service";
+import { backupFileName, formatBackupTimestamp } from "@main/backup/filename";
 import { createLogger } from "@main/logger";
 
 const log = createLogger("backup");
 
-function timestamp(): string {
-  const d = new Date();
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(
-    d.getMinutes(),
-  )}${p(d.getSeconds())}`;
-}
-
 export const backupBindings: Binding[] = [
-  bind(C.backupExport, async () => {
+  bind(C.backupExport, async (input) => {
     const win = BrowserWindow.getFocusedWindow();
-    const stamp = timestamp();
+    const now = Temporal.Now.zonedDateTimeISO();
     const opts = {
-      defaultPath: `marginalia-backup-${stamp}.zip`,
+      defaultPath: backupFileName(input.kind, now),
       filters: [{ name: "Marginalia Backup", extensions: ["zip"] }],
     };
     const r = win ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts);
     if (r.canceled || !r.filePath) return null;
     const folder = resolveMigrationsFolder();
     const res = await exportBackup({
+      kind: input.kind,
+      createdAt: now.epochMilliseconds,
       db: getDb(),
       rawSqlite: getDb().$client,
       zipPath: r.filePath,
@@ -42,7 +37,7 @@ export const backupBindings: Binding[] = [
       appVersion: app.getVersion(),
       schemaHead: latestMigrationDir(folder),
     });
-    log.info(`backup exported to ${res.path}`);
+    log.info(`${input.kind} backup exported to ${res.path}`);
     return res;
   }),
 
@@ -69,7 +64,7 @@ export const backupBindings: Binding[] = [
       preRestoreDir: appService.getPath("preRestoreDir"),
       dbFileName: path.basename(appService.getPath("dbFile")),
       knownMigrationDirs: listMigrationDirs(resolveMigrationsFolder()),
-      stamp: timestamp(),
+      stamp: formatBackupTimestamp(Temporal.Now.zonedDateTimeISO()),
       closeDb,
     });
     log.info("backup restored; relaunching");

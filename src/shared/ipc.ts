@@ -59,7 +59,7 @@ import { setPreferenceInput } from "@shared/preferences";
 import type { ReadingStatsDto } from "@shared/stats";
 import { statsGetInput, statsReadingStateInput } from "@shared/stats";
 import type { BackupExportResult, BackupInspection } from "@shared/backup";
-import { backupRestoreInput } from "@shared/backup";
+import { backupExportInput, backupRestoreInput } from "@shared/backup";
 import type { MemoryDto } from "@shared/memory";
 import { deleteMemoryInput, updateMemoryInput } from "@shared/memory";
 import type { AvatarPickResult } from "@shared/agent";
@@ -305,7 +305,7 @@ export const C = {
   statsGet: def("stats:get", "invoke", statsGetInput, out<ReadingStatsDto>()),
 
   // backup
-  backupExport: def("backup:export", "invoke", z.void(), out<BackupExportResult | null>()),
+  backupExport: def("backup:export", "invoke", backupExportInput, out<BackupExportResult | null>()),
   backupInspect: def("backup:inspect", "invoke", z.void(), out<BackupInspection | null>()),
   backupRestore: def("backup:restore", "invoke", backupRestoreInput, out<void>()),
 

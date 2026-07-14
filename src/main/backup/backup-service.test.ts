@@ -7,7 +7,7 @@ import { books } from "@main/db/schema";
 import { storedBookPath } from "@main/library/book-files";
 import { exportBackup, inspectBackup, restoreBackup } from "@main/backup/backup-service";
 import { latestMigrationDir, listMigrationDirs } from "@main/db/migrations-path";
-import { createBackupZip } from "@main/backup/archive";
+import { createBackupZip, extractZip } from "@main/backup/archive";
 
 const MIG = path.resolve(process.cwd(), "src/main/db/migrations");
 const HEAD = latestMigrationDir(MIG);
@@ -41,6 +41,8 @@ describe("backup-service roundtrip", () => {
 
   it("exports a zip with a manifest reflecting the library", async () => {
     const res = await exportBackup({
+      kind: "full",
+      createdAt: 1,
       db: src.db,
       rawSqlite: src.db.$client,
       zipPath,
@@ -56,11 +58,36 @@ describe("backup-service roundtrip", () => {
     expect(ins.manifest.bookCount).toBe(1);
     expect(ins.manifest.appVersion).toBe("9.9.9");
     expect(ins.manifest.schemaHead).toBe(HEAD);
+    expect(ins.manifest.kind).toBe("full");
+    expect(ins.manifest.formatVersion).toBe(2);
     expect(ins.compatible).toBe(true);
+  });
+
+  it("exports a compact zip without books", async () => {
+    await exportBackup({
+      kind: "compact",
+      createdAt: 2,
+      db: src.db,
+      rawSqlite: src.db.$client,
+      zipPath,
+      booksDir: src.booksDir,
+      tmpDir: src.tmpDir,
+      appVersion: "9.9.9",
+      schemaHead: HEAD,
+    });
+
+    const extracted = tmp("svc-compact-extract-");
+    await extractZip(zipPath, extracted);
+    expect(existsSync(path.join(extracted, "marginalia.db"))).toBe(true);
+    expect(existsSync(path.join(extracted, "books"))).toBe(false);
+    const inspection = await inspectBackup({ zipPath, knownMigrationDirs: KNOWN });
+    expect(inspection.manifest.kind).toBe("compact");
   });
 
   it("inspect flags an incompatible (newer) backup", async () => {
     await exportBackup({
+      kind: "full",
+      createdAt: 1,
       db: src.db,
       rawSqlite: src.db.$client,
       zipPath,
@@ -76,6 +103,8 @@ describe("backup-service roundtrip", () => {
 
   it("restores the bundle into a fresh dataDir and preserves old data", async () => {
     await exportBackup({
+      kind: "full",
+      createdAt: 1,
       db: src.db,
       rawSqlite: src.db.$client,
       zipPath,
@@ -135,6 +164,7 @@ describe("backup-service roundtrip", () => {
     mkdirSync(cbooks);
     const badZip = path.join(craft, "bad.zip");
     await createBackupZip({
+      kind: "full",
       zipPath: badZip,
       snapshotPath: snap,
       booksDir: cbooks,

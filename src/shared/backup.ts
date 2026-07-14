@@ -1,26 +1,37 @@
 import { z } from "zod";
 
-/** 备份包格式版本——格式演进的判别位。 */
-export const BACKUP_FORMAT_VERSION = 1;
+export const BACKUP_FORMAT_VERSION = 2;
+export const backupKindSchema = z.enum(["full", "compact"]);
+export type BackupKind = z.infer<typeof backupKindSchema>;
 
-export const backupManifestSchema = z.object({
-  formatVersion: z.number().int().positive(),
+const manifestFields = {
   appVersion: z.string(),
-  /** 导出方最新迁移目录名（<timestamp>_<name>，字典序末位）；还原兼容判定依据。 */
   schemaHead: z.string(),
   createdAt: z.number().int().nonnegative(),
   bookCount: z.number().int().nonnegative(),
   includesApiKeys: z.boolean(),
-  /** db 快照的 sha256，还原前完整性校验。 */
   dbSha256: z.string(),
+};
+
+const legacyManifestSchema = z
+  .object({ formatVersion: z.literal(1), ...manifestFields })
+  .transform((manifest) => ({ ...manifest, kind: "full" as const }));
+
+const currentManifestSchema = z.object({
+  formatVersion: z.literal(BACKUP_FORMAT_VERSION),
+  kind: backupKindSchema,
+  ...manifestFields,
 });
+
+export const backupManifestSchema = z.union([legacyManifestSchema, currentManifestSchema]);
 export type BackupManifest = z.infer<typeof backupManifestSchema>;
 
-/** backup:restore 入参——已 inspect 过的本地 zip 路径。 */
+export const backupExportInput = z.object({ kind: backupKindSchema });
+export type BackupExportInput = z.infer<typeof backupExportInput>;
+
 export const backupRestoreInput = z.object({ path: z.string().min(1) });
 export type BackupRestoreInput = z.infer<typeof backupRestoreInput>;
 
-/** backup:inspect 返回：备份预览 + 兼容性结论（供还原确认弹窗）。 */
 export interface BackupInspection {
   path: string;
   manifest: BackupManifest;
@@ -28,7 +39,6 @@ export interface BackupInspection {
   reason?: string;
 }
 
-/** backup:export 返回：写出的 zip 路径。 */
 export interface BackupExportResult {
   path: string;
 }
