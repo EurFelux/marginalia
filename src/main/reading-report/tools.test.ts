@@ -191,6 +191,26 @@ describe("createReadingReportTools", () => {
     expect(schema.parse({ offset: 0, limit: 100 })).toEqual({ offset: 0, limit: 100 });
     expect(schema.safeParse({ offset: 0, limit: 101 }).success).toBe(false);
   });
+
+  it("bounds conversation reads with a seq cursor and a smaller page", async () => {
+    const { tools } = await setupEpub();
+    const schema = tools.readConversation.inputSchema as {
+      parse(input: unknown): { conversationId: string; afterSeq?: number; limit: number };
+      safeParse(input: unknown): { success: boolean };
+    };
+
+    expect(schema.parse({ conversationId: "c" })).toEqual({
+      conversationId: "c",
+      limit: 20,
+    });
+    expect(schema.parse({ conversationId: "c", afterSeq: 0, limit: 50 })).toEqual({
+      conversationId: "c",
+      afterSeq: 0,
+      limit: 50,
+    });
+    expect(schema.safeParse({ conversationId: "c", limit: 51 }).success).toBe(false);
+    expect(schema.safeParse({ conversationId: "c", afterSeq: -1 }).success).toBe(false);
+  });
 });
 
 describe("PDF report tools", () => {

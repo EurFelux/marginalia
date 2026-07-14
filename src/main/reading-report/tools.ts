@@ -65,11 +65,16 @@ export function createReadingReportTools(deps: ReadingReportToolsDeps) {
         ),
     }),
     readConversation: tool({
-      description: "Read the in-session turns of one listed conversation with neighboring context.",
-      inputSchema: z.object({ conversationId: z.string().min(1) }),
-      execute: async ({ conversationId }) =>
+      description:
+        "Read a bounded page of in-session turns from one listed conversation. Compacted history is returned only as a rolling summary; raw messages are strictly after the compaction frontier.",
+      inputSchema: z.object({
+        conversationId: z.string().min(1),
+        afterSeq: z.number().int().nonnegative().optional(),
+        limit: z.number().int().positive().max(50).default(20),
+      }),
+      execute: async ({ conversationId, afterSeq, limit }) =>
         runTool("readConversation", () =>
-          readSessionConversation(deps.db, deps.session, conversationId),
+          readSessionConversation(deps.db, deps.session, conversationId, { afterSeq, limit }),
         ),
     }),
     listPreviousReadingSessions: tool({

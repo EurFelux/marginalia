@@ -1,5 +1,6 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
 import { createDb, runMigrations } from "@main/db/client";
 import {
   annotations,
@@ -15,6 +16,7 @@ import {
   listSessionBookNotes,
   listSessionConversations,
   readSessionConversation,
+  SESSION_CONVERSATION_TEXT_BUDGET,
 } from "@main/reading-report/evidence";
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
@@ -173,19 +175,141 @@ describe("session evidence", () => {
   it("returns in-window messages with one adjacent neighbor on each side in seq order", () => {
     const { db, session } = setup();
 
-    expect(readSessionConversation(db, session, "conversation-in-window")).toEqual([
-      expect.objectContaining({ seq: 0, text: "before" }),
-      expect.objectContaining({ seq: 1, text: "inside one" }),
-      expect.objectContaining({ seq: 2, text: "inside two" }),
-      expect.objectContaining({ seq: 3, text: "after" }),
+    const result = readSessionConversation(db, session, "conversation-in-window", {});
+
+    if (result.status !== "messages") throw new Error("expected raw tail messages");
+    expect(result.messages).toEqual([
+      expect.objectContaining({ seq: 0, text: "before", context: "neighbor" }),
+      expect.objectContaining({ seq: 1, text: "inside one", context: "session" }),
+      expect.objectContaining({ seq: 2, text: "inside two", context: "session" }),
+      expect.objectContaining({ seq: 3, text: "after", context: "neighbor" }),
     ]);
+    expect(result.hasMore).toBe(false);
+    expect(result.nextAfterSeq).toBeNull();
   });
 
   it("rejects a conversation from another book", () => {
     const { db, session, otherBook } = setup();
 
-    expect(() => readSessionConversation(db, session, otherBook.id)).toThrow(
+    expect(() => readSessionConversation(db, session, otherBook.id, {})).toThrow(
       /not found for this book/,
     );
+  });
+
+  it("returns the compacted summary but never raw messages at or before its frontier", () => {
+    const { db, session } = setup();
+    db.update(conversations)
+      .set({ contextSummary: "EARLY SUMMARY", summarizedThroughSeq: 1 })
+      .where(eq(conversations.id, "conversation-in-window"))
+      .run();
+
+    const result = readSessionConversation(db, session, "conversation-in-window", {});
+
+    if (result.status !== "messages") throw new Error("expected raw tail messages");
+    expect(result.compactedContext).toEqual({ summary: "EARLY SUMMARY", throughSeq: 1 });
+    expect(JSON.stringify(result)).not.toContain('"text":"before"');
+    expect(JSON.stringify(result)).not.toContain('"text":"inside one"');
+    expect(result.messages.map((message) => message.seq)).toEqual([2, 3]);
+  });
+
+  it("returns a compacted-only result when every in-session message is behind the frontier", () => {
+    const { db, session } = setup();
+    db.update(conversations)
+      .set({ contextSummary: "ALL SESSION TURNS", summarizedThroughSeq: 2 })
+      .where(eq(conversations.id, "conversation-in-window"))
+      .run();
+
+    expect(readSessionConversation(db, session, "conversation-in-window", {})).toEqual({
+      status: "compacted-only",
+      compactedContext: { summary: "ALL SESSION TURNS", throughSeq: 2 },
+      messages: [],
+    });
+  });
+
+  it("paginates uncompacted in-session messages with an exclusive seq cursor", () => {
+    const { db, session } = setup();
+
+    const first = readSessionConversation(db, session, "conversation-in-window", { limit: 1 });
+    expect(first).toEqual(
+      expect.objectContaining({ status: "messages", hasMore: true, nextAfterSeq: 1 }),
+    );
+    const second = readSessionConversation(db, session, "conversation-in-window", {
+      afterSeq: 1,
+      limit: 1,
+    });
+    expect(second).toEqual(
+      expect.objectContaining({ status: "messages", hasMore: false, nextAfterSeq: null }),
+    );
+    if (second.status !== "messages") throw new Error("expected second message page");
+    expect(second.messages.map((message) => message.seq)).toEqual([2, 3]);
+  });
+
+  it("caps returned message text and marks truncation", () => {
+    const { db, session } = setup();
+    db.insert(messages)
+      .values({
+        conversationId: "conversation-in-window",
+        role: "assistant",
+        parts: [{ type: "text", text: "x".repeat(SESSION_CONVERSATION_TEXT_BUDGET + 100) }],
+        seq: 4,
+        createdAt: inside,
+      })
+      .run();
+
+    const result = readSessionConversation(db, session, "conversation-in-window", {
+      afterSeq: 3,
+    });
+
+    if (result.status !== "messages") throw new Error("expected raw tail messages");
+    expect(result.messages[0]).toEqual(
+      expect.objectContaining({
+        seq: 4,
+        truncated: true,
+        text: "x".repeat(SESSION_CONVERSATION_TEXT_BUDGET),
+      }),
+    );
+  });
+
+  it("continues from the last returned session message when the text budget fills first", () => {
+    const { db, session } = setup();
+    const conversation = db
+      .insert(conversations)
+      .values({ id: "conversation-budget", bookId: "book-1" })
+      .returning()
+      .get();
+    db.insert(messages)
+      .values(
+        [0, 1, 2, 3].map((seq) => ({
+          conversationId: conversation.id,
+          role: seq % 2 === 0 ? ("user" as const) : ("assistant" as const),
+          parts: [{ type: "text" as const, text: String(seq).repeat(8_000) }],
+          seq,
+          createdAt: inside,
+        })),
+      )
+      .run();
+
+    const first = readSessionConversation(db, session, conversation.id, {});
+    if (first.status !== "messages") throw new Error("expected first message page");
+    expect(first.messages.map((message) => message.seq)).toEqual([0, 1, 2]);
+    expect(first).toEqual(expect.objectContaining({ hasMore: true, nextAfterSeq: 2 }));
+
+    const second = readSessionConversation(db, session, conversation.id, { afterSeq: 2 });
+    if (second.status !== "messages") throw new Error("expected second message page");
+    expect(second.messages.map((message) => message.seq)).toEqual([3]);
+    expect(second).toEqual(expect.objectContaining({ hasMore: false, nextAfterSeq: null }));
+  });
+
+  it("does not return a neighboring message at the compaction frontier", () => {
+    const { db, session } = setup();
+    db.update(conversations)
+      .set({ contextSummary: "EARLY SUMMARY", summarizedThroughSeq: 1 })
+      .where(eq(conversations.id, "conversation-in-window"))
+      .run();
+
+    const result = readSessionConversation(db, session, "conversation-in-window", {});
+
+    if (result.status !== "messages") throw new Error("expected raw tail messages");
+    expect(result.messages.some((message) => message.seq <= 1)).toBe(false);
   });
 });
