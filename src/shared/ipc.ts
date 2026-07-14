@@ -63,6 +63,7 @@ import type { MemoryDto } from "@shared/memory";
 import { deleteMemoryInput, updateMemoryInput } from "@shared/memory";
 import type { AvatarPickResult } from "@shared/agent";
 import type {
+  CancelReadingReportResult,
   GenerateReadingReportResult,
   ReadingSessionDetailDto,
   ReadingSessionSummaryDto,
@@ -217,6 +218,12 @@ export const C = {
     "invoke",
     readingSessionIdInput,
     out<GenerateReadingReportResult>(),
+  ),
+  readingSessionsCancelReport: def(
+    "reading-sessions:cancel-report",
+    "invoke",
+    readingSessionIdInput,
+    out<CancelReadingReportResult>(),
   ),
   readingSessionsSaveReport: def(
     "reading-sessions:save-report",

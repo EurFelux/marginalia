@@ -8,6 +8,7 @@ import {
   toReadingSessionSummary,
 } from "@main/reading-sessions/repository";
 import {
+  cancelReadingReportGeneration,
   getReadingSessionDetail,
   saveUserReadingReport,
   startReadingReportGeneration,
@@ -42,6 +43,9 @@ export const readingSessionBindings: Binding[] = [
   ),
   bind(C.readingSessionsGenerateReport, (input) =>
     startReadingReportGeneration(makeReadingReportDeps(), input.sessionId),
+  ),
+  bind(C.readingSessionsCancelReport, (input) =>
+    cancelReadingReportGeneration(makeReadingReportDeps(), input.sessionId),
   ),
   bind(C.readingSessionsSaveReport, (input) =>
     saveUserReadingReport(makeReadingReportDeps(), input.sessionId, input.content),

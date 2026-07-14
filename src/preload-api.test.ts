@@ -83,6 +83,7 @@ describe("readingSessions", () => {
     await api.readingSessions.list({ bookId: "b1" });
     await api.readingSessions.get({ sessionId: "s1" });
     await api.readingSessions.generateReport({ sessionId: "s1" });
+    await api.readingSessions.cancelReport({ sessionId: "s1" });
     await api.readingSessions.saveReport({ sessionId: "s1", content: "# Report" });
 
     expect(invoke).toHaveBeenNthCalledWith(1, C.readingSessionsStart.channel, {
@@ -95,7 +96,10 @@ describe("readingSessions", () => {
     expect(invoke).toHaveBeenNthCalledWith(5, C.readingSessionsGenerateReport.channel, {
       sessionId: "s1",
     });
-    expect(invoke).toHaveBeenNthCalledWith(6, C.readingSessionsSaveReport.channel, {
+    expect(invoke).toHaveBeenNthCalledWith(6, C.readingSessionsCancelReport.channel, {
+      sessionId: "s1",
+    });
+    expect(invoke).toHaveBeenNthCalledWith(7, C.readingSessionsSaveReport.channel, {
       sessionId: "s1",
       content: "# Report",
     });

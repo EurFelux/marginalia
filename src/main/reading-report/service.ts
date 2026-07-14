@@ -21,6 +21,7 @@ import {
   toReadingSessionSummary,
 } from "@main/reading-sessions/repository";
 import type {
+  CancelReadingReportResult,
   GenerateReadingReportResult,
   ReadingSessionDetailDto,
 } from "@shared/reading-sessions";
@@ -121,9 +122,9 @@ export function startReadingReportGeneration(
 export function cancelReadingReportGeneration(
   deps: Pick<ReadingReportServiceDeps, "db" | "runtime">,
   sessionId: string,
-) {
+): CancelReadingReportResult {
   completedSession(deps.db, sessionId);
-  return deps.runtime.cancel(sessionId) ? { outcome: "canceled" as const } : { outcome: "idle" as const };
+  return deps.runtime.cancel(sessionId) ? { outcome: "canceled" } : { outcome: "idle" };
 }
 
 export function saveUserReadingReport(

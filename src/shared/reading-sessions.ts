@@ -38,6 +38,12 @@ export const generateReadingReportResultSchema = z.discriminatedUnion("outcome",
 ]);
 export type GenerateReadingReportResult = z.infer<typeof generateReadingReportResultSchema>;
 
+export const cancelReadingReportResultSchema = z.discriminatedUnion("outcome", [
+  z.object({ outcome: z.literal("canceled") }),
+  z.object({ outcome: z.literal("idle") }),
+]);
+export type CancelReadingReportResult = z.infer<typeof cancelReadingReportResultSchema>;
+
 export interface ReadingSessionSummaryDto {
   id: string;
   bookId: string;

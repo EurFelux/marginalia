@@ -8,8 +8,10 @@ const mocks = vi.hoisted(() => ({
     tick: vi.fn(),
   },
   completeReading: vi.fn(),
+  cancelReadingReportGeneration: vi.fn(),
   getActiveReadingSession: vi.fn(),
   getDb: vi.fn(),
+  makeReadingReportDeps: vi.fn(),
   toReadingSessionSummary: vi.fn(),
 }));
 
@@ -22,11 +24,14 @@ vi.mock("@main/reading-sessions/repository", () => ({
   toReadingSessionSummary: mocks.toReadingSessionSummary,
 }));
 vi.mock("@main/reading-report/service", () => ({
+  cancelReadingReportGeneration: mocks.cancelReadingReportGeneration,
   getReadingSessionDetail: vi.fn(),
   saveUserReadingReport: vi.fn(),
   startReadingReportGeneration: vi.fn(),
 }));
-vi.mock("@main/ai/send-deps", () => ({ makeReadingReportDeps: vi.fn() }));
+vi.mock("@main/ai/send-deps", () => ({
+  makeReadingReportDeps: mocks.makeReadingReportDeps,
+}));
 vi.mock("@main/stats/clock-wiring", () => ({ getReadingClock: () => mocks.clock }));
 
 import { readingSessionBindings } from "@main/ipc/reading-sessions-handlers";
@@ -34,6 +39,9 @@ import { readingSessionBindings } from "@main/ipc/reading-sessions-handlers";
 const complete = readingSessionBindings.find(
   (binding) => binding.contract.channel === "reading-sessions:complete",
 )!.fn as (input: { bookId: string }) => unknown;
+const cancelReport = readingSessionBindings.find(
+  (binding) => binding.contract.channel === "reading-sessions:cancel-report",
+)!.fn as (input: { sessionId: string }) => unknown;
 
 let clock: ReadingClock;
 let now: number;
@@ -93,5 +101,16 @@ describe("reading session completion clock ownership", () => {
     expect(mocks.completeReading.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.clock.setReadingBook.mock.invocationCallOrder[0],
     );
+  });
+});
+
+describe("reading report cancellation binding", () => {
+  it("passes the injected report dependencies and session ID to the service", () => {
+    const deps = { runtime: {} };
+    mocks.makeReadingReportDeps.mockReturnValue(deps);
+    mocks.cancelReadingReportGeneration.mockReturnValue({ outcome: "canceled" });
+
+    expect(cancelReport({ sessionId: "session-1" })).toEqual({ outcome: "canceled" });
+    expect(mocks.cancelReadingReportGeneration).toHaveBeenCalledWith(deps, "session-1");
   });
 });
