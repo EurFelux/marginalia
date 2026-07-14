@@ -292,6 +292,10 @@ export default {
   "settings.appearance": "外观",
   "settings.assistantModel": "对话模型",
   "settings.backup.cancel": "取消",
+  "settings.backup.confirmCompactRestore":
+    "将用此精简备份整体替换当前应用数据（{{count}} 本书，导出于 {{when}}）。本机现有书籍原文件不会被删除或覆盖；缺少本地文件的书可在恢复后重新连接。当前数据库会先保留安全副本，随后应用将重启。",
+  "settings.backup.confirmFullRestore":
+    "将用此完整备份整体替换当前全部数据与书籍原文件（{{count}} 本书，导出于 {{when}}）。替换前会自动保留一份当前数据的备份，随后应用将重启。",
   "settings.backup.exportCompact": "导出精简备份",
   "settings.backup.exportDone": "备份已导出：{{path}}",
   "settings.backup.exportFailed": "备份导出失败",
@@ -299,6 +303,8 @@ export default {
   "settings.backup.exportFullDesc": "包含所有 EPUB / PDF 原文件",
   "settings.backup.exportOptions": "选择备份类型",
   "settings.backup.incompatible": "无法还原：备份来自更新版本（{{reason}}）",
+  "settings.backup.kindCompact": "精简备份",
+  "settings.backup.kindFull": "完整备份",
   "settings.backup.readFailed": "无法读取该备份",
   "settings.backup.restore": "还原备份",
   "settings.backup.restoreFailed": "还原失败",
