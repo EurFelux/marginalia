@@ -101,5 +101,8 @@ out/
 # Brainstorm visual companion (superpowers)
 .superpowers/
 
+# Agent worktrees
+.worktrees/
+
 # Workspace package build output (tsup)
 packages/*/dist/
