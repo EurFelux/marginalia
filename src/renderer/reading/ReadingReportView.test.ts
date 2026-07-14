@@ -5,6 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const toast = vi.hoisted(() => ({ error: vi.fn(), info: vi.fn() }));
 const log = vi.hoisted(() => ({ warn: vi.fn() }));
+const cancelReport = vi.hoisted(() => vi.fn());
+const generateReport = vi.hoisted(() => vi.fn());
+const invalidateQueries = vi.hoisted(() => vi.fn());
 const saveReport = vi.hoisted(() => vi.fn());
 const startReading = vi.hoisted(() => vi.fn());
 
@@ -17,10 +20,10 @@ vi.mock("@tanstack/react-query", () => ({
       : {
           isPending: false,
           isError: false,
-          data: { report: { status: "ready", content: "# Report" } },
+          data: { report: reportState },
         },
   useQueryClient: () => ({
-    invalidateQueries: vi.fn(),
+    invalidateQueries,
     removeQueries: vi.fn(),
     setQueryData: vi.fn(),
   }),
@@ -30,6 +33,7 @@ vi.mock("react-i18next", () => ({
     t: (key: string, options?: { error?: string }) => {
       const translations: Record<string, string> = {
         "readingReport.rereadFailed": "Unable to restart reading. Please try again.",
+        "readingReport.cancelFailed": "Unable to stop generation. Please try again.",
         "readingReport.saveFailed": "Unable to save this report. Please try again.",
       };
       return `${translations[key] ?? key}${options?.error ?? ""}`;
@@ -44,7 +48,8 @@ vi.mock("@renderer/components/LocalizedStreamdown", () => ({
     createElement("div", { "data-testid": "report-body", className }, children),
 }));
 vi.mock("@renderer/components/ui/alert-dialog", () => ({
-  AlertDialog: ({ children }: { children: React.ReactNode }) => children,
+  AlertDialog: ({ open, children }: { open: boolean; children: React.ReactNode }) =>
+    open ? children : null,
   AlertDialogContent: ({ children }: { children: React.ReactNode }) => children,
   AlertDialogDescription: ({ children }: { children: React.ReactNode }) => children,
   AlertDialogFooter: ({ children }: { children: React.ReactNode }) => children,
@@ -78,19 +83,26 @@ const session = {
   activeSeconds: 0,
 };
 
+let reportState:
+  | { status: "empty" }
+  | { status: "ready"; content: string }
+  | { status: "regenerating"; content: string };
+
 let host: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  reportState = { status: "ready", content: "# Report" };
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
   window.api = {
     readingSessions: {
+      cancelReport,
       saveReport,
       start: startReading,
-      generateReport: vi.fn(),
+      generateReport,
     },
   } as never;
 });
@@ -101,6 +113,137 @@ afterEach(() => {
 });
 
 describe("ReadingReportView", () => {
+  it("confirms before replacing an existing report", async () => {
+    generateReport.mockResolvedValue({ outcome: "accepted" });
+    await act(async () =>
+      root.render(
+        createElement(ReadingReportView, {
+          book: {
+            id: "book-1",
+            title: null,
+            author: null,
+            hasCover: false,
+            format: "epub",
+            pageCount: null,
+            hasTextLayer: false,
+            readingState: "finished",
+          },
+        }),
+      ),
+    );
+
+    const regenerate = [...host.querySelectorAll<HTMLButtonElement>("button")].find(
+      (button) => button.textContent === "readingReport.regenerate",
+    )!;
+    await act(async () => regenerate.click());
+
+    expect(generateReport).not.toHaveBeenCalled();
+    expect(host.textContent).toContain("readingReport.regenerateConfirmTitle");
+
+    const confirm = [...host.querySelectorAll<HTMLButtonElement>("button")].find(
+      (button) => button.textContent === "readingReport.confirmRegenerate",
+    )!;
+    await act(async () => confirm.click());
+
+    expect(generateReport).toHaveBeenCalledWith({ sessionId: "session-1" });
+  });
+
+  it("starts an initial generation without a replacement confirmation", async () => {
+    reportState = { status: "empty" };
+    generateReport.mockResolvedValue({ outcome: "accepted" });
+    await act(async () =>
+      root.render(
+        createElement(ReadingReportView, {
+          book: {
+            id: "book-1",
+            title: null,
+            author: null,
+            hasCover: false,
+            format: "epub",
+            pageCount: null,
+            hasTextLayer: false,
+            readingState: "finished",
+          },
+        }),
+      ),
+    );
+
+    const generate = [...host.querySelectorAll<HTMLButtonElement>("button")].find(
+      (button) => button.textContent === "readingReport.generate",
+    )!;
+    await act(async () => generate.click());
+
+    expect(generateReport).toHaveBeenCalledWith({ sessionId: "session-1" });
+    expect(host.textContent).not.toContain("readingReport.regenerateConfirmTitle");
+  });
+
+  it("stops regeneration while keeping the old report visible", async () => {
+    reportState = { status: "regenerating", content: "# Report" };
+    cancelReport.mockResolvedValue({ outcome: "canceled" });
+    await act(async () =>
+      root.render(
+        createElement(ReadingReportView, {
+          book: {
+            id: "book-1",
+            title: null,
+            author: null,
+            hasCover: false,
+            format: "epub",
+            pageCount: null,
+            hasTextLayer: false,
+            readingState: "finished",
+          },
+        }),
+      ),
+    );
+
+    expect(host.querySelector("[data-testid='report-body']")?.textContent).toBe("# Report");
+    const stop = [...host.querySelectorAll<HTMLButtonElement>("button")].find(
+      (button) => button.textContent === "readingReport.stopRegenerating",
+    )!;
+    await act(async () => stop.click());
+
+    expect(cancelReport).toHaveBeenCalledWith({ sessionId: "session-1" });
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["reading-session", "session-1"],
+    });
+    expect(toast.info).toHaveBeenCalledWith("readingReport.generationStopped");
+  });
+
+  it("keeps rejected cancellation details out of the localized failure toast", async () => {
+    reportState = { status: "regenerating", content: "# Report" };
+    const error = new Error("provider secret from cancel path");
+    cancelReport.mockRejectedValue(error);
+    await act(async () =>
+      root.render(
+        createElement(ReadingReportView, {
+          book: {
+            id: "book-1",
+            title: null,
+            author: null,
+            hasCover: false,
+            format: "epub",
+            pageCount: null,
+            hasTextLayer: false,
+            readingState: "finished",
+          },
+        }),
+      ),
+    );
+
+    const stop = [...host.querySelectorAll<HTMLButtonElement>("button")].find(
+      (button) => button.textContent === "readingReport.stopRegenerating",
+    )!;
+    await act(async () => stop.click());
+
+    expect(toast.error).toHaveBeenCalledWith("Unable to stop generation. Please try again.", {
+      closeButton: true,
+      duration: Infinity,
+    });
+    expect(JSON.stringify(toast.error.mock.calls)).not.toContain("provider secret");
+    expect(log.warn).toHaveBeenCalledWith("cancel reading report generation failed", error);
+  });
+
   it("clamps a long book title to two lines without constraining the report body", () => {
     act(() =>
       root.render(
@@ -238,8 +381,14 @@ describe("ReadingReportView", () => {
       ),
     );
 
-    const reread = [...host.querySelectorAll<HTMLButtonElement>("button")].at(-1)!;
+    const reread = [...host.querySelectorAll<HTMLButtonElement>("button")].find(
+      (button) => button.textContent === "readingReport.reread",
+    )!;
     await act(async () => reread.click());
+    const confirm = [...host.querySelectorAll<HTMLButtonElement>("button")]
+      .filter((button) => button.textContent === "readingReport.reread")
+      .at(-1)!;
+    await act(async () => confirm.click());
 
     expect(toast.error).toHaveBeenCalledWith("Unable to restart reading. Please try again.", {
       closeButton: true,

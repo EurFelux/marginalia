@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, BookOpen, FilePenLine, RotateCcw, Sparkles } from "lucide-react";
+import { ArrowLeft, BookOpen, FilePenLine, RotateCcw, Sparkles, Square } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import type { BookSummaryDto } from "@shared/library";
@@ -53,6 +53,7 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [rereadOpen, setRereadOpen] = useState(false);
+  const [regenerateOpen, setRegenerateOpen] = useState(false);
   const sessions = useQuery(readingSessionsQuery(book.id));
   const completedSessions = sessions.data?.filter((session) => session.completedAt != null) ?? [];
   const selectedSession =
@@ -85,6 +86,31 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
     } catch (error) {
       log.warn("generate reading report failed", error);
       showError(t("readingReport.generateFailed"));
+    }
+  };
+
+  const requestGenerate = () => {
+    const status = detail.data?.report.status;
+    if (status === "ready" || status === "regeneration-failed") {
+      setRegenerateOpen(true);
+      return;
+    }
+    void generate();
+  };
+
+  const cancelGeneration = async () => {
+    if (!selectedSession) return;
+    try {
+      const result = await window.api.readingSessions.cancelReport({
+        sessionId: selectedSession.id,
+      });
+      await qc.invalidateQueries({ queryKey: qk.readingSession(selectedSession.id) });
+      if (result.outcome === "canceled") {
+        toast.info(t("readingReport.generationStopped"));
+      }
+    } catch (error) {
+      log.warn("cancel reading report generation failed", error);
+      showError(t("readingReport.cancelFailed"));
     }
   };
 
@@ -272,9 +298,21 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
                 </Button>
               ) : null}
               {!editing ? (
-                <Button onClick={() => void generate()} disabled={!model.canGenerate}>
-                  <Sparkles data-icon="inline-start" />
-                  {model.busy ? t("readingReport.generating") : generateLabel}
+                <Button
+                  variant={model.canCancel ? "outline" : "default"}
+                  onClick={model.canCancel ? () => void cancelGeneration() : requestGenerate}
+                  disabled={!model.canCancel && !model.canGenerate}
+                >
+                  {model.canCancel ? (
+                    <Square data-icon="inline-start" />
+                  ) : (
+                    <Sparkles data-icon="inline-start" />
+                  )}
+                  {model.canCancel
+                    ? model.content
+                      ? t("readingReport.stopRegenerating")
+                      : t("readingReport.stopGenerating")
+                    : generateLabel}
                 </Button>
               ) : null}
             </CardFooter>
@@ -293,6 +331,28 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
               {t("common.cancel", "取消")}
             </Button>
             <Button onClick={() => void reread()}>{t("readingReport.reread")}</Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={regenerateOpen} onOpenChange={setRegenerateOpen}>
+        <AlertDialogContent>
+          <AlertDialogTitle>{t("readingReport.regenerateConfirmTitle")}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {t("readingReport.regenerateConfirmDescription")}
+          </AlertDialogDescription>
+          <AlertDialogFooter>
+            <Button variant="outline" onClick={() => setRegenerateOpen(false)}>
+              {t("readingReport.keepCurrent")}
+            </Button>
+            <Button
+              onClick={() => {
+                setRegenerateOpen(false);
+                void generate();
+              }}
+            >
+              {t("readingReport.confirmRegenerate")}
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

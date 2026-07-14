@@ -5,31 +5,55 @@ export interface ReportViewModel {
   busy: boolean;
   canGenerate: boolean;
   canEdit: boolean;
+  canCancel: boolean;
   error: "generation-failed" | "regeneration-failed" | null;
 }
 
 export function reportViewModel(state: ReadingReportState): ReportViewModel {
   switch (state.status) {
     case "empty":
-      return { content: null, busy: false, canGenerate: true, canEdit: true, error: null };
+      return {
+        content: null,
+        busy: false,
+        canGenerate: true,
+        canEdit: true,
+        canCancel: false,
+        error: null,
+      };
     case "generating":
-      return { content: null, busy: true, canGenerate: false, canEdit: false, error: null };
+      return {
+        content: null,
+        busy: true,
+        canGenerate: false,
+        canEdit: false,
+        canCancel: true,
+        error: null,
+      };
     case "generation-failed":
       return {
         content: null,
         busy: false,
         canGenerate: true,
         canEdit: true,
+        canCancel: false,
         error: "generation-failed",
       };
     case "ready":
-      return { content: state.content, busy: false, canGenerate: true, canEdit: true, error: null };
+      return {
+        content: state.content,
+        busy: false,
+        canGenerate: true,
+        canEdit: true,
+        canCancel: false,
+        error: null,
+      };
     case "regenerating":
       return {
         content: state.content,
         busy: true,
         canGenerate: false,
         canEdit: false,
+        canCancel: true,
         error: null,
       };
     case "regeneration-failed":
@@ -38,6 +62,7 @@ export function reportViewModel(state: ReadingReportState): ReportViewModel {
         busy: false,
         canGenerate: true,
         canEdit: true,
+        canCancel: false,
         error: "regeneration-failed",
       };
     default:
