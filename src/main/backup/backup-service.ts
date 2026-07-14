@@ -76,7 +76,7 @@ export async function inspectBackup(opts: {
   return { path: opts.zipPath, archiveSha256, manifest, compatible, reason };
 }
 
-/** 还原（快照替换）：解包到 staging → 校验完整性/兼容性 → closeDb → applyRestore。relaunch 由 handler 做。 */
+/** 还原（快照替换）：隔离 archive source/payload → 校验完整性/兼容性 → closeDb → applyRestore。relaunch 由 handler 做。 */
 export async function restoreBackup(opts: {
   zipPath: string;
   archiveSha256: string;
@@ -89,16 +89,19 @@ export async function restoreBackup(opts: {
   stamp: string;
   closeDb: () => void;
 }): Promise<void> {
-  const stagingDir = path.join(opts.tmpDir, `restore-${opts.stamp}`);
-  await rm(stagingDir, { recursive: true, force: true });
-  await mkdir(stagingDir, { recursive: true });
+  const restoreRoot = path.join(opts.tmpDir, `restore-${opts.stamp}`);
+  const sourceDir = path.join(restoreRoot, "source");
+  const payloadDir = path.join(restoreRoot, "payload");
+  await rm(restoreRoot, { recursive: true, force: true });
+  await mkdir(sourceDir, { recursive: true });
+  await mkdir(payloadDir, { recursive: true });
   try {
-    const stagedArchive = path.join(stagingDir, "archive.zip");
+    const stagedArchive = path.join(sourceDir, "archive.zip");
     await copyFile(opts.zipPath, stagedArchive);
     if ((await sha256File(stagedArchive)) !== opts.archiveSha256) {
       throw new Error("restore refused: archive checksum changed since inspection");
     }
-    await extractZip(stagedArchive, stagingDir);
+    await extractZip(stagedArchive, payloadDir);
 
     // 兼容性（manifest 必在、schemaHead 已知）
     const manifestRaw = await readZipEntryText(stagedArchive, "manifest.json");
@@ -107,8 +110,8 @@ export async function restoreBackup(opts: {
     if (!compat.compatible) throw new Error(`restore refused: ${compat.reason}`);
 
     // 完整性：db sha256 + SQLite quick_check；完整包还须书文件齐全
-    const stagedDb = path.join(stagingDir, opts.dbFileName);
-    const stagedBooks = path.join(stagingDir, "books");
+    const stagedDb = path.join(payloadDir, opts.dbFileName);
+    const stagedBooks = path.join(payloadDir, "books");
     const sha = await sha256File(stagedDb);
     if (sha !== manifest.dbSha256) {
       throw new Error("restore refused: backup database checksum mismatch (corrupt bundle)");
@@ -131,7 +134,7 @@ export async function restoreBackup(opts: {
         kind: manifest.kind,
         dataDir: opts.dataDir,
         booksDir: opts.booksDir,
-        stagingDir,
+        stagingDir: payloadDir,
         preRestoreTarget,
         dbFileName: opts.dbFileName,
       });
@@ -141,7 +144,7 @@ export async function restoreBackup(opts: {
       throw new Error(`Restore failed while swapping files. ${detail}`, { cause: err });
     }
   } finally {
-    await rm(stagingDir, { recursive: true, force: true }).catch((e: NodeJS.ErrnoException) => {
+    await rm(restoreRoot, { recursive: true, force: true }).catch((e: NodeJS.ErrnoException) => {
       if (e.code !== "ENOENT") log.warn("restore staging cleanup failed", e);
     });
   }

@@ -117,11 +117,11 @@ marginalia-compact-backup-YYYYMMDD-HHMMSS.zip
 
 ### 5.3 完整恢复
 
-先将用户选中的 zip 复制到 staging，校验其 SHA-256 等于 inspect token，之后只读取/解包这份稳定副本。校验通过后保留现有行为：校验 DB sha256 → 校验 DB 引用的每本书均有包内文件 → 关闭 live DB → 当前 DB + `books/` 移入 pre-restore → staged DB + `books/` 换入正式位置 → 重启。
+先将用户选中的 zip 复制到 restore root 的 `source/archive.zip`，校验其 SHA-256 等于 inspect token；只从这份稳定 source 读取 manifest，并只解包到独立的 `payload/`。校验通过后保留现有行为：校验 payload DB sha256 → 校验 DB 引用的每本书均有包内文件 → 关闭 live DB → 当前 DB + `books/` 移入 pre-restore → payload DB + `books/` 换入正式位置 → 重启。payload 中的 zip 条目不能越界写入 source。
 
 ### 5.4 精简恢复
 
-1. 先复制 zip 到 staging 并校验其 SHA-256 等于 inspect token；之后仅解包该稳定副本，校验 manifest、schemaHead、DB sha256，并以只读连接执行 `PRAGMA quick_check`，结果必须为 `ok`。
+1. 先复制 zip 到 restore root 的 `source/archive.zip` 并校验其 SHA-256 等于 inspect token；只从 source 读取 manifest，只解包到独立的 `payload/`，校验 manifest、schemaHead、payload DB sha256，并以只读连接执行 `PRAGMA quick_check`，结果必须为 `ok`。zip 路径穿越不得越出 payload。
 2. **不调用** `verifyBookFiles`：精简包按定义没有 `books/`。
 3. 关闭 live DB，释放 WAL/文件锁。
 4. 把当前 `marginalia.db`、`-wal`、`-shm` 移入 `pre-restore/<timestamp>/`。
@@ -175,6 +175,7 @@ marginalia-compact-backup-YYYYMMDD-HHMMSS.zip
 - inspect full/compact 选择对应确认文案。
 - IPC contract、preload API 与 handler coverage 保持无漂移。
 - inspect 后将同一路径替换为不同 kind 的包时，restore 因 archive checksum token 不符而在 `closeDb` 前拒绝，DB 与 books 均保持不变。
+- 包含顶层 `archive.zip` 条目的精简包不得覆盖 restore source 或改变 kind；恢复后本地 books 仍保持不变。
 - 注入换入 rename 失败时，完整与精简恢复都恢复 live 原 DB；精简恢复从不移动 local `books/`。
 - i18n extract/lint 通过，中英文文案均覆盖。
 

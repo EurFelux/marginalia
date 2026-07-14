@@ -4,7 +4,7 @@
 
 **Goal:** Add a compact backup that contains the complete SQLite snapshot but omits original EPUB/PDF files, while keeping restore semantics snapshot-based and preserving the destination `books/` directory during compact restore.
 
-**Architecture:** Evolve the existing zip manifest to version 2 with an explicit `kind: "full" | "compact"`, while normalizing legacy v1 packages to `full`. Reuse the existing online SQLite snapshot, checksum, staging, and relaunch pipeline; inspect returns a whole-archive SHA-256 token, and restore copies then verifies that token in staging before reading the stable copy. Only archive inclusion and restore file swapping branch by the explicit kind; tracked reverse moves restore original artifacts if a swap fails. The renderer exposes compact export as the primary half of one split button and full export in its dropdown half.
+**Architecture:** Evolve the existing zip manifest to version 2 with an explicit `kind: "full" | "compact"`, while normalizing legacy v1 packages to `full`. Reuse the existing online SQLite snapshot, checksum, staging, and relaunch pipeline; inspect returns a whole-archive SHA-256 token, and restore copies then verifies that token at `restoreRoot/source/archive.zip`, reads its manifest only there, and extracts only into sibling `restoreRoot/payload/`. Only archive inclusion and restore file swapping branch by the explicit kind; tracked reverse moves restore original artifacts if a swap fails. The renderer exposes compact export as the primary half of one split button and full export in its dropdown half.
 
 **Tech Stack:** Electron 41.7.1, TypeScript 6, Zod 4, better-sqlite3/Drizzle, archiver/yauzl, React 19, Base UI/shadcn components, i18next, Vitest 4.
 
@@ -14,7 +14,7 @@
 - `src/shared/backup.ts` and `src/shared/ipc.ts` remain the Zod/type single source for the contract.
 - Compact means “complete SQLite snapshot minus `books/`”; settings, providers, plaintext API keys, covers/blobs, progress, annotations, notes, summaries, conversations, memories, stats, and app metadata remain included.
 - Restore never merges: full replaces DB + `books/`; compact replaces DB and must not move, create, delete, or overwrite the destination `books/`.
-- Restore confirmation binds the inspected archive to its whole-archive SHA-256 token; a changed path is refused before `closeDb` or live-data mutation, and all parsing/extraction after that check uses the staged archive copy.
+- Restore confirmation binds the inspected archive to its whole-archive SHA-256 token; a changed path is refused before `closeDb` or live-data mutation, all manifest parsing uses the staged source copy, and extraction occurs only in a separate payload directory so zip entries cannot overwrite that source.
 - New v2 manifests require `kind`; legacy v1 manifests normalize to `kind: "full"`; future format versions are rejected.
 - Keep Electron pinned to `41.7.1`; do not change better-sqlite3, Drizzle, or pnpm configuration.
 - New time code uses `Temporal`, with `Temporal.Now.*()` confined to Electron glue and explicit `Temporal.ZonedDateTime` injected into pure formatters.
@@ -503,7 +503,7 @@ git commit -m "feat(backup): add compact archive export"
 - Consumes: normalized `BackupManifest.kind` from Task 1.
 - Produces: `verifySqliteDatabase(dbFile): void` using `PRAGMA quick_check`.
 - Produces: `applyRestore({ kind, dataDir, booksDir, stagingDir, preRestoreTarget, dbFileName })`.
-- Produces: `restoreBackup` that copies the selected archive into staging, verifies the inspect checksum token before reading it, always verifies DB integrity, runs `verifyBookFiles` only for full, and passes manifest kind into the swap.
+- Produces: `restoreBackup` that copies the selected archive into an isolated source directory, verifies the inspect checksum token before reading it, extracts only into a sibling payload directory, always verifies DB integrity, runs `verifyBookFiles` only for full, and passes payload plus manifest kind into the swap.
 
 - [ ] **Step 1: Add failing quick-check and compact-swap tests**
 

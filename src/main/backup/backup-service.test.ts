@@ -1,4 +1,11 @@
-import { mkdtempSync, mkdirSync, writeFileSync, existsSync, readFileSync } from "node:fs";
+import {
+  createWriteStream,
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -8,6 +15,7 @@ import { readBookFileResult, storedBookPath } from "@main/library/book-files";
 import { exportBackup, inspectBackup, restoreBackup } from "@main/backup/backup-service";
 import { latestMigrationDir, listMigrationDirs } from "@main/db/migrations-path";
 import { createBackupZip, extractZip, sha256File } from "@main/backup/archive";
+import { ZipArchive } from "archiver";
 
 const MIG = path.resolve(process.cwd(), "src/main/db/migrations");
 const HEAD = latestMigrationDir(MIG);
@@ -185,6 +193,75 @@ describe("backup-service roundtrip", () => {
     expect(closed).toBe(false);
     expect(readFileSync(path.join(dataDir, "marginalia.db"), "utf8")).toBe("LIVE-DB");
     expect(readFileSync(storedBookPath(booksDir, "live", "epub"), "utf8")).toBe("LIVE-BOOK");
+  });
+
+  it("keeps compact semantics when a payload entry is named archive.zip", async () => {
+    const craft = tmp("svc-nested-archive-");
+    const nestedFullZip = path.join(craft, "nested-full.zip");
+    await exportBackup({
+      kind: "full",
+      createdAt: 7,
+      db: src.db,
+      rawSqlite: src.db.$client,
+      zipPath: nestedFullZip,
+      booksDir: src.booksDir,
+      tmpDir: src.tmpDir,
+      appVersion: "9.9.9",
+      schemaHead: HEAD,
+    });
+    const nestedPayload = path.join(craft, "nested-payload");
+    await extractZip(nestedFullZip, nestedPayload);
+    const nestedDb = path.join(nestedPayload, "marginalia.db");
+    const outerZip = path.join(craft, "outer-compact.zip");
+    const compactManifest = {
+      formatVersion: 2,
+      kind: "compact",
+      appVersion: "9.9.9",
+      schemaHead: HEAD,
+      createdAt: 8,
+      bookCount: 1,
+      includesApiKeys: true,
+      dbSha256: await sha256File(nestedDb),
+    };
+    await new Promise<void>((resolve, reject) => {
+      const output = createWriteStream(outerZip);
+      const archive = new ZipArchive({ zlib: { level: 9 } });
+      output.on("close", resolve);
+      output.on("error", reject);
+      archive.on("error", reject);
+      archive.pipe(output);
+      archive.file(nestedDb, { name: "marginalia.db" });
+      archive.directory(path.join(nestedPayload, "books"), "books");
+      archive.append(JSON.stringify(compactManifest), { name: "manifest.json" });
+      archive.file(nestedFullZip, { name: "archive.zip" });
+      void archive.finalize();
+    });
+    const inspection = await inspectBackup({ zipPath: outerZip, knownMigrationDirs: KNOWN });
+    expect(inspection.manifest.kind).toBe("compact");
+
+    const dataDir = tmp("svc-nested-archive-dst-");
+    const booksDir = path.join(dataDir, "books");
+    mkdirSync(booksDir);
+    writeFileSync(path.join(dataDir, "marginalia.db"), "LIVE-DB");
+    writeFileSync(storedBookPath(booksDir, "live", "epub"), "LIVE-BOOK");
+    const preRestoreDir = path.join(dataDir, "pre-restore");
+
+    await restoreBackup({
+      zipPath: outerZip,
+      archiveSha256: inspection.archiveSha256,
+      dataDir,
+      booksDir,
+      tmpDir: path.join(dataDir, "tmp"),
+      preRestoreDir,
+      dbFileName: "marginalia.db",
+      knownMigrationDirs: KNOWN,
+      stamp: "nested-archive",
+      closeDb: () => {},
+    });
+
+    expect(readFileSync(storedBookPath(booksDir, "live", "epub"), "utf8")).toBe("LIVE-BOOK");
+    expect(existsSync(storedBookPath(booksDir, "b1", "epub"))).toBe(false);
+    expect(existsSync(path.join(preRestoreDir, "nested-archive", "books"))).toBe(false);
   });
 
   it("restores the bundle into a fresh dataDir and preserves old data", async () => {
