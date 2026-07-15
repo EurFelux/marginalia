@@ -1,5 +1,5 @@
 // Playwright 冒烟助手（本地 eval 工具，等价 node -e：argv[2] 即代码，仅供本机终端手敲，勿喂任何不可信输入）
-// 前置：dev 实例以 `pnpm start -- --remote-debugging-port=9222` 启动。
+// 前置：dev 实例以 `pnpm dev -- --remote-debugging-port=9222` 启动。
 // 用法：node scripts/smoke-eval.mjs '<await 可用的 js，page 为 app 页面>'
 // 例：node scripts/smoke-eval.mjs 'await page.locator("header button").count()'
 // 注意：Electron 的 /json/version/ 带尾斜杠返回 400，connectOverCDP 必须传 ws URL。

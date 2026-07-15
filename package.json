@@ -11,7 +11,7 @@
   },
   "main": ".vite/build/main.js",
   "scripts": {
-    "start": "pnpm build:packages && concurrently -k -n epub,app \"pnpm --filter @marginalia/epub-parser dev\" \"electron-forge start\"",
+    "dev": "pnpm build:packages && concurrently -k -n epub,app \"pnpm --filter @marginalia/epub-parser dev\" \"electron-forge start\"",
     "package": "electron-forge package",
     "make": "electron-forge make",
     "release": "GITHUB_TOKEN=$(gh auth token) electron-forge publish",
