@@ -1,5 +1,11 @@
 # marginalia
 
+## 0.18.1
+
+### Patch Changes
+
+- 782e075: Weight EPUB reading progress by readable text so uneven file packaging no longer distorts the percentage, and keep restored locations stable across very long sections.
+
 ## 0.18.0
 
 ### Minor Changes
