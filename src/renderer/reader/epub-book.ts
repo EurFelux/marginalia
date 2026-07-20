@@ -2,6 +2,10 @@ import ePub, { EpubCFI, type Book } from "epubjs";
 import type Section from "epubjs/types/section";
 import { htmlToText } from "@marginalia/epub-parser";
 import i18n from "@renderer/i18n";
+import { createLogger } from "@renderer/logger";
+import { readableTextLength } from "./epub-text-position";
+
+const log = createLogger("epub");
 
 /** 高亮 mark 的 class；CFI 计算 / toRange 时作为 ignoreClass 传入，防止 mark 污染 CFI 路径。 */
 export const ANNO_IGNORE_CLASS = "anno";
@@ -9,6 +13,8 @@ export const ANNO_IGNORE_CLASS = "anno";
 export interface EpubBook {
   /** spine 项数（= VirtualDocs 的 count）。 */
   count: number;
+  /** 各 spine 项的可读文本长度；创建书对象时一次性扫描，顺序与 spine 一致。 */
+  readonly textLengths: readonly number[];
   /** 渲染第 index 个 spine 项为资源已解析的 HTML 串（喂 VirtualDocs.loadSection）。 */
   loadSection: (index: number) => Promise<string>;
   /** spine 项的 href（→ chapterIdByHref → 当前章/进度）。 */
@@ -23,8 +29,10 @@ export interface EpubBook {
   cfiFromRange: (index: number, range: Range) => string | null;
   /** CFI 区间串 → 给定 section 文档内的 DOM Range（高亮渲染）；失败返回 null。 */
   rangeFromCfi: (cfi: string, doc: Document) => Range | null;
-  /** 当前 spine section 内的纯文本长度（与 readChapterText 的文本规整口径同源），未知时返回 0。 */
+  /** 当前 spine section 内的可读 DOM 文本长度（进度与虚拟高度权重口径），未知时返回 0。 */
   textLengthAtIndex: (index: number) => number;
+  /** 当前 spine section 经 readChapterText 同口径规整后的文本长度，尚未渲染时返回 0。 */
+  chapterTextLengthAtIndex: (index: number) => number;
   /** 卸载第 index 个 section 的解析文档（释放内存）；幂等，未加载/越界为 no-op。仅对远离视口的 section 调用。 */
   unloadSection: (index: number) => void;
   /** 给定 section 文档与其内某元素，算该元素起点 CFI（进度锚点级存储）。失败返回 null。 */
@@ -33,6 +41,64 @@ export interface EpubBook {
   anchorCfi: (index: number, anchorId: string) => Promise<string | null>;
   /** 释放 epubjs 资源（卸载书、blob URL）。 */
   destroy: () => void;
+}
+
+export interface TextScanSection {
+  href: string;
+  load: () => Promise<Document>;
+  unload: () => void;
+}
+
+export interface TextScanWarning {
+  index: number;
+  href: string;
+  error: unknown;
+}
+
+export interface SectionTextProfile {
+  readableLength: number;
+  chapterTextLength: number;
+}
+
+/** 把 epubjs section 的运行时 load/document/unload 协议适配为可独立测试的顺序扫描接口。 */
+export function adaptTextScanSection(
+  index: number,
+  section: Pick<Section, "href" | "document" | "load" | "unload"> | null,
+  request: NonNullable<Parameters<Section["load"]>[0]>,
+): TextScanSection {
+  return {
+    href: section?.href ?? `spine:${index}`,
+    load: async () => {
+      if (!section) throw new Error(`Missing EPUB spine section ${index}`);
+      await (section.load(request) as unknown as Promise<Element>);
+      if (!section.document) throw new Error(`EPUB section has no document: ${section.href}`);
+      return section.document;
+    },
+    unload: () => section?.unload(),
+  };
+}
+
+/** 顺序扫描 spine，建立进度与章节文本两套同源坐标；单节失败记为 0 并继续。 */
+export async function scanSectionTextProfiles(
+  sections: readonly TextScanSection[],
+  onWarning: (warning: TextScanWarning) => void,
+): Promise<SectionTextProfile[]> {
+  const profiles: SectionTextProfile[] = [];
+  for (const [index, section] of sections.entries()) {
+    try {
+      const doc = await section.load();
+      profiles.push({
+        readableLength: readableTextLength(doc),
+        chapterTextLength: htmlToText(doc.documentElement.outerHTML).length,
+      });
+    } catch (error) {
+      profiles.push({ readableLength: 0, chapterTextLength: 0 });
+      onWarning({ index, href: section.href, error });
+    } finally {
+      section.unload();
+    }
+  }
+  return profiles;
 }
 
 /** 取 section 文档里第一个块级元素（section 起点 CFI 的锚）。 */
@@ -65,7 +131,6 @@ export async function createEpubBook(bytes: Uint8Array): Promise<EpubBook> {
   // spine 项数：运行时 epubjs Spine 有 `.length`（unpack 时由 items.length 赋值），
   // 但 0.3.93 的 spine.d.ts 未声明该属性，故需断言读取。
   const count: number = (spine as unknown as { length: number }).length;
-  const textLengths = new Map<number, number>();
 
   const sectionAt = (index: number): Section | null => {
     try {
@@ -76,8 +141,21 @@ export async function createEpubBook(bytes: Uint8Array): Promise<EpubBook> {
     }
   };
 
+  const request = book.load.bind(book);
+
+  const textProfiles = await scanSectionTextProfiles(
+    Array.from({ length: count }, (_, index) =>
+      adaptTextScanSection(index, sectionAt(index), request),
+    ),
+    ({ index, href, error }) =>
+      log.warn(`failed to scan readable text in spine ${index} (${href})`, error),
+  );
+  const textLengths = textProfiles.map((profile) => profile.readableLength);
+  const chapterTextLengths = textProfiles.map((profile) => profile.chapterTextLength);
+
   return {
     count,
+    textLengths,
 
     loadSection: async (index) => {
       const s = sectionAt(index);
@@ -86,8 +164,8 @@ export async function createEpubBook(bytes: Uint8Array): Promise<EpubBook> {
       // 注：section.d.ts 0.3.93 把 render 误标为同步返回 string，但运行时返回 Promise<string>
       // （lib/section.js 里 render 返回 defer().promise），故按真实类型断言后 await。
       // 渲染后 s.document 保留，供 cfiAtIndex/cfiFromRange（不 unload）。
-      const html = await (s.render(book.load.bind(book)) as unknown as Promise<string>);
-      textLengths.set(index, htmlToText(html).length);
+      const html = await (s.render(request) as unknown as Promise<string>);
+      chapterTextLengths[index] = htmlToText(html).length;
       return html;
     },
 
@@ -164,7 +242,9 @@ export async function createEpubBook(bytes: Uint8Array): Promise<EpubBook> {
       }
     },
 
-    textLengthAtIndex: (index) => textLengths.get(index) ?? 0,
+    textLengthAtIndex: (index) => textLengths[index] ?? 0,
+
+    chapterTextLengthAtIndex: (index) => chapterTextLengths[index] ?? 0,
 
     cfiFromElement: (index, el) => {
       const s = sectionAt(index);
@@ -181,7 +261,7 @@ export async function createEpubBook(bytes: Uint8Array): Promise<EpubBook> {
       if (!s) return null;
       try {
         // s.document 在 render 前为 undefined；未就绪先 render（与 loadSection 同路径）。
-        if (!s.document) await (s.render(book.load.bind(book)) as unknown as Promise<string>);
+        if (!s.document) await (s.render(request) as unknown as Promise<string>);
         const el = s.document?.getElementById(anchorId) ?? null;
         if (!el) return null;
         return new EpubCFI(el, s.cfiBase, ANNO_IGNORE_CLASS).toString();

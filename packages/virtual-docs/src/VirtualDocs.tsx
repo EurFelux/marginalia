@@ -4,10 +4,14 @@ import { SectionFrame, type SectionSelectEvent } from "./SectionFrame";
 import type { ViewportRect } from "./geometry";
 import {
   calibratedEstimate,
+  deferBeforeLoadedIndex,
+  loadedFromIndexAfterNavigation,
+  loadedFromIndexAfterVisibleTop,
   sectionScrollRatio,
   sectionsToUnload,
   topVisibleSection,
 } from "./precision";
+import { startScrollConvergence } from "./scroll-convergence";
 
 /** 未缓存 section 的默认占位高度（px）；缓存命中后用真实测高。 */
 const DEFAULT_ESTIMATE = 600;
@@ -30,7 +34,11 @@ export interface VirtualDocsHandle {
    * 元素未就绪，继续重试）。收敛重试：virtuoso 须先测得 item 真高才认大 offset（冷启大 section 测量慢），
    * 故每轮按元素当前位置重发滚动直到它贴近 scroller 顶，或超时退化为 section 顶。供 CFI/锚点等元素定位。
    */
-  scrollToSectionElement: (index: number, resolveEl: (doc: Document) => Element | null) => void;
+  scrollToSectionElement: (
+    index: number,
+    resolveEl: (doc: Document) => Element | null,
+    onSettled?: () => void,
+  ) => void;
   /** 对所有在挂 section 重跑 decorate（标注增删改后调用）。 */
   redecorate: () => void;
 }
@@ -51,6 +59,11 @@ export interface VirtualDocsProps {
    */
   sectionWeight?: (index: number) => number;
   /**
+   * 尚无实测 section 时的最低 px/权重估算；适合字符数等有稳定量纲的权重。
+   * 仅作冷启动保护，首个有效实测样本出现后由动态校准取代。
+   */
+  initialPxPerWeight?: number;
+  /**
    * 真实视口顶 section 索引变化时回调。优先用 IntersectionObserver 精确计算；
    * IntersectionObserver 不可用时 fallback 到 virtuoso rangeChanged.startIndex（近似，含 overscan）。
    */
@@ -62,6 +75,8 @@ export interface VirtualDocsProps {
   onHighlightHover?: (annoId: string, rect: ViewportRect) => void;
   onHighlightLeave?: () => void;
   onContentMouseDown?: () => void;
+  /** 用户直接操作滚动区时触发；消费方可据此放弃尚未完成的位置恢复。 */
+  onUserNavigation?: () => void;
   /** 点 iframe 内站内 <a>（相对路径 / #fragment）时回调；消费方据此 resolve 到 section+anchor 跳转。 */
   onInternalLink?: (e: { index: number; href: string }) => void;
   /** 点 iframe 内外链（http/https/mailto）时回调；消费方开系统浏览器。 */
@@ -79,6 +94,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
     styleCss,
     initialIndex,
     sectionWeight,
+    initialPxPerWeight,
     onTopSectionChange,
     onSelect,
     onSelectionCleared,
@@ -87,6 +103,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
     onHighlightHover,
     onHighlightLeave,
     onContentMouseDown,
+    onUserNavigation,
     onInternalLink,
     onExternalLink,
     onUnloadSection,
@@ -95,55 +112,95 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
   ref,
 ) {
   const vRef = useRef<VirtuosoHandle | null>(null);
+  const scrollerEl = useRef<HTMLElement | null>(null);
+  const cancelScrollRef = useRef<(() => void) | null>(null);
+  const onUserNavigationRef = useRef(onUserNavigation);
+  onUserNavigationRef.current = onUserNavigation;
   const [decorateNonce, setDecorateNonce] = useState(0);
   const [scrollerReady, setScrollerReady] = useState(0);
+  const [userNavigationStarted, setUserNavigationStarted] = useState(false);
+  const [loadedFromIndex, setLoadedFromIndex] = useState(initialIndex ?? 0);
+  const rangeLoadingEnabledRef = useRef(false);
+  const cancelPendingScroll = useCallback(() => {
+    cancelScrollRef.current?.();
+    cancelScrollRef.current = null;
+  }, []);
   useImperativeHandle(ref, () => {
     // 滚到第 index 个 section 内 resolveEl(doc) 定位的元素处。先用 scrollToIndex 把 section 带进渲染
-    // 窗口（其 iframe 才加载），轮询等 virtuoso **把该 section 真高计入总滚动高**（scroller.scrollHeight
-    // ≥ section 高）——这是「item 已测量」的可靠信号；未测量时直接发大 offset 会被 clamp/溢出到下一 section
-    //（正是「停在顶部/串章」的根因）。测量后用 virtuoso 原生 scrollToIndex({offset}) 一次精确定位（不抢
-    // 滚、不回弹）。超时（≤80×100ms=8s，留足冷启大 section 测量）退化为 section 顶（不卡死、不白屏）。
+    // 窗口（其 iframe 才加载），再按元素与 scroller 顶的实际偏差重复定位，直到误差收敛。不能只用
+    // scrollHeight ≥ section 高判断「已测量」：目标前方的超长 section 仍可能继续修正高度，使一次定位随后
+    // 漂走。超时（≤300×100ms=30s，覆盖冷启超长 section 的迟到测量）退化为最后一次位置（不卡死、不白屏）。
     const scrollToSectionElement = (
       index: number,
       resolveEl: (doc: Document) => Element | null,
+      onSettled?: () => void,
     ) => {
+      rangeLoadingEnabledRef.current = false;
+      if (!onSettled) {
+        setUserNavigationStarted(true);
+        setLoadedFromIndex((current) => loadedFromIndexAfterNavigation(current, index));
+      }
+      cancelPendingScroll();
       vRef.current?.scrollToIndex({ index, align: "start" });
-      let tries = 0;
-      const tick = () => {
+      const attempt = () => {
         const scroller = scrollerEl.current;
         const frame = scroller?.querySelector<HTMLIFrameElement>(
           `[data-section-index="${index}"] iframe`,
         );
         const doc = frame?.contentDocument;
-        const el = doc && doc.documentElement.scrollHeight > 0 ? resolveEl(doc) : null;
-        if (el && scroller && doc) {
-          const sectionH = doc.documentElement.scrollHeight;
-          // virtuoso 已把该 section 真高计入总高 ⇒ 测量完成，offset 不再被 clamp/溢出。
-          if (scroller.scrollHeight >= sectionH - 4) {
-            const offset =
-              el.getBoundingClientRect().top - doc.documentElement.getBoundingClientRect().top;
-            vRef.current?.scrollToIndex({ index, align: "start", offset });
-            return;
-          }
+        const docRoot = doc?.documentElement;
+        const el = doc && docRoot && docRoot.scrollHeight > 0 ? resolveEl(doc) : null;
+        if (el && scroller && docRoot) {
+          const offset = el.getBoundingClientRect().top - docRoot.getBoundingClientRect().top;
+          const delta =
+            frame!.getBoundingClientRect().top + offset - scroller.getBoundingClientRect().top;
+          if (Math.abs(delta) <= 4) return true;
+          vRef.current?.scrollToIndex({ index, align: "start", offset });
+        } else {
+          // 前方超长 section 的实测高度刚修正时，首次跳转可能只落到目标附近，目标 iframe 尚未挂载。
+          // 用最新高度表重发 section 级定位，把目标重新带入渲染窗口后再解析元素。
+          vRef.current?.scrollToIndex({ index, align: "start" });
         }
-        if (tries++ < 80) setTimeout(tick, 100);
-        else console.warn("[virtual-docs] scrollToSectionElement: section not measured", index);
+        return false;
       };
-      setTimeout(tick, 100);
+      cancelScrollRef.current = startScrollConvergence(
+        attempt,
+        () => {
+          cancelScrollRef.current = null;
+          console.warn("[virtual-docs] scrollToSectionElement: position did not converge", index);
+        },
+        {
+          // 超长 section 的初次对齐可能是假象：前方 iframe 的迟到测高会在数秒后再次推开目标。
+          // 至少观察 6 秒，并要求连续 5 次对齐；用户输入或新导航仍会立即取消这段观察。
+          minimumAttempts: 60,
+          successesRequired: 5,
+          maxAttempts: 300,
+          onSuccess: () => {
+            cancelScrollRef.current = null;
+            onSettled?.();
+            recomputeRef.current(true);
+          },
+        },
+      );
     };
     return {
-      scrollToIndex: (index: number) => vRef.current?.scrollToIndex({ index, align: "start" }),
+      scrollToIndex: (index: number) => {
+        setUserNavigationStarted(true);
+        rangeLoadingEnabledRef.current = false;
+        setLoadedFromIndex((current) => loadedFromIndexAfterNavigation(current, index));
+        cancelPendingScroll();
+        vRef.current?.scrollToIndex({ index, align: "start" });
+      },
       scrollToAnchor: (index: number, anchorId: string) =>
         scrollToSectionElement(index, (doc) => doc.getElementById(anchorId)),
       scrollToSectionElement,
       redecorate: () => setDecorateNonce((n) => n + 1),
     };
-  }, []);
+  }, [cancelPendingScroll]);
 
   const heightCache = useRef<Map<number, number>>(new Map());
   // 已 unload 的 section 集：避免重复 unload；section 重新进入保留区时移除（届时会 reload）。
   const unloaded = useRef<Set<number>>(new Set());
-  const scrollerEl = useRef<HTMLElement | null>(null);
   const observedEls = useRef<Map<number, HTMLElement>>(new Map());
   const io = useRef<IntersectionObserver | null>(null);
   const lastTop = useRef<number | null>(null);
@@ -160,6 +217,11 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
       return { index, top: r.top, bottom: r.bottom };
     });
     const section = topVisibleSection(secs, vt);
+    if (section) {
+      setLoadedFromIndex((current) =>
+        loadedFromIndexAfterVisibleTop(current, section.index, rangeLoadingEnabledRef.current),
+      );
+    }
     if (section && (section.index !== lastTop.current || force)) {
       lastTop.current = section.index;
       onTopSectionChange?.(section.index, { scrollRatio: sectionScrollRatio(section, vt) });
@@ -189,15 +251,44 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
     scrollerEl.current = el instanceof HTMLElement ? el : null;
     setScrollerReady((n) => n + 1);
   }, []);
+  const handleUserNavigation = useCallback(() => {
+    cancelPendingScroll();
+    onUserNavigationRef.current?.();
+  }, [cancelPendingScroll]);
+  const handleUserScrollNavigation = useCallback(() => {
+    setUserNavigationStarted(true);
+    rangeLoadingEnabledRef.current = true;
+    handleUserNavigation();
+  }, [handleUserNavigation]);
+
+  // A new imperative command cancels the previous one above; genuine user input also owns the
+  // viewport from that point onward, so stale restoration retries must not pull it back.
+  useEffect(() => {
+    const scroller = scrollerEl.current;
+    if (!scroller) return;
+    const scrollEvents = ["wheel", "touchstart", "keydown"] as const;
+    for (const event of scrollEvents) scroller.addEventListener(event, handleUserScrollNavigation);
+    scroller.addEventListener("pointerdown", handleUserNavigation);
+    return () => {
+      for (const event of scrollEvents)
+        scroller.removeEventListener(event, handleUserScrollNavigation);
+      scroller.removeEventListener("pointerdown", handleUserNavigation);
+    };
+  }, [scrollerReady, handleUserNavigation, handleUserScrollNavigation]);
+
+  useEffect(() => cancelPendingScroll, [cancelPendingScroll]);
 
   // scroller 就绪后建 IO，observe 已注册的元素 + throttle 滚动监听。
   useEffect(() => {
-    if (!ioSupported) return;
     const scroller = scrollerEl.current;
     if (!scroller) return;
-    const obs = new IntersectionObserver(() => recomputeRef.current(), { root: scroller });
+    const obs = ioSupported
+      ? new IntersectionObserver(() => recomputeRef.current(), { root: scroller })
+      : null;
     io.current = obs;
-    for (const el of observedEls.current.values()) obs.observe(el);
+    if (obs) {
+      for (const el of observedEls.current.values()) obs.observe(el);
+    }
     // IO 仅在 section 边界触发；一个 section 含多锚点章时（锚点级切章的书），section 内滚动须靠
     // 滚动事件以当前 scrollRatio 重算顶部（force 绕过 index 去重）。throttle（leading+trailing）抑制每帧风暴。
     const THROTTLE_MS = 120;
@@ -219,7 +310,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
     };
     scroller.addEventListener("scroll", onScroll, { passive: true });
     return () => {
-      obs.disconnect();
+      obs?.disconnect();
       io.current = null;
       scroller.removeEventListener("scroll", onScroll);
       if (trailing) clearTimeout(trailing);
@@ -241,6 +332,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
     (index: number) => (
       <LazySection
         index={index}
+        deferLoad={deferBeforeLoadedIndex(loadedFromIndex, index)}
         loadSection={loadSection}
         styleCss={styleCss}
         onSelect={onSelect}
@@ -251,6 +343,8 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
         onHighlightLeave={onHighlightLeave}
         decorateNonce={decorateNonce}
         onContentMouseDown={onContentMouseDown}
+        onUserNavigation={handleUserNavigation}
+        onUserScrollNavigation={handleUserScrollNavigation}
         onInternalLink={onInternalLink}
         onExternalLink={onExternalLink}
         estimatedHeight={calibratedEstimate(
@@ -258,6 +352,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
           sectionWeight,
           index,
           DEFAULT_ESTIMATE,
+          initialPxPerWeight,
         )}
         onMeasured={onMeasured}
         registerSection={registerSection}
@@ -266,8 +361,12 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
     ),
     [
       loadSection,
+      initialIndex,
+      userNavigationStarted,
+      loadedFromIndex,
       styleCss,
       sectionWeight,
+      initialPxPerWeight,
       onSelect,
       onSelectionCleared,
       decorate,
@@ -276,6 +375,8 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
       onHighlightLeave,
       decorateNonce,
       onContentMouseDown,
+      handleUserNavigation,
+      handleUserScrollNavigation,
       onInternalLink,
       onExternalLink,
       onMeasured,
@@ -291,7 +392,11 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
       style={{ height: "100%" }}
       totalCount={count}
       initialTopMostItemIndex={initialIndex ?? 0}
-      increaseViewportBy={OVERSCAN_PX}
+      increaseViewportBy={
+        (initialIndex ?? 0) > 0 && !userNavigationStarted
+          ? { top: 0, bottom: OVERSCAN_PX.bottom }
+          : OVERSCAN_PX
+      }
       itemContent={itemContent}
       scrollerRef={handleScrollerRef}
       rangeChanged={(range) => {
@@ -312,6 +417,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
 
 function LazySection({
   index,
+  deferLoad,
   loadSection,
   styleCss,
   onSelect,
@@ -322,6 +428,8 @@ function LazySection({
   onHighlightLeave,
   decorateNonce,
   onContentMouseDown,
+  onUserNavigation,
+  onUserScrollNavigation,
   onInternalLink,
   onExternalLink,
   estimatedHeight,
@@ -330,6 +438,7 @@ function LazySection({
   unregisterSection,
 }: {
   index: number;
+  deferLoad: boolean;
   loadSection: (index: number) => Promise<string>;
   styleCss?: string;
   onSelect?: (e: SectionSelectEvent) => void;
@@ -340,6 +449,8 @@ function LazySection({
   onHighlightLeave?: () => void;
   decorateNonce?: number;
   onContentMouseDown?: () => void;
+  onUserNavigation?: () => void;
+  onUserScrollNavigation?: () => void;
   onInternalLink?: (e: { index: number; href: string }) => void;
   onExternalLink?: (url: string) => void;
   estimatedHeight?: number;
@@ -351,6 +462,10 @@ function LazySection({
   const outerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    if (deferLoad) {
+      setHtml(null);
+      return;
+    }
     let alive = true;
     loadSection(index)
       .then((h) => alive && setHtml(h))
@@ -361,7 +476,7 @@ function LazySection({
     return () => {
       alive = false;
     };
-  }, [index, loadSection]);
+  }, [index, loadSection, deferLoad]);
 
   useEffect(() => {
     const el = outerRef.current;
@@ -387,6 +502,8 @@ function LazySection({
           onHighlightLeave={onHighlightLeave}
           decorateNonce={decorateNonce}
           onContentMouseDown={onContentMouseDown}
+          onUserNavigation={onUserNavigation}
+          onUserScrollNavigation={onUserScrollNavigation}
           onInternalLink={onInternalLink}
           onExternalLink={onExternalLink}
           estimatedHeight={estimatedHeight}

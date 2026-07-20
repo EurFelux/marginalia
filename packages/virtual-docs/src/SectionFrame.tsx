@@ -28,6 +28,10 @@ interface Props {
   decorateNonce?: number;
   /** iframe 内任意 mousedown 时回调；同源 iframe 内部事件不冒泡到父文档，消费方借此关闭浮层。 */
   onContentMouseDown?: () => void;
+  /** iframe 内普通指针操作；父滚动容器收不到这些跨文档事件。 */
+  onUserNavigation?: () => void;
+  /** iframe 内明确会推动阅读位置的输入；用于渐进开放前置 section。 */
+  onUserScrollNavigation?: () => void;
   /** 点 iframe 内站内 <a>（相对路径 / #fragment）时回调；消费方据此 resolve 到 section+anchor 跳转。 */
   onInternalLink?: (e: { index: number; href: string }) => void;
   /** 点 iframe 内外链（http/https/mailto）时回调；消费方开系统浏览器。 */
@@ -64,6 +68,8 @@ export function SectionFrame({
   onHighlightLeave,
   decorateNonce,
   onContentMouseDown,
+  onUserNavigation,
+  onUserScrollNavigation,
   estimatedHeight,
   onMeasured,
   onInternalLink,
@@ -79,6 +85,8 @@ export function SectionFrame({
     onHighlightHover,
     onHighlightLeave,
     onContentMouseDown,
+    onUserNavigation,
+    onUserScrollNavigation,
     estimatedHeight,
     onMeasured,
     onInternalLink,
@@ -92,6 +100,8 @@ export function SectionFrame({
     onHighlightHover,
     onHighlightLeave,
     onContentMouseDown,
+    onUserNavigation,
+    onUserScrollNavigation,
     estimatedHeight,
     onMeasured,
     onInternalLink,
@@ -156,6 +166,8 @@ export function SectionFrame({
       }
       cbRef.current.onContentMouseDown?.();
     };
+    const onUserNavigationInput = () => cbRef.current.onUserNavigation?.();
+    const onUserScrollNavigationInput = () => cbRef.current.onUserScrollNavigation?.();
     // 上次命中的带笔记高亮 id（仅在变化时上报，减少无谓 store 写入与重渲染）。
     let lastNotedId: string | null = null;
     const reportLeaveIfNeeded = () => {
@@ -218,6 +230,10 @@ export function SectionFrame({
       doc?.removeEventListener("click", onAnnoClick);
       doc?.removeEventListener("click", onLinkClick);
       doc?.removeEventListener("mousedown", onContentDown);
+      doc?.removeEventListener("wheel", onUserScrollNavigationInput);
+      doc?.removeEventListener("touchstart", onUserScrollNavigationInput);
+      doc?.removeEventListener("pointerdown", onUserNavigationInput);
+      doc?.removeEventListener("keydown", onUserScrollNavigationInput);
       doc?.removeEventListener("mousemove", onContentMove);
       doc?.removeEventListener("mouseout", onContentOut);
       if (doc?.body) doc.body.style.cursor = "";
@@ -269,6 +285,10 @@ export function SectionFrame({
       doc.addEventListener("click", onAnnoClick);
       doc.addEventListener("click", onLinkClick);
       doc.addEventListener("mousedown", onContentDown);
+      doc.addEventListener("wheel", onUserScrollNavigationInput, { passive: true });
+      doc.addEventListener("touchstart", onUserScrollNavigationInput, { passive: true });
+      doc.addEventListener("pointerdown", onUserNavigationInput);
+      doc.addEventListener("keydown", onUserScrollNavigationInput);
       doc.addEventListener("mousemove", onContentMove);
       doc.addEventListener("mouseout", onContentOut);
     };

@@ -2,10 +2,33 @@
 
 const clamp01 = (v: number): number => Math.min(1, Math.max(0, v));
 
-/** epub：spine 比例近似（epub-book 的 textLengths 惰性填充，字符加权不可行；spec §6.3）。 */
-export function epubPercent(index: number, scrollRatio: number, sectionCount: number): number {
-  if (sectionCount <= 0) return 0;
-  return clamp01((index + clamp01(scrollRatio)) / sectionCount);
+/** epub：以全书可读文本量加权；没有文本 profile 时降级为 spine 比例。 */
+export function epubPercent(
+  index: number,
+  textOffset: number | null,
+  textLengths: readonly number[],
+  scrollRatio: number,
+): number {
+  const sectionCount = textLengths.length;
+  if (sectionCount === 0) return 0;
+
+  const safeIndex = Math.floor(index);
+  if (safeIndex < 0) return 0;
+  if (safeIndex >= sectionCount) return 1;
+
+  const lengths = textLengths.map((length) => (Number.isFinite(length) ? Math.max(0, length) : 0));
+  const total = lengths.reduce((sum, length) => sum + length, 0);
+  const ratio = Number.isFinite(scrollRatio) ? clamp01(scrollRatio) : 0;
+
+  if (total === 0) return clamp01((safeIndex + ratio) / sectionCount);
+
+  const completed = lengths.slice(0, safeIndex).reduce((sum, length) => sum + length, 0);
+  const currentLength = lengths[safeIndex] ?? 0;
+  const current =
+    textOffset === null || !Number.isFinite(textOffset)
+      ? ratio * currentLength
+      : Math.min(Math.max(textOffset, 0), currentLength);
+  return clamp01((completed + current) / total);
 }
 
 /** PDF：页比例，精确。 */

@@ -27,20 +27,10 @@ import { fontFaceCss } from "./reader-fonts";
 import { useThemeStore } from "../store/theme-store";
 import { ttsController } from "./tts/tts-controller";
 import { TTS_IFRAME_CSS } from "./tts/tts-css";
+import { readableTextOffsetAtRange, readableTextRangeAtY } from "./epub-text-position";
+import { advanceRestoreGate } from "./epub-progress-restore";
 
 const log = createLogger("epub");
-
-/** 深度优先取第一个非空文本节点（进度像素级 CFI 用：在视口顶块的首字符建 range）。 */
-function firstTextNode(node: Node): Text | null {
-  if (node.nodeType === Node.TEXT_NODE) {
-    return (node.textContent ?? "").length > 0 ? (node as Text) : null;
-  }
-  for (const child of Array.from(node.childNodes)) {
-    const t = firstTextNode(child);
-    if (t) return t;
-  }
-  return null;
-}
 
 interface Props {
   bookId: string;
@@ -78,6 +68,10 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 进度精确恢复只做一次（每次开书/换书重置）；防 progress 缓存更新触发的重复恢复。
   const restoredRef = useRef(false);
+  // 冷启超长 section 时，虚拟列表会先短暂落在中间 section；命中目标前禁止它覆盖已存 locator。
+  const restoreTargetIndexRef = useRef<number | null>(null);
+  // 当前 Range 无法映射到文本坐标时只告警一次，避免滚动产生日志风暴。
+  const offsetFallbackWarnedRef = useRef(false);
 
   // 恢复位置：进度 locator（ePub 下为 CFI 串）→ spine index（开书时取一次）。
   const progress = useQuery({
@@ -99,33 +93,43 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
     topChapterIdRef.current = null;
     topSectionIndexRef.current = 0;
     restoredRef.current = false;
+    restoreTargetIndexRef.current = null;
+    offsetFallbackWarnedRef.current = false;
   }, [bookId]);
 
   // 把锚点级 CFI 解析回 section 内元素并精确滚到它（恢复 / 标注跳转复用）。CFI → section index →
   // VirtualDocs 等 iframe 就绪 + virtuoso 测量后收敛定位到该元素。失败退化为 section 顶。
-  const scrollToCfi = (cfi: string) => {
+  const scrollToCfi = (cfi: string, onSettled?: () => void) => {
     if (!book) return;
     const idx = book.indexOfCfi(cfi);
     if (idx < 0) return;
     // cfiFromElement 生成的「指向元素」CFI 末段带 [id] 断言；epubjs toRange 对这类 point CFI 常返回
     // null（"No startContainer found"），故取最后一个 [id] 断言作锚点元素 id 兜底。
     const idAssertion = [...cfi.matchAll(/\[([^\]]+)\]/g)].at(-1)?.[1] ?? null;
-    vRef.current?.scrollToSectionElement(idx, (doc) => {
-      // 先试 rangeFromCfi（标注的 range CFI 走这条精确路）；失败再用 [id] 断言 getElementById（进度恢复）。
-      const node = book.rangeFromCfi(cfi, doc)?.startContainer ?? null;
-      const fromRange = node
-        ? node.nodeType === 1
-          ? (node as Element)
-          : node.parentElement
-        : null;
-      return fromRange ?? (idAssertion ? doc.getElementById(idAssertion) : null);
-    });
+    vRef.current?.scrollToSectionElement(
+      idx,
+      (doc) => {
+        // 先试 rangeFromCfi（标注的 range CFI 走这条精确路）；失败再用 [id] 断言 getElementById（进度恢复）。
+        const node = book.rangeFromCfi(cfi, doc)?.startContainer ?? null;
+        const fromRange = node
+          ? node.nodeType === 1
+            ? (node as Element)
+            : node.parentElement
+          : null;
+        return fromRange ?? (idAssertion ? doc.getElementById(idAssertion) : null);
+      },
+      onSettled,
+    );
   };
 
   // 跳章：currentChapterId 变化（ChapterList 点击）→ 滚到对应 spine index（锚点级）。
   useEffect(() => {
     if (!book || currentChapterId == null) return;
     if (currentChapterId === topChapterIdRef.current) return; // 由滚动引起的同步，不回滚
+    // 首次 currentChapterId 可能是上次会话留在 store 里的旧值；无论有没有 locator，都先等进度查询
+    // 完成并由恢复 effect 接管，否则旧章节跳转会抢在深处 initialIndex 前挂载超长正文。
+    if (!restoredRef.current) return;
+    restoreTargetIndexRef.current = null;
     ttsController.notifyUserNavigation();
     const ch = chapters.find((c) => c.id === currentChapterId);
     if (!ch) return;
@@ -150,7 +154,15 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
     if (!book || progress.isLoading || restoredRef.current) return;
     restoredRef.current = true;
     const locator = progress.data?.locator;
-    if (locator != null) scrollToCfi(locator);
+    if (locator != null) {
+      const target = book.indexOfCfi(locator);
+      if (target >= 0) {
+        restoreTargetIndexRef.current = target;
+      }
+      scrollToCfi(locator, () => {
+        restoreTargetIndexRef.current = null;
+      });
+    }
     // scrollToCfi 依赖 book/vRef（稳定/ref）；仅 book 就绪时跑一次（restoredRef 守）。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [book, progress.isLoading]);
@@ -161,7 +173,10 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
     ttsController.attach({
       sectionCount: book.count,
       getTopSectionIndex: () => topSectionIndexRef.current,
-      scrollToSection: (i) => vRef.current?.scrollToIndex(i),
+      scrollToSection: (i) => {
+        restoreTargetIndexRef.current = null;
+        vRef.current?.scrollToIndex(i);
+      },
     });
     return () => ttsController.detach();
   }, [book]);
@@ -177,7 +192,7 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
     for (let i = 0; i < index; i++) {
       const href = book?.hrefAtIndex(i);
       if (href && chapterIdByHref(chapters, href) === chapterId)
-        offset += book?.textLengthAtIndex(i) ?? 0;
+        offset += book?.chapterTextLengthAtIndex(i) ?? 0;
     }
     return offset;
   };
@@ -192,9 +207,9 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
 
   const onTopSectionChange = (index: number, meta: { scrollRatio: number }) => {
     if (!book) return;
+    const restoreGate = advanceRestoreGate(restoreTargetIndexRef.current, index);
+    restoreTargetIndexRef.current = restoreGate.target;
     topSectionIndexRef.current = index;
-    const percent = epubPercent(index, meta.scrollRatio, book.count);
-    setReadingPercent(percent);
     // 当前章高亮（锚点级）
     const anchorChapterIdAt = (sectionIndex: number): string | null => {
       const sHref = book.hrefAtIndex(sectionIndex);
@@ -208,8 +223,9 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
         `[data-section-index="${sectionIndex}"] iframe`,
       );
       const doc = frame?.contentDocument;
-      if (!doc) return chapterIdByHref(chapters, sHref);
-      const docTop = doc.documentElement.getBoundingClientRect().top;
+      const docRoot = doc?.documentElement;
+      if (!doc || !docRoot) return chapterIdByHref(chapters, sHref);
+      const docTop = docRoot.getBoundingClientRect().top;
       const positions = sectionChs
         .map((c) => {
           const el = c.anchor ? doc.getElementById(c.anchor) : null;
@@ -219,9 +235,7 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
         })
         .filter((x): x is { id: string; anchor: string; top: number } => x !== null)
         .sort((a, b) => a.top - b.top);
-      const sectionHeight = book.textLengthAtIndex(sectionIndex)
-        ? doc.documentElement.scrollHeight
-        : 0;
+      const sectionHeight = book.textLengthAtIndex(sectionIndex) ? docRoot.scrollHeight : 0;
       const viewportTop = sectionHeight * meta.scrollRatio;
       return pickAnchorChapterId(positions, viewportTop) ?? chapterIdByHref(chapters, sHref);
     };
@@ -231,42 +245,43 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
 
     // 像素级进度：取「视口顶部那个块级元素」，存其首字符的 range CFI（range CFI 才能被 rangeFromCfi
     // 在恢复时精确还原；cfiFromElement 的 point CFI 在恢复时 toRange 解析不出）。退化到 section 起点 CFI。
-    const topElementCfi = (sectionIndex: number): string => {
+    const topReadablePosition = (
+      sectionIndex: number,
+    ): { cfi: string; textOffset: number | null } => {
       const fallback = book!.cfiAtIndex(sectionIndex) ?? "";
       const frame = document.querySelector<HTMLIFrameElement>(
         `[data-section-index="${sectionIndex}"] iframe`,
       );
       const doc = frame?.contentDocument;
       const scroller = document.querySelector(".no-scrollbar");
-      if (!doc || !frame || !scroller) return fallback;
+      if (!doc?.documentElement || !frame || !scroller) return { cfi: fallback, textOffset: null };
       // 视口顶在该 section 文档内的 y：scroller 顶（主坐标）− iframe 顶（主坐标）。iframe 不内部滚动，
       // 故块元素 getBoundingClientRect().top 即其 doc 内 offsetTop，可直接与之比较。
       const targetInDoc = scroller.getBoundingClientRect().top - frame.getBoundingClientRect().top;
-      const blocks = [...doc.querySelectorAll("p,h1,h2,h3,h4,h5,h6,li,blockquote")];
-      let top: Element | null = null;
-      for (const el of blocks) {
-        if (el.getBoundingClientRect().top <= targetInDoc + 4) top = el;
-        else break;
-      }
-      const el = top ?? blocks[0] ?? null;
-      if (!el) return fallback;
-      const text = firstTextNode(el);
-      if (text) {
-        const range = doc.createRange();
-        range.setStart(text, 0);
-        range.setEnd(text, Math.min(1, text.length));
-        const c = book!.cfiFromRange(sectionIndex, range);
-        if (c) return c;
-      }
-      return book!.cfiFromElement(sectionIndex, el) ?? fallback;
+      const range = readableTextRangeAtY(doc, targetInDoc);
+      if (!range) return { cfi: fallback, textOffset: null };
+      return {
+        cfi: book!.cfiFromRange(sectionIndex, range) ?? fallback,
+        textOffset: readableTextOffsetAtRange(doc, range),
+      };
     };
 
-    const cfi = topElementCfi(index);
+    const { cfi, textOffset } = topReadablePosition(index);
+    if (
+      textOffset == null &&
+      book.textLengthAtIndex(index) > 0 &&
+      !offsetFallbackWarnedRef.current
+    ) {
+      offsetFallbackWarnedRef.current = true;
+      log.warn(`text offset unavailable; using section scroll ratio: ${index}`);
+    }
+    const percent = epubPercent(index, textOffset, book.textLengths, meta.scrollRatio);
+    setReadingPercent(percent);
     if (chId) {
       // 锚点章 = 整 spine 文件里的一小片（正文从锚点切到下一锚点），整章一次 readChapterText 即读全 →
       // offset 从 0 起。section 相对 offset（= 在整个大文件里的字符位置）对锚点章无意义：会远超章长、
       // 取到空文本，使「读我当前位置」的 AI 工具拿不到内容。无锚点的整文件章仍用 section 相对 offset（正确）。
-      const sectionLength = book.textLengthAtIndex(index);
+      const sectionLength = book.chapterTextLengthAtIndex(index);
       const offset = ch?.anchor
         ? 0
         : chapterTextOffsetBeforeIndex(chId, index) + Math.floor(sectionLength * meta.scrollRatio);
@@ -285,7 +300,7 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
       if (chId !== currentChapterId) setCurrentChapter(chId);
     }
     // 防抖存进度（section 级 CFI）
-    if (cfi && persistProgress) {
+    if (cfi && persistProgress && restoreGate.shouldPersist) {
       if (saveTimer.current) clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(() => {
         void window.api.progress
@@ -328,6 +343,7 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
 
   const onInternalLink = ({ index, href }: { index: number; href: string }) => {
     if (!book) return;
+    restoreTargetIndexRef.current = null;
     const hash = href.indexOf("#");
     const anchor = hash >= 0 ? href.slice(hash + 1) : "";
     // 纯 fragment（#x，无路径）→ 当前 section 内；带路径 → resolve 到目标 section。
@@ -348,6 +364,7 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
   // 侧栏列表点击 → 精确滚到该标注（锚点级：CFI 解析回元素，不再只到 section 顶）。
   useEffect(() => {
     if (!book || !scrollCommand) return;
+    restoreTargetIndexRef.current = null;
     ttsController.notifyUserNavigation();
     scrollToCfi(scrollCommand.locator);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -391,6 +408,7 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
         count={book.count}
         loadSection={book.loadSection}
         sectionWeight={book.textLengthAtIndex}
+        initialPxPerWeight={0.1}
         styleCss={
           fontFaceCss(prefs.fontFamily) +
           "\n" +
@@ -412,6 +430,9 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
         onHighlightHover={hoverHighlight}
         onHighlightLeave={leaveHighlight}
         onContentMouseDown={onContentMouseDown}
+        onUserNavigation={() => {
+          restoreTargetIndexRef.current = null;
+        }}
         onInternalLink={onInternalLink}
         onExternalLink={onExternalLink}
       />

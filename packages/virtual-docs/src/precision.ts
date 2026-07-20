@@ -1,4 +1,22 @@
-/** 估高占位：缓存命中用缓存高度，否则用默认估值。 */
+/** 深处冷启动时，尚未走到的前置 section 保持轻量占位，避免其迟到测高推走目标。 */
+export function deferBeforeLoadedIndex(loadedFromIndex: number, index: number): boolean {
+  return index < loadedFromIndex;
+}
+
+/** 命令式跳转只开放目标及其后的 section；已开放的 section 不重新收回。 */
+export function loadedFromIndexAfterNavigation(current: number, target: number): number {
+  return Math.min(current, target);
+}
+
+/** 只有确认出现滚动意图后，才随真实可视顶部向前逐步开放 section。 */
+export function loadedFromIndexAfterVisibleTop(
+  current: number,
+  visibleTop: number,
+  rangeLoadingEnabled: boolean,
+): number {
+  return rangeLoadingEnabled ? Math.min(current, visibleTop) : current;
+}
+
 export function estimateHeight(
   cache: ReadonlyMap<number, number>,
   index: number,
@@ -17,6 +35,7 @@ export function calibratedEstimate(
   weightOf: ((index: number) => number) | undefined,
   index: number,
   defaultEstimate: number,
+  initialPxPerWeight = 0,
 ): number {
   const cached = cache.get(index);
   if (cached != null) return cached;
@@ -31,7 +50,11 @@ export function calibratedEstimate(
     sumHeight += h;
     sumWeight += w;
   }
-  if (sumWeight <= 0) return defaultEstimate;
+  if (sumWeight <= 0) {
+    return initialPxPerWeight > 0
+      ? Math.max(defaultEstimate, targetWeight * initialPxPerWeight)
+      : defaultEstimate;
+  }
   return targetWeight * (sumHeight / sumWeight);
 }
 

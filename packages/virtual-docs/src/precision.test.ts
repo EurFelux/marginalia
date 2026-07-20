@@ -1,11 +1,35 @@
 import { describe, expect, it } from "vitest";
 import {
   calibratedEstimate,
+  deferBeforeLoadedIndex,
   estimateHeight,
+  loadedFromIndexAfterNavigation,
+  loadedFromIndexAfterVisibleTop,
   sectionScrollRatio,
   sectionsToUnload,
   topVisibleIndex,
 } from "./precision";
+
+describe("deferred section loading", () => {
+  it("keeps sections before the active navigation target deferred", () => {
+    expect(deferBeforeLoadedIndex(8, 7)).toBe(true);
+    expect(deferBeforeLoadedIndex(8, 8)).toBe(false);
+    expect(deferBeforeLoadedIndex(0, 0)).toBe(false);
+  });
+
+  it("opens loading only as far back as imperative navigation requires", () => {
+    expect(loadedFromIndexAfterNavigation(8, 6)).toBe(6);
+    expect(loadedFromIndexAfterNavigation(8, 10)).toBe(8);
+    expect(loadedFromIndexAfterNavigation(6, 4)).toBe(4);
+  });
+
+  it("does not open deferred sections for a click, then opens them gradually while scrolling", () => {
+    expect(loadedFromIndexAfterVisibleTop(8, 5, false)).toBe(8);
+    expect(loadedFromIndexAfterVisibleTop(8, 8, true)).toBe(8);
+    expect(loadedFromIndexAfterVisibleTop(8, 7, true)).toBe(7);
+    expect(loadedFromIndexAfterVisibleTop(5, 7, true)).toBe(5);
+  });
+});
 
 describe("estimateHeight", () => {
   it("returns cached height when present", () => {
@@ -28,6 +52,15 @@ describe("calibratedEstimate", () => {
   });
   it("falls back to default when nothing has been measured yet", () => {
     expect(calibratedEstimate(new Map(), () => 1000, 3, 600)).toBe(600);
+  });
+  it("uses a conservative initial weight ratio before the first measurement", () => {
+    const weights = new Map([
+      [2, 1000],
+      [3, 100_000],
+    ]);
+    const weightOf = (i: number) => weights.get(i) ?? 0;
+    expect(calibratedEstimate(new Map(), weightOf, 2, 600, 0.1)).toBe(600);
+    expect(calibratedEstimate(new Map(), weightOf, 3, 600, 0.1)).toBe(10_000);
   });
   it("scales the estimate by measured px-per-weight", () => {
     // section 0 measured 5000px at weight 1000 → 5 px/unit; target weight 2000 → 10000px
