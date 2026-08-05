@@ -5,7 +5,6 @@ import {
   ALIGN_SUCCESSES_REQUIRED,
   initialViewportState,
   overscanTop,
-  rangeLoadingEnabled,
   reduceViewport,
   type ViewportEvent,
   type ViewportState,
@@ -186,14 +185,16 @@ describe("reduceViewport", () => {
     expect(effects).toEqual([{ kind: "scrollToIndex", index: 3 }]);
   });
 
-  it("derives range loading and overscan from the phase", () => {
+  it("derives overscan from the navigation latch", () => {
     const initial = initialViewportState(40);
-    expect(rangeLoadingEnabled(initial)).toBe(false);
+    // 深处冷启、尚未发生过用户导航 → 顶部 overscan 强制为 0：上方 section 的迟到测高
+    // 会推走恢复目标，此时不能预挂载。
     expect(overscanTop(initial, 40, 2400)).toBe(0);
+    // 从头开书（initialIndex=0）没有「上方 section 推走目标」的风险，照常双向 overscan。
     expect(overscanTop(initial, 0, 2400)).toBe(2400);
 
+    // 一旦发生过用户级导航（即使仍是深处冷启的 initialIndex），latch 永久翻转，恢复双向 overscan。
     const owned = reduceViewport(initial, { type: "USER_INPUT", scrollIntent: true }).next;
-    expect(rangeLoadingEnabled(owned)).toBe(true);
     expect(overscanTop(owned, 40, 2400)).toBe(2400);
   });
 });

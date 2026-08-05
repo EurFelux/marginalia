@@ -132,8 +132,12 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
   const tickerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const resolveElRef = useRef<((doc: Document) => Element | null) | null>(null);
   const alignTargetRef = useRef<number | null>(null);
-  /** scrollToSectionElement 返回的 Promise 的兑现函数；由 reportAlignResult 效果兑现。 */
-  const alignResolveRef = useRef<((result: AlignResult) => void) | null>(null);
+  /**
+   * scrollToSectionElement 返回的 Promise 的兑现函数队列（FIFO）。必须是队列而非单个 ref：
+   * 新一轮 ALIGN_REQUESTED 会产生一个兑现**上一轮**的 "cancelled" 效果，而效果在提交后才执行，
+   * 那时新一轮的 resolve 已经写入——单 ref 会让新 Promise 被立即兑现、旧 Promise 永久悬挂。
+   */
+  const alignResolversRef = useRef<((result: AlignResult) => void)[]>([]);
   /** ticker 回调里要用 raise，但它在 useMachine 之后才存在——先声明 ref，之后回填。 */
   const raiseRef = useRef<((event: ViewportEvent) => void) | null>(null);
   const onUserNavigationRef = useRef(onUserNavigation);
@@ -213,12 +217,12 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
         alignTargetRef.current = null;
         resolveElRef.current = null;
         return;
-      case "reportAlignResult": {
-        const resolve = alignResolveRef.current;
-        alignResolveRef.current = null;
-        resolve?.(effect.result);
+      case "reportAlignResult":
+        // FIFO 取队首：新一轮 ALIGN_REQUESTED 产生的 "cancelled" 兑现的是**上一轮**的 Promise，
+        // 而此刻队尾已经是新一轮的 resolve。用单个 ref 存 resolve 会让新 Promise 被立即兑现为
+        // cancelled、旧 Promise 永久悬挂——队列是这里唯一正确的结构。
+        alignResolversRef.current.shift()?.(effect.result);
         return;
-      }
       case "recomputeTop":
         recomputeRef.current(true);
         return;
@@ -249,7 +253,9 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
       alignTargetRef.current = index;
       resolveElRef.current = resolveEl;
       return new Promise<AlignResult>((resolve) => {
-        alignResolveRef.current = resolve;
+        // 先入队再 raise：本轮的 resolve 排在队尾，raise 产生的 "cancelled" 效果稍后取走队首
+        // （＝上一轮的 resolve），两者各自兑现自己的 Promise。
+        alignResolversRef.current.push(resolve);
         raise({ type: "ALIGN_REQUESTED", index, owner: opts.owner });
       });
     };
@@ -310,6 +316,10 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
     () => () => {
       if (tickerRef.current) clearInterval(tickerRef.current);
       tickerRef.current = null;
+      // 卸载/换书时兑现所有在途 Promise，否则等待方（进度恢复）永远收不到结果。
+      const pending = alignResolversRef.current;
+      alignResolversRef.current = [];
+      for (const resolve of pending) resolve("cancelled");
     },
     [],
   );

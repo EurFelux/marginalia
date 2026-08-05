@@ -171,11 +171,6 @@ export function reduceViewport(state: ViewportState, event: ViewportEvent): View
   }
 }
 
-/** 只有用户拥有视口时，才随真实可视顶部向前开放 section。 */
-export function rangeLoadingEnabled(state: ViewportState): boolean {
-  return state.phase.kind === "userOwned";
-}
-
 /**
  * 深处冷启且用户尚未导航过时禁用顶部预挂载：上方 section 的迟到测高会推走恢复目标。
  * 一旦发生用户级导航即永久恢复双向 overscan。

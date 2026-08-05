@@ -42,6 +42,9 @@ export function useMachine<S, E extends { type: string }, F extends { kind: stri
   const [committed, dispatch] = useReducer(
     (current: Committed<S, F>, event: E): Committed<S, F> => {
       const { next, effects } = reduce(current.state, event);
+      // 空迁移短路：返回同一对象让 React bail out，不重渲、不打点。滚动时高频事件
+      // （节流后仍每 120ms 一次）多数是空迁移，不短路会强制重渲并淹掉诊断日志。
+      if (next === current.state && effects.length === 0) return current;
       const describe = optionsRef.current?.describeState;
       return {
         state: next,
