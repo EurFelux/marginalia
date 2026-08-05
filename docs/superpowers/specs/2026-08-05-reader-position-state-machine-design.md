@@ -202,7 +202,7 @@ const [state, raise] = useMachine(machine, init, runEffect, onTransition);
 
 **持久化竞态**：`persistProgress` 的 1 秒 debounce 留在执行器中，但到期后重新读当前 state，非 `following` 则丢弃 —— 消除「排队中的保存落在恢复期」的窗口。
 
-**进度缓存回写**：`qc.setQueryData(qk.progress(bookId), …)` 现只写 `locator`、抹掉 `percent`。执行器改为合并写入（保留原对象其余字段）。
+**进度缓存回写**：`qc.setQueryData(qk.progress(bookId), { locator })` 原样保留 —— `progressGet` 的输出契约本就只有 `{ locator: string } | null`，不存在字段丢失，仅调用点从组件迁到执行器。
 
 ### 日志
 
