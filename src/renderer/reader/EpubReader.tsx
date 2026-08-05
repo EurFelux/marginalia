@@ -99,27 +99,37 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
 
   // 把锚点级 CFI 解析回 section 内元素并精确滚到它（恢复 / 标注跳转复用）。CFI → section index →
   // VirtualDocs 等 iframe 就绪 + virtuoso 测量后收敛定位到该元素。失败退化为 section 顶。
-  const scrollToCfi = (cfi: string, onSettled?: () => void) => {
+  // owner 临时透传给 VirtualDocs 的状态机（restore=进度恢复，不计作用户导航；user=标注跳转，计）；
+  // Task 5 会重写这两处调用点，届时会理清这层临时适配。
+  const scrollToCfi = (
+    cfi: string,
+    opts: { owner: "restore" | "user" },
+    onSettled?: () => void,
+  ) => {
     if (!book) return;
     const idx = book.indexOfCfi(cfi);
     if (idx < 0) return;
     // cfiFromElement 生成的「指向元素」CFI 末段带 [id] 断言；epubjs toRange 对这类 point CFI 常返回
     // null（"No startContainer found"），故取最后一个 [id] 断言作锚点元素 id 兜底。
     const idAssertion = [...cfi.matchAll(/\[([^\]]+)\]/g)].at(-1)?.[1] ?? null;
-    vRef.current?.scrollToSectionElement(
-      idx,
-      (doc) => {
-        // 先试 rangeFromCfi（标注的 range CFI 走这条精确路）；失败再用 [id] 断言 getElementById（进度恢复）。
-        const node = book.rangeFromCfi(cfi, doc)?.startContainer ?? null;
-        const fromRange = node
-          ? node.nodeType === 1
-            ? (node as Element)
-            : node.parentElement
-          : null;
-        return fromRange ?? (idAssertion ? doc.getElementById(idAssertion) : null);
-      },
-      onSettled,
-    );
+    void vRef.current
+      ?.scrollToSectionElement(
+        idx,
+        (doc) => {
+          // 先试 rangeFromCfi（标注的 range CFI 走这条精确路）；失败再用 [id] 断言 getElementById（进度恢复）。
+          const node = book.rangeFromCfi(cfi, doc)?.startContainer ?? null;
+          const fromRange = node
+            ? node.nodeType === 1
+              ? (node as Element)
+              : node.parentElement
+            : null;
+          return fromRange ?? (idAssertion ? doc.getElementById(idAssertion) : null);
+        },
+        opts,
+      )
+      .then((result) => {
+        if (result === "settled") onSettled?.();
+      });
   };
 
   // 跳章：currentChapterId 变化（ChapterList 点击）→ 滚到对应 spine index（锚点级）。
@@ -135,7 +145,7 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
     if (!ch) return;
     const idx = book.indexOfHref(ch.href);
     if (idx < 0) return;
-    if (ch.anchor) vRef.current?.scrollToAnchor(idx, ch.anchor);
+    if (ch.anchor) void vRef.current?.scrollToAnchor(idx, ch.anchor);
     else vRef.current?.scrollToIndex(idx);
   }, [book, currentChapterId, chapters]);
 
@@ -159,7 +169,7 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
       if (target >= 0) {
         restoreTargetIndexRef.current = target;
       }
-      scrollToCfi(locator, () => {
+      scrollToCfi(locator, { owner: "restore" }, () => {
         restoreTargetIndexRef.current = null;
       });
     }
@@ -352,7 +362,7 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
       log.warn(`internal link target not found: ${href}`);
       return;
     }
-    if (anchor) vRef.current?.scrollToAnchor(targetIdx, anchor);
+    if (anchor) void vRef.current?.scrollToAnchor(targetIdx, anchor);
     else vRef.current?.scrollToIndex(targetIdx);
   };
   const onExternalLink = (url: string) => {
@@ -366,7 +376,7 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
     if (!book || !scrollCommand) return;
     restoreTargetIndexRef.current = null;
     ttsController.notifyUserNavigation();
-    scrollToCfi(scrollCommand.locator);
+    scrollToCfi(scrollCommand.locator, { owner: "user" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [book, scrollCommand]);
 
