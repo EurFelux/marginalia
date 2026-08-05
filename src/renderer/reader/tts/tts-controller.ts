@@ -14,6 +14,8 @@ export interface ReaderTtsContext {
   sectionCount: number;
   getTopSectionIndex: () => number;
   scrollToSection: (index: number) => void;
+  /** 真实滚动容器；由 VirtualDocs 提供，避免全局类选择器耦合。 */
+  getScroller: () => Element | null;
 }
 
 const SECTION_DOC_POLL_MS = 100;
@@ -31,13 +33,12 @@ function sectionFrame(index: number): HTMLIFrameElement | null {
   return document.querySelector<HTMLIFrameElement>(`[data-section-index="${index}"] iframe`);
 }
 
-function scrollerEl(): Element | null {
-  return document.querySelector(".no-scrollbar");
-}
-
 /** 视口内第一个可见段；无（图片页等）→ 0（spec §6：从该 section 第一段起）。 */
-function firstVisibleParagraph(paras: TtsParagraph[], frame: HTMLIFrameElement): number {
-  const scroller = scrollerEl();
+function firstVisibleParagraph(
+  paras: TtsParagraph[],
+  frame: HTMLIFrameElement,
+  scroller: Element | null,
+): number {
   if (!scroller) return 0;
   const frameTop = frame.getBoundingClientRect().top;
   const view = scroller.getBoundingClientRect();
@@ -100,7 +101,7 @@ class TtsController {
       return;
     }
     this.followSuspended = false;
-    this.startSection(index, paras, firstVisibleParagraph(paras, frame));
+    this.startSection(index, paras, firstVisibleParagraph(paras, frame, ctx.getScroller()));
   }
 
   pause(): void {
@@ -229,7 +230,7 @@ class TtsController {
 
   private scrollToParagraph(el: Element): void {
     const frame = sectionFrame(this.sectionIndex);
-    const scroller = scrollerEl();
+    const scroller = this.ctx?.getScroller() ?? null;
     if (!frame || !scroller) return;
     const view = scroller.getBoundingClientRect();
     const topMain = frame.getBoundingClientRect().top + el.getBoundingClientRect().top;

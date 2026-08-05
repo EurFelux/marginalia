@@ -160,6 +160,7 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
       sectionCount: book.count,
       getTopSectionIndex: () => topSectionIndexRef.current,
       scrollToSection: (i) => vRef.current?.scrollToIndex(i),
+      getScroller: () => vRef.current?.getScrollerElement() ?? null,
     });
     return () => ttsController.detach();
   }, [book]);
@@ -234,7 +235,7 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
         `[data-section-index="${sectionIndex}"] iframe`,
       );
       const doc = frame?.contentDocument;
-      const scroller = document.querySelector(".no-scrollbar");
+      const scroller = vRef.current?.getScrollerElement() ?? null;
       if (!doc?.documentElement || !frame || !scroller) return { cfi: fallback, textOffset: null };
       // 视口顶在该 section 文档内的 y：scroller 顶（主坐标）− iframe 顶（主坐标）。iframe 不内部滚动，
       // 故块元素 getBoundingClientRect().top 即其 doc 内 offsetTop，可直接与之比较。
