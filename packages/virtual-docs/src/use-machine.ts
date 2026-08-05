@@ -31,32 +31,47 @@ export function useMachine<S, E extends { type: string }, F extends { kind: stri
   runEffect: (effect: F) => void,
   options?: UseMachineOptions<S>,
 ): [S, (event: E) => void] {
-  const pending = useRef<F[]>([]);
   const runEffectRef = useRef(runEffect);
   runEffectRef.current = runEffect;
   const optionsRef = useRef(options);
   optionsRef.current = options;
 
-  const [state, dispatch] = useReducer((current: S, event: E): S => {
-    const { next, effects } = reduce(current, event);
-    if (effects.length > 0) pending.current.push(...effects);
-    const describe = optionsRef.current?.describeState;
-    optionsRef.current?.onTransition?.({
-      event: event.type,
-      from: describe ? describe(current) : "?",
-      to: describe ? describe(next) : "?",
-      effects: effects.map((e) => e.kind),
-    });
-    return next;
-  }, initial);
+  // 待办 effects 与打点素材都进 reducer 的返回值，绝不写在 reducer 体内：渲染层启用了
+  // StrictMode，React 会双调用 reducer 以暴露不纯实现——体内的副作用会跑两次（effects 入队
+  // 两份、日志打两份），而返回值只提交一次。seq 让「同一批 effects」只被排空一次。
+  const [committed, dispatch] = useReducer(
+    (current: Committed<S, F>, event: E): Committed<S, F> => {
+      const { next, effects } = reduce(current.state, event);
+      const describe = optionsRef.current?.describeState;
+      return {
+        state: next,
+        effects,
+        seq: current.seq + 1,
+        record: {
+          event: event.type,
+          from: describe ? describe(current.state) : "?",
+          to: describe ? describe(next) : "?",
+          effects: effects.map((e) => e.kind),
+        },
+      };
+    },
+    { state: initial, effects: [], seq: 0, record: null },
+  );
 
   useEffect(() => {
-    if (pending.current.length === 0) return;
-    const queue = pending.current;
-    pending.current = [];
-    for (const effect of queue) runEffectRef.current(effect);
-  });
+    if (committed.record) optionsRef.current?.onTransition?.(committed.record);
+    for (const effect of committed.effects) runEffectRef.current(effect);
+    // 按 seq 触发：同一次 dispatch 的产物只排空一次，即使前后两批 effects 内容相同。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [committed.seq]);
 
   const raise = useCallback((event: E) => dispatch(event), []);
-  return [state, raise];
+  return [committed.state, raise];
+}
+
+interface Committed<S, F> {
+  state: S;
+  effects: F[];
+  seq: number;
+  record: TransitionRecord | null;
 }
