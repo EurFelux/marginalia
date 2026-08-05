@@ -28,7 +28,7 @@
 | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/virtual-docs/src/viewport-machine.ts`（新）                | L3 纯 reducer：视口所有权 + 定位收敛。无 DOM、无 React。                                                                           |
 | `packages/virtual-docs/src/viewport-machine.test.ts`（新）           | L3 迁移规则单测。                                                                                                                  |
-| `packages/virtual-docs/src/use-machine.ts`（新）                     | 两台机共用的通用执行器 hook：`useReducer` + 顺序执行 effects + 迁移打点。仅依赖 React。                                            |
+| `packages/virtual-docs/src/use-machine.ts`（新）                     | 两台机共用的通用执行器 hook：自管状态 + 顺序执行 effects + 迁移打点。仅依赖 React。                                            |
 | `packages/virtual-docs/src/index.ts`（改）                           | 导出 `useMachine` 及其类型。                                                                                                       |
 | `packages/virtual-docs/src/VirtualDocs.tsx`（改）                    | 去掉 4 个 state/ref，改由 L3 机器驱动；新增 `getScrollerElement()`、`onTransition` prop；`scrollToSectionElement` 改返回 Promise。 |
 | `packages/virtual-docs/src/scroll-convergence.ts` + `.test.ts`（删） | 逻辑并入 L3 reducer。                                                                                                              |
@@ -504,7 +504,7 @@ git commit -m "feat(virtual-docs): add viewport ownership state machine"
   - `function useMachine<S, E extends { type: string }, F extends { kind: string }>(reduce, initial, runEffect, options?): [S, (event: E) => void]`
   - `options: { describeState?: (s: S) => string; onTransition?: (r: TransitionRecord) => void }`
 
-**背景：** 这是两台机共用的执行器。职责有三：把 reducer 接到 `useReducer`、顺序执行本次迁移产生的 effects、把迁移交给 `onTransition` 打点。**它不做任何领域判断。**
+**背景：** 这是两台机共用的执行器。职责有三：把 reducer 接进 React 的渲染循环、顺序执行本次迁移产生的 effects、把迁移交给 `onTransition` 打点。**它不做任何领域判断。**
 
 注意两个实现约束：
 
@@ -518,7 +518,7 @@ git commit -m "feat(virtual-docs): add viewport ownership state machine"
 创建 `packages/virtual-docs/src/use-machine.ts`：
 
 ```ts
-import { useCallback, useEffect, useReducer, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export interface MachineTransition<S, F> {
   next: S;
@@ -556,51 +556,46 @@ export function useMachine<S, E extends { type: string }, F extends { kind: stri
   const optionsRef = useRef(options);
   optionsRef.current = options;
 
-  // 待办 effects 与打点素材都进 reducer 的返回值，绝不写在 reducer 体内：渲染层启用了
-  // StrictMode，React 会双调用 reducer 以暴露不纯实现——体内的副作用会跑两次（effects 入队
-  // 两份、日志打两份），而返回值只提交一次。seq 让「同一批 effects」只被排空一次。
-  const [committed, dispatch] = useReducer(
-    (current: Committed<S, F>, event: E): Committed<S, F> => {
-      const { next, effects } = reduce(current.state, event);
-      // 空迁移短路：返回同一对象让 React bail out，不重渲、不打点。滚动时高频事件
-      // （节流后仍每 120ms 一次）多数是空迁移，不短路会强制重渲并淹掉诊断日志。
-      if (next === current.state && effects.length === 0) return current;
-      const describe = optionsRef.current?.describeState;
-      return {
-        state: next,
-        effects,
-        seq: current.seq + 1,
-        record: {
-          event: event.type,
-          from: describe ? describe(current.state) : "?",
-          to: describe ? describe(next) : "?",
-          effects: effects.map((e) => e.kind),
-        },
-      };
-    },
-    { state: initial, effects: [], seq: 0, record: null },
-  );
+  // 状态自管而非交给 useReducer：useReducer 在同一 React 批次内会连续调用 reducer，只提交
+  // 最后一个结果——中间那次迁移产生的 effects 会被整体丢弃（丢掉一个 startTicker 就足以让
+  // 收敛永不开始、Promise 永久悬挂）。raise 同步跑 reducer 并把 effects 累积进队列，
+  // 从根本上不受批次语义影响；raise 不是 reducer，也就不受 StrictMode 双调用约束。
+  const stateRef = useRef(initial);
+  const pending = useRef<F[]>([]);
+  const [, forceRender] = useState(0);
+
+  const raise = useCallback((event: E) => {
+    const { next, effects } = reduce(stateRef.current, event);
+    // 空迁移短路：不重渲、不打点。滚动时高频事件（节流后仍每 120ms 一次）多数是空迁移，
+    // 不短路会强制重渲并淹掉诊断日志。
+    if (next === stateRef.current && effects.length === 0) return;
+    const describe = optionsRef.current?.describeState;
+    const record: TransitionRecord = {
+      event: event.type,
+      from: describe ? describe(stateRef.current) : "?",
+      to: describe ? describe(next) : "?",
+      effects: effects.map((e) => e.kind),
+    };
+    stateRef.current = next;
+    if (effects.length > 0) pending.current.push(...effects);
+    optionsRef.current?.onTransition?.(record);
+    forceRender((n) => n + 1);
+    // reduce 由消费方在挂载时固定；随渲染变化的量都走 ref。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
-    if (committed.record) optionsRef.current?.onTransition?.(committed.record);
-    for (const effect of committed.effects) runEffectRef.current(effect);
-    // 按 seq 触发：同一次 dispatch 的产物只排空一次，即使前后两批 effects 内容相同。
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [committed.seq]);
+    if (pending.current.length === 0) return;
+    const queue = pending.current;
+    pending.current = [];
+    for (const effect of queue) runEffectRef.current(effect);
+  });
 
-  const raise = useCallback((event: E) => dispatch(event), []);
-  return [committed.state, raise];
-}
-
-interface Committed<S, F> {
-  state: S;
-  effects: F[];
-  seq: number;
-  record: TransitionRecord | null;
+  return [stateRef.current, raise];
 }
 ```
 
-⚠️ **不要把 effects 入队或打点写进 reducer 体内。** 渲染层 `src/renderer.tsx` 启用了 `StrictMode`，React 会双调用 reducer 来暴露不纯实现；被丢弃的只是返回值，reducer 体内的副作用照跑两次。日志双份会直接损害本次重构要建立的诊断能力（`pnpm dev` 正是排查跳动的环境）。
+⚠️ **`reduce` 必须保持纯函数，且不要改用 `useReducer` 托管状态。** 两个坑叠在一起：① 渲染层 `src/renderer.tsx` 启用了 `StrictMode`，React 会双调用 reducer 来暴露不纯实现，写在 reducer 体内的副作用会跑两次；② `useReducer` 在同一批次内连续调用 reducer 却只提交最后一个结果，中间那次迁移的 effects 会被整体丢弃——丢掉一个 `startTicker` 就足以让收敛永不开始、Promise 永久悬挂。自管状态同时避开这两条。
 
 - [ ] **Step 2: 从包入口导出**
 
@@ -766,10 +761,12 @@ const runViewportEffect = (effect: ViewportEffect) => {
       return;
     }
     case "stopTicker":
+      // 只停表，不碰 alignTargetRef / resolveElRef：新一轮 ALIGN_REQUESTED 在 raise 之前就同步
+      // 写好了新的 target 与解析器，而它产生的 stopTicker 效果要到提交后才执行——在这里清空
+      // 等于把**新一轮**的定位目标抹掉，measureAlignment 从此恒返回未对齐，收敛机会持续 30 秒
+      // 把视口反复拽回 section 顶。二者由下一次 ALIGN_REQUESTED 覆盖即可，无需清理。
       if (tickerRef.current) clearInterval(tickerRef.current);
       tickerRef.current = null;
-      alignTargetRef.current = null;
-      resolveElRef.current = null;
       return;
     case "reportAlignResult":
       // FIFO 取队首：新一轮 ALIGN_REQUESTED 产生的 "cancelled" 兑现的是**上一轮**的 Promise，
@@ -1361,13 +1358,23 @@ export function useReadingPosition({
 
   const runEffect = (effect: ReadingPositionEffect) => {
     switch (effect.kind) {
-      case "restoreToCfi":
-        void vRef.current
-          ?.scrollToSectionElement(effect.targetIndex, resolveCfiElement(effect.locator), {
+      case "restoreToCfi": {
+        const handle = vRef.current;
+        // handle 缺失时必须自己发终结事件：可选链短路会让 RESTORE_FINISHED 永不到达，
+        // 状态永久卡在 restoring、进度从此不再保存——正是本次要消灭的那类缺陷。
+        if (!handle) {
+          raiseRef.current?.({ type: "RESTORE_FINISHED", result: "cancelled" });
+          return;
+        }
+        // owner: "restore" 表示这次定位由系统发起，不计作用户导航——据此保持顶部 overscan 为 0，
+        // 避免上方 section 的迟到测高把恢复目标推走。用户主动跳转则传 "user"。
+        void handle
+          .scrollToSectionElement(effect.targetIndex, resolveCfiElement(effect.locator), {
             owner: "restore",
           })
           .then((result) => raiseRef.current?.({ type: "RESTORE_FINISHED", result }));
         return;
+      }
       case "scrollToAnnotation": {
         const index = book?.indexOfCfi(effect.locator) ?? -1;
         if (index < 0) return;
