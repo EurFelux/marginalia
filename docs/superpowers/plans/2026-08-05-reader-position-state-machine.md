@@ -65,7 +65,6 @@ Task 2 依赖 Task 1（要从包入口再导出 `AlignResult`）。Task 4 与 Ta
   - `type ViewportPhase`、`interface ViewportState`、`type ViewportEvent`、`type ViewportEffect`、`interface ViewportTransition`
   - `function initialViewportState(initialIndex: number): ViewportState`
   - `function reduceViewport(state: ViewportState, event: ViewportEvent): ViewportTransition`
-  - `function rangeLoadingEnabled(state: ViewportState): boolean`
   - `function overscanTop(state: ViewportState, initialIndex: number, fullTop: number): number`
   - 常量 `ALIGN_MINIMUM_ATTEMPTS = 60`、`ALIGN_SUCCESSES_REQUIRED = 5`、`ALIGN_MAX_ATTEMPTS = 300`
 
@@ -85,7 +84,6 @@ import {
   ALIGN_SUCCESSES_REQUIRED,
   initialViewportState,
   overscanTop,
-  rangeLoadingEnabled,
   reduceViewport,
   type ViewportEvent,
   type ViewportState,
@@ -266,14 +264,14 @@ describe("reduceViewport", () => {
     expect(effects).toEqual([{ kind: "scrollToIndex", index: 3 }]);
   });
 
-  it("derives range loading and overscan from the phase", () => {
+  it("derives overscan from the navigation latch", () => {
     const initial = initialViewportState(40);
-    expect(rangeLoadingEnabled(initial)).toBe(false);
+    // 深处冷启且用户未导航过 → 禁用顶部预挂载，防上方 section 的迟到测高推走恢复目标。
     expect(overscanTop(initial, 40, 2400)).toBe(0);
+    // 从头开书没有这个风险，照常双向预挂载。
     expect(overscanTop(initial, 0, 2400)).toBe(2400);
 
     const owned = reduceViewport(initial, { type: "USER_INPUT", scrollIntent: true }).next;
-    expect(rangeLoadingEnabled(owned)).toBe(true);
     expect(overscanTop(owned, 40, 2400)).toBe(2400);
   });
 });
@@ -462,11 +460,6 @@ export function reduceViewport(state: ViewportState, event: ViewportEvent): View
   }
 }
 
-/** 只有用户拥有视口时，才随真实可视顶部向前开放 section。 */
-export function rangeLoadingEnabled(state: ViewportState): boolean {
-  return state.phase.kind === "userOwned";
-}
-
 /**
  * 深处冷启且用户尚未导航过时禁用顶部预挂载：上方 section 的迟到测高会推走恢复目标。
  * 一旦发生用户级导航即永久恢复双向 overscan。
@@ -479,7 +472,7 @@ export function overscanTop(state: ViewportState, initialIndex: number, fullTop:
 - [ ] **Step 4: 跑测试确认通过**
 
 Run: `pnpm test packages/virtual-docs/src/viewport-machine.test.ts`
-Expected: PASS，14 个用例全绿
+Expected: PASS，14 个用例全绿（其中一条覆盖 overscan 派生）
 
 - [ ] **Step 5: 类型检查**
 
@@ -569,6 +562,9 @@ export function useMachine<S, E extends { type: string }, F extends { kind: stri
   const [committed, dispatch] = useReducer(
     (current: Committed<S, F>, event: E): Committed<S, F> => {
       const { next, effects } = reduce(current.state, event);
+      // 空迁移短路：返回同一对象让 React bail out，不重渲、不打点。滚动时高频事件
+      // （节流后仍每 120ms 一次）多数是空迁移，不短路会强制重渲并淹掉诊断日志。
+      if (next === current.state && effects.length === 0) return current;
       const describe = optionsRef.current?.describeState;
       return {
         state: next,
@@ -649,7 +645,7 @@ git commit -m "feat(virtual-docs): add shared machine executor hook"
 
 **Interfaces:**
 
-- Consumes: Task 1 的 `reduceViewport` / `initialViewportState` / `rangeLoadingEnabled` / `overscanTop` / `AlignResult`；Task 2 的 `useMachine`
+- Consumes: Task 1 的 `reduceViewport` / `initialViewportState` / `overscanTop` / `AlignResult`；Task 2 的 `useMachine`
 - Produces（`VirtualDocsHandle` 的新形态）：
   - `scrollToIndex(index: number): void`
   - `scrollToAnchor(index: number, anchorId: string): Promise<AlignResult>`
@@ -660,12 +656,12 @@ git commit -m "feat(virtual-docs): add shared machine executor hook"
 
 **背景：** 这是本计划风险最高的一步 —— 要在保持行为等价的前提下换掉 4 个 state/ref。逐项对照：
 
-| 旧                                           | 新                                                  |
-| -------------------------------------------- | --------------------------------------------------- |
-| `cancelScrollRef` + `startScrollConvergence` | `aligning` 相位 + ticker effect                     |
-| `loadedFromIndex` (useState)                 | `state.loadedFromIndex`                             |
-| `rangeLoadingEnabledRef`                     | `rangeLoadingEnabled(state)`                        |
-| `userNavigationStarted` (useState)           | `overscanTop(state, initialIndex, OVERSCAN_PX.top)` |
+| 旧                                           | 新                                                                |
+| -------------------------------------------- | ----------------------------------------------------------------- |
+| `cancelScrollRef` + `startScrollConvergence` | `aligning` 相位 + ticker effect                                   |
+| `loadedFromIndex` (useState)                 | `state.loadedFromIndex`                                           |
+| `rangeLoadingEnabledRef`                     | reducer 内联判断（`VISIBLE_TOP_CHANGED` 仅在 `userOwned` 下推进） |
+| `userNavigationStarted` (useState)           | `overscanTop(state, initialIndex, OVERSCAN_PX.top)`               |
 
 `attempt()` 里的 DOM 几何计算**留在执行器**（reducer 不碰 DOM），但只负责算出 `aligned` 与 `offset`，不再自己决定重发。
 
@@ -683,7 +679,6 @@ import { startScrollConvergence } from "./scroll-convergence";
 import {
   initialViewportState,
   overscanTop,
-  rangeLoadingEnabled,
   reduceViewport,
   type AlignResult,
   type ViewportEffect,
@@ -721,8 +716,12 @@ const cancelPendingScroll = useCallback(() => {
 const tickerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 const resolveElRef = useRef<((doc: Document) => Element | null) | null>(null);
 const alignTargetRef = useRef<number | null>(null);
-/** scrollToSectionElement 返回的 Promise 的兑现函数；由 reportAlignResult 效果兑现。 */
-const alignResolveRef = useRef<((result: AlignResult) => void) | null>(null);
+/**
+ * scrollToSectionElement 返回的 Promise 的兑现函数队列（FIFO）。必须是队列而非单个 ref：
+ * 新一轮 ALIGN_REQUESTED 会产生一个兑现**上一轮**的 "cancelled" 效果，而效果在提交后才执行，
+ * 那时新一轮的 resolve 已经写入——单 ref 会让新 Promise 被立即兑现、旧 Promise 永久悬挂。
+ */
+const alignResolversRef = useRef<((result: AlignResult) => void)[]>([]);
 /** ticker 回调里要用 raise，但它在 useMachine 之后才存在——先声明 ref，之后回填。 */
 const raiseRef = useRef<((event: ViewportEvent) => void) | null>(null);
 ```
@@ -772,12 +771,12 @@ const runViewportEffect = (effect: ViewportEffect) => {
       alignTargetRef.current = null;
       resolveElRef.current = null;
       return;
-    case "reportAlignResult": {
-      const resolve = alignResolveRef.current;
-      alignResolveRef.current = null;
-      resolve?.(effect.result);
+    case "reportAlignResult":
+      // FIFO 取队首：新一轮 ALIGN_REQUESTED 产生的 "cancelled" 兑现的是**上一轮**的 Promise，
+      // 而此刻队尾已经是新一轮的 resolve。用单个 ref 存 resolve 会让新 Promise 被立即兑现为
+      // cancelled、旧 Promise 永久悬挂——队列是这里唯一正确的结构。
+      alignResolversRef.current.shift()?.(effect.result);
       return;
-    }
     case "recomputeTop":
       recomputeRef.current(true);
       return;
@@ -824,7 +823,9 @@ useImperativeHandle(ref, () => {
     alignTargetRef.current = index;
     resolveElRef.current = resolveEl;
     return new Promise<AlignResult>((resolve) => {
-      alignResolveRef.current = resolve;
+      // 先入队再 raise：本轮的 resolve 排在队尾，raise 产生的 "cancelled" 效果稍后取走队首
+      // （＝上一轮的 resolve），两者各自兑现自己的 Promise。
+      alignResolversRef.current.push(resolve);
       raise({ type: "ALIGN_REQUESTED", index, owner: opts.owner });
     });
   };
@@ -839,7 +840,7 @@ useImperativeHandle(ref, () => {
 }, [raise]);
 ```
 
-注意 `alignResolveRef` 的赋值必须在 `raise` **之前**：`ALIGN_REQUESTED` 会同步产生 `reportAlignResult:"cancelled"` 效果去兑现**上一轮**的 Promise，若顺序颠倒会把新 Promise 当成旧的兑现掉。effects 在提交后才执行，故此处赋值顺序足够安全 —— 但仍按此顺序书写以免后续改动踩坑。
+⚠️ **兑现函数必须存成 FIFO 队列，不能用单个 ref。** effects 在提交后才排空，那时新一轮的 resolve 早已就位；若用单 ref，`ALIGN_REQUESTED` 产生的 `reportAlignResult:"cancelled"` 会读到**新** resolve，把新 Promise 立即兑现为 cancelled，而上一轮的 Promise 永久悬挂。触发路径很实际：恢复收敛期间（最长 30 秒）点一下标注列表就会二次调用本方法。
 
 同步更新 `VirtualDocsHandle` 接口：
 
@@ -905,6 +906,10 @@ useEffect(
   () => () => {
     if (tickerRef.current) clearInterval(tickerRef.current);
     tickerRef.current = null;
+    // 卸载/换书时兑现所有在途 Promise，否则等待方（进度恢复）永远收不到结果。
+    const pending = alignResolversRef.current;
+    alignResolversRef.current = [];
+    for (const resolve of pending) resolve("cancelled");
   },
   [],
 );
