@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export interface MachineTransition<S, F> {
   next: S;
@@ -36,45 +36,40 @@ export function useMachine<S, E extends { type: string }, F extends { kind: stri
   const optionsRef = useRef(options);
   optionsRef.current = options;
 
-  // 待办 effects 与打点素材都进 reducer 的返回值，绝不写在 reducer 体内：渲染层启用了
-  // StrictMode，React 会双调用 reducer 以暴露不纯实现——体内的副作用会跑两次（effects 入队
-  // 两份、日志打两份），而返回值只提交一次。seq 让「同一批 effects」只被排空一次。
-  const [committed, dispatch] = useReducer(
-    (current: Committed<S, F>, event: E): Committed<S, F> => {
-      const { next, effects } = reduce(current.state, event);
-      // 空迁移短路：返回同一对象让 React bail out，不重渲、不打点。滚动时高频事件
-      // （节流后仍每 120ms 一次）多数是空迁移，不短路会强制重渲并淹掉诊断日志。
-      if (next === current.state && effects.length === 0) return current;
-      const describe = optionsRef.current?.describeState;
-      return {
-        state: next,
-        effects,
-        seq: current.seq + 1,
-        record: {
-          event: event.type,
-          from: describe ? describe(current.state) : "?",
-          to: describe ? describe(next) : "?",
-          effects: effects.map((e) => e.kind),
-        },
-      };
-    },
-    { state: initial, effects: [], seq: 0, record: null },
-  );
+  // 状态自管而非交给 useReducer：useReducer 在同一 React 批次内会连续调用 reducer，只提交
+  // 最后一个结果——中间那次迁移产生的 effects 会被整体丢弃（丢掉一个 startTicker 就足以让
+  // 收敛永不开始、Promise 永久悬挂）。raise 同步跑 reducer 并把 effects 累积进队列，
+  // 从根本上不受批次语义影响；raise 不是 reducer，也就不受 StrictMode 双调用约束。
+  const stateRef = useRef(initial);
+  const pending = useRef<F[]>([]);
+  const [, forceRender] = useState(0);
+
+  const raise = useCallback((event: E) => {
+    const { next, effects } = reduce(stateRef.current, event);
+    // 空迁移短路：不重渲、不打点。滚动时高频事件（节流后仍每 120ms 一次）多数是空迁移，
+    // 不短路会强制重渲并淹掉诊断日志。
+    if (next === stateRef.current && effects.length === 0) return;
+    const describe = optionsRef.current?.describeState;
+    const record: TransitionRecord = {
+      event: event.type,
+      from: describe ? describe(stateRef.current) : "?",
+      to: describe ? describe(next) : "?",
+      effects: effects.map((e) => e.kind),
+    };
+    stateRef.current = next;
+    if (effects.length > 0) pending.current.push(...effects);
+    optionsRef.current?.onTransition?.(record);
+    forceRender((n) => n + 1);
+    // reduce 由消费方在挂载时固定；随渲染变化的量都走 ref。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
-    if (committed.record) optionsRef.current?.onTransition?.(committed.record);
-    for (const effect of committed.effects) runEffectRef.current(effect);
-    // 按 seq 触发：同一次 dispatch 的产物只排空一次，即使前后两批 effects 内容相同。
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [committed.seq]);
+    if (pending.current.length === 0) return;
+    const queue = pending.current;
+    pending.current = [];
+    for (const effect of queue) runEffectRef.current(effect);
+  });
 
-  const raise = useCallback((event: E) => dispatch(event), []);
-  return [committed.state, raise];
-}
-
-interface Committed<S, F> {
-  state: S;
-  effects: F[];
-  seq: number;
-  record: TransitionRecord | null;
+  return [stateRef.current, raise];
 }

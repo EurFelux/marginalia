@@ -212,10 +212,12 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
         return;
       }
       case "stopTicker":
+        // 只停表，不碰 alignTargetRef / resolveElRef：新一轮 ALIGN_REQUESTED 在 raise 之前就同步
+        // 写好了新的 target 与解析器，而它产生的 stopTicker 效果要到提交后才执行——在这里清空
+        // 等于把**新一轮**的定位目标抹掉，measureAlignment 从此恒返回未对齐，收敛机会持续 30 秒
+        // 把视口反复拽回 section 顶。二者由下一次 ALIGN_REQUESTED 覆盖即可，无需清理。
         if (tickerRef.current) clearInterval(tickerRef.current);
         tickerRef.current = null;
-        alignTargetRef.current = null;
-        resolveElRef.current = null;
         return;
       case "reportAlignResult":
         // FIFO 取队首：新一轮 ALIGN_REQUESTED 产生的 "cancelled" 兑现的是**上一轮**的 Promise，

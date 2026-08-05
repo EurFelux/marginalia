@@ -28,7 +28,7 @@
 | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/virtual-docs/src/viewport-machine.ts`（新）                | L3 纯 reducer：视口所有权 + 定位收敛。无 DOM、无 React。                                                                           |
 | `packages/virtual-docs/src/viewport-machine.test.ts`（新）           | L3 迁移规则单测。                                                                                                                  |
-| `packages/virtual-docs/src/use-machine.ts`（新）                     | 两台机共用的通用执行器 hook：自管状态 + 顺序执行 effects + 迁移打点。仅依赖 React。                                            |
+| `packages/virtual-docs/src/use-machine.ts`（新）                     | 两台机共用的通用执行器 hook：自管状态 + 顺序执行 effects + 迁移打点。仅依赖 React。                                                |
 | `packages/virtual-docs/src/index.ts`（改）                           | 导出 `useMachine` 及其类型。                                                                                                       |
 | `packages/virtual-docs/src/VirtualDocs.tsx`（改）                    | 去掉 4 个 state/ref，改由 L3 机器驱动；新增 `getScrollerElement()`、`onTransition` prop；`scrollToSectionElement` 改返回 Promise。 |
 | `packages/virtual-docs/src/scroll-convergence.ts` + `.test.ts`（删） | 逻辑并入 L3 reducer。                                                                                                              |

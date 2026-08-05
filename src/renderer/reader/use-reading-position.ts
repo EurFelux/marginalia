@@ -52,13 +52,23 @@ export function useReadingPosition({
 
   const runEffect = (effect: ReadingPositionEffect) => {
     switch (effect.kind) {
-      case "restoreToCfi":
-        void vRef.current
-          ?.scrollToSectionElement(effect.targetIndex, resolveCfiElement(effect.locator), {
+      case "restoreToCfi": {
+        const handle = vRef.current;
+        // handle 缺失时必须自己发终结事件：可选链短路会让 RESTORE_FINISHED 永不到达，
+        // 状态永久卡在 restoring、进度从此不再保存——正是本次要消灭的那类缺陷。
+        if (!handle) {
+          raiseRef.current?.({ type: "RESTORE_FINISHED", result: "cancelled" });
+          return;
+        }
+        // owner: "restore" 表示这次定位由系统发起，不计作用户导航——据此保持顶部 overscan 为 0，
+        // 避免上方 section 的迟到测高把恢复目标推走。用户主动跳转则传 "user"。
+        void handle
+          .scrollToSectionElement(effect.targetIndex, resolveCfiElement(effect.locator), {
             owner: "restore",
           })
           .then((result) => raiseRef.current?.({ type: "RESTORE_FINISHED", result }));
         return;
+      }
       case "scrollToAnnotation": {
         const index = book?.indexOfCfi(effect.locator) ?? -1;
         if (index < 0) return;
