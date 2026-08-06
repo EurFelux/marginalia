@@ -2,6 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **已被推翻（2026-08-06）：** 本计划让打开会话的一次性滚动使用 `smooth`，但 smooth 的中间帧
+> 会落在无限列表「接近顶部」的阈值内，使打开长会话时必然多触发一页历史加载，而该加载的锚点恢复
+> 又直接写 `scrollTop`、把动画取消在半途——首屏因此永远停不到底部。`conversationOpenScrollBehavior()`
+> 现返回 `"instant"`。本文件仅作历史记录，勿据此改回 smooth。
+
 **Goal:** Preserve smooth scrolling for the one-shot bottom positioning after an existing conversation renders, while keeping every message-update and streaming follow scroll instant.
 
 **Architecture:** Keep both behavior choices in the pure renderer scroll policy module. `AIPanel` continues to own timing and DOM access: message updates call the existing policy, while the conversation-opening timeout calls a dedicated one-shot policy after stopping the active stream and waiting for layout.

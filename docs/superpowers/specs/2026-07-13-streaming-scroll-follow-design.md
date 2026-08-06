@@ -25,8 +25,14 @@ bottom must remain.
   bottom does not count.
 - Automatic scrolling caused by message updates never uses smooth scrolling. Its intermediate
   animation frames must not participate in follow-state detection.
-- The one-shot scroll after opening and rendering conversation history may remain smooth because that
-  path stops any active stream before loading and does not compete with incoming chunks.
+- ~~The one-shot scroll after opening and rendering conversation history may remain smooth because that
+  path stops any active stream before loading and does not compete with incoming chunks.~~
+  **Superseded 2026-08-06: the one-shot scroll after opening must also be instant.** The original
+  argument only weighed competition with incoming chunks and missed a second competitor — the
+  infinite-scroll history loader. A smooth scroll starts at `scrollTop = 0`, and its opening frames
+  are still within the loader's near-top threshold, so opening a long conversation always triggered
+  one spurious page load; that load's anchor restore then wrote `scrollTop` directly and cancelled
+  the animation mid-flight, leaving the panel permanently short of the bottom.
 - Loading older messages continues to preserve its existing visible-message anchor and never enables
   bottom following accidentally.
 

@@ -85,7 +85,10 @@ describe("messageScrollBehavior", () => {
 });
 
 describe("conversationOpenScrollBehavior", () => {
-  it("uses smooth scrolling for the one-shot history render", () => {
-    expect(conversationOpenScrollBehavior()).toBe("smooth");
+  // smooth 会分帧滚动，途中每一帧都派发 scroll 事件；起始几帧的 scrollTop 仍在「接近顶部」的
+  // 阈值内，会误触发无限列表的上翻加载，而其锚点恢复又直接写 scrollTop、把动画取消在半途——
+  // 首屏因此既多加载一页、又永远到不了底。一次到位不产生中间帧，两个症状同时消失。
+  it("jumps instantly so the one-shot history render never lands near the top", () => {
+    expect(conversationOpenScrollBehavior()).toBe("instant");
   });
 });
