@@ -1,5 +1,12 @@
 # marginalia
 
+## 0.18.2
+
+### Patch Changes
+
+- 3bb8cc9: Open long conversations directly at the newest message instead of starting at the top, which also stops the panel from loading a spurious extra page of history.
+- 4875910: Fix reading progress silently not being saved after a slow position restore times out.
+
 ## 0.18.1
 
 ### Patch Changes
