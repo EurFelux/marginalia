@@ -30,15 +30,27 @@ export default defineConfig({
     alias: [
       { find: "@shared", replacement: path.resolve(__dirname, "src/shared") },
       { find: "@renderer", replacement: path.resolve(__dirname, "src/renderer") },
+      // 直指源码入口，绕开 node_modules 软链：经软链解析时 Vite 视其为 dep，给 URL 挂 `?v=<browserHash>`
+      // 并回 `Cache-Control: max-age=31536000,immutable`。browserHash 只由 configHash+lockfileHash 决定，
+      // 改包源码不会变 → 同 URL 命中渲染进程强缓存，dev server 已供新代码而页面仍跑旧副本
+      // （典型症状：`does not provide an export named 'xxx'`，而该 export 明明存在）。
+      // 走 alias 后它是普通源码模块，无 `?v=`、无强缓存，HMR 正常。
+      {
+        find: "@marginalia/virtual-docs",
+        replacement: path.resolve(__dirname, "packages/virtual-docs/src/index.ts"),
+      },
     ],
   },
   // 工作区源码包（经软链消费）不要预打包：Vite 会 bundle 进 .vite/deps 并缓存，缓存失效只看
   // lockfile/config、不看软链源码 mtime——改了包源码运行时仍用旧产物。排除后 Vite 从源码直供，
-  // 源码改动即时生效、HMR 正常。
+  // 源码改动即时生效。
   // epub-parser 已预构建为自包含 ESM（dist/index.js，node-html-parser 等 CJS 依赖 build 期内联），
   // 故无需再 include 其 CJS 传递依赖；仍 exclude 以避软链 dist 的 stale 缓存。
+  // 注意 exclude 只挡预打包、挡不住上面 alias 注释里说的 immutable 强缓存；epub-parser 改 dist 后
+  // 若遇同类幻影 stale，清 node_modules/.vite 重启即可（其 dist 由 watcher 重建，不像源码包那样高频）。
+  // virtual-docs 已走 alias 直指源码，不再需要 exclude。
   // pdf-parser 渲染层不消费（仅主进程经 Rollup bundle），不在此列。
   optimizeDeps: {
-    exclude: ["@marginalia/virtual-docs", "@marginalia/epub-parser"],
+    exclude: ["@marginalia/epub-parser"],
   },
 });
