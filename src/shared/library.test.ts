@@ -62,8 +62,9 @@ describe("reading session contracts", () => {
       readingReportStateSchema.parse({
         status: "regeneration-failed",
         content: "# Kept",
+        progress: [],
         reason: "offline",
       }),
-    ).toEqual({ status: "regeneration-failed", content: "# Kept" });
+    ).toEqual({ status: "regeneration-failed", content: "# Kept", progress: [] });
   });
 });

@@ -94,7 +94,7 @@ function setup(options: { report?: string; evidence?: boolean } = {}) {
     },
     runAgent,
     createInvestigator: () => async () => null,
-    runtime: new ReadingReportRuntime(),
+    runtime: new ReadingReportRuntime(() => instant("2026-07-03T00:00:00Z").epochMilliseconds),
     now: () => instant("2026-07-03T00:00:00Z"),
   };
   // 主 agent 不占后台并发池（它是前台任务），故不能只靠 background 数组等它跑完；
@@ -116,7 +116,11 @@ describe("reading report service", () => {
 
     expect(getReadingSessionDetail(deps, session.id).report).toEqual({ status: "empty" });
     expect(startReadingReportGeneration(deps, session.id)).toEqual({ outcome: "accepted" });
-    expect(getReadingSessionDetail(deps, session.id).report).toEqual({ status: "generating" });
+    expect(getReadingSessionDetail(deps, session.id).report).toEqual({
+      status: "generating",
+      startedAt: instant("2026-07-03T00:00:00Z").epochMilliseconds,
+      progress: [],
+    });
     task.resolve(" # What stayed with me ");
     await drain();
     expect(getReadingSessionDetail(deps, session.id).report).toEqual({
@@ -132,12 +136,15 @@ describe("reading report service", () => {
     expect(getReadingSessionDetail(deps, session.id).report).toEqual({
       status: "regenerating",
       content: "# Old",
+      startedAt: instant("2026-07-03T00:00:00Z").epochMilliseconds,
+      progress: [],
     });
     task.reject(new Error("network down"));
     await drain();
     expect(getReadingSessionDetail(deps, session.id).report).toEqual({
       status: "regeneration-failed",
       content: "# Old",
+      progress: [],
     });
   });
 
@@ -166,6 +173,7 @@ describe("reading report service", () => {
     expect(getReadingSessionDetail(deps, session.id).report).toEqual({
       status: "regeneration-failed",
       content: "# Existing",
+      progress: [],
     });
     expect(startReadingReportGeneration(deps, session.id)).toEqual({
       outcome: "insufficient-evidence",
@@ -182,6 +190,7 @@ describe("reading report service", () => {
     expect(startReadingReportGeneration(deps, session.id)).toEqual({ outcome: "unavailable" });
     expect(getReadingSessionDetail(deps, session.id).report).toEqual({
       status: "generation-failed",
+      progress: [],
     });
     expect(saveUserReadingReport(deps, session.id, " # Written ").report).toEqual({
       status: "ready",
@@ -406,6 +415,7 @@ describe("reading report service", () => {
     expect(getReadingSessionDetail(deps, session.id).report).toEqual({
       status: "regeneration-failed",
       content: "# Old",
+      progress: [],
     });
     expect(getMemoryBySlug(deps.db, "durable-insight")?.body).toBe("External update.");
   });
