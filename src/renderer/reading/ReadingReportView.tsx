@@ -30,6 +30,7 @@ import { createLogger } from "@renderer/logger";
 import { formatDuration } from "@renderer/stats/format-duration";
 import { useNavigationStore } from "@renderer/store/navigation-store";
 import { ReportEditor } from "./ReportEditor";
+import { ReportProgressTimeline } from "./ReportProgressTimeline";
 import { reportViewModel } from "./report-view-model";
 
 const log = createLogger("reading");
@@ -280,14 +281,19 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
                   onSave={(content) => void save(content)}
                   onCancel={() => setEditing(false)}
                 />
-              ) : model.content ? (
-                <LocalizedStreamdown className="font-serif leading-8">
-                  {model.content}
-                </LocalizedStreamdown>
               ) : (
-                <div className="flex flex-1 items-center justify-center text-center text-sm text-muted-foreground">
-                  {model.busy ? t("readingReport.generating") : t("readingReport.empty")}
-                </div>
+                <>
+                  <ReportProgressTimeline progress={model.progress} startedAt={model.startedAt} />
+                  {model.content ? (
+                    <LocalizedStreamdown className="font-serif leading-8">
+                      {model.content}
+                    </LocalizedStreamdown>
+                  ) : model.progress.length === 0 && !model.busy ? (
+                    <div className="flex flex-1 items-center justify-center text-center text-sm text-muted-foreground">
+                      {t("readingReport.empty")}
+                    </div>
+                  ) : null}
+                </>
               )}
             </CardContent>
             <CardFooter className="justify-end gap-2">
