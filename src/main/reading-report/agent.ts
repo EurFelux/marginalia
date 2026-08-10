@@ -26,7 +26,9 @@ export async function runReadingReportAgent(input: RunReadingReportAgentInput): 
     providerOptions: providerCallOptions(input.resolved.providerType),
     abortSignal: input.abortSignal,
     stopWhen: isStepCount(10),
-    maxOutputTokens: 4096,
+    // 刻意不设 maxOutputTokens（对齐 stream-assistant，走 provider 默认）：推理模型的思考 token 与正文
+    // 共享该预算，而写报告那步的上下文最大（前若干步的全部工具结果），思考会把小额度吃光、正文一字不出
+    // ——表现为 finishReason=length + text 为空，然后被下面的空文本检查报成误导性的 "empty text"。
     maxRetries: 1,
     onStepFinish: ({ finishReason, toolCalls, text }) => {
       log.debug(
