@@ -14,6 +14,7 @@ import {
 } from "@main/db/schema";
 import { importBook } from "@main/library/repository";
 import { createReadingReportTools } from "@main/reading-report/tools";
+import type { Investigate } from "@main/reading-report/investigation-runner";
 import type { LoadBytes } from "@main/ai/tools";
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
@@ -125,11 +126,19 @@ async function setupEpub() {
     if (bookId !== book.id) throw new Error("attempted to load another book");
     return bytes;
   });
-  const tools = createReadingReportTools({ db, session, loadBytes, imageToolResults: false });
+  const investigate = vi.fn<Investigate>(async () => null);
+  const tools = createReadingReportTools({
+    db,
+    session,
+    loadBytes,
+    imageToolResults: false,
+    investigate,
+  });
   return {
     db,
     book,
     session,
+    investigate,
     previous,
     later,
     reportless,
@@ -211,6 +220,44 @@ describe("createReadingReportTools", () => {
     expect(schema.safeParse({ conversationId: "c", limit: 51 }).success).toBe(false);
     expect(schema.safeParse({ conversationId: "c", afterSeq: -1 }).success).toBe(false);
   });
+
+  it("returns an investigation and forwards the caller's focus", async () => {
+    const { tools, investigate } = await setupEpub();
+    investigate.mockResolvedValueOnce({
+      topic: "determinism",
+      points: [],
+      coverage: { fromSeq: 0, toSeq: 3, messagesRead: 4, truncated: false },
+    });
+
+    const result = await tools.investigateConversation.execute!(
+      { conversationId: "conversation-in-window", focus: "their objection" },
+      opts,
+    );
+
+    expect(investigate).toHaveBeenCalledWith({
+      conversationId: "conversation-in-window",
+      focus: "their objection",
+    });
+    expect(result).toEqual(expect.objectContaining({ status: "ok", topic: "determinism" }));
+  });
+
+  it("degrades to busy when no concurrency slot was granted", async () => {
+    const { tools, investigate } = await setupEpub();
+    investigate.mockResolvedValueOnce(null);
+
+    expect(await tools.investigateConversation.execute!({ conversationId: "c" }, opts)).toEqual(
+      expect.objectContaining({ status: "busy", suggestion: expect.any(String) }),
+    );
+  });
+
+  it("degrades to failed instead of breaking the report when investigation throws", async () => {
+    const { tools, investigate } = await setupEpub();
+    investigate.mockRejectedValueOnce(new Error("model exploded"));
+
+    expect(await tools.investigateConversation.execute!({ conversationId: "c" }, opts)).toEqual(
+      expect.objectContaining({ status: "failed", suggestion: expect.any(String) }),
+    );
+  });
 });
 
 describe("PDF report tools", () => {
@@ -228,7 +275,13 @@ describe("PDF report tools", () => {
       if (bookId !== book.id) throw new Error("attempted to load another book");
       return bytes;
     });
-    const tools = createReadingReportTools({ db, session, loadBytes, imageToolResults: true });
+    const tools = createReadingReportTools({
+      db,
+      session,
+      loadBytes,
+      imageToolResults: true,
+      investigate: async () => null,
+    });
     if (!("readPage" in tools)) throw new Error("readPage missing");
 
     expect("listAnnotations" in tools).toBe(true);

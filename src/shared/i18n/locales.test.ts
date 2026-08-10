@@ -56,6 +56,41 @@ const englishTask6PluralKeys = ["readingSession.days_one", "readingSession.days_
 
 const chineseTask6PluralKeys = ["readingSession.days"] as const;
 
+const reportProgressKeys = [
+  "readingReport.progress.elapsed",
+  "readingReport.progress.skipped",
+  "readingReport.progress.title",
+  "readingReport.progress.tool.getBookSummary",
+  "readingReport.progress.tool.getChapterSummary",
+  "readingReport.progress.tool.getPreviousReadingReport",
+  "readingReport.progress.tool.getSessionReadingStats",
+  "readingReport.progress.tool.getToc",
+  "readingReport.progress.tool.investigateConversation",
+  "readingReport.progress.tool.listAnnotations",
+  "readingReport.progress.tool.listBookNotes",
+  "readingReport.progress.tool.listConversations",
+  "readingReport.progress.tool.listPreviousReadingSessions",
+  "readingReport.progress.tool.readChapterText",
+  "readingReport.progress.tool.readConversation",
+  "readingReport.progress.tool.readMemory",
+  "readingReport.progress.tool.readPage",
+  "readingReport.progress.tool.saveMemory",
+  "readingReport.progress.tool.unknown",
+  "readingReport.progress.tool.updateMemory",
+] as const;
+
+const englishReportProgressPluralKeys = [
+  "readingReport.progress.count_one",
+  "readingReport.progress.count_other",
+  "readingReport.progress.steps_one",
+  "readingReport.progress.steps_other",
+] as const;
+
+const chineseReportProgressPluralKeys = [
+  "readingReport.progress.count",
+  "readingReport.progress.steps",
+] as const;
+
 const restoreKindKeys = ["settings.backup.kindCompact", "settings.backup.kindFull"] as const;
 
 const englishRestoreConfirmationKeys = [
@@ -92,6 +127,15 @@ describe("locale completeness", () => {
     }
     for (const key of englishTask6PluralKeys) expectNonEmptyString(en, key);
     for (const key of chineseTask6PluralKeys) expectNonEmptyString(zhCN, key);
+  });
+
+  it("provides non-empty copy for the report generation timeline", () => {
+    for (const key of reportProgressKeys) {
+      expectNonEmptyString(en, key);
+      expectNonEmptyString(zhCN, key);
+    }
+    for (const key of englishReportProgressPluralKeys) expectNonEmptyString(en, key);
+    for (const key of chineseReportProgressPluralKeys) expectNonEmptyString(zhCN, key);
   });
 
   it("keeps restore confirmation keys used by both locales", () => {

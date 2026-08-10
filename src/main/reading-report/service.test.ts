@@ -93,10 +93,19 @@ function setup(options: { report?: string; evidence?: boolean } = {}) {
       return work;
     },
     runAgent,
-    runtime: new ReadingReportRuntime(),
+    createInvestigator: () => async () => null,
+    runtime: new ReadingReportRuntime(() => instant("2026-07-03T00:00:00Z").epochMilliseconds),
     now: () => instant("2026-07-03T00:00:00Z"),
   };
-  return { deps, session, task, runAgent, drain: async () => Promise.all(background) };
+  // 主 agent 不占后台并发池（它是前台任务），故不能只靠 background 数组等它跑完；
+  // 轮转宏任务直到该 session 不再 in-flight，仍未收敛时（测试故意挂住 deferred）如常返回。
+  const drain = async () => {
+    for (let i = 0; i < 20 && deps.runtime.inFlight.has(session.id); i++) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    await Promise.all(background);
+  };
+  return { deps, session, task, runAgent, drain };
 }
 
 describe("reading report service", () => {
@@ -107,7 +116,11 @@ describe("reading report service", () => {
 
     expect(getReadingSessionDetail(deps, session.id).report).toEqual({ status: "empty" });
     expect(startReadingReportGeneration(deps, session.id)).toEqual({ outcome: "accepted" });
-    expect(getReadingSessionDetail(deps, session.id).report).toEqual({ status: "generating" });
+    expect(getReadingSessionDetail(deps, session.id).report).toEqual({
+      status: "generating",
+      startedAt: instant("2026-07-03T00:00:00Z").epochMilliseconds,
+      progress: [],
+    });
     task.resolve(" # What stayed with me ");
     await drain();
     expect(getReadingSessionDetail(deps, session.id).report).toEqual({
@@ -123,12 +136,15 @@ describe("reading report service", () => {
     expect(getReadingSessionDetail(deps, session.id).report).toEqual({
       status: "regenerating",
       content: "# Old",
+      startedAt: instant("2026-07-03T00:00:00Z").epochMilliseconds,
+      progress: [],
     });
     task.reject(new Error("network down"));
     await drain();
     expect(getReadingSessionDetail(deps, session.id).report).toEqual({
       status: "regeneration-failed",
       content: "# Old",
+      progress: [],
     });
   });
 
@@ -150,6 +166,27 @@ describe("reading report service", () => {
     ).toEqual({ status: "empty" });
   });
 
+  it("surfaces tool calls as generation progress", async () => {
+    const { deps, session, task, drain } = setup();
+    deps.resolveModel = () => ({ ok: true, model: {} as never, modelId: "summary" });
+    deps.runAgent = async (input) => {
+      await input.tools.listAnnotations!.execute!({ offset: 0, limit: 50 }, {} as never);
+      return task.promise;
+    };
+
+    startReadingReportGeneration(deps, session.id);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const state = getReadingSessionDetail(deps, session.id).report;
+    expect(state.status).toEqual("generating");
+    const steps = state.status === "generating" ? state.progress : [];
+    expect(steps).toHaveLength(1);
+    expect(steps[0]).toMatchObject({ tool: "listAnnotations", outcome: "ok", count: 1 });
+
+    task.resolve("# Done");
+    await drain();
+  });
+
   it("clears a prior failure when evidence is unavailable", () => {
     const { deps, session } = setup({ report: "# Existing", evidence: false });
     deps.runtime.fail(session.id, { kind: "regeneration" });
@@ -157,6 +194,7 @@ describe("reading report service", () => {
     expect(getReadingSessionDetail(deps, session.id).report).toEqual({
       status: "regeneration-failed",
       content: "# Existing",
+      progress: [],
     });
     expect(startReadingReportGeneration(deps, session.id)).toEqual({
       outcome: "insufficient-evidence",
@@ -173,6 +211,7 @@ describe("reading report service", () => {
     expect(startReadingReportGeneration(deps, session.id)).toEqual({ outcome: "unavailable" });
     expect(getReadingSessionDetail(deps, session.id).report).toEqual({
       status: "generation-failed",
+      progress: [],
     });
     expect(saveUserReadingReport(deps, session.id, " # Written ").report).toEqual({
       status: "ready",
@@ -394,7 +433,8 @@ describe("reading report service", () => {
     await drain();
 
     expect(memoryToolAvailable).toBe(true);
-    expect(getReadingSessionDetail(deps, session.id).report).toEqual({
+    // progress 不入断言：该用例真的调了 updateMemory，时间线里会留下那一步。
+    expect(getReadingSessionDetail(deps, session.id).report).toMatchObject({
       status: "regeneration-failed",
       content: "# Old",
     });

@@ -15,13 +15,27 @@ import {
   listSessionConversations,
   readSessionConversation,
 } from "@main/reading-report/evidence";
+import type { ConversationInvestigation } from "@main/reading-report/investigator";
+import { createLogger } from "@main/logger";
+
+const log = createLogger("report");
 
 export interface ReadingReportToolsDeps {
   db: DB;
   session: ReadingSessionRow;
   loadBytes: LoadBytes;
   imageToolResults: boolean;
+  /**
+   * 派 subagent 调查一个会话。返回 null = 未拿到并发额度（主 agent 应自行翻页）。
+   * 抛错交由工具层转 failed 降级。
+   */
+  investigate: (input: {
+    conversationId: string;
+    focus?: string;
+  }) => Promise<ConversationInvestigation | null>;
 }
+
+const INVESTIGATION_FALLBACK = "read this conversation yourself with readConversation";
 
 export function createReadingReportTools(deps: ReadingReportToolsDeps) {
   const pageInput = z.object({
@@ -57,16 +71,38 @@ export function createReadingReportTools(deps: ReadingReportToolsDeps) {
         ),
     }),
     listConversations: tool({
-      description: "List conversations with messages during this reading session.",
+      description:
+        "List conversations with messages during this reading session, each with its in-session size (messageCount, estimatedTokens) and whether a compacted background summary exists. Use the sizes to budget: read a small conversation yourself, and delegate a large one (roughly 30k tokens or more) to investigateConversation.",
       inputSchema: pageInput,
       execute: async ({ offset, limit }) =>
         runTool("listConversations", () =>
           page(listSessionConversations(deps.db, deps.session), offset, limit),
         ),
     }),
+    investigateConversation: tool({
+      description:
+        "Delegate one large conversation to an assistant that reads all of it and reports what the reader did: their questions, judgments, turning points, and connections, each with the seq range it came from. Read that range with readConversation when you want the reader's own words. Returns status busy or failed when delegation is unavailable — page the conversation yourself in that case.",
+      inputSchema: z.object({
+        conversationId: z.string().min(1),
+        focus: z.string().optional(),
+      }),
+      execute: async ({ conversationId, focus }) => {
+        try {
+          const investigation = await deps.investigate({ conversationId, focus });
+          if (investigation === null) {
+            return { status: "busy" as const, suggestion: INVESTIGATION_FALLBACK };
+          }
+          return { status: "ok" as const, ...investigation };
+        } catch (err) {
+          // 软降级：调查失败绝不使报告生成失败，主 agent 退回自行翻页。
+          log.warn(`investigation of conversation ${conversationId} failed`, err);
+          return { status: "failed" as const, suggestion: INVESTIGATION_FALLBACK };
+        }
+      },
+    }),
     readConversation: tool({
       description:
-        "Read a bounded page of in-session turns from one listed conversation. Compacted history is returned only as a rolling background summary that may include discussion before this reading; raw messages are strictly after the compaction frontier.",
+        "Read a bounded page of in-session turns from one listed conversation, oldest first. Page with nextAfterSeq while hasMore is true. A conversation may also carry a rolling background summary that can include discussion from before this reading; treat it as context, not as evidence from this reading.",
       inputSchema: z.object({
         conversationId: z.string().min(1),
         afterSeq: z.number().int().nonnegative().optional(),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Limiter } from "@main/ai/background-limiter";
+import { acquireSlot, Limiter } from "@main/ai/background-limiter";
 
 /** 可手动 resolve 的 deferred，用于精确控制任务完成时机。 */
 function deferred<T>() {
@@ -106,5 +106,42 @@ describe("Limiter", () => {
     await r1; // settle 触发 pump，按新上限放行第二个
     await Promise.resolve();
     expect(started).toBe(2);
+  });
+});
+
+describe("acquireSlot", () => {
+  it("grants immediately when a slot is free and frees it on release", async () => {
+    const limiter = new Limiter(() => 1);
+    const slot = await acquireSlot(limiter.run, 1_000);
+
+    if (!slot.ok) throw new Error("expected the free slot to be granted");
+    let ranWhileHeld = false;
+    void limiter.run(async () => {
+      ranWhileHeld = true;
+    });
+    await Promise.resolve();
+    expect(ranWhileHeld).toBe(false); // 槽位仍被占着
+
+    slot.release();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(ranWhileHeld).toBe(true);
+  });
+
+  it("gives up when no slot frees within the timeout", async () => {
+    const limiter = new Limiter(() => 1);
+    const gate = deferred<void>();
+    void limiter.run(() => gate.promise);
+    await Promise.resolve();
+
+    await expect(acquireSlot(limiter.run, 10)).resolves.toEqual({ ok: false });
+
+    // 放弃后占位不得继续消耗额度：占用方结束时后续任务应立刻放行。
+    gate.resolve();
+    let ranAfterGiveUp = false;
+    await limiter.run(async () => {
+      ranAfterGiveUp = true;
+    });
+    expect(ranAfterGiveUp).toBe(true);
   });
 });

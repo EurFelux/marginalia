@@ -40,3 +40,36 @@ export class Limiter {
     while (this.queue.length > 0 && this.active < this.getLimit()) this.queue.shift()!();
   }
 }
+
+export type SlotAcquisition = { ok: true; release: () => void } | { ok: false };
+
+/**
+ * 占一个后台槽位并保持占用直到 release()，超时未排到则放弃。
+ * 用于「拿不到并发额度就降级」而非无限排队的调用方：占位任务体只是等 release，
+ * 故超时分支同样调 release —— 该占位若稍后才被调度，会立即结束而不真正消耗额度。
+ */
+export function acquireSlot(run: RunBackground, timeoutMs: number): Promise<SlotAcquisition> {
+  let release = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let granted = () => {};
+  const grant = new Promise<void>((resolve) => {
+    granted = resolve;
+  });
+  void run(async () => {
+    granted();
+    await held;
+  }).catch(() => {});
+
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      release();
+      resolve({ ok: false });
+    }, timeoutMs);
+    void grant.then(() => {
+      clearTimeout(timer);
+      resolve({ ok: true, release });
+    });
+  });
+}

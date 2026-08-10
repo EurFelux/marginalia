@@ -6,12 +6,19 @@ import { textOfParts } from "@main/ai/prompt";
 import type { AnnotationDto, AnnotationStyle } from "@shared/annotations";
 import type { BookNoteDto } from "@shared/book-notes";
 import type { MessageRole, MessageStatus } from "@shared/types";
+import { estimateTokens, sliceToTokenBudget } from "@shared/tokens";
 
 export interface SessionConversationSummary {
   id: string;
   title: string | null;
   createdAt: number;
   updatedAt: number;
+  /** 本次阅读窗口内的消息条数——供模型判断该会话该自己读还是外派 subagent。 */
+  messageCount: number;
+  /** 窗口内消息正文的粗略 token 估算（同上用途）。 */
+  estimatedTokens: number;
+  /** 是否存在可用的滚动概要（多数会话为 false：仅超长会话才会被压缩）。 */
+  hasCompactedContext: boolean;
 }
 
 export interface SessionMessageExcerpt {
@@ -24,12 +31,24 @@ export interface SessionMessageExcerpt {
 }
 
 export const SESSION_CONVERSATION_DEFAULT_LIMIT = 20;
+/**
+ * 主 agent 单次取回的条数上限：护栏，防它一口气把整段原文灌进自己的上下文。
+ * subagent 不受此限（见 maxLimit 参数）——它只装一个会话，条数该由 token 预算封顶。
+ */
 export const SESSION_CONVERSATION_MAX_LIMIT = 50;
-export const SESSION_CONVERSATION_TEXT_BUDGET = 24_000;
+/**
+ * 单次读取返回的正文 token 预算（口径见 estimateTokens）。记 token 而非字符：按字符计会让
+ * 同一数字在中文下约等于 24k token、在英文下只有约 6k token，行为相差约 4 倍。
+ */
+export const SESSION_CONVERSATION_TOKEN_BUDGET = 24_000;
 
 export interface SessionConversationReadOptions {
   afterSeq?: number;
   limit?: number;
+  /** 覆盖单次读取的 token 预算（subagent 只装一个会话，可吃得更粗）。 */
+  tokenBudget?: number;
+  /** 覆盖条数上限的校验值；缺省用给主 agent 的 SESSION_CONVERSATION_MAX_LIMIT。 */
+  maxLimit?: number;
 }
 
 export interface SessionConversationMessage extends SessionMessageExcerpt {
@@ -37,19 +56,17 @@ export interface SessionConversationMessage extends SessionMessageExcerpt {
   truncated: boolean;
 }
 
-export type SessionConversationReadResult =
-  | {
-      status: "compacted-only";
-      compactedContext: { summary: string; throughSeq: number };
-      messages: [];
-    }
-  | {
-      status: "messages";
-      compactedContext: { summary: string; throughSeq: number } | null;
-      messages: SessionConversationMessage[];
-      hasMore: boolean;
-      nextAfterSeq: number | null;
-    };
+export interface SessionConversationReadResult {
+  status: "messages";
+  /**
+   * 该会话的滚动概要（若有）。原始消息现已全部可读，故这只是背景——它可能含本次阅读之前的
+   * 讨论，不可当作本次阅读的证据。
+   */
+  compactedContext: { summary: string; throughSeq: number } | null;
+  messages: SessionConversationMessage[];
+  hasMore: boolean;
+  nextAfterSeq: number | null;
+}
 
 function sessionWindow(session: ReadingSessionRow) {
   if (session.completedAt == null) return null;
@@ -127,12 +144,13 @@ export function listSessionConversations(
 ): SessionConversationSummary[] {
   const createdInside = isInWindow(messages.createdAt, session);
   if (!createdInside) return [];
-  return db
+  const rows = db
     .select({
       id: conversations.id,
       title: conversations.title,
       createdAt: conversations.createdAt,
       updatedAt: conversations.updatedAt,
+      contextSummary: conversations.contextSummary,
     })
     .from(conversations)
     .innerJoin(messages, eq(messages.conversationId, conversations.id))
@@ -140,6 +158,23 @@ export function listSessionConversations(
     .groupBy(conversations.id)
     .orderBy(desc(conversations.updatedAt))
     .all();
+  return rows.map(({ contextSummary, ...conversation }) => {
+    // 规模只按窗口内消息计：清单是模型分配读取预算的唯一依据，须与它随后能读到的范围一致。
+    const inWindow = db
+      .select({ parts: messages.parts })
+      .from(messages)
+      .where(and(eq(messages.conversationId, conversation.id), createdInside))
+      .all();
+    return {
+      ...conversation,
+      messageCount: inWindow.length,
+      estimatedTokens: inWindow.reduce(
+        (sum, row) => sum + estimateTokens(textOfParts(row.parts)),
+        0,
+      ),
+      hasCompactedContext: Boolean(contextSummary?.trim()),
+    };
+  });
 }
 
 export function readSessionConversation(
@@ -161,21 +196,26 @@ export function readSessionConversation(
 
   const window = sessionWindow(session);
   if (!window) throw new Error("cannot read conversation evidence for an active session");
+  const maxLimit = options.maxLimit ?? SESSION_CONVERSATION_MAX_LIMIT;
   const limit = options.limit ?? SESSION_CONVERSATION_DEFAULT_LIMIT;
-  if (!Number.isInteger(limit) || limit < 1 || limit > SESSION_CONVERSATION_MAX_LIMIT) {
-    throw new Error(
-      `conversation page limit must be between 1 and ${SESSION_CONVERSATION_MAX_LIMIT}`,
-    );
+  if (!Number.isInteger(limit) || limit < 1 || limit > maxLimit) {
+    throw new Error(`conversation page limit must be between 1 and ${maxLimit}`);
   }
-  const frontier = conversation.summarizedThroughSeq ?? -1;
-  const cursor = Math.max(frontier, options.afterSeq ?? frontier);
+  const budget = options.tokenBudget ?? SESSION_CONVERSATION_TOKEN_BUDGET;
+  if (!Number.isInteger(budget) || budget < 1) {
+    throw new Error("conversation token budget must be a positive integer");
+  }
+  // 刻意不按 summarizedThroughSeq 过滤：压缩只是让聊天时不必把旧轮塞进上下文，原始消息仍完好
+  // 存在。曾经过滤掉压缩前缀，使一个 470 条的会话只有最后 110 条对报告可见（76% 的证据凭空消失，
+  // 只剩一段概要）。长会话现在由 investigateConversation 的 subagent 分页消化，单次调用另有
+  // token 预算护着，无需再靠这道过滤保护上下文。
+  const cursor = options.afterSeq ?? -1;
   const rawRows = db
     .select()
     .from(messages)
     .where(
       and(
         eq(messages.conversationId, conversation.id),
-        gt(messages.seq, frontier),
         gt(messages.seq, cursor),
         gte(messages.createdAt, window.startedAt),
         lte(messages.createdAt, window.completedAt),
@@ -186,34 +226,8 @@ export function readSessionConversation(
     .all();
 
   if (rawRows.length === 0) {
-    const anyInSession = db
-      .select({ id: messages.id })
-      .from(messages)
-      .where(
-        and(
-          eq(messages.conversationId, conversation.id),
-          gte(messages.createdAt, window.startedAt),
-          lte(messages.createdAt, window.completedAt),
-        ),
-      )
-      .limit(1)
-      .get();
-    if (
-      options.afterSeq === undefined &&
-      anyInSession &&
-      conversation.summarizedThroughSeq !== null &&
-      conversation.contextSummary?.trim()
-    ) {
-      return {
-        status: "compacted-only",
-        compactedContext: {
-          summary: conversation.contextSummary.trim(),
-          throughSeq: conversation.summarizedThroughSeq,
-        },
-        messages: [],
-      };
-    }
-    if (options.afterSeq !== undefined && anyInSession) {
+    // 游标已走完时返回空页；否则该会话在本次阅读窗口内根本没有消息，属调用方传错 id。
+    if (options.afterSeq !== undefined) {
       return {
         status: "messages",
         compactedContext: null,
@@ -237,17 +251,11 @@ export function readSessionConversation(
     const previous = db
       .select()
       .from(messages)
-      .where(
-        and(
-          eq(messages.conversationId, conversation.id),
-          gt(messages.seq, frontier),
-          lt(messages.seq, first.seq),
-        ),
-      )
+      .where(and(eq(messages.conversationId, conversation.id), lt(messages.seq, first.seq)))
       .orderBy(desc(messages.seq))
       .limit(1)
       .get();
-    if (previous && textOfParts(previous.parts).length < SESSION_CONVERSATION_TEXT_BUDGET) {
+    if (previous && estimateTokens(textOfParts(previous.parts)) < budget) {
       candidates.push({ row: previous, context: "neighbor" });
     }
   }
@@ -256,28 +264,26 @@ export function readSessionConversation(
     const next = db
       .select()
       .from(messages)
-      .where(
-        and(
-          eq(messages.conversationId, conversation.id),
-          gt(messages.seq, frontier),
-          gt(messages.seq, last.seq),
-        ),
-      )
+      .where(and(eq(messages.conversationId, conversation.id), gt(messages.seq, last.seq)))
       .orderBy(asc(messages.seq))
       .limit(1)
       .get();
     if (next) candidates.push({ row: next, context: "neighbor" });
   }
 
-  let remaining = SESSION_CONVERSATION_TEXT_BUDGET;
+  let remaining = budget;
   const excerpts: SessionConversationMessage[] = [];
   for (const candidate of candidates) {
     if (remaining <= 0) break;
     const excerpt = messageExcerpt(candidate.row);
-    const truncated = excerpt.text.length > remaining;
-    const text = truncated ? excerpt.text.slice(0, remaining) : excerpt.text;
-    excerpts.push({ ...excerpt, text, context: candidate.context, truncated });
-    remaining -= text.length;
+    const slice = sliceToTokenBudget(excerpt.text, remaining);
+    excerpts.push({
+      ...excerpt,
+      text: slice.text,
+      context: candidate.context,
+      truncated: slice.truncated,
+    });
+    remaining -= slice.tokens;
   }
   const summary = conversation.contextSummary?.trim();
   const compactedContext =

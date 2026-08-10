@@ -1,4 +1,4 @@
-import type { ReadingReportState } from "@shared/reading-sessions";
+import type { ReadingReportProgressStep, ReadingReportState } from "@shared/reading-sessions";
 
 export interface ReportViewModel {
   content: string | null;
@@ -7,6 +7,10 @@ export interface ReportViewModel {
   canEdit: boolean;
   canCancel: boolean;
   error: "generation-failed" | "regeneration-failed" | null;
+  /** 本次生成的工具活动时间线；非生成/非失败态为空。 */
+  progress: readonly ReadingReportProgressStep[];
+  /** 生成开始时刻（epoch ms），仅生成中非 null —— 渲染层据此自行计时。 */
+  startedAt: number | null;
 }
 
 export function reportViewModel(state: ReadingReportState): ReportViewModel {
@@ -19,6 +23,8 @@ export function reportViewModel(state: ReadingReportState): ReportViewModel {
         canEdit: true,
         canCancel: false,
         error: null,
+        progress: [],
+        startedAt: null,
       };
     case "generating":
       return {
@@ -28,6 +34,8 @@ export function reportViewModel(state: ReadingReportState): ReportViewModel {
         canEdit: false,
         canCancel: true,
         error: null,
+        progress: state.progress,
+        startedAt: state.startedAt,
       };
     case "generation-failed":
       return {
@@ -37,6 +45,8 @@ export function reportViewModel(state: ReadingReportState): ReportViewModel {
         canEdit: true,
         canCancel: false,
         error: "generation-failed",
+        progress: state.progress,
+        startedAt: null,
       };
     case "ready":
       return {
@@ -46,6 +56,8 @@ export function reportViewModel(state: ReadingReportState): ReportViewModel {
         canEdit: true,
         canCancel: false,
         error: null,
+        progress: [],
+        startedAt: null,
       };
     case "regenerating":
       return {
@@ -55,6 +67,8 @@ export function reportViewModel(state: ReadingReportState): ReportViewModel {
         canEdit: false,
         canCancel: true,
         error: null,
+        progress: state.progress,
+        startedAt: state.startedAt,
       };
     case "regeneration-failed":
       return {
@@ -64,6 +78,8 @@ export function reportViewModel(state: ReadingReportState): ReportViewModel {
         canEdit: true,
         canCancel: false,
         error: "regeneration-failed",
+        progress: state.progress,
+        startedAt: null,
       };
     default:
       return assertNever(state);

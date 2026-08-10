@@ -17,3 +17,29 @@ export function estimateTokens(text: string): number {
   }
   return Math.ceil(cjk + other / 4);
 }
+
+export interface TokenBudgetSlice {
+  text: string;
+  tokens: number;
+  truncated: boolean;
+}
+
+/**
+ * 按 estimateTokens 的口径把文本截到 token 预算内：返回估算不超过 budget 的最长前缀。
+ * 用于「按 token 记账、按字符截断」的证据分页——直接按字符设预算会让同一数字在 CJK 与
+ * 拉丁文本下相差约 4 倍（CJK 1 字符 ≈ 1 token，其余 4 字符 ≈ 1 token）。
+ * budget ≤ 0 时返回空串并标记截断（除非原文本身为空）。
+ */
+export function sliceToTokenBudget(text: string, budget: number): TokenBudgetSlice {
+  const total = estimateTokens(text);
+  if (total <= budget) return { text, tokens: total, truncated: false };
+  let weight = 0;
+  let end = 0;
+  for (const ch of text) {
+    const next = weight + (CJK.test(ch) ? 1 : 0.25);
+    if (Math.ceil(next) > budget) break;
+    weight = next;
+    end += ch.length;
+  }
+  return { text: text.slice(0, end), tokens: Math.ceil(weight), truncated: true };
+}

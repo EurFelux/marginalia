@@ -11,6 +11,7 @@ const invalidateQueries = vi.hoisted(() => vi.fn());
 const saveReport = vi.hoisted(() => vi.fn());
 const startReading = vi.hoisted(() => vi.fn());
 
+import type { ReadingReportProgressStep } from "@shared/reading-sessions";
 import { ReadingReportView } from "@renderer/reading/ReadingReportView";
 
 vi.mock("@tanstack/react-query", () => ({
@@ -86,7 +87,12 @@ const session = {
 let reportState:
   | { status: "empty" }
   | { status: "ready"; content: string }
-  | { status: "regenerating"; content: string };
+  | {
+      status: "regenerating";
+      content: string;
+      startedAt: number;
+      progress: readonly ReadingReportProgressStep[];
+    };
 
 let host: HTMLDivElement;
 let root: Root;
@@ -178,7 +184,7 @@ describe("ReadingReportView", () => {
   });
 
   it("stops regeneration while keeping the old report visible", async () => {
-    reportState = { status: "regenerating", content: "# Report" };
+    reportState = { status: "regenerating", content: "# Report", startedAt: 0, progress: [] };
     cancelReport.mockResolvedValue({ outcome: "canceled" });
     await act(async () =>
       root.render(
@@ -213,7 +219,7 @@ describe("ReadingReportView", () => {
   });
 
   it("keeps rejected cancellation details out of the localized failure toast", async () => {
-    reportState = { status: "regenerating", content: "# Report" };
+    reportState = { status: "regenerating", content: "# Report", startedAt: 0, progress: [] };
     const error = new Error("provider secret from cancel path");
     cancelReport.mockRejectedValue(error);
     await act(async () =>

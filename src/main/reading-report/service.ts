@@ -9,7 +9,9 @@ import { supportsImageToolResults } from "@main/ai/model-factory";
 import type { LoadBytes } from "@main/ai/tools";
 import { hasReaderEvidence } from "@main/reading-report/evidence";
 import { runReadingReportAgent } from "@main/reading-report/agent";
+import type { createInvestigator } from "@main/reading-report/investigation-runner";
 import { buildReadingReportSystemPrompt } from "@main/reading-report/prompt";
+import { withProgress } from "@main/reading-report/progress";
 import { createReadingReportMemoryWorkspace } from "@main/reading-report/memory-workspace";
 import { ReadingReportRuntime, type GenerationKind } from "@main/reading-report/runtime";
 import { createReadingReportTools } from "@main/reading-report/tools";
@@ -32,8 +34,10 @@ export interface ReadingReportServiceDeps {
   db: DB;
   loadBytes: LoadBytes;
   resolveModel: () => ResolvedModel;
+  /** 仅 subagent 走此池；主 agent 是前台任务，见下方 startReadingReportGeneration 的注释。 */
   runBackground: RunBackground;
   runAgent: typeof runReadingReportAgent;
+  createInvestigator: typeof createInvestigator;
   runtime: ReadingReportRuntime;
   now: () => Temporal.Instant;
 }
@@ -77,31 +81,42 @@ export function startReadingReportGeneration(
   }
   const claim = deps.runtime.claim(sessionId, kind);
   if (claim == null) return { outcome: "accepted" };
-  void deps
-    .runBackground(async () => {
-      claim.signal.throwIfAborted();
-      const title =
-        deps.db.select({ title: books.title }).from(books).where(eq(books.id, session.bookId)).get()
-          ?.title ?? null;
-      const tools = createReadingReportTools({
+  // 刻意不包 runBackground：报告生成是用户显式触发、有进度反馈、可取消的前台任务，与聊天同级。
+  // 让它长期占用后台并发额度既会挡住真正的后台摘要，也会与其派出的 subagent 互等成死锁。
+  void (async () => {
+    claim.signal.throwIfAborted();
+    const title =
+      deps.db.select({ title: books.title }).from(books).where(eq(books.id, session.bookId)).get()
+        ?.title ?? null;
+    const tools = createReadingReportTools({
+      db: deps.db,
+      session,
+      loadBytes: deps.loadBytes,
+      imageToolResults: supportsImageToolResults(resolved.providerType),
+      investigate: deps.createInvestigator({
         db: deps.db,
         session,
-        loadBytes: deps.loadBytes,
-        imageToolResults: supportsImageToolResults(resolved.providerType),
-      });
-      const memoryWorkspace = createReadingReportMemoryWorkspace(deps.db);
-      const content = await deps.runAgent({
         resolved,
-        tools: { ...tools, ...memoryWorkspace.tools },
-        instructions: buildReadingReportSystemPrompt(deps.db),
-        bookTitle: title,
-        startedAt: session.startedAt,
-        completedAt: session.completedAt!,
-        activeSeconds: readingSessionSeconds(deps.db, session.id),
+        runBackground: deps.runBackground,
         abortSignal: claim.signal,
-      });
-      return { content, memoryMutations: memoryWorkspace.mutations() };
-    })
+      }),
+    });
+    const memoryWorkspace = createReadingReportMemoryWorkspace(deps.db);
+    const content = await deps.runAgent({
+      resolved,
+      tools: withProgress(
+        { ...tools, ...memoryWorkspace.tools },
+        deps.runtime.sink(session.id, claim.generation),
+      ),
+      instructions: buildReadingReportSystemPrompt(deps.db),
+      bookTitle: title,
+      startedAt: session.startedAt,
+      completedAt: session.completedAt!,
+      activeSeconds: readingSessionSeconds(deps.db, session.id),
+      abortSignal: claim.signal,
+    });
+    return { content, memoryMutations: memoryWorkspace.mutations() };
+  })()
     .then((result) => {
       if (!deps.runtime.isCurrent(session.id, claim.generation)) return;
       const committedAt = deps.now().epochMilliseconds;
