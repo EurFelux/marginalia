@@ -5,7 +5,6 @@ import { parseJsonOutput } from "@main/ai/structured-output";
 import { createLogger } from "@main/logger";
 import { estimateTokens } from "@shared/tokens";
 import {
-  SESSION_CONVERSATION_MAX_LIMIT,
   type SessionConversationMessage,
   type SessionConversationReadOptions,
   type SessionConversationReadResult,
@@ -19,6 +18,13 @@ export const INVESTIGATION_PAGE_TOKEN_BUDGET = 40_000;
 export const INVESTIGATION_TOTAL_TOKEN_BUDGET = 150_000;
 /** 拿不到后台并发额度多久后放弃外派、让主 agent 自己翻页。 */
 export const INVESTIGATION_SLOT_TIMEOUT_MS = 45_000;
+/**
+ * 单页取回的条数上限。刻意远大于给主 agent 的 SESSION_CONVERSATION_MAX_LIMIT：subagent 的
+ * 页大小应当由 token 预算封顶，条数上限若先触发，会把一页切成远小于预算的碎片——短问短答的
+ * 会话尤甚（50 条可能只有几千 token），页数与模型调用次数随之翻数倍，跨轮因果也更容易断。
+ * 仍保留一个上限，纯粹是防单页取回量失控。
+ */
+export const INVESTIGATION_PAGE_MESSAGE_LIMIT = 500;
 
 const investigationPoint = z.object({
   kind: z.enum(["question", "judgment", "turn", "connection"]),
@@ -137,7 +143,8 @@ export async function investigateConversation(
     }
     const page = deps.readPage({
       afterSeq,
-      limit: SESSION_CONVERSATION_MAX_LIMIT,
+      limit: INVESTIGATION_PAGE_MESSAGE_LIMIT,
+      maxLimit: INVESTIGATION_PAGE_MESSAGE_LIMIT,
       tokenBudget: Math.min(pageBudget, remaining),
     });
 

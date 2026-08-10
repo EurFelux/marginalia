@@ -3,10 +3,11 @@ import {
   investigateConversation,
   type ConversationInvestigation,
 } from "@main/reading-report/investigator";
-import type {
-  SessionConversationMessage,
-  SessionConversationReadOptions,
-  SessionConversationReadResult,
+import {
+  SESSION_CONVERSATION_MAX_LIMIT,
+  type SessionConversationMessage,
+  type SessionConversationReadOptions,
+  type SessionConversationReadResult,
 } from "@main/reading-report/evidence";
 
 function message(seq: number, text: string): SessionConversationMessage {
@@ -101,6 +102,20 @@ describe("conversation investigation", () => {
     expect(result.coverage.truncated).toBe(true);
     // 每页约 800 token，1000 的总预算最多容下两页。
     expect(readPage.mock.calls.length).toBeLessThanOrEqual(2);
+  });
+
+  it("lets the token budget, not the message count, bound a page", async () => {
+    const readPage = vi.fn((_options: SessionConversationReadOptions) =>
+      messagePage([0], { hasMore: false }),
+    );
+    const generate = vi.fn().mockResolvedValue(pointsJson([{ seqFrom: 0, seqTo: 0 }]));
+
+    await investigateConversation({ readPage, generate });
+
+    // 条数上限若先触发，短问短答的会话会被切成远小于 token 预算的碎片。
+    const request = readPage.mock.calls[0]?.[0];
+    expect(request?.limit).toBeGreaterThan(SESSION_CONVERSATION_MAX_LIMIT);
+    expect(request?.maxLimit).toBe(request?.limit);
   });
 
   it("caps a page budget request at the remaining cumulative budget", async () => {

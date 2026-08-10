@@ -147,8 +147,11 @@
 | 主 agent `stopWhen`         | 10 步    | **40 步**      | 不去掉——去掉后模型卡在翻页循环里就失去兜底。40 步足够"列清单 + 派 3 个 subagent + 深挖几段 + 写正文"，同时构成失控上限 |
 | `readConversation` 单次预算 | 24k 字符 | **24k token**  | 数值不动，只统一单位。主 agent 用它读小会话和回溯片段，此粒度合适                                                      |
 | subagent 单页预算           | —        | **40k token**  | subagent 的 context 只装一个会话，可以吃得更粗                                                                         |
+| subagent 单页条数上限       | —        | **500 条**     | 远高于给主 agent 的 50，使页大小由 token 预算而非条数封顶（详见下）                                                    |
 | subagent 累计上限           | —        | **150k token** | 读到底或读到此上限，触顶则 `coverage.truncated: true`                                                                  |
 | subagent 槽位等待超时       | —        | **45s**        | 超时转 busy 降级                                                                                                       |
+
+**页大小必须由 token 预算封顶，而非条数。** `SESSION_CONVERSATION_MAX_LIMIT = 50` 是给主 agent 的护栏（防它把整段原文灌进自己的上下文），subagent 若沿用它，条数会先于 token 预算触发：长问长答的会话 50 条约 20k token（只吃到预算一半），短问短答的会话 50 条可能仅几千 token（吃到八分之一）。后果是页数与模型调用次数翻数倍、每次可见的上下文偏小、跨轮因果更易断。因此 `readSessionConversation` 的条数上限参数化（`maxLimit`），subagent 用 `INVESTIGATION_PAGE_MESSAGE_LIMIT = 500`——保留上限只为防单页取回量失控。
 
 ## Prompt
 

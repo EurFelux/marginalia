@@ -31,6 +31,10 @@ export interface SessionMessageExcerpt {
 }
 
 export const SESSION_CONVERSATION_DEFAULT_LIMIT = 20;
+/**
+ * 主 agent 单次取回的条数上限：护栏，防它一口气把整段原文灌进自己的上下文。
+ * subagent 不受此限（见 maxLimit 参数）——它只装一个会话，条数该由 token 预算封顶。
+ */
 export const SESSION_CONVERSATION_MAX_LIMIT = 50;
 /**
  * 单次读取返回的正文 token 预算（口径见 estimateTokens）。记 token 而非字符：按字符计会让
@@ -43,6 +47,8 @@ export interface SessionConversationReadOptions {
   limit?: number;
   /** 覆盖单次读取的 token 预算（subagent 只装一个会话，可吃得更粗）。 */
   tokenBudget?: number;
+  /** 覆盖条数上限的校验值；缺省用给主 agent 的 SESSION_CONVERSATION_MAX_LIMIT。 */
+  maxLimit?: number;
 }
 
 export interface SessionConversationMessage extends SessionMessageExcerpt {
@@ -192,11 +198,10 @@ export function readSessionConversation(
 
   const window = sessionWindow(session);
   if (!window) throw new Error("cannot read conversation evidence for an active session");
+  const maxLimit = options.maxLimit ?? SESSION_CONVERSATION_MAX_LIMIT;
   const limit = options.limit ?? SESSION_CONVERSATION_DEFAULT_LIMIT;
-  if (!Number.isInteger(limit) || limit < 1 || limit > SESSION_CONVERSATION_MAX_LIMIT) {
-    throw new Error(
-      `conversation page limit must be between 1 and ${SESSION_CONVERSATION_MAX_LIMIT}`,
-    );
+  if (!Number.isInteger(limit) || limit < 1 || limit > maxLimit) {
+    throw new Error(`conversation page limit must be between 1 and ${maxLimit}`);
   }
   const budget = options.tokenBudget ?? SESSION_CONVERSATION_TOKEN_BUDGET;
   if (!Number.isInteger(budget) || budget < 1) {

@@ -320,6 +320,20 @@ describe("session evidence", () => {
     expect(result.messages[0]).toEqual(expect.objectContaining({ seq: 4, truncated: false }));
   });
 
+  it("rejects an oversized page for the main agent but honors a raised ceiling", () => {
+    const { db, session } = setup();
+
+    expect(() =>
+      readSessionConversation(db, session, "conversation-in-window", { limit: 200 }),
+    ).toThrow(/between 1 and 50/);
+    expect(() =>
+      readSessionConversation(db, session, "conversation-in-window", {
+        limit: 200,
+        maxLimit: 500,
+      }),
+    ).not.toThrow();
+  });
+
   it("honors an overridden token budget", () => {
     const { db, session } = setup();
     db.insert(messages)
