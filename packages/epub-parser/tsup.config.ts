@@ -4,7 +4,13 @@ export default defineConfig({
   entry: ["src/index.ts"],
   format: ["esm"],
   dts: true,
-  clean: true,
+  // 刻意不 clean：`pnpm dev` 跑着时，另开终端的 `pnpm test` / `pnpm typecheck` 会各自前置一次
+  // `build:packages`，clean 让 dist/ 消失约 40ms——这期间 vite dev server 若重建主进程 bundle
+  // （两者都由「刚保存了 src/main 下的文件」触发，撞上的概率远高于该窗口的随机概率），就会报
+  // `Rolldown failed to resolve import "@marginalia/epub-parser"` 并中断热更新。
+  // 覆盖写是原子的，故不 clean 时产物永远完整可解析。entry 固定为单个 src/index.ts、产物文件名
+  // 恒定，不存在陈旧残留；真要清理直接删 dist/ 即可。
+  clean: false,
   // 内联所有运行时依赖，dist 自包含、零外部 import——这是清空渲染层 vite optimizeDeps.include 的前提。
   noExternal: ["node-html-parser", "fflate", "fast-xml-parser"],
   esbuildOptions(options) {
