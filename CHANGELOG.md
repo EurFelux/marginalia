@@ -1,5 +1,14 @@
 # marginalia
 
+## 0.18.3
+
+### Patch Changes
+
+- 8ff16ec: Show what the assistant is doing while a reading report generates. The report card now displays a live timeline of each step — collecting your annotations, listing conversations, sending a helper into a long one, rereading the text — with the elapsed time, how many steps are done, and which steps were skipped. Steps that run at the same time appear side by side, and if generation fails the timeline stays put so you can see where it stopped.
+- a95f3a3: Stop reading reports from failing to generate when the report model spends its whole output budget on reasoning. The report agent no longer imposes a fixed output cap, so reasoning models can think through a long reading and still write the report.
+- b1b8990: Base reading reports on the whole reading instead of a fragment of it. The report assistant now sees how large each conversation is, delegates long ones to a helper that reads them end to end, and can go back for your exact words on anything the helper flags. Reports no longer stop short because the assistant ran out of steps mid-conversation, and long Chinese conversations are no longer cut roughly four times shorter than English ones. Report generation also stops competing with background summaries for your configured concurrency.
+- 5d1c644: Let reading reports see a long conversation in full. Once a conversation grew long enough to be compacted, the report assistant could only read the turns after that point — in one real reading, 110 of 470 messages — so reports covered the tail of a conversation and missed where it started. Compacting never deleted anything, so the assistant now reads the whole conversation and treats the rolling summary as background.
+
 ## 0.18.2
 
 ### Patch Changes
