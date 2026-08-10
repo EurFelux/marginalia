@@ -149,7 +149,6 @@ export async function investigateConversation(
     });
 
     if (page.compactedContext) background ??= page.compactedContext.summary;
-    if (page.status === "compacted-only") break;
 
     const sessionMessages = page.messages.filter((message) => message.context === "session");
     if (page.messages.length === 0) break;

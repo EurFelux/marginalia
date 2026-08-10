@@ -171,12 +171,28 @@ describe("conversation investigation", () => {
     );
   });
 
-  it("passes the compacted summary as background and stops on a compacted-only page", async () => {
+  it("passes a compacted summary to the model as background", async () => {
     const readPage = vi.fn(
       (): SessionConversationReadResult => ({
-        status: "compacted-only",
+        ...messagePage([0], { hasMore: false }),
         compactedContext: { summary: "EARLIER GROUND", throughSeq: 9 },
+      }),
+    );
+    const generate = vi.fn().mockResolvedValue(pointsJson([{ seqFrom: 0, seqTo: 0 }]));
+
+    await investigateConversation({ readPage, generate });
+
+    expect(generate.mock.calls[0]?.[0]).toContain("EARLIER GROUND");
+  });
+
+  it("returns an empty investigation when the conversation has no readable turns", async () => {
+    const readPage = vi.fn(
+      (): SessionConversationReadResult => ({
+        status: "messages",
+        compactedContext: null,
         messages: [],
+        hasMore: false,
+        nextAfterSeq: null,
       }),
     );
     const generate = vi.fn();

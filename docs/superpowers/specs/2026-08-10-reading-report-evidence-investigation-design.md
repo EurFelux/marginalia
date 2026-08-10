@@ -40,6 +40,8 @@
 - **标注与笔记的取数逻辑不变**。`listSessionAnnotations` / `listSessionBookNotes` 数据量小，不构成瓶颈。
 - **时间窗过滤不变**。`evidence.ts` 中"消息 `createdAt` 须落在 session 窗口内、前后各补一条 neighbor"的规则经确认无问题。
 
+**范围修订（实现后）**：原本还列了"压缩前缀不可读"为不改项，实测证明它才是最大的一道闸门——真实数据里一个 470 条消息的会话，`summarizedThroughSeq = 359` 让报告只看得到最后 110 条（**76% 的证据消失**）。故一并修掉，见下方"压缩前缀"一节。
+
 ## 架构
 
 主 agent 从"自己读完一切"改为**编排者**：掌握全局视野与预算，小会话自己读，大会话外派 subagent，需要原话时回头深挖。
@@ -88,7 +90,7 @@
     seqTo: number,
   }>,
   coverage: {
-    fromSeq: number | null,   // 未读到任何原始消息（如全部落在压缩前缀之后为空）时为 null
+    fromSeq: number | null,   // 该会话在本次窗口内没有任何消息时为 null
     toSeq: number | null,
     messagesRead: number,
     truncated: boolean,
@@ -137,6 +139,18 @@
 3. **诱发保守**——模型见槽位紧张会"懂事"地少派，本该外派的也自己读了。
 
 改为通过**调用结果**暴露池状态：主 agent 拿到的是已发生的事实而非预测，且是在它已读完其他会话、清楚自身 context 余量的时刻做降级决定，判断质量更高。
+
+### 组件五：压缩前缀不再过滤
+
+`readSessionConversation` 曾按 `summarizedThroughSeq` 过滤，只返回压缩前沿之后的原始消息。这道过滤是本问题最大的一道闸门：真实数据中一个 470 条的会话被压缩到 frontier=359，报告只能看到最后 110 条，其余只剩一段概要——表现正是"AI 只看了会话的最新部分"。
+
+**压缩并不删除消息**。它只是让聊天时不必把旧轮重新塞进上下文，原始消息完好留在 `messages` 表里。这道过滤原本的用意是避免报告重复消费已被概要覆盖的内容，但代价是丢掉长会话的绝大部分证据；而长会话现在由 subagent 分页消化，单次读取另有 token 预算护着，这层保护已属冗余。
+
+因此：
+
+- 原始消息**不再按 frontier 过滤**，`readConversation` 从最早的一条读起。
+- `compactedContext` 仍然返回，但降级为**背景**——它可能含本次阅读之前的讨论，`READING_REPORT_CORE` 对它的既有约束不变。
+- `SessionConversationReadResult` 的 `compacted-only` 变体随之成为死代码并删除：只要窗口内有消息，就一定有原始消息可读。
 
 ## 预算与步数
 

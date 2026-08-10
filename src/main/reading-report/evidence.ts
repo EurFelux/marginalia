@@ -56,19 +56,17 @@ export interface SessionConversationMessage extends SessionMessageExcerpt {
   truncated: boolean;
 }
 
-export type SessionConversationReadResult =
-  | {
-      status: "compacted-only";
-      compactedContext: { summary: string; throughSeq: number };
-      messages: [];
-    }
-  | {
-      status: "messages";
-      compactedContext: { summary: string; throughSeq: number } | null;
-      messages: SessionConversationMessage[];
-      hasMore: boolean;
-      nextAfterSeq: number | null;
-    };
+export interface SessionConversationReadResult {
+  status: "messages";
+  /**
+   * 该会话的滚动概要（若有）。原始消息现已全部可读，故这只是背景——它可能含本次阅读之前的
+   * 讨论，不可当作本次阅读的证据。
+   */
+  compactedContext: { summary: string; throughSeq: number } | null;
+  messages: SessionConversationMessage[];
+  hasMore: boolean;
+  nextAfterSeq: number | null;
+}
 
 function sessionWindow(session: ReadingSessionRow) {
   if (session.completedAt == null) return null;
@@ -207,15 +205,17 @@ export function readSessionConversation(
   if (!Number.isInteger(budget) || budget < 1) {
     throw new Error("conversation token budget must be a positive integer");
   }
-  const frontier = conversation.summarizedThroughSeq ?? -1;
-  const cursor = Math.max(frontier, options.afterSeq ?? frontier);
+  // 刻意不按 summarizedThroughSeq 过滤：压缩只是让聊天时不必把旧轮塞进上下文，原始消息仍完好
+  // 存在。曾经过滤掉压缩前缀，使一个 470 条的会话只有最后 110 条对报告可见（76% 的证据凭空消失，
+  // 只剩一段概要）。长会话现在由 investigateConversation 的 subagent 分页消化，单次调用另有
+  // token 预算护着，无需再靠这道过滤保护上下文。
+  const cursor = options.afterSeq ?? -1;
   const rawRows = db
     .select()
     .from(messages)
     .where(
       and(
         eq(messages.conversationId, conversation.id),
-        gt(messages.seq, frontier),
         gt(messages.seq, cursor),
         gte(messages.createdAt, window.startedAt),
         lte(messages.createdAt, window.completedAt),
@@ -226,34 +226,8 @@ export function readSessionConversation(
     .all();
 
   if (rawRows.length === 0) {
-    const anyInSession = db
-      .select({ id: messages.id })
-      .from(messages)
-      .where(
-        and(
-          eq(messages.conversationId, conversation.id),
-          gte(messages.createdAt, window.startedAt),
-          lte(messages.createdAt, window.completedAt),
-        ),
-      )
-      .limit(1)
-      .get();
-    if (
-      options.afterSeq === undefined &&
-      anyInSession &&
-      conversation.summarizedThroughSeq !== null &&
-      conversation.contextSummary?.trim()
-    ) {
-      return {
-        status: "compacted-only",
-        compactedContext: {
-          summary: conversation.contextSummary.trim(),
-          throughSeq: conversation.summarizedThroughSeq,
-        },
-        messages: [],
-      };
-    }
-    if (options.afterSeq !== undefined && anyInSession) {
+    // 游标已走完时返回空页；否则该会话在本次阅读窗口内根本没有消息，属调用方传错 id。
+    if (options.afterSeq !== undefined) {
       return {
         status: "messages",
         compactedContext: null,
@@ -277,13 +251,7 @@ export function readSessionConversation(
     const previous = db
       .select()
       .from(messages)
-      .where(
-        and(
-          eq(messages.conversationId, conversation.id),
-          gt(messages.seq, frontier),
-          lt(messages.seq, first.seq),
-        ),
-      )
+      .where(and(eq(messages.conversationId, conversation.id), lt(messages.seq, first.seq)))
       .orderBy(desc(messages.seq))
       .limit(1)
       .get();
@@ -296,13 +264,7 @@ export function readSessionConversation(
     const next = db
       .select()
       .from(messages)
-      .where(
-        and(
-          eq(messages.conversationId, conversation.id),
-          gt(messages.seq, frontier),
-          gt(messages.seq, last.seq),
-        ),
-      )
+      .where(and(eq(messages.conversationId, conversation.id), gt(messages.seq, last.seq)))
       .orderBy(asc(messages.seq))
       .limit(1)
       .get();

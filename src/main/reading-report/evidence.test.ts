@@ -224,7 +224,7 @@ describe("session evidence", () => {
     );
   });
 
-  it("returns the compacted summary but never raw messages at or before its frontier", () => {
+  it("still returns raw messages the compaction frontier has already summarized", () => {
     const { db, session } = setup();
     db.update(conversations)
       .set({ contextSummary: "EARLY SUMMARY", summarizedThroughSeq: 1 })
@@ -233,24 +233,25 @@ describe("session evidence", () => {
 
     const result = readSessionConversation(db, session, "conversation-in-window", {});
 
-    if (result.status !== "messages") throw new Error("expected raw tail messages");
+    // 压缩只是让聊天时不必重载旧轮，原始消息仍在；过滤掉它们会让长会话的绝大部分证据消失。
     expect(result.compactedContext).toEqual({ summary: "EARLY SUMMARY", throughSeq: 1 });
-    expect(JSON.stringify(result)).not.toContain('"text":"before"');
-    expect(JSON.stringify(result)).not.toContain('"text":"inside one"');
-    expect(result.messages.map((message) => message.seq)).toEqual([2, 3]);
+    expect(result.messages.map((message) => message.seq)).toEqual([0, 1, 2, 3]);
+    expect(result.messages.map((message) => message.text)).toContain("inside one");
   });
 
-  it("returns a compacted-only result when every in-session message is behind the frontier", () => {
+  it("returns every in-session message even when the frontier covers all of them", () => {
     const { db, session } = setup();
     db.update(conversations)
       .set({ contextSummary: "ALL SESSION TURNS", summarizedThroughSeq: 2 })
       .where(eq(conversations.id, "conversation-in-window"))
       .run();
 
-    expect(readSessionConversation(db, session, "conversation-in-window", {})).toEqual({
-      status: "compacted-only",
-      compactedContext: { summary: "ALL SESSION TURNS", throughSeq: 2 },
-      messages: [],
+    const result = readSessionConversation(db, session, "conversation-in-window", {});
+
+    expect(result.messages.map((message) => message.seq)).toEqual([0, 1, 2, 3]);
+    expect(result.compactedContext).toEqual({
+      summary: "ALL SESSION TURNS",
+      throughSeq: 2,
     });
   });
 
@@ -387,16 +388,18 @@ describe("session evidence", () => {
     expect(second).toEqual(expect.objectContaining({ hasMore: false, nextAfterSeq: null }));
   });
 
-  it("does not return a neighboring message at the compaction frontier", () => {
+  it("reports the whole in-window conversation size regardless of the frontier", () => {
     const { db, session } = setup();
     db.update(conversations)
       .set({ contextSummary: "EARLY SUMMARY", summarizedThroughSeq: 1 })
       .where(eq(conversations.id, "conversation-in-window"))
       .run();
 
+    // 规模必须与模型实际能读到的范围一致，否则它据以分配的预算就是错的。
+    const [listed] = listSessionConversations(db, session);
     const result = readSessionConversation(db, session, "conversation-in-window", {});
 
-    if (result.status !== "messages") throw new Error("expected raw tail messages");
-    expect(result.messages.some((message) => message.seq <= 1)).toBe(false);
+    expect(listed?.messageCount).toBe(2);
+    expect(result.messages.filter((message) => message.context === "session").length).toBe(2);
   });
 });
