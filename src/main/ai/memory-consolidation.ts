@@ -14,6 +14,7 @@ import {
 } from "@main/memory/repository";
 import { memorySlug } from "@shared/memory";
 import { renderRoleTaggedTranscript } from "@main/ai/prompt";
+import { parseJsonOutput } from "@main/ai/structured-output";
 import { conversations } from "@main/db/schema";
 import { listMessagesAfterSeq } from "@main/chat/messages";
 import { getPreference } from "@main/preferences/repository";
@@ -129,45 +130,12 @@ export function renderMemoryPassInput(
   return combined.length > maxChars ? combined.slice(combined.length - maxChars) : combined;
 }
 
-/** 剥 markdown 代码围栏并扫出最外层平衡的 {…}（容忍模型在 JSON 前后夹带 prose）；找不到返回 null。 */
-function extractJsonObject(text: string): string | null {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const body = fenced?.[1] ?? text;
-  const start = body.indexOf("{");
-  if (start < 0) return null;
-  let depth = 0;
-  let inString = false;
-  let escaped = false;
-  for (let i = start; i < body.length; i++) {
-    const ch = body[i];
-    if (inString) {
-      if (escaped) escaped = false;
-      else if (ch === "\\") escaped = true;
-      else if (ch === '"') inString = false;
-      continue;
-    }
-    if (ch === '"') inString = true;
-    else if (ch === "{") depth++;
-    else if (ch === "}" && --depth === 0) return body.slice(start, i + 1);
-  }
-  return null;
-}
-
 /**
  * 从模型文本健壮地抽取并校验 ops 清单（provider 无关，不依赖 response_format）：
  * 剥围栏 → 平衡括号扫出最外层对象 → JSON.parse → Zod 校验。任何失败返回 null（调用方跳过本轮重试）。
  */
 export function parseMemoryOps(text: string): z.infer<typeof memoryPassOutput> | null {
-  const json = extractJsonObject(text);
-  if (json == null) return null;
-  let raw: unknown;
-  try {
-    raw = JSON.parse(json);
-  } catch {
-    return null;
-  }
-  const parsed = memoryPassOutput.safeParse(raw);
-  return parsed.success ? parsed.data : null;
+  return parseJsonOutput(text, memoryPassOutput);
 }
 
 // prompt 把输出格式说清楚并给范例，让模型直接吐可被 parseMemoryOps 解析的 JSON（无 response_format 依赖）。

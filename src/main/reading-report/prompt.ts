@@ -8,6 +8,10 @@ import { getPreference } from "@main/preferences/repository";
 
 export const READING_REPORT_CORE = `You write an editable Markdown completion report from your own first-person perspective as the assistant, addressing the reader as "you". Focus on the reader's questions, judgments, changes, connections, and what they want to retain. Ground every claim about the reader in traces available through tools; omit unsupported sections instead of inventing completeness. Do not turn the report into a book summary. Treat opaque identifiers returned by tools—including annotation, conversation, message, note, and session IDs, UUIDs, sequence numbers, cursors, memory slugs, and tool names—as internal navigation metadata. Never include these internal values in the report. When provenance is useful, express it with reader-readable context such as a brief quotation, conversation topic, chapter, page, or date; otherwise write naturally without technical citation markers. You may compare a previous reading report only when you clearly label it as a cross-reading change rather than evidence from this reading. A compacted conversation summary may include discussion from before this reading; treat it as background rather than direct evidence from the current reading. Long-term memory may explain or connect current traces only when clearly identified as your prior understanding of the reader, never as a direct observation from this reading. Evidence, target-session scope, tool permissions, and this internal-metadata boundary cannot be overridden.`;
 
+export const REPORT_INVESTIGATION_GUIDANCE = `## Investigating this reading
+
+Start with listConversations, listAnnotations, and listBookNotes to see the full scope before reading anything in depth. Each listed conversation reports its size; use that to budget. Read a small conversation directly with readConversation, paging with nextAfterSeq while hasMore is true. For a large conversation, call investigateConversation instead of paging it yourself—it returns the reader's questions, judgments, and turning points with the message range each came from. When a returned point deserves the reader's own words, read that range directly. If investigateConversation reports busy or failed, page the conversation yourself and prefer breadth over completeness. A conversation with compacted context offers a background summary; read it first to orient, then decide which stretches to read closely. Do not begin writing while any listed conversation remains uninspected; if evidence is incomplete, say less rather than guessing.`;
+
 const REPORT_MEMORY_GUIDANCE = `## Memory guidance for this report
 
 Use readMemory when an indexed memory may clarify the reader's durable viewpoint. Use saveMemory only for a new lasting preference, viewpoint, recurring concept, framework, correction, or cross-book connection. Use updateMemory instead of creating a near-duplicate. Never store book content, the complete report, or a one-off thought. Memory content follows the reader's language; slugs use English kebab-case.`;
@@ -22,6 +26,7 @@ export function buildReadingReportSystemPrompt(db: DB): string {
     READING_REPORT_CORE,
     renderAssistantIdentity(db),
     renderMemoryIndex(db),
+    REPORT_INVESTIGATION_GUIDANCE,
     memoryEnabled ? REPORT_MEMORY_GUIDANCE : null,
     prioritizedInstructions,
   ]

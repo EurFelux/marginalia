@@ -5,6 +5,12 @@ import { createLogger } from "@main/logger";
 
 const log = createLogger("report");
 
+/**
+ * 工具步上限。刻意保留而非取消：取消后模型卡在翻页循环里就没有兜底了。
+ * 需容纳「列清单 + 外派若干 subagent + 回读几段原文 + 写正文」，10 步曾在写正文前就耗尽。
+ */
+export const REPORT_AGENT_MAX_STEPS = 40;
+
 export interface RunReadingReportAgentInput {
   resolved: Extract<ResolvedModel, { ok: true }>;
   tools: ToolSet;
@@ -21,11 +27,11 @@ export async function runReadingReportAgent(input: RunReadingReportAgentInput): 
     model: input.resolved.model,
     reasoning: input.resolved.reasoningEffort,
     instructions: input.instructions,
-    prompt: `Write the completion report for ${input.bookTitle ?? "this book"}. This reading ran from ${input.startedAt} to ${input.completedAt} and has ${input.activeSeconds} active reading seconds. Inspect reader traces before writing.`,
+    prompt: `Write the completion report for ${input.bookTitle ?? "this book"}. This reading ran from ${input.startedAt} to ${input.completedAt} and has ${input.activeSeconds} active reading seconds. Inspect all reader traces before writing; conversation evidence is paginated.`,
     tools: input.tools,
     providerOptions: providerCallOptions(input.resolved.providerType),
     abortSignal: input.abortSignal,
-    stopWhen: isStepCount(10),
+    stopWhen: isStepCount(REPORT_AGENT_MAX_STEPS),
     // 刻意不设 maxOutputTokens（对齐 stream-assistant，走 provider 默认）：推理模型的思考 token 与正文
     // 共享该预算，而写报告那步的上下文最大（前若干步的全部工具结果），思考会把小额度吃光、正文一字不出
     // ——表现为 finishReason=length + text 为空，然后被下面的空文本检查报成误导性的 "empty text"。

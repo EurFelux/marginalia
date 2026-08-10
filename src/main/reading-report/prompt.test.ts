@@ -58,6 +58,27 @@ describe("buildReadingReportSystemPrompt", () => {
     expect(prompt).toContain("## Who you are");
   });
 
+  it("tells the agent to page evidence, delegate large conversations, and not write early", () => {
+    const prompt = buildReadingReportSystemPrompt(freshDb());
+
+    expect(prompt).toContain("paging with nextAfterSeq while hasMore is true");
+    expect(prompt).toContain("call investigateConversation instead of paging it yourself");
+    expect(prompt).toContain("page the conversation yourself");
+    expect(prompt).toContain(
+      "Do not begin writing while any listed conversation remains uninspected",
+    );
+  });
+
+  it("keeps investigation guidance even when memory is disabled", () => {
+    const db = freshDb();
+    setPreference(db, "memoryEnabled", false);
+
+    const prompt = buildReadingReportSystemPrompt(db);
+
+    expect(prompt).toContain("## Investigating this reading");
+    expect(prompt).not.toContain("saveMemory");
+  });
+
   it("keeps internal evidence handles out of the reader-facing report", () => {
     const prompt = buildReadingReportSystemPrompt(freshDb());
 

@@ -93,10 +93,19 @@ function setup(options: { report?: string; evidence?: boolean } = {}) {
       return work;
     },
     runAgent,
+    createInvestigator: () => async () => null,
     runtime: new ReadingReportRuntime(),
     now: () => instant("2026-07-03T00:00:00Z"),
   };
-  return { deps, session, task, runAgent, drain: async () => Promise.all(background) };
+  // 主 agent 不占后台并发池（它是前台任务），故不能只靠 background 数组等它跑完；
+  // 轮转宏任务直到该 session 不再 in-flight，仍未收敛时（测试故意挂住 deferred）如常返回。
+  const drain = async () => {
+    for (let i = 0; i < 20 && deps.runtime.inFlight.has(session.id); i++) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    await Promise.all(background);
+  };
+  return { deps, session, task, runAgent, drain };
 }
 
 describe("reading report service", () => {

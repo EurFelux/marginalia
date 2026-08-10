@@ -16,8 +16,9 @@ import {
   listSessionBookNotes,
   listSessionConversations,
   readSessionConversation,
-  SESSION_CONVERSATION_TEXT_BUDGET,
+  SESSION_CONVERSATION_TOKEN_BUDGET,
 } from "@main/reading-report/evidence";
+import { estimateTokens } from "@shared/tokens";
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
 const startedAt = Temporal.Instant.from("2026-07-01T00:00:00Z").epochMilliseconds;
@@ -172,6 +173,33 @@ describe("session evidence", () => {
     expect(hasReaderEvidence(db, session)).toBe(true);
   });
 
+  it("reports in-window size and compaction availability for each listed conversation", () => {
+    const { db, session } = setup();
+
+    const [listed] = listSessionConversations(db, session);
+    // 窗口外的 seq 0 与 seq 3 不计入——规模须与模型随后能读到的范围一致。
+    expect(listed).toEqual(
+      expect.objectContaining({
+        id: "conversation-in-window",
+        messageCount: 2,
+        estimatedTokens: estimateTokens("inside one") + estimateTokens("inside two"),
+        hasCompactedContext: false,
+      }),
+    );
+  });
+
+  it("flags a conversation that carries a compacted summary", () => {
+    const { db, session } = setup();
+    db.update(conversations)
+      .set({ contextSummary: "EARLY SUMMARY", summarizedThroughSeq: 1 })
+      .where(eq(conversations.id, "conversation-in-window"))
+      .run();
+
+    expect(listSessionConversations(db, session)[0]).toEqual(
+      expect.objectContaining({ hasCompactedContext: true }),
+    );
+  });
+
   it("returns in-window messages with one adjacent neighbor on each side in seq order", () => {
     const { db, session } = setup();
 
@@ -244,13 +272,14 @@ describe("session evidence", () => {
     expect(second.messages.map((message) => message.seq)).toEqual([2, 3]);
   });
 
-  it("caps returned message text and marks truncation", () => {
+  it("caps returned message text at the token budget and marks truncation", () => {
     const { db, session } = setup();
+    // CJK：1 字符 ≈ 1 token，故字符数直接对应预算——按字符记账时这条曾能整条通过。
     db.insert(messages)
       .values({
         conversationId: "conversation-in-window",
         role: "assistant",
-        parts: [{ type: "text", text: "x".repeat(SESSION_CONVERSATION_TEXT_BUDGET + 100) }],
+        parts: [{ type: "text", text: "喵".repeat(SESSION_CONVERSATION_TOKEN_BUDGET + 100) }],
         seq: 4,
         createdAt: inside,
       })
@@ -265,8 +294,52 @@ describe("session evidence", () => {
       expect.objectContaining({
         seq: 4,
         truncated: true,
-        text: "x".repeat(SESSION_CONVERSATION_TEXT_BUDGET),
+        text: "喵".repeat(SESSION_CONVERSATION_TOKEN_BUDGET),
       }),
+    );
+  });
+
+  it("counts latin text at roughly a quarter token per character", () => {
+    const { db, session } = setup();
+    // 同样长度的拉丁文本约为 1/4 token，应整条返回而不被截断。
+    db.insert(messages)
+      .values({
+        conversationId: "conversation-in-window",
+        role: "assistant",
+        parts: [{ type: "text", text: "x".repeat(SESSION_CONVERSATION_TOKEN_BUDGET + 100) }],
+        seq: 4,
+        createdAt: inside,
+      })
+      .run();
+
+    const result = readSessionConversation(db, session, "conversation-in-window", {
+      afterSeq: 3,
+    });
+
+    if (result.status !== "messages") throw new Error("expected raw tail messages");
+    expect(result.messages[0]).toEqual(expect.objectContaining({ seq: 4, truncated: false }));
+  });
+
+  it("honors an overridden token budget", () => {
+    const { db, session } = setup();
+    db.insert(messages)
+      .values({
+        conversationId: "conversation-in-window",
+        role: "assistant",
+        parts: [{ type: "text", text: "喵".repeat(50) }],
+        seq: 4,
+        createdAt: inside,
+      })
+      .run();
+
+    const result = readSessionConversation(db, session, "conversation-in-window", {
+      afterSeq: 3,
+      tokenBudget: 10,
+    });
+
+    if (result.status !== "messages") throw new Error("expected raw tail messages");
+    expect(result.messages[0]).toEqual(
+      expect.objectContaining({ seq: 4, truncated: true, text: "喵".repeat(10) }),
     );
   });
 
@@ -282,7 +355,7 @@ describe("session evidence", () => {
         [0, 1, 2, 3].map((seq) => ({
           conversationId: conversation.id,
           role: seq % 2 === 0 ? ("user" as const) : ("assistant" as const),
-          parts: [{ type: "text" as const, text: String(seq).repeat(8_000) }],
+          parts: [{ type: "text" as const, text: "喵".repeat(8_000) }],
           seq,
           createdAt: inside,
         })),

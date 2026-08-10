@@ -14,6 +14,7 @@ import type { SummaryDeps } from "@main/ai/summary";
 import type { LoadBytes } from "@main/ai/tools";
 import type { SendDeps } from "@main/ai/send";
 import { runReadingReportAgent } from "@main/reading-report/agent";
+import { createInvestigator } from "@main/reading-report/investigation-runner";
 import { ReadingReportRuntime } from "@main/reading-report/runtime";
 import type { ReadingReportServiceDeps } from "@main/reading-report/service";
 
@@ -74,6 +75,7 @@ export function makeReadingReportDeps(): ReadingReportServiceDeps {
     resolveModel: () => resolveSummaryModel(db),
     runBackground: backgroundLimiter.run,
     runAgent: runReadingReportAgent,
+    createInvestigator,
     runtime: readingReportRuntime,
     now: () => Temporal.Now.instant(),
   };

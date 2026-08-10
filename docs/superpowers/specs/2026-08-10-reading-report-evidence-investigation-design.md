@@ -1,6 +1,6 @@
 # 阅读报告证据调查 · 设计文档
 
-> 状态：设计已评审通过，待 `writing-plans` 出实现计划。
+> 状态：已实现（本文在实现中同步修订，与代码一致）。
 > 日期：2026-08-10
 > 关联：`2026-07-14-reading-sessions-completion-reports-design.md`（本文修正的证据获取链路即由该轮引入）。
 
@@ -49,8 +49,9 @@
   ├─ listConversations        → 带规模元数据的清单，据此做预算
   ├─ readConversation         → 小会话直读 / 深挖回溯（24k token/次）
   └─ investigateConversation  → 大会话外派
-        └─ subagent (generateText, 摘要模型, 25 步)
+        └─ subagent（摘要模型，逐页单发）
               └─ 循环分页读完单个会话（40k token/页，总上限 150k token）
+              └─ 每页单独抽要点，只让要点跨页累积
               └─ 回传结构化要点 + 每条要点的 seq 范围
 ```
 
@@ -66,9 +67,13 @@
 
 ### 组件二：`investigator.ts`（新文件）— subagent 逻辑
 
-纯函数 + 注入端口（`runAgent`、`resolveModel`、分页读取函数），不碰 Electron，可 headless 单测。
+纯函数 + 注入端口（`readPage` 读一页证据、`generate` 单发模型），不碰 Electron，可 headless 单测。生产侧的组装（绑定 db / session / 模型 / 并发额度）放在 `investigation-runner.ts`，使 `investigator.ts` 保持无 IO。
 
-职责：对单个会话循环分页读取（每页 40k token，累计上限 150k token），交给摘要模型产出结构化要点。
+职责：对单个会话循环分页读取（每页 40k token，累计上限 150k token），逐页交给摘要模型抽取要点，最后合并。
+
+**刻意不做成"给 subagent 一套翻页工具、让它自己循环"**：那样每页原文都会累积进 subagent 自己的上下文，长会话照样爆——只是把爆点从主 agent 挪到 subagent，成功判据 #2 只兑现了一半。逐页抽取则只让**要点**跨页累积，单次模型调用的上下文恒等于「一页 + 已确立的 topic」，与会话总长度无关。代价是模型看不到跨页的长程关联，由「已确立的 topic」与主 agent 手上的全局视野补偿。
+
+因此 subagent 不是 tool-calling loop，无需 `stopWhen`；页数由预算和 `hasMore` 决定。
 
 输出形态：
 
@@ -82,7 +87,12 @@
     seqFrom: number,
     seqTo: number,
   }>,
-  coverage: { fromSeq: number, toSeq: number, truncated: boolean },
+  coverage: {
+    fromSeq: number | null,   // 未读到任何原始消息（如全部落在压缩前缀之后为空）时为 null
+    toSeq: number | null,
+    messagesRead: number,
+    truncated: boolean,
+  },
 }
 ```
 
@@ -138,7 +148,6 @@
 | `readConversation` 单次预算 | 24k 字符 | **24k token**  | 数值不动，只统一单位。主 agent 用它读小会话和回溯片段，此粒度合适                                                      |
 | subagent 单页预算           | —        | **40k token**  | subagent 的 context 只装一个会话，可以吃得更粗                                                                         |
 | subagent 累计上限           | —        | **150k token** | 读到底或读到此上限，触顶则 `coverage.truncated: true`                                                                  |
-| subagent `stopWhen`         | —        | **25 步**      | 150k / 40k ≈ 4 页，加上输出，25 步宽裕                                                                                 |
 | subagent 槽位等待超时       | —        | **45s**        | 超时转 busy 降级                                                                                                       |
 
 ## Prompt
@@ -158,13 +167,29 @@
 ## 错误处理
 
 - **subagent 一切失败均软降级**，绝不使报告生成失败：抛错 / 模型未配置 / 输出不合 schema → 返回 `status: "failed"` 并留 `log.warn`（遵循"凡优雅吞错处必须留 warn"）。
-- **槽位超时**同理返回 `status: "busy"`，用 `Promise.race` 包住排队。
+- **槽位超时**同理返回 `status: "busy"`。落点是 `background-limiter.ts` 新增的 `acquireSlot(run, timeoutMs)`：占位任务体只等 release，故超时分支同样调 release——该占位若稍后才被调度会立即结束，不真正消耗额度。
 - **abortSignal 透传到底**：用户取消报告生成（`runtime.cancel`）时，在跑的 subagent 必须一并中止，否则产生继续烧配额的孤儿请求。现有代码无此先例，需显式接线。
 
 ## 测试
 
-- `evidence.test.ts` — 补 `listSessionConversations` 三个新字段：空会话、有 `contextSummary` 的会话、token 估算与消息计数。
-- `investigator.test.ts`（新增）— 注入 fake `runAgent`：分页循环读完、150k 触顶置 `truncated: true`、schema 不合时的失败路径。
-- `tools.test.ts` — 补 busy / failed 两条降级路径。
-- `prompt.test.ts` — 补新指引段的存在性与 memory 开关下的排列。
+- `evidence.test.ts` — `listSessionConversations` 三个新字段（含有 `contextSummary` 的会话），以及 token 记账：同长度的 CJK 被截断而拉丁文本不被截断，外加可覆盖的 `tokenBudget`。
+- `investigator.test.ts`（新增）— 注入 fake `readPage` / `generate`：分页读完并合并要点、**每次模型调用不夹带前页原文**、累计预算触顶置 `truncated: true`、单页预算被剩余总预算夹住、越界 seq 被夹回本页、单页解析失败跳过而其余保留、全页失败才抛错、compacted-only 直接收尾、focus 透传。
+- `background-limiter.test.ts` — `acquireSlot` 的授予/释放与超时放弃（含放弃后不残留占用）。
+- `tools.test.ts` — ok / busy / failed 三条路径与 focus 透传。
+- `prompt.test.ts` — 新指引段的存在性，以及 memory 关闭时它仍在。
 - 覆盖完整性（每个会话都被检视）走真实长会话手测。
+
+## 实现落点
+
+| 文件                                              | 变化                                                                                      |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `src/shared/tokens.ts`                            | 新增 `sliceToTokenBudget`（按 token 记账、按字符截断）                                    |
+| `src/main/ai/structured-output.ts`                | 新增；从 `memory-consolidation.ts` 抽出 `extractJsonObject` + `parseJsonOutput`，两处共用 |
+| `src/main/ai/background-limiter.ts`               | 新增 `acquireSlot`                                                                        |
+| `src/main/reading-report/evidence.ts`             | 规模元数据；预算改 token 并可覆盖                                                         |
+| `src/main/reading-report/investigator.ts`         | 新增；纯逻辑的分页调查                                                                    |
+| `src/main/reading-report/investigation-runner.ts` | 新增；接真实模型与并发额度                                                                |
+| `src/main/reading-report/tools.ts`                | `investigateConversation` 工具与三态降级                                                  |
+| `src/main/reading-report/service.ts`              | 主 agent 脱离后台池；注入 investigator                                                    |
+| `src/main/reading-report/agent.ts`                | `REPORT_AGENT_MAX_STEPS = 40`；user prompt 补半句                                         |
+| `src/main/reading-report/prompt.ts`               | `REPORT_INVESTIGATION_GUIDANCE`                                                           |
