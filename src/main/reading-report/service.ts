@@ -11,6 +11,7 @@ import { hasReaderEvidence } from "@main/reading-report/evidence";
 import { runReadingReportAgent } from "@main/reading-report/agent";
 import type { createInvestigator } from "@main/reading-report/investigation-runner";
 import { buildReadingReportSystemPrompt } from "@main/reading-report/prompt";
+import { withProgress } from "@main/reading-report/progress";
 import { createReadingReportMemoryWorkspace } from "@main/reading-report/memory-workspace";
 import { ReadingReportRuntime, type GenerationKind } from "@main/reading-report/runtime";
 import { createReadingReportTools } from "@main/reading-report/tools";
@@ -103,7 +104,10 @@ export function startReadingReportGeneration(
     const memoryWorkspace = createReadingReportMemoryWorkspace(deps.db);
     const content = await deps.runAgent({
       resolved,
-      tools: { ...tools, ...memoryWorkspace.tools },
+      tools: withProgress(
+        { ...tools, ...memoryWorkspace.tools },
+        deps.runtime.sink(session.id, claim.generation),
+      ),
       instructions: buildReadingReportSystemPrompt(deps.db),
       bookTitle: title,
       startedAt: session.startedAt,

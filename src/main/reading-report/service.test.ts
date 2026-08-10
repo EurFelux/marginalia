@@ -166,6 +166,27 @@ describe("reading report service", () => {
     ).toEqual({ status: "empty" });
   });
 
+  it("surfaces tool calls as generation progress", async () => {
+    const { deps, session, task, drain } = setup();
+    deps.resolveModel = () => ({ ok: true, model: {} as never, modelId: "summary" });
+    deps.runAgent = async (input) => {
+      await input.tools.listAnnotations!.execute!({ offset: 0, limit: 50 }, {} as never);
+      return task.promise;
+    };
+
+    startReadingReportGeneration(deps, session.id);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const state = getReadingSessionDetail(deps, session.id).report;
+    expect(state.status).toEqual("generating");
+    const steps = state.status === "generating" ? state.progress : [];
+    expect(steps).toHaveLength(1);
+    expect(steps[0]).toMatchObject({ tool: "listAnnotations", outcome: "ok", count: 1 });
+
+    task.resolve("# Done");
+    await drain();
+  });
+
   it("clears a prior failure when evidence is unavailable", () => {
     const { deps, session } = setup({ report: "# Existing", evidence: false });
     deps.runtime.fail(session.id, { kind: "regeneration" });
@@ -412,10 +433,10 @@ describe("reading report service", () => {
     await drain();
 
     expect(memoryToolAvailable).toBe(true);
-    expect(getReadingSessionDetail(deps, session.id).report).toEqual({
+    // progress 不入断言：该用例真的调了 updateMemory，时间线里会留下那一步。
+    expect(getReadingSessionDetail(deps, session.id).report).toMatchObject({
       status: "regeneration-failed",
       content: "# Old",
-      progress: [],
     });
     expect(getMemoryBySlug(deps.db, "durable-insight")?.body).toBe("External update.");
   });
