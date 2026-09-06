@@ -20,6 +20,7 @@ describe("messageDtoToUIMessage", () => {
       role: "user",
       parts: [{ type: "text", text: "你好" }],
       metadata: {
+        createdAt: 1,
         contextChips: [
           {
             id: "selection",
@@ -77,14 +78,15 @@ describe("messageDtoToUIMessage", () => {
       },
     ]);
   });
-  it("omits metadata when dto has none (assistant messages / chip-less sends)", () => {
+  it("keeps createdAt and omits chips when dto has none (assistant messages / chip-less sends)", () => {
     expect(messageDtoToUIMessage({ ...dto, metadata: null })).toEqual({
       id: "m1",
       role: "user",
       parts: [{ type: "text", text: "你好" }],
+      metadata: { createdAt: 1 },
     });
     expect(
-      messageDtoToUIMessage({ ...dto, metadata: { contextChips: [] } }).metadata,
+      messageDtoToUIMessage({ ...dto, metadata: { contextChips: [] } }).metadata?.contextChips,
     ).toBeUndefined();
   });
   it("messagesToUI maps a list in order", () => {

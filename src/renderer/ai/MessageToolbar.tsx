@@ -11,11 +11,7 @@ export function MessageToolbar({ m, onEdit }: { m: ChatUIMessage; onEdit?: () =>
   const { t } = useTranslation();
   const actions = useChatActions();
   return (
-    <div
-      role="toolbar"
-      aria-label={t("ai.messageActions", "消息操作")}
-      className="mt-1 flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
-    >
+    <div role="toolbar" aria-label={t("ai.messageActions", "消息操作")} className="flex gap-0.5">
       <CopyButton text={textOf(m)} />
       {m.role === "user" && (
         <>

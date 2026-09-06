@@ -22,13 +22,14 @@ function hydrateChip(snapshot: ChipSnapshot): Chip {
 /**
  * 持久化 MessageDto → useChat 的 ChatUIMessage。
  * parts 本就是 UIMessage["parts"]，role(MessageRole) ⊆ UIMessage role；
- * metadata.contextChips 由快照水合回 live Chip，使重开会话后历史用户气泡重渲 chip 徽标。
+ * metadata.contextChips 由快照水合回 live Chip，使重开会话后历史用户气泡重渲 chip 徽标；
+ * createdAt 一并带上，供气泡渲染时间戳与日期分隔（#108）。
  */
 export function messageDtoToUIMessage(dto: MessageDto): ChatUIMessage {
   const chips = dto.metadata?.contextChips;
-  const base: ChatUIMessage = { id: dto.id, role: dto.role, parts: dto.parts };
-  if (chips && chips.length > 0) base.metadata = { contextChips: chips.map(hydrateChip) };
-  return base;
+  const metadata: ChatUIMessage["metadata"] = { createdAt: dto.createdAt };
+  if (chips && chips.length > 0) metadata.contextChips = chips.map(hydrateChip);
+  return { id: dto.id, role: dto.role, parts: dto.parts, metadata };
 }
 
 export function messagesToUI(dtos: MessageDto[]): ChatUIMessage[] {

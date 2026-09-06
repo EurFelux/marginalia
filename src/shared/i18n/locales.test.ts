@@ -24,7 +24,6 @@ const task6ReadingKeys = [
   "readingReport.empty",
   "readingReport.generate",
   "readingReport.generateFailed",
-  "readingReport.generating",
   "readingReport.generationStopped",
   "readingReport.insufficientEvidence",
   "readingReport.keepCurrent",

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import type { ChatStatus } from "ai";
 import { getToolName } from "ai";
 import { useQuery } from "@tanstack/react-query";
@@ -11,6 +11,8 @@ import { chipLabel } from "@renderer/ai/chip-label";
 import { useChatActions } from "@renderer/ai/chat-actions";
 import { MessageEditor } from "@renderer/ai/MessageEditor";
 import { textOf } from "@renderer/ai/message-text";
+import { dayKind, messageCreatedAt, startsNewDay } from "@renderer/ai/message-time";
+import { MessageTimestamp } from "@renderer/ai/MessageTimestamp";
 import { MessageToolbar } from "@renderer/ai/MessageToolbar";
 import { segments, type ToolPart } from "@renderer/ai/segments";
 import { toolStepLabel, toolStepStatus } from "@renderer/ai/tool-step-label";
@@ -58,6 +60,9 @@ export function MessageList({
   }
   const lastMessage = messages.at(-1);
   const lastId = lastMessage?.id;
+  // live 消息（本轮发送/流式产出）尚未回读落库时间，统一以本次渲染时刻兜底。
+  const nowMs = Temporal.Now.instant().epochMilliseconds;
+  const timeZone = Temporal.Now.timeZoneId();
   const activity = assistantActivity(
     status,
     lastMessage?.role === "assistant" ? lastMessage.parts : undefined,
@@ -71,23 +76,51 @@ export function MessageList({
             : t("ai.scrollToLoadOlder", "上滑加载更早消息")}
         </div>
       )}
-      {messages.map((m, i) =>
-        m.role === "user" ? (
-          <UserBubble key={m.id} m={m} />
-        ) : (
-          <AssistantBubble
-            key={m.id}
-            m={m}
-            streaming={status === "streaming" && m.id === lastId}
-            activity={m.id === lastId ? activity : null}
-            chapters={chapters}
-            showAvatar={showAvatar}
-            agentName={agentName}
-            groupHead={i === 0 || messages[i - 1].role !== "assistant"}
-          />
-        ),
-      )}
-      {status === "submitted" && <PendingBubble showAvatar={showAvatar} agentName={agentName} />}
+      {messages.map((m, i) => {
+        const createdAt = messageCreatedAt(m, nowMs);
+        const prevAt = i === 0 ? null : messageCreatedAt(messages[i - 1], nowMs);
+        return (
+          <Fragment key={m.id}>
+            {startsNewDay(prevAt, createdAt, timeZone) && (
+              <DayDivider at={createdAt} nowMs={nowMs} timeZone={timeZone} />
+            )}
+            {m.role === "user" ? (
+              <UserBubble m={m} createdAt={createdAt} timeZone={timeZone} />
+            ) : (
+              <AssistantBubble
+                m={m}
+                createdAt={createdAt}
+                timeZone={timeZone}
+                streaming={status === "streaming" && m.id === lastId}
+                activity={m.id === lastId ? activity : null}
+                chapters={chapters}
+                showAvatar={showAvatar}
+                groupHead={i === 0 || messages[i - 1].role !== "assistant"}
+              />
+            )}
+          </Fragment>
+        );
+      })}
+      {status === "submitted" && <PendingBubble showAvatar={showAvatar} />}
+    </div>
+  );
+}
+
+/** 跨自然日时插入的日期分隔行：今天/昨天用人话，更早给绝对日期。 */
+function DayDivider({ at, nowMs, timeZone }: { at: number; nowMs: number; timeZone: string }) {
+  const { t, i18n } = useTranslation();
+  const kind = dayKind(at, nowMs, timeZone);
+  const label =
+    kind === "today"
+      ? t("ai.day.today", "今天")
+      : kind === "yesterday"
+        ? t("ai.day.yesterday", "昨天")
+        : new Intl.DateTimeFormat(i18n.language, { dateStyle: "long", timeZone }).format(at);
+  return (
+    <div className="flex items-center gap-3" role="separator" aria-label={label}>
+      <span className="h-px flex-1 bg-border" aria-hidden />
+      <span className="shrink-0 text-[11px] text-muted-foreground">{label}</span>
+      <span className="h-px flex-1 bg-border" aria-hidden />
     </div>
   );
 }
@@ -115,9 +148,9 @@ function AssistantActivityIndicator({ activity }: { activity: Exclude<AssistantA
   );
 }
 
-function PendingBubble({ showAvatar, agentName }: { showAvatar: boolean; agentName: string }) {
+function PendingBubble({ showAvatar }: { showAvatar: boolean }) {
   return (
-    <AssistantShell showAvatar={showAvatar} agentName={agentName} groupHead>
+    <AssistantShell showAvatar={showAvatar} groupHead>
       <div className="max-w-full space-y-2 rounded-2xl rounded-bl-sm bg-muted px-3.5 py-2 text-sm leading-relaxed text-foreground">
         <AssistantActivityIndicator activity="preparing" />
       </div>
@@ -125,7 +158,15 @@ function PendingBubble({ showAvatar, agentName }: { showAvatar: boolean; agentNa
   );
 }
 
-function UserBubble({ m }: { m: ChatUIMessage }) {
+function UserBubble({
+  m,
+  createdAt,
+  timeZone,
+}: {
+  m: ChatUIMessage;
+  createdAt: number;
+  timeZone: string;
+}) {
   const { t } = useTranslation();
   const actions = useChatActions();
   const [editing, setEditing] = useState(false);
@@ -150,7 +191,8 @@ function UserBubble({ m }: { m: ChatUIMessage }) {
   }
 
   return (
-    <div className="group flex flex-col items-end" data-message-id={m.id}>
+    <div className="group relative flex flex-col items-end" data-message-id={m.id}>
+      <MessageTimestamp at={createdAt} timeZone={timeZone} align="end" />
       <div className="max-w-[88%] rounded-2xl rounded-br-sm bg-primary px-3 py-2.5 text-primary-foreground">
         {chips.length > 0 && (
           <div className="mb-2 space-y-1.5 border-b border-primary-foreground/20 pb-2">
@@ -178,22 +220,21 @@ function UserBubble({ m }: { m: ChatUIMessage }) {
 
 function AssistantShell({
   children,
+  timestamp,
   showAvatar,
-  agentName,
   groupHead,
   messageId,
 }: {
   children: ReactNode;
+  /** 气泡上方的 hover 浮层（原先此处常驻 agent 名字）。 */
+  timestamp?: ReactNode;
   showAvatar: boolean;
-  agentName: string;
   groupHead: boolean;
   messageId?: string;
 }) {
   const body = (
-    <div className="group flex flex-col items-start" data-message-id={messageId}>
-      {showAvatar && groupHead && (
-        <span className="mb-1 text-xs font-medium text-muted-foreground">{agentName}</span>
-      )}
+    <div className="group relative flex flex-col items-start" data-message-id={messageId}>
+      {timestamp}
       {children}
     </div>
   );
@@ -216,19 +257,21 @@ function AssistantShell({
 
 function AssistantBubble({
   m,
+  createdAt,
+  timeZone,
   streaming,
   activity,
   chapters,
   showAvatar,
-  agentName,
   groupHead,
 }: {
   m: ChatUIMessage;
+  createdAt: number;
+  timeZone: string;
   streaming: boolean;
   activity: AssistantActivity;
   chapters: ChapterRefDto[];
   showAvatar: boolean;
-  agentName: string;
   groupHead: boolean;
 }) {
   const segs = segments(m.parts);
@@ -237,9 +280,14 @@ function AssistantBubble({
   return (
     <AssistantShell
       showAvatar={showAvatar}
-      agentName={agentName}
       groupHead={groupHead}
       messageId={m.id}
+      timestamp={
+        // 流式途中不亮时间：那一刻的「现在」还在走，等落库时刻定下来再显示。
+        streaming ? undefined : (
+          <MessageTimestamp at={createdAt} timeZone={timeZone} align="start" />
+        )
+      }
     >
       <div className="max-w-full space-y-2 rounded-2xl rounded-bl-sm bg-muted px-3.5 py-2 text-sm leading-relaxed text-foreground">
         {segs.map((s, i) =>

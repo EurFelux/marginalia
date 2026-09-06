@@ -20,6 +20,8 @@ export default {
   "ai.conversationList": "Conversations",
   "ai.copied": "Copied",
   "ai.copy": "Copy",
+  "ai.day.today": "Today",
+  "ai.day.yesterday": "Yesterday",
   "ai.edit": "Edit",
   "ai.editCancel": "Cancel",
   "ai.editSave": "Send",
@@ -280,7 +282,6 @@ export default {
   "readingReport.empty": "No report has been saved for this reading session.",
   "readingReport.generate": "Generate report",
   "readingReport.generateFailed": "Unable to generate this report. Please try again.",
-  "readingReport.generating": "Reviewing the thoughts left by this reading…",
   "readingReport.generationStopped": "Generation stopped. Existing content is unchanged.",
   "readingReport.insufficientEvidence":
     "There are not enough reading traces yet. You can write this report yourself.",

@@ -317,7 +317,10 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
 
   const handleSend = (text: string, chips: Chip[]) => {
     followBottomRef.current = true;
-    void sendMessage({ text, metadata: { contextChips: chips } });
+    void sendMessage({
+      text,
+      metadata: { contextChips: chips, createdAt: Temporal.Now.instant().epochMilliseconds },
+    });
   };
 
   return (
