@@ -1,5 +1,12 @@
 # marginalia
 
+## 0.18.5
+
+### Patch Changes
+
+- 6493c69: Fix assistant replies stalling while the model calls a tool. With fast models, the reply text could freeze for several seconds and then appear all at once when the tool finished; it now streams smoothly the whole way through.
+- c4547a4: Assistant replies now fade in as they stream. New text appears the moment it arrives and settles in with a soft trailing fade instead of popping onto the screen. The effect is turned off when your system asks for reduced motion.
+
 ## 0.18.4
 
 ### Patch Changes
