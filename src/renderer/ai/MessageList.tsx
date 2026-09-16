@@ -23,6 +23,15 @@ import { qk } from "@renderer/query/keys";
 import { usePrefsStore } from "@renderer/store/prefs-store";
 import type { ChapterRefDto } from "@shared/library";
 
+/**
+ * 流式正文逐字淡入（Streamdown 内置 animate 插件，仅 isAnimating 时注入 span，已显示的字不重播）。
+ * sep 用 char：默认 word 按空白切分，中文无空格会整段一起淡入。
+ * stagger 必须为 0：每批字到达即渲染（useChat 50ms 合批，快模型一批一二十字），批内错开会拖过下一批到达，
+ * 前批末尾比后批开头更透明，形成多道此起彼伏的波。为 0 时透明度沿文本单调递增，只有一道拖尾；
+ * duration 决定拖尾长短（约最近 duration 毫秒内到达的字仍在淡入）。
+ */
+const STREAM_ANIMATION = { animation: "fadeIn", sep: "char", duration: 500, stagger: 0 } as const;
+
 export function MessageList({
   messages,
   status,
@@ -293,7 +302,9 @@ function AssistantBubble({
         {segs.map((s, i) =>
           s.kind === "text" ? (
             // Streamdown 自带 markdown 排版（经 @source 由 Tailwind 生成其类）；不叠 prose 以免边距打架
-            <LocalizedStreamdown key={i}>{s.text}</LocalizedStreamdown>
+            <LocalizedStreamdown key={i} animated={STREAM_ANIMATION} isAnimating={streaming}>
+              {s.text}
+            </LocalizedStreamdown>
           ) : (
             <ToolStepRow key={i} part={s.part} chapters={chapters} />
           ),

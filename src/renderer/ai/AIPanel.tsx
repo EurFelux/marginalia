@@ -43,6 +43,10 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
   const { messages, sendMessage, status, stop, setMessages, regenerate, error } =
     useChat<ChatUIMessage>({
       transport: createIpcChatTransport(context),
+      // 合批 messages 通知：不节流时每个 chunk 都触发一次同步渲染，渲染侧实测 ~9ms/块，快模型
+      // （~200 块/秒）下 IPC 事件在渲染主线程积压到落后主进程近 10s；且连续的紧急渲染会不断打断
+      // Streamdown 放进 startTransition 的正文更新——工具参数流式期间正文完全停更、最后一次性刷出。
+      throttle: 50,
       // 流式错误此前只塞进 error 字段弹 banner、从不落日志；补一条 warn 使渲染侧失败也有痕迹可查。
       onError: (err) => log.warn("chat stream error", err),
     });

@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "katex/dist/katex.min.css";
+/* 流式正文逐字淡入的 keyframes 与 [data-sd-animate] 规则（MessageList 的 animated 选项依赖） */
+@import "streamdown/styles.css";
 @plugin '@tailwindcss/typography';
 /* Streamdown 在其打包产物里用 Tailwind 工具类渲染 markdown——让 Tailwind 扫描它以生成这些类 */
 @source "../node_modules/streamdown/dist/*.js";
@@ -503,5 +505,12 @@ a {
   body {
     background-color: var(--background);
     color: var(--foreground);
+  }
+}
+
+/* 系统开启「减弱动态效果」时关闭流式淡入 */
+@media (prefers-reduced-motion: reduce) {
+  [data-sd-animate] {
+    animation: none;
   }
 }
