@@ -42,6 +42,8 @@ import { ttsController } from "@renderer/reader/tts/tts-controller";
 import { useTtsStore } from "@renderer/store/tts-store";
 import { EpubSessionProvider } from "@renderer/reader/epub-session";
 import { CompleteReadingDialog } from "@renderer/reading/CompleteReadingDialog";
+import { useSearchStore } from "@renderer/store/search-store";
+import { handleFindShortcut } from "@renderer/reader/search-shortcut";
 
 export function ReaderView({ mode }: { mode: "active" | "reference" }) {
   const { t } = useTranslation();
@@ -62,6 +64,19 @@ export function ReaderView({ mode }: { mode: "active" | "reference" }) {
   const setPanelWidth = usePaneSizeStore((s) => s.setPanelWidth);
   const qc = useQueryClient();
   const ttsStatus = useTtsStore((s) => s.status);
+  const resetSearch = useSearchStore((s) => s.resetForBook);
+
+  // 书内搜索：换书即丢弃上一本的查询与结果。
+  useEffect(() => {
+    resetSearch(bookId);
+  }, [bookId, resetSearch]);
+
+  // ⌘F / Ctrl+F 打开书内搜索。捕获阶段挂 document；ePub 正文在 iframe 内，另由 EpubReader 经
+  // VirtualDocs.onKeyDown 转发（同源 iframe 的键盘事件不冒泡到父文档）。
+  useEffect(() => {
+    document.addEventListener("keydown", handleFindShortcut, true);
+    return () => document.removeEventListener("keydown", handleFindShortcut, true);
+  }, []);
 
   const chapters = useQuery({
     queryKey: qk.chapters(bookId ?? ""),

@@ -139,6 +139,32 @@ describe("reduceReadingPosition", () => {
     ]);
   });
 
+  it("jumps to a search hit, abandoning an in-flight restore", () => {
+    const restoring = reduceReadingPosition(initialReadingPositionState(), ready).next;
+    const hit = { href: "text/ch2.xhtml", occurrence: 3, query: "margin" };
+    const { next, effects } = reduceReadingPosition(restoring, {
+      type: "SEARCH_HIT_REQUESTED",
+      ...hit,
+    });
+    expect(next).toEqual({ kind: "following" });
+    expect(effects).toEqual([
+      { kind: "notifyTtsUserNavigation" },
+      { kind: "scrollToSearchHit", ...hit },
+    ]);
+  });
+
+  it("ignores a search hit jump while the book is still loading", () => {
+    const loading = initialReadingPositionState();
+    expect(
+      reduceReadingPosition(loading, {
+        type: "SEARCH_HIT_REQUESTED",
+        href: "a.xhtml",
+        occurrence: 0,
+        query: "x",
+      }),
+    ).toEqual({ next: loading, effects: [] });
+  });
+
   it("returns to loading when the book changes", () => {
     const { next, effects } = reduceReadingPosition(following(), { type: "BOOK_CHANGED" });
     expect(next).toEqual({ kind: "loading" });

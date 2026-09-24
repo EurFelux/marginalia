@@ -93,6 +93,8 @@ export interface VirtualDocsProps {
   onInternalLink?: (e: { index: number; href: string }) => void;
   /** 点 iframe 内外链（http/https/mailto）时回调；消费方开系统浏览器。 */
   onExternalLink?: (url: string) => void;
+  /** iframe 内 keydown 转发（同源 iframe 的键盘事件不冒泡到父文档）。 */
+  onKeyDown?: (e: KeyboardEvent) => void;
   /** 某 section 离开「active range ± KEEP_DISTANCE」时回调一次，供消费方释放其资源。 */
   onUnloadSection?: (index: number) => void;
   /** 透传给底层 Virtuoso 的 scroller 根元素的 className（如隐藏原生滚动条）。 */
@@ -120,6 +122,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
     onUserNavigation,
     onInternalLink,
     onExternalLink,
+    onKeyDown,
     onUnloadSection,
     className,
     onTransition,
@@ -395,6 +398,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
         onUserScrollNavigation={handleUserScrollNavigation}
         onInternalLink={onInternalLink}
         onExternalLink={onExternalLink}
+        onKeyDown={onKeyDown}
         estimatedHeight={calibratedEstimate(
           heightCache.current,
           sectionWeight,
@@ -426,6 +430,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
       handleUserScrollNavigation,
       onInternalLink,
       onExternalLink,
+      onKeyDown,
       onMeasured,
       registerSection,
       unregisterSection,
@@ -478,6 +483,7 @@ function LazySection({
   onUserScrollNavigation,
   onInternalLink,
   onExternalLink,
+  onKeyDown,
   estimatedHeight,
   onMeasured,
   registerSection,
@@ -499,6 +505,7 @@ function LazySection({
   onUserScrollNavigation?: () => void;
   onInternalLink?: (e: { index: number; href: string }) => void;
   onExternalLink?: (url: string) => void;
+  onKeyDown?: (e: KeyboardEvent) => void;
   estimatedHeight?: number;
   onMeasured?: (index: number, height: number) => void;
   registerSection: (index: number, el: HTMLElement) => void;
@@ -552,6 +559,7 @@ function LazySection({
           onUserScrollNavigation={onUserScrollNavigation}
           onInternalLink={onInternalLink}
           onExternalLink={onExternalLink}
+          onKeyDown={onKeyDown}
           estimatedHeight={estimatedHeight}
           onMeasured={onMeasured}
         />

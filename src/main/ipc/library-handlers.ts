@@ -24,6 +24,7 @@ import {
 import { readBookBytes } from "@main/library/import-source";
 import { getProgress, saveProgress } from "@main/library/progress";
 import { assertTextLayer, getToc, listChapters, readChapterText } from "@main/library/content";
+import { prepareBookSearch, searchBook } from "@main/library/search";
 import {
   assertSummaryModelReady,
   ensureBookSummary,
@@ -51,6 +52,10 @@ async function ensureEpubIndexed(bookId: string): Promise<void> {
     log.warn(`ensureEpubIndexed failed (book ${bookId})`, err);
   }
 }
+
+/** 书内搜索读书文件的方式（searchBook 只在索引未缓存时才调用）。 */
+const searchBookBytes = (bookId: string) => (format: "epub" | "pdf") =>
+  readBookFile(appService.getPath("booksDir"), bookId, format);
 
 const toDto = (b: {
   id: string;
@@ -189,6 +194,16 @@ export const libraryBindings: Binding[] = [
     if (!getBook(db, input.bookId)) throw new Error(`content: book ${input.bookId} not found`);
     await ensureEpubIndexed(input.bookId);
     return listChapters(db, input.bookId);
+  }),
+
+  bind(C.contentSearch, async (input) => {
+    await ensureEpubIndexed(input.bookId);
+    return await searchBook(getDb(), input.bookId, input.query, searchBookBytes(input.bookId));
+  }),
+
+  bind(C.contentPrepareSearch, async (input) => {
+    await ensureEpubIndexed(input.bookId);
+    await prepareBookSearch(getDb(), input.bookId, searchBookBytes(input.bookId));
   }),
 
   bind(C.contentChapterSummary, (input) =>

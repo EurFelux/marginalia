@@ -59,6 +59,8 @@ import type { ReadingStatsDto } from "@shared/stats";
 import { statsGetInput, statsReadingStateInput } from "@shared/stats";
 import type { BackupExportResult, BackupInspection } from "@shared/backup";
 import { backupExportInput, backupRestoreInput } from "@shared/backup";
+import type { BookSearchResult } from "@shared/search";
+import { searchBookInput } from "@shared/search";
 import type { MemoryDto } from "@shared/memory";
 import { deleteMemoryInput, updateMemoryInput } from "@shared/memory";
 import type { AvatarPickResult } from "@shared/agent";
@@ -235,6 +237,9 @@ export const C = {
   // content
   contentToc: def("content:toc", "invoke", bookIdInput, out<TocNode[]>()),
   contentChapters: def("content:chapters", "invoke", bookIdInput, out<ChapterRefDto[]>()),
+  contentSearch: def("content:search", "invoke", searchBookInput, out<BookSearchResult>()),
+  /** 预热书内搜索索引（打开搜索页时调用；构建过程逐章让出事件循环，不阻塞其他 IPC）。 */
+  contentPrepareSearch: def("content:prepare-search", "invoke", bookIdInput, out<void>()),
   contentChapterText: def(
     "content:chapter-text",
     "invoke",

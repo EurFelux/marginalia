@@ -19,6 +19,12 @@ import { useEpubSession } from "./epub-session";
 import { BookFileMissingPanel } from "./BookFileMissingPanel";
 import { epubPercent } from "./percent";
 import { epubReadingContext } from "./epub-reading-context";
+import { applySearchHighlights, SEARCH_HIGHLIGHT_CSS } from "./epub-search";
+import { elementOf } from "./element-of";
+import type { EpubBook } from "./epub-book";
+import type { BookSearchHit } from "@shared/search";
+import { handleFindShortcut } from "./search-shortcut";
+import { useSearchStore } from "@renderer/store/search-store";
 import { prefsToCss } from "./prefs-to-css";
 import { readerThemeCss } from "./reader-theme-css";
 import { sectionSelectToSelectionInfo } from "./epub-selection";
@@ -91,8 +97,7 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
     if (!book) return null;
     const idAssertion = [...cfi.matchAll(/\[([^\]]+)\]/g)].at(-1)?.[1] ?? null;
     // 先试 rangeFromCfi（标注的 range CFI 走这条精确路）；失败再用 [id] 断言 getElementById（进度恢复）。
-    const node = book.rangeFromCfi(cfi, doc)?.startContainer ?? null;
-    const fromRange = node ? (node.nodeType === 1 ? (node as Element) : node.parentElement) : null;
+    const fromRange = elementOf(book.rangeFromCfi(cfi, doc)?.startContainer);
     return fromRange ?? (idAssertion ? doc.getElementById(idAssertion) : null);
   };
 
@@ -274,8 +279,20 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
     });
   };
 
+  // 书内搜索：当前结果的查询串（高亮全部命中）与当前命中（醒目高亮 + 跳转）。
+  const searchQuery = useSearchStore((s) => (s.result?.kind === "ok" ? s.resultQuery : null));
+  const searchActive = useSearchStore((s) =>
+    s.activeIndex !== null && s.result?.kind === "ok" ? s.result.hits[s.activeIndex] : undefined,
+  );
+  const searchJump = useSearchStore((s) => s.jump);
+
+  // section 载入 / 标注变化：重贴标注（改动 DOM），故搜索高亮以 refresh 重新匹配。
   const decorate = (index: number, doc: Document) => {
-    if (book) applyAnnotations(book, annotations.data ?? [], index, doc);
+    if (!book) return;
+    applyAnnotations(book, annotations.data ?? [], index, doc);
+    applySearchHighlights(doc, searchQuery, activeOccurrence(searchActive, book, index), {
+      refresh: true,
+    });
   };
   const onHighlightClick = (
     annoId: string,
@@ -290,10 +307,29 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
     setSelection(null);
   };
 
-  // 标注数据变化（建/改/删后 invalidate）→ 对在挂 section 重贴高亮。
+  // 标注数据变化 → 对在挂 section 重贴高亮。
   useEffect(() => {
     vRef.current?.redecorate();
   }, [annotations.data]);
+
+  // 搜索查询 / 当前命中变化 → 只更新搜索高亮（不重贴标注；同一查询复用各文档的命中缓存）。
+  useEffect(() => {
+    const scroller = vRef.current?.getScrollerElement();
+    if (!scroller) return;
+    for (const el of scroller.querySelectorAll<HTMLElement>("[data-section-index]")) {
+      const doc = el.querySelector("iframe")?.contentDocument;
+      if (!doc?.body) continue;
+      const index = Number(el.dataset.sectionIndex);
+      applySearchHighlights(doc, searchQuery, activeOccurrence(searchActive, book, index));
+    }
+  }, [searchQuery, searchActive, book]);
+
+  // 搜索结果跳转（nonce 递增即一次新请求；同一命中再点也要重新跳）。
+  useEffect(() => {
+    if (!searchJump || searchJump.hit.target.format !== "epub") return;
+    const { href, occurrence } = searchJump.hit.target;
+    raise({ type: "SEARCH_HIT_REQUESTED", href, occurrence, query: searchJump.query });
+  }, [searchJump, raise]);
 
   const onInternalLink = ({ index, href }: { index: number; href: string }) => {
     if (!book) return;
@@ -368,7 +404,9 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
           "\n" +
           readerThemeCss(resolvedTheme === "dark") +
           "\n" +
-          TTS_IFRAME_CSS
+          TTS_IFRAME_CSS +
+          "\n" +
+          SEARCH_HIGHLIGHT_CSS
         }
         initialIndex={initialIndex}
         onTopSectionChange={onTopSectionChange}
@@ -384,9 +422,21 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
         onTransition={(r) => log.debug("viewport transition", r)}
         onInternalLink={onInternalLink}
         onExternalLink={onExternalLink}
+        onKeyDown={handleFindShortcut}
       />
     </div>
   );
+}
+
+/** 当前命中若落在第 index 个 section，返回它在该 section 内的序号；否则 null。 */
+function activeOccurrence(
+  hit: BookSearchHit | undefined,
+  book: EpubBook | null,
+  index: number,
+): number | null {
+  return hit?.target.format === "epub" && book?.indexOfHref(hit.target.href) === index
+    ? hit.target.occurrence
+    : null;
 }
 
 function ReaderError({ message }: { message: string }) {

@@ -9,7 +9,7 @@ import { ScrollArea } from "@renderer/components/ui/scroll-area";
 import { qk } from "@renderer/query/keys";
 import { useAnnotationStore } from "@renderer/store/annotation-store";
 import { STYLE_STRIPE } from "./highlight";
-import { chapterIdAtPage } from "./pdf-chapter-at-page";
+import { chapterIdAtPage } from "@shared/pdf-chapter-at-page";
 import { parsePdfLocatorRange } from "./pdf-locator";
 import { chapterIdAtCfi } from "./chapter-id-at-cfi";
 import { useEpubSession } from "./epub-session";

@@ -35,6 +35,8 @@ export type ReadingPositionEvent =
   | { type: "USER_NAVIGATED" }
   | { type: "CHAPTER_REQUESTED"; chapterId: string }
   | { type: "ANNOTATION_SCROLL"; locator: string }
+  /** 搜索结果跳转：href 所在 spine 文件内第 occurrence 个 query 命中。 */
+  | { type: "SEARCH_HIT_REQUESTED"; href: string; occurrence: number; query: string }
   | { type: "TOP_SECTION_CHANGED"; position: ReadingPosition }
   | { type: "BOOK_CHANGED" };
 
@@ -42,6 +44,7 @@ export type ReadingPositionEffect =
   | { kind: "restoreToCfi"; locator: string; targetIndex: number }
   | { kind: "scrollToChapter"; chapterId: string }
   | { kind: "scrollToAnnotation"; locator: string }
+  | { kind: "scrollToSearchHit"; href: string; occurrence: number; query: string }
   | { kind: "notifyTtsUserNavigation" }
   | { kind: "reportPosition"; position: ReadingPosition }
   | { kind: "persistProgress"; position: ReadingPosition };
@@ -104,6 +107,18 @@ export function reduceReadingPosition(
           { kind: "scrollToAnnotation", locator: event.locator },
         ],
       };
+
+    case "SEARCH_HIT_REQUESTED": {
+      if (state.kind === "loading") return { next: state, effects: [] };
+      const { href, occurrence, query } = event;
+      return {
+        next: { kind: "following" },
+        effects: [
+          { kind: "notifyTtsUserNavigation" },
+          { kind: "scrollToSearchHit", href, occurrence, query },
+        ],
+      };
+    }
 
     case "TOP_SECTION_CHANGED":
       return {
