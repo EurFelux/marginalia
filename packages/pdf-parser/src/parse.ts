@@ -52,6 +52,28 @@ export async function pageText(doc: PDFDocumentProxy, pageNo: number): Promise<s
   return out;
 }
 
+/**
+ * 页内文本流（与渲染层 TextLayer 同一坐标空间：getTextContent 默认参数、items 顺序、不含 EOL 合成换行）
+ * + 行尾断点（items 的 hasEOL 处，供搜索视作空白）。
+ */
+export async function pageTextFlow(
+  doc: PDFDocumentProxy,
+  pageNo: number,
+): Promise<{ text: string; breaks: number[] }> {
+  const page = await doc.getPage(pageNo);
+  const tc = await page.getTextContent();
+  let text = "";
+  const breaks: number[] = [];
+  for (const item of tc.items) {
+    if ("str" in item) {
+      text += item.str;
+      if (item.hasEOL && breaks.at(-1) !== text.length) breaks.push(text.length);
+    }
+  }
+  page.cleanup();
+  return { text, breaks };
+}
+
 interface FlatOutlineEntry {
   title: string;
   pageIndex: number; // 0-based

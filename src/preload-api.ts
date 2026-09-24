@@ -75,6 +75,7 @@ export function createApi(d: PreloadDeps) {
     content: {
       toc: inv(C.contentToc),
       chapters: inv(C.contentChapters),
+      search: inv(C.contentSearch),
       chapterText: inv(C.contentChapterText),
       chapterSummary: inv(C.contentChapterSummary),
       generateChapterSummary: inv(C.contentGenerateChapterSummary),

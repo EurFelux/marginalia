@@ -24,6 +24,7 @@ import {
 import { readBookBytes } from "@main/library/import-source";
 import { getProgress, saveProgress } from "@main/library/progress";
 import { assertTextLayer, getToc, listChapters, readChapterText } from "@main/library/content";
+import { searchBook } from "@main/library/search";
 import {
   assertSummaryModelReady,
   ensureBookSummary,
@@ -189,6 +190,17 @@ export const libraryBindings: Binding[] = [
     if (!getBook(db, input.bookId)) throw new Error(`content: book ${input.bookId} not found`);
     await ensureEpubIndexed(input.bookId);
     return listChapters(db, input.bookId);
+  }),
+
+  bind(C.contentSearch, async (input) => {
+    const db = getDb();
+    const book = getBook(db, input.bookId);
+    if (!book) throw new Error(`content: book ${input.bookId} not found`);
+    await ensureEpubIndexed(input.bookId);
+    // 书文件只在未缓存时才读（searchBook 按 bookId 缓存文本流）。
+    return await searchBook(db, input.bookId, input.query, () =>
+      readBookFile(appService.getPath("booksDir"), input.bookId, book.format),
+    );
   }),
 
   bind(C.contentChapterSummary, (input) =>
