@@ -1,5 +1,17 @@
 # marginalia
 
+## 0.19.0
+
+### Minor Changes
+
+- eb7b8cd: Search inside the book you're reading. Press ⌘F (Ctrl+F on Windows/Linux) anywhere in the reader to open the new Search tab in the sidebar: matches are listed by chapter (or page) with surrounding text, and clicking one — or pressing Enter / Shift+Enter — jumps straight to it with the match highlighted in the text. Search ignores case, treats full-width and half-width characters alike, finds Chinese phrases across line breaks, and covers text in tables and other places the AI's reading tools skip. Works for ePub and PDFs with a text layer; scanned PDFs say why they can't be searched.
+
+### Patch Changes
+
+- 99573e6: Chat replies now tell you when they end abnormally. A reply cut off by the model's output limit, stopped by a content filter, or aborted by the provider shows an error banner instead of silently looking finished; the text received so far is kept. A reply where the AI mistyped a tool call but recovered on its own is no longer marked as failed, and a tool step the model never got to run shows "Not run" instead of loading forever.
+- 32c2047: The built-in DeepSeek provider now speaks its native chat API via the official `@ai-sdk/deepseek` package: thinking streams and prompt-cache stats are handled natively, and a server-side resource interruption (`insufficient_system_resource`) is now surfaced as an error you can retry instead of silently looking like a finished reply. You can also switch DeepSeek to the OpenAI Responses API in Settings — three API formats (Chat Completions / Responses / Anthropic) are now selectable.
+- 8ed2fd6: Asking the AI right after opening a book you have never read no longer fails with an "invalid input" error before you scroll.
+
 ## 0.18.5
 
 ### Patch Changes
