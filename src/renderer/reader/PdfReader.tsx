@@ -30,6 +30,12 @@ import { findPdfTextLinks } from "./pdf-autolink";
 import { overlayClass } from "./highlight";
 import type { PdfPageAnno } from "./pdf-annotations";
 import { hitHighlight, usePdfHighlights } from "./use-pdf-highlights";
+import {
+  NO_SEARCH_MARKS,
+  usePdfSearchHighlights,
+  type PdfSearchMark,
+} from "./use-pdf-search-highlights";
+import { useSearchStore } from "@renderer/store/search-store";
 import { useNoteHoverStore } from "@renderer/store/note-hover-store";
 
 const log = createLogger("pdf");
@@ -102,6 +108,9 @@ export function PdfReader({ bookId, chapters, persistProgress }: Props) {
     staleTime: Infinity,
   });
   const scrollCommand = useAnnotationStore((s) => s.scrollCommand);
+  const searchResult = useSearchStore((s) => s.result);
+  const searchActiveIndex = useSearchStore((s) => s.activeIndex);
+  const searchJump = useSearchStore((s) => s.jump);
 
   // 容器宽度（适宽缩放的输入）：ResizeObserver 跟踪。
   // 依赖 bytes.data?.ok：缺失态会先 early-return 出 BookFileMissingPanel（containerRef 容器未挂载），
@@ -171,6 +180,12 @@ export function PdfReader({ bookId, chapters, persistProgress }: Props) {
     const r = parsePdfLocatorRange(scrollCommand.locator);
     if (r) virtuosoRef.current?.scrollToIndex({ index: r.page - 1, align: "start" });
   }, [book, scrollCommand]);
+
+  // 搜索结果跳转：先把命中所在页滚进视口；页面文本层就绪后由 PdfPage 把命中矩形居中。
+  useEffect(() => {
+    if (!book || !searchJump || searchJump.hit.target.format !== "pdf") return;
+    virtuosoRef.current?.scrollToIndex({ index: searchJump.hit.target.page - 1, align: "center" });
+  }, [book, searchJump]);
 
   // .selecting 清理挂 document 捕获：拖选释放在容器外（窗外/浮层上）时容器 onMouseUp
   // 不触发，class 残留会让该页链接层一直收不到 pointer 事件（链接永久不可点）。
@@ -401,6 +416,18 @@ export function PdfReader({ bookId, chapters, persistProgress }: Props) {
 
   // 标注按页分组（每渲染重算；可见页 × 条数级，开销可忽略——React Compiler 亦会缓存）。
   const annosByPage = pdfAnnosByPage(annotations.data ?? []);
+  // 搜索命中按页分组（当前命中标 active）；只有当前命中所在页拿到跳转 nonce。
+  const searchMarksByPage = new Map<number, PdfSearchMark[]>();
+  if (searchResult?.kind === "ok") {
+    searchResult.hits.forEach((hit, i) => {
+      if (hit.target.format !== "pdf") return;
+      const list = searchMarksByPage.get(hit.target.page) ?? [];
+      list.push({ start: hit.target.start, end: hit.target.end, active: i === searchActiveIndex });
+      searchMarksByPage.set(hit.target.page, list);
+    });
+  }
+  const searchJumpPage =
+    searchJump?.hit.target.format === "pdf" ? searchJump.hit.target.page : null;
 
   // 恢复位置：页 + 页内比例 → 精确 scrollTop（全书同尺寸直接算，无挂载后跳动）。
   // 首页页顶特判回 0：scrollTopFor(1, 0) = 8px（py-2 上缝），别让书首露半截缝。
@@ -479,6 +506,8 @@ export function PdfReader({ bookId, chapters, persistProgress }: Props) {
             cssHeight={pageH}
             invert={resolvedTheme === "dark"}
             annos={annosByPage.get(index + 1) ?? []}
+            searchMarks={searchMarksByPage.get(index + 1) ?? NO_SEARCH_MARKS}
+            searchJumpNonce={searchJumpPage === index + 1 ? searchJump!.nonce : null}
             onLinkPage={(pageNumber) =>
               virtuosoRef.current?.scrollToIndex({ index: pageNumber - 1, align: "start" })
             }
@@ -497,9 +526,22 @@ function PdfPage(props: {
   cssHeight: number;
   invert: boolean;
   annos: PdfPageAnno[];
+  searchMarks: PdfSearchMark[];
+  /** 当前搜索跳转落在本页时为其 nonce，否则 null。 */
+  searchJumpNonce: number | null;
   onLinkPage: (pageNumber: number) => void;
 }) {
-  const { book, index, cssWidth, cssHeight, invert, annos, onLinkPage } = props;
+  const {
+    book,
+    index,
+    cssWidth,
+    cssHeight,
+    invert,
+    annos,
+    searchMarks,
+    searchJumpNonce,
+    onLinkPage,
+  } = props;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const textLayerRef = useRef<HTMLDivElement | null>(null);
   const annotationLayerRef = useRef<HTMLDivElement | null>(null);
@@ -512,6 +554,17 @@ function PdfPage(props: {
   const leaveHighlight = useNoteHoverStore((s) => s.leaveHighlight);
   const lastNotedId = useRef<string | null>(null);
   const highlights = usePdfHighlights(annos, textLayerRef.current, textReady);
+  const searchRects = usePdfSearchHighlights(searchMarks, textLayerRef.current, textReady);
+  const activeSearchRef = useRef<HTMLDivElement | null>(null);
+  const scrolledJumpNonce = useRef<number | null>(null);
+
+  // 每次跳转只居中一次：等本页文本层就绪、当前命中矩形画出来后再滚。
+  useEffect(() => {
+    if (searchJumpNonce === null || scrolledJumpNonce.current === searchJumpNonce) return;
+    if (!activeSearchRef.current) return;
+    scrolledJumpNonce.current = searchJumpNonce;
+    activeSearchRef.current.scrollIntoView({ block: "center", inline: "nearest" });
+  }, [searchJumpNonce, searchRects]);
   const [autoLinks, setAutoLinks] = useState<PdfAutoLink[]>([]);
 
   // 渲染策略：首次/滚动到新页 → 立即渲染；同页缩放（cssWidth 变）→ debounce 重渲，过程中可见
@@ -655,6 +708,30 @@ function PdfPage(props: {
               <div
                 key={`${h.annoId}-${Math.round(h.rect.left)}-${Math.round(h.rect.top)}`}
                 className={cn("absolute", overlayClass(h.style, h.hasNote))}
+                // 运行时计算的矩形几何
+                style={{
+                  left: h.rect.left,
+                  top: h.rect.top,
+                  width: h.rect.width,
+                  height: h.rect.height,
+                }}
+              />
+            ))}
+          </div>
+          {/* 搜索命中 overlay：与标注 overlay 同层级、纯视觉。当前命中挂 ref 供跳转居中。 */}
+          <div className="pointer-events-none absolute inset-0">
+            {searchRects.map((h, i) => (
+              <div
+                key={`search-${i}`}
+                ref={
+                  h.active && !searchRects.slice(0, i).some((r) => r.active)
+                    ? activeSearchRef
+                    : undefined
+                }
+                className={cn(
+                  "absolute rounded-[2px]",
+                  h.active ? "bg-orange-500/50" : "bg-yellow-400/35",
+                )}
                 // 运行时计算的矩形几何
                 style={{
                   left: h.rect.left,

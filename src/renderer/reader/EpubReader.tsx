@@ -19,6 +19,9 @@ import { useEpubSession } from "./epub-session";
 import { BookFileMissingPanel } from "./BookFileMissingPanel";
 import { epubPercent } from "./percent";
 import { epubReadingContext } from "./epub-reading-context";
+import { applySearchHighlights, SEARCH_HIGHLIGHT_CSS } from "./epub-search";
+import { handleFindShortcut } from "./search-shortcut";
+import { useSearchStore } from "@renderer/store/search-store";
 import { prefsToCss } from "./prefs-to-css";
 import { readerThemeCss } from "./reader-theme-css";
 import { sectionSelectToSelectionInfo } from "./epub-selection";
@@ -274,8 +277,21 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
     });
   };
 
+  // 书内搜索：当前结果的查询串（高亮全部命中）与当前命中（醒目高亮 + 跳转）。
+  const searchQuery = useSearchStore((s) => (s.result?.kind === "ok" ? s.resultQuery : null));
+  const searchActive = useSearchStore((s) =>
+    s.activeIndex !== null && s.result?.kind === "ok" ? s.result.hits[s.activeIndex] : undefined,
+  );
+  const searchJump = useSearchStore((s) => s.jump);
+
   const decorate = (index: number, doc: Document) => {
-    if (book) applyAnnotations(book, annotations.data ?? [], index, doc);
+    if (!book) return;
+    applyAnnotations(book, annotations.data ?? [], index, doc);
+    const active =
+      searchActive?.target.format === "epub" && book.indexOfHref(searchActive.target.href) === index
+        ? searchActive.target.occurrence
+        : null;
+    applySearchHighlights(doc, searchQuery, active);
   };
   const onHighlightClick = (
     annoId: string,
@@ -290,10 +306,17 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
     setSelection(null);
   };
 
-  // 标注数据变化（建/改/删后 invalidate）→ 对在挂 section 重贴高亮。
+  // 标注数据 / 搜索结果 / 当前命中变化 → 对在挂 section 重贴高亮。
   useEffect(() => {
     vRef.current?.redecorate();
-  }, [annotations.data]);
+  }, [annotations.data, searchQuery, searchActive]);
+
+  // 搜索结果跳转（nonce 递增即一次新请求；同一命中再点也要重新跳）。
+  useEffect(() => {
+    if (!searchJump || searchJump.hit.target.format !== "epub") return;
+    const { href, occurrence } = searchJump.hit.target;
+    raise({ type: "SEARCH_HIT_REQUESTED", href, occurrence, query: searchJump.query });
+  }, [searchJump, raise]);
 
   const onInternalLink = ({ index, href }: { index: number; href: string }) => {
     if (!book) return;
@@ -368,7 +391,9 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
           "\n" +
           readerThemeCss(resolvedTheme === "dark") +
           "\n" +
-          TTS_IFRAME_CSS
+          TTS_IFRAME_CSS +
+          "\n" +
+          SEARCH_HIGHLIGHT_CSS
         }
         initialIndex={initialIndex}
         onTopSectionChange={onTopSectionChange}
@@ -384,6 +409,7 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
         onTransition={(r) => log.debug("viewport transition", r)}
         onInternalLink={onInternalLink}
         onExternalLink={onExternalLink}
+        onKeyDown={handleFindShortcut}
       />
     </div>
   );

@@ -36,6 +36,8 @@ interface Props {
   onInternalLink?: (e: { index: number; href: string }) => void;
   /** 点 iframe 内外链（http/https/mailto）时回调；消费方开系统浏览器。 */
   onExternalLink?: (url: string) => void;
+  /** iframe 内 keydown（同源 iframe 的键盘事件不冒泡到父文档）；消费方借此实现阅读器快捷键。 */
+  onKeyDown?: (e: KeyboardEvent) => void;
   /** 就绪前的占位高度（来自 VirtualDocs 测高缓存）；避免就绪前 0/默认高度造成跳变。 */
   estimatedHeight?: number;
   /** 内容就绪、测得稳定高度后回调（index, heightPx），供 VirtualDocs 写测高缓存。 */
@@ -74,6 +76,7 @@ export function SectionFrame({
   onMeasured,
   onInternalLink,
   onExternalLink,
+  onKeyDown,
 }: Props) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   // 用 ref 持最新回调，避免回调身份变化触发 effect 重挂
@@ -91,6 +94,7 @@ export function SectionFrame({
     onMeasured,
     onInternalLink,
     onExternalLink,
+    onKeyDown,
   });
   cbRef.current = {
     onSelect,
@@ -106,6 +110,7 @@ export function SectionFrame({
     onMeasured,
     onInternalLink,
     onExternalLink,
+    onKeyDown,
   };
   const docRef = useRef<Document | null>(null);
 
@@ -167,6 +172,7 @@ export function SectionFrame({
       cbRef.current.onContentMouseDown?.();
     };
     const onUserNavigationInput = () => cbRef.current.onUserNavigation?.();
+    const onDocKeyDown = (e: KeyboardEvent) => cbRef.current.onKeyDown?.(e);
     const onUserScrollNavigationInput = () => cbRef.current.onUserScrollNavigation?.();
     // 上次命中的带笔记高亮 id（仅在变化时上报，减少无谓 store 写入与重渲染）。
     let lastNotedId: string | null = null;
@@ -234,6 +240,7 @@ export function SectionFrame({
       doc?.removeEventListener("touchstart", onUserScrollNavigationInput);
       doc?.removeEventListener("pointerdown", onUserNavigationInput);
       doc?.removeEventListener("keydown", onUserScrollNavigationInput);
+      doc?.removeEventListener("keydown", onDocKeyDown);
       doc?.removeEventListener("mousemove", onContentMove);
       doc?.removeEventListener("mouseout", onContentOut);
       if (doc?.body) doc.body.style.cursor = "";
@@ -289,6 +296,7 @@ export function SectionFrame({
       doc.addEventListener("touchstart", onUserScrollNavigationInput, { passive: true });
       doc.addEventListener("pointerdown", onUserNavigationInput);
       doc.addEventListener("keydown", onUserScrollNavigationInput);
+      doc.addEventListener("keydown", onDocKeyDown);
       doc.addEventListener("mousemove", onContentMove);
       doc.addEventListener("mouseout", onContentOut);
     };
