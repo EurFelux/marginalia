@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { findMatches, snippetAround, type SearchableText } from "@shared/text-search";
+import {
+  buildSearchIndex,
+  findInIndex,
+  findMatches,
+  snippetAround,
+  type SearchableText,
+} from "@shared/text-search";
 
 const src = (text: string, breaks: number[] = []): SearchableText => ({ text, breaks });
 const found = (source: SearchableText, query: string) =>
@@ -56,6 +62,28 @@ describe("findMatches", () => {
   it("maps compatibility expansions back to the whole source character", () => {
     // ﬁ（U+FB01）经 NFKC 展开为 fi：命中范围覆盖整个原字符
     expect(found(src("the ﬁrst page"), "first")).toEqual(["ﬁrst"]);
+  });
+});
+
+describe("buildSearchIndex / findInIndex", () => {
+  it("answers many queries from one index exactly like findMatches", () => {
+    const s = src("The Margin, the ＭＡＲＧＩＮＳ and 书页的\n边缘", [11]);
+    const index = buildSearchIndex(s);
+    for (const q of ["margin", "the", "书页的边缘", "ＴＨＥ ＭＡＲＧＩＮＳ", "absent", ""]) {
+      expect(findInIndex(index, q)).toEqual(findMatches(s, q));
+    }
+  });
+
+  it("maps a match ending on a surrogate pair to the end of that character", () => {
+    // U+1D400 MATHEMATICAL BOLD CAPITAL A 占两个 UTF-16 单元，NFKC 后为 "A"
+    const s = src("x \u{1D400}\u{1D401} y");
+    const [m] = findInIndex(buildSearchIndex(s), "ab");
+    expect(s.text.slice(m!.start, m!.end)).toBe("\u{1D400}\u{1D401}");
+  });
+
+  it("keeps working across the index's growth when compatibility characters expand", () => {
+    const s = src("ﬃ".repeat(40) + " office");
+    expect(findInIndex(buildSearchIndex(s), "office")).toEqual([{ start: 41, end: 47 }]);
   });
 });
 

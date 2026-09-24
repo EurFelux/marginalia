@@ -1,7 +1,7 @@
 import { strToU8, zipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 import { makeFixtureEpub } from "./fixture";
-import { sectionTextFlows } from "./search-text";
+import { sectionTextFlow, sectionTextFlows, spineHrefs } from "./search-text";
 
 function oneFileEpub(body: string): Uint8Array {
   return zipSync({
@@ -42,5 +42,12 @@ describe("sectionTextFlows", () => {
     );
     expect(flow!.text).toBe("A & BC");
     expect(flow!.anchors).toEqual({ a1: 0, a2: 5 });
+  });
+
+  it("reads the spine and single sections without inflating unrelated entries", () => {
+    const bytes = makeFixtureEpub();
+    expect(spineHrefs(bytes)).toEqual(["OEBPS/ch1.xhtml", "OEBPS/ch2.xhtml"]);
+    expect(sectionTextFlow(bytes, "OEBPS/ch2.xhtml")?.text).toBe("Chapter TwoThe end.");
+    expect(sectionTextFlow(bytes, "OEBPS/missing.xhtml")).toBeNull();
   });
 });

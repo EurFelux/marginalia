@@ -1,12 +1,27 @@
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { eq } from "drizzle-orm";
 import { makeFixtureEpub } from "@marginalia/epub-parser";
 import { fixturePageText, makeScannedPdf, makeTextPdf } from "@marginalia/pdf-parser/fixture";
 import { openPdf, pageTextFlow } from "@marginalia/pdf-parser";
 import { createDb, runMigrations } from "@main/db/client";
 import { importBook } from "@main/library/repository";
-import { searchBook, searchCorpus, type SearchCorpus } from "@main/library/search";
+import { listChapters } from "@main/library/content";
+import { books } from "@main/db/schema";
+import {
+  indexCorpus,
+  prepareBookSearch,
+  searchBook,
+  searchCorpus,
+  type SearchCorpus,
+} from "@main/library/search";
 import type { ChapterRefDto } from "@shared/library";
+
+// 包一层计数：章节列表是 N+1 查询（大书上 ~20ms），应随索引缓存、不必每次查询都取。
+vi.mock("@main/library/content", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@main/library/content")>();
+  return { ...actual, listChapters: vi.fn(actual.listChapters) };
+});
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
 
@@ -48,7 +63,7 @@ describe("searchCorpus (epub)", () => {
   ];
 
   it("numbers hits per spine file and attributes them to chapters", () => {
-    const { hits, truncated } = searchCorpus(corpus, chapters, "margin");
+    const { hits, truncated } = searchCorpus(indexCorpus(corpus), chapters, "margin");
     expect(truncated).toBe(false);
     expect(hits.map((h) => [h.chapterId, h.target])).toEqual([
       ["pre", { format: "epub", href: "s1.xhtml", occurrence: 0 }],
@@ -59,18 +74,22 @@ describe("searchCorpus (epub)", () => {
   });
 
   it("builds a snippet around each hit", () => {
-    const { hits } = searchCorpus(corpus, chapters, "orphan");
+    const { hits } = searchCorpus(indexCorpus(corpus), chapters, "orphan");
     expect(hits[0]!.snippet).toEqual({ before: "", match: "Orphan", after: " margin text." });
   });
 
   it("stops at the limit and reports truncation", () => {
-    const { hits, truncated } = searchCorpus(corpus, chapters, "margin", 3);
+    const { hits, truncated } = searchCorpus(indexCorpus(corpus), chapters, "margin", 3);
     expect(hits).toHaveLength(3);
     expect(truncated).toBe(true);
   });
 
   it("attributes hits before any chapter to no chapter", () => {
-    const { hits } = searchCorpus(corpus, [chapter({ id: "last", href: "s3.xhtml" })], "preface");
+    const { hits } = searchCorpus(
+      indexCorpus(corpus),
+      [chapter({ id: "last", href: "s3.xhtml" })],
+      "preface",
+    );
     expect(hits[0]!.chapterId).toBeNull();
   });
 });
@@ -90,7 +109,7 @@ describe("searchCorpus (pdf)", () => {
       chapter({ id: "one", href: "pdf-ch:0", startPage: 1 }),
       chapter({ id: "two", href: "pdf-ch:1", startPage: 3, orderIndex: 1 }),
     ];
-    const { hits } = searchCorpus(corpus, chapters, "beta");
+    const { hits } = searchCorpus(indexCorpus(corpus), chapters, "beta");
     expect(hits.map((h) => [h.chapterId, h.target])).toEqual([
       ["one", { format: "pdf", page: 1, start: 6, end: 10 }],
       ["two", { format: "pdf", page: 3, start: 0, end: 4 }],
@@ -129,6 +148,61 @@ describe("searchBook", () => {
       expect(flow.text.slice(hit.target.start, hit.target.end).replace(/\s/g, "")).toBe("page2");
     }
     await doc.loadingTask.destroy();
+  });
+
+  it("yields to the event loop while building the index, so other IPC is not starved", async () => {
+    const db = freshDb();
+    const bytes = makeFixtureEpub({ title: "Yield Check" });
+    const book = await importBook(db, { bytes });
+    const order: string[] = [];
+    const search = searchBook(db, book.id, "chapter", async () => bytes).then(() =>
+      order.push("search done"),
+    );
+    setImmediate(() => order.push("other work"));
+    await search;
+    expect(order).toEqual(["other work", "search done"]);
+  });
+
+  it("reuses the index prepared ahead of the first query", async () => {
+    const db = freshDb();
+    const bytes = makeFixtureEpub({ title: "Prepare Check" });
+    const book = await importBook(db, { bytes });
+    let loads = 0;
+    const loadBytes = async () => {
+      loads++;
+      return bytes;
+    };
+    await prepareBookSearch(db, book.id, loadBytes);
+    const first = await searchBook(db, book.id, "hello", loadBytes);
+    const second = await searchBook(db, book.id, "end", loadBytes);
+    expect(loads).toBe(1);
+    expect(first.kind === "ok" && first.hits.length).toBe(1);
+    expect(second.kind === "ok" && second.hits.length).toBe(1);
+  });
+
+  it("loads the chapter list once per index, not once per query", async () => {
+    const db = freshDb();
+    const bytes = makeFixtureEpub({ title: "Chapters Once" });
+    const book = await importBook(db, { bytes });
+    vi.mocked(listChapters).mockClear();
+    await searchBook(db, book.id, "hello", async () => bytes);
+    await searchBook(db, book.id, "end", async () => bytes);
+    expect(vi.mocked(listChapters)).toHaveBeenCalledTimes(1);
+  });
+
+  it("rebuilds the index after the book is re-indexed with a new parser version", async () => {
+    const db = freshDb();
+    const bytes = makeFixtureEpub({ title: "Reindex Check" });
+    const book = await importBook(db, { bytes });
+    let loads = 0;
+    const loadBytes = async () => {
+      loads++;
+      return bytes;
+    };
+    await searchBook(db, book.id, "hello", loadBytes);
+    db.update(books).set({ parserVersion: 999 }).where(eq(books.id, book.id)).run();
+    await searchBook(db, book.id, "hello", loadBytes);
+    expect(loads).toBe(2);
   });
 
   it("reports a scanned pdf instead of returning nothing", async () => {

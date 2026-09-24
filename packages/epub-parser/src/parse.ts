@@ -44,9 +44,9 @@ type Manifest = Map<string, { href: string; properties: string }>;
  * 定位并解析 OPF：返回 package 节点、OPF 目录、manifest(id→解析后包内绝对 href) 与取文件文本的闭包。
  * 供 parseEpub 与 readSpine 共享——后者要在不重复定位 container/OPF 的前提下拿到有序 spine。
  */
-function loadOpf(files: Record<string, Uint8Array>) {
+function loadOpf(read: (path: string) => Uint8Array | undefined) {
   const text = (p: string): string => {
-    const b = files[p];
+    const b = read(p);
     if (!b) throw new Error(`epub: missing entry ${p}`);
     return strFromU8(b);
   };
@@ -88,13 +88,24 @@ function buildSpine(itemref: unknown, manifest: Manifest): SpineItem[] {
  * 避免二次全解压——供跨 spine 章节抽取（extractChapterAcrossSpine）按阅读顺序枚举文件。
  */
 export function readSpine(files: Record<string, Uint8Array>): SpineItem[] {
-  const { pkg, manifest } = loadOpf(files);
+  const { pkg, manifest } = loadOpf((p) => files[p]);
+  return buildSpine(pkg.spine?.itemref, manifest);
+}
+
+/** 只解压 epub 里的这一个条目（图片等大资源不碰）；缺失返回 undefined。 */
+export function unzipEntry(bytes: Uint8Array, path: string): Uint8Array | undefined {
+  return unzipSync(bytes, { filter: (f) => f.name === path })[path];
+}
+
+/** 直接从 epub 字节读有序 spine：只解压 container.xml 与 OPF。 */
+export function readSpineFromBytes(bytes: Uint8Array): SpineItem[] {
+  const { pkg, manifest } = loadOpf((p) => unzipEntry(bytes, p));
   return buildSpine(pkg.spine?.itemref, manifest);
 }
 
 export function parseEpub(bytes: Uint8Array): ParsedEpub {
   const files = unzipSync(bytes);
-  const { pkg, manifest, text } = loadOpf(files);
+  const { pkg, manifest, text } = loadOpf((p) => files[p]);
   const meta = pkg.metadata ?? {};
   const uniqueId: string | undefined = pkg["@_unique-identifier"];
 

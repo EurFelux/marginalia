@@ -238,6 +238,8 @@ export const C = {
   contentToc: def("content:toc", "invoke", bookIdInput, out<TocNode[]>()),
   contentChapters: def("content:chapters", "invoke", bookIdInput, out<ChapterRefDto[]>()),
   contentSearch: def("content:search", "invoke", searchBookInput, out<BookSearchResult>()),
+  /** 预热书内搜索索引（打开搜索页时调用；构建过程逐章让出事件循环，不阻塞其他 IPC）。 */
+  contentPrepareSearch: def("content:prepare-search", "invoke", bookIdInput, out<void>()),
   contentChapterText: def(
     "content:chapter-text",
     "invoke",
