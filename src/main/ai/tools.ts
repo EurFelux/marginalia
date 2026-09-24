@@ -59,9 +59,9 @@ export function resolveChapterRef(db: DB, bookId: string, ref: string): string {
 }
 
 /**
- * tool 执行错误不抛、转 `{ error }` result：AI SDK v6 中 execute 抛错会中断整条流式
- * 回复（onError → 该轮 status=error），模型没有自我纠正的机会；转 result 后错误进入
- * 对话流，模型可据错误信息（如 resolveChapterRef 的章节清单）换参重试。
+ * tool 执行错误不抛、转 `{ error }` result：错误原文作为正常 result 进入对话流，模型可据
+ * 错误信息（如 resolveChapterRef 的章节清单）换参重试。execute 抛错本身也不会中断回合
+ * （SDK 转成 tool-error 喂回模型、循环继续；只有流级错误才使该轮 status=error，见 stream-assistant）。
  */
 export async function runTool<T>(
   name: string,

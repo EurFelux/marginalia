@@ -1,6 +1,7 @@
 // src/main/ai/send.test.ts
 import path from "node:path";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import type { UIMessageChunk } from "ai";
 import { MockLanguageModelV4, simulateReadableStream } from "ai/test";
 import { makeFixtureEpub } from "@marginalia/epub-parser";
 import { makeTextPdf } from "@marginalia/pdf-parser/fixture";
@@ -20,6 +21,7 @@ import type { LoadBytes } from "@main/ai/tools";
 import { runResend, runSend, type SendDeps, type SendInput } from "@main/ai/send";
 import { __resetNamingRuntime } from "@main/chat/conversation-title";
 import type { RunBackground } from "@main/ai/background-limiter";
+import { initMainI18n } from "@main/i18n";
 
 const passThrough: RunBackground = (fn) => fn();
 
@@ -865,5 +867,149 @@ describe("runResend", () => {
     await r.finished;
     expect(getMessage(db, user.id)?.parts).toEqual([{ type: "text", text: "EDITED QUESTION" }]);
     expect(captured.texts.join("\n")).toContain("EDITED QUESTION");
+  });
+});
+
+// ── 回合终态（#109）：只有流级错误落 error；能自愈的不算；异常 finish reason 需反馈 ──
+
+type StepChunks = unknown[];
+
+/** 多步脚本 mock：第 n 次 doStream 回放 steps[n]（越界回放最后一步）。 */
+function scriptedModel(steps: StepChunks[]) {
+  let call = 0;
+  return new MockLanguageModelV4({
+    doStream: async () => {
+      const chunks = steps[Math.min(call, steps.length - 1)];
+      call += 1;
+      return { stream: simulateReadableStream({ chunks: chunks as never[] }) };
+    },
+  });
+}
+
+const textStep = (
+  text: string,
+  reason: "stop" | "length" | "content-filter" | "error" = "stop",
+) => [
+  { type: "text-start", id: "t1" },
+  { type: "text-delta", id: "t1", delta: text },
+  { type: "text-end", id: "t1" },
+  { type: "finish", finishReason: { unified: reason, raw: undefined }, usage: USAGE },
+];
+
+/** 跑一轮 runSend，排干 caller stream，返回落库的 assistant 与 caller stream 的 chunk 序列。 */
+async function runTurn(steps: StepChunks[]) {
+  const { db, book, deps } = await setup({
+    ok: true,
+    model: scriptedModel(steps),
+    modelId: "mock",
+  });
+  const convo = createConversation(db, { bookId: book.id });
+  const r = await runSend(deps, input(book.id, convo.id));
+  if (!r.ok) throw new Error(`runSend rejected: ${r.reason}`);
+  const chunks: UIMessageChunk[] = [];
+  for await (const chunk of r.stream) chunks.push(chunk);
+  await r.finished;
+  const assistant = listMessages(db, r.conversationId).find((m) => m.role === "assistant")!;
+  return { assistant, chunks, types: chunks.map((c) => c.type) };
+}
+
+describe("turn outcome", () => {
+  beforeAll(() => initMainI18n("en"));
+
+  it("keeps a turn complete when the model recovers from a malformed tool call", async () => {
+    const { assistant, types } = await runTurn([
+      [
+        { type: "tool-call", toolCallId: "c1", toolName: "getToc", input: '{"par' },
+        finishChunk("tool-calls"),
+      ],
+      textStep("Recovered."),
+    ]);
+    expect(assistant.status).toBe("complete");
+    expect(assistant.metadata?.error).toBeUndefined();
+    expect(types).not.toContain("error");
+    expect(assistant.parts.some((p) => "state" in p && p.state === "output-error")).toBe(true);
+  });
+
+  it("keeps a truncated reply complete but surfaces feedback before the finish chunk", async () => {
+    const { assistant, chunks, types } = await runTurn([textStep("Half an ans", "length")]);
+    expect(assistant.status).toBe("complete");
+    expect(assistant.metadata?.finish).toEqual({ reason: "length" });
+    expect(JSON.stringify(assistant.parts)).toContain("Half an ans");
+    const errorAt = types.indexOf("error");
+    expect(errorAt).toBeGreaterThan(-1);
+    expect(errorAt).toBe(types.indexOf("finish") - 1);
+    expect(types.filter((t) => t === "error")).toHaveLength(1);
+    expect((chunks[errorAt] as { errorText: string }).errorText).toMatch(/length|长度/i);
+  });
+
+  it("persists a provider-declared error finish as an error turn and keeps the partial text", async () => {
+    const { assistant, chunks, types } = await runTurn([
+      [
+        { type: "text-start", id: "t1" },
+        { type: "text-delta", id: "t1", delta: "Partial" },
+        { type: "text-end", id: "t1" },
+        {
+          type: "finish",
+          finishReason: { unified: "error", raw: "insufficient_system_resource" },
+          usage: USAGE,
+        },
+      ],
+    ]);
+    expect(assistant.status).toBe("error");
+    expect(assistant.metadata?.finish).toEqual({
+      reason: "error",
+      raw: "insufficient_system_resource",
+    });
+    expect(JSON.stringify(assistant.parts)).toContain("Partial");
+    expect(types.filter((t) => t === "error")).toHaveLength(1);
+    const error = chunks.find((c) => c.type === "error") as { errorText: string };
+    expect(error.errorText).toContain("insufficient_system_resource");
+  });
+
+  it("gives a stream-level error exactly one feedback and no finish metadata", async () => {
+    const { assistant, types } = await runTurn([
+      [
+        { type: "text-start", id: "t1" },
+        { type: "text-delta", id: "t1", delta: "Half" },
+        { type: "error", error: new Error("socket hang up") },
+        { type: "finish", finishReason: { unified: "error", raw: undefined }, usage: USAGE },
+      ],
+    ]);
+    expect(assistant.status).toBe("error");
+    expect(assistant.metadata?.error?.message).toContain("socket hang up");
+    expect(assistant.metadata?.finish).toBeUndefined();
+    expect(types.filter((t) => t === "error")).toHaveLength(1);
+  });
+
+  it("keeps a content-filtered reply complete and surfaces feedback", async () => {
+    const { assistant, types } = await runTurn([textStep("Some text", "content-filter")]);
+    expect(assistant.status).toBe("complete");
+    expect(assistant.metadata?.finish).toEqual({ reason: "content-filter" });
+    expect(types.filter((t) => t === "error")).toHaveLength(1);
+  });
+
+  it("keeps a turn complete when the model recovers from schema-invalid tool input", async () => {
+    const { assistant, types } = await runTurn([
+      [
+        {
+          type: "tool-call",
+          toolCallId: "c1",
+          toolName: "getChapterSummary",
+          input: '{"chapterId": 42}',
+        },
+        finishChunk("tool-calls"),
+      ],
+      textStep("Recovered."),
+    ]);
+    expect(assistant.status).toBe("complete");
+    expect(types).not.toContain("error");
+    expect(assistant.parts.some((p) => "state" in p && p.state === "output-error")).toBe(true);
+  });
+
+  it("does not surface feedback for a normal reply", async () => {
+    const { assistant, types } = await runTurn([textStep("All good.")]);
+    expect(assistant.status).toBe("complete");
+    expect(assistant.metadata?.finish).toBeUndefined();
+    expect(types).not.toContain("error");
   });
 });

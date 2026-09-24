@@ -306,7 +306,7 @@ function AssistantBubble({
               {s.text}
             </LocalizedStreamdown>
           ) : (
-            <ToolStepRow key={i} part={s.part} chapters={chapters} />
+            <ToolStepRow key={i} part={s.part} chapters={chapters} streaming={streaming} />
           ),
         )}
         {activity && <AssistantActivityIndicator activity={activity} />}
@@ -324,9 +324,17 @@ const TOOL_ICONS: Record<string, LucideIcon> = {
   readPage: FileText,
 };
 
-function ToolStepRow({ part, chapters }: { part: ToolPart; chapters: ChapterRefDto[] }) {
+function ToolStepRow({
+  part,
+  chapters,
+  streaming,
+}: {
+  part: ToolPart;
+  chapters: ChapterRefDto[];
+  streaming: boolean;
+}) {
   const { t } = useTranslation();
-  const status = toolStepStatus(part);
+  const status = toolStepStatus(part, streaming);
   const Icon = TOOL_ICONS[getToolName(part)] ?? Wrench;
   return (
     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -345,7 +353,9 @@ function ToolStepRow({ part, chapters }: { part: ToolPart; chapters: ChapterRefD
           ? t("ai.toolStep.failed", "失败")
           : status === "done"
             ? t("ai.toolStep.done", "完成")
-            : t("ai.toolStep.loading", "读取中…")}
+            : status === "not-executed"
+              ? t("ai.toolStep.notExecuted", "未执行")
+              : t("ai.toolStep.loading", "读取中…")}
       </span>
     </div>
   );

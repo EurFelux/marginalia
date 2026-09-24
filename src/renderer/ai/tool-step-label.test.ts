@@ -152,21 +152,26 @@ describe("isErrorShape", () => {
 
 describe("toolStepStatus", () => {
   it("output-error → failed", () => {
-    expect(toolStepStatus(part("tool-readPage", { state: "output-error", errorText: "x" }))).toBe(
-      "failed",
-    );
+    expect(
+      toolStepStatus(part("tool-readPage", { state: "output-error", errorText: "x" }), false),
+    ).toBe("failed");
   });
   it("output-available with { error } result → failed (soft failure)", () => {
-    expect(toolStepStatus(part("tool-readPage", { output: { error: "chapter not found" } }))).toBe(
-      "failed",
-    );
+    expect(
+      toolStepStatus(part("tool-readPage", { output: { error: "chapter not found" } }), false),
+    ).toBe("failed");
   });
   it("output-available with normal result → done", () => {
-    expect(toolStepStatus(part("tool-readPage", { output: { kind: "text" } }))).toBe("done");
+    expect(toolStepStatus(part("tool-readPage", { output: { kind: "text" } }), false)).toBe("done");
   });
-  it("input-streaming → loading", () => {
+  it("input-streaming while the reply streams → loading", () => {
     expect(
-      toolStepStatus(part("tool-readPage", { state: "input-streaming", output: undefined })),
+      toolStepStatus(part("tool-readPage", { state: "input-streaming", output: undefined }), true),
     ).toBe("loading");
+  });
+  it("no output once the reply has ended → not-executed (dangling call, #109)", () => {
+    expect(
+      toolStepStatus(part("tool-readPage", { state: "input-available", output: undefined }), false),
+    ).toBe("not-executed");
   });
 });
