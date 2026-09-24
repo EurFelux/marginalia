@@ -13,8 +13,8 @@ export interface ReadingPosition {
   index: number;
   /** 视口顶在该 section 内的相对位置，0–1。 */
   scrollRatio: number;
-  /** 视口顶那个块级元素首字符的 range CFI。 */
-  cfi: string;
+  /** 视口顶那个块级元素首字符的 range CFI；section 尚未渲染时未知（null）。 */
+  cfi: string | null;
   /** 全书阅读进度，0–1。 */
   percent: number;
   chapterId: string | null;
