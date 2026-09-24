@@ -2,7 +2,7 @@
  * LoggerService（主进程）：级别过滤、四段式格式化、console 着色、文件落盘的统一中枢。
  * 薄实例（createLogger 产出）只持有 module 与级别方法——所有逻辑收敛在模块内单例。
  * 进程分流：main 日志 → stdout + main-*.log；renderer 日志（经 log:write IPC）→ renderer-*.log，不回显 stdout。
- * Spec: docs/superpowers/specs/2026-06-07-persistent-logging-design.md
+ * Spec: docs/specs/2026-06-07-persistent-logging-design.md
  */
 import { appService } from "../app";
 import { appendLogLine, cleanupExpiredLogs, type LogSource } from "./file-sink";

@@ -6,7 +6,7 @@ description: Marginalia 的需求管理工作流——GitHub Issues + Projects k
 # 需求管理：Issues + Kanban 工作流
 
 需求的唯一真相源是 **GitHub Issues**，看板视图是 **GitHub Projects kanban**。
-`docs/superpowers/ROADMAP.md` 不再记需求（2026-06-07 已全量迁移）——它只留架构决策与交付历史；新需求一律走本工作流。
+`docs/archive/ROADMAP.md` 不再记需求（2026-06-07 已全量迁移）——它只留架构决策与交付历史；新需求一律走本工作流。
 
 ## 关键常量（实测固化，勿重查）
 

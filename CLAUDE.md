@@ -6,7 +6,7 @@ This file provides guidance to coding agents working in this repository. It is s
 
 Marginalia 是一个基于 Electron + React 的桌面 AI 阅读器，支持 ePub 与 PDF：导入书库、阅读（进度 / 标注 / TOC）、选区问 AI（真模型流式回复）、章节与全书摘要。主进程承载全部业务逻辑；渲染层 `src/renderer/`（`library` / `reader` / `ai` / `settings` 等模块）仅做 UI。
 
-> **进度真相源 = GitHub Issues + Projects kanban**（用 `kanban` skill 操作）：需求/里程碑状态、当前焦点、待办 backlog 都在那里（别在本文件里维护会过时的状态散文）。开工定位、收尾关卡（挪列 / close issue）一律走 `kanban` skill。设计细节去 `docs/superpowers/specs/`（设计）与 `docs/superpowers/plans/`（实现计划）。`docs/superpowers/ROADMAP.md` **已退役**、仅作历史归档，勿再当真相源或更新它。
+> **进度真相源 = GitHub Issues + Projects kanban**（用 `kanban` skill 操作）：需求/里程碑状态、当前焦点、待办 backlog 都在那里（别在本文件里维护会过时的状态散文）。开工定位、收尾关卡（挪列 / close issue）一律走 `kanban` skill。设计细节去 `docs/specs/`（只读留档，规则见文末「进度管理与设计文档」）。`docs/archive/ROADMAP.md` **已退役**、仅作历史归档，勿再当真相源或更新它。
 
 ## 常用命令
 
@@ -16,7 +16,7 @@ pnpm dev            # 启动 Electron 开发模式（会阻塞）
 pnpm package        # 打包
 pnpm make           # 制作分发包
 pnpm release        # 发布到 GitHub Release（draft+prerelease；发布前先 pnpm changeset version，发完跑 pnpm release:notes。token 现取自 gh keyring。注意 pnpm publish 是 pnpm 内置命令＝发 npm，勿用）
-pnpm changeset      # 合并分支前写一条用户向英文 changelog 条目（finishing 流程一步；用户不可见的分支不写）
+pnpm changeset      # 合并分支前写一条用户向英文 changelog 条目（合并前收尾步骤之一；用户不可见的分支不写）
 pnpm release:notes  # 从 CHANGELOG.md 抽当前版本段填进 GitHub Release draft 的 notes（--dry-run 仅打印不调 gh）
 
 # 类型检查 / Lint / 格式化
@@ -112,7 +112,7 @@ Drizzle ORM over better-sqlite3，Schema 定义在 `src/main/db/schema.ts`。
 - **禁止裸 `console.*` 记录诊断信息**：主进程 `import { createLogger } from "@main/logger"`，渲染层 `@renderer/logger`；每文件模块级 `const log = createLogger("<module>")`（module 用短域名：`send`/`summary`/`library`/`db`/`ipc`/`tools`/`ai`/`reader`/`pdf`/`epub`…，参考既有分配）。logger 恒双写 console + 文件（`userData/logs/{main,renderer}-YYYY-MM-DD.log`，30 天保留）；renderer 日志双写 DevTools console 并经 IPC 落 renderer 专属文件、不回显主进程 stdout。
 - **消息规范**：不带 `[xxx]` 前缀（module 段自动携带）、不带尾冒号；Error/unknown 一律作第二参（`log.warn("save failed", err)`），service 自动展开 stack 并缩进——别手动拼 err 进 message。
 - **级别语义**：`error` = 不可恢复/需关注；`warn` = 降级/被吞的软失败——**凡优雅吞错处必须留 warn**（降级越优雅，日志越必要）；`info` = 关键锚点（启动标记、迁移、导入成功），克制使用防噪音；`debug` = 仅 dev 落盘。替换既有日志调用时**不得擅自升降级别语义**。
-- IPC handler 抛出的错误由 `registry.ts` catch-all 自动落盘，handler 内无需重复记录；设计细节见 `docs/superpowers/specs/2026-06-07-persistent-logging-design.md`。
+- IPC handler 抛出的错误由 `registry.ts` catch-all 自动落盘，handler 内无需重复记录；设计细节见 `docs/specs/2026-06-07-persistent-logging-design.md`。
 
 ## 代码规范（UI 样式）
 
@@ -148,8 +148,8 @@ Drizzle ORM over better-sqlite3，Schema 定义在 `src/main/db/schema.ts`。
 ## 进度管理与设计文档
 
 - **进度真相源 = GitHub Issues + Projects kanban**（用 `kanban` skill）：需求/里程碑状态、当前焦点、待办 backlog 都在那里。开工前先看 kanban 定位「在哪 / 下一步 / 欠了什么」，收尾时用 `kanban` skill 挪列 / close 对应 issue（含合并分支时检查有无可 close 的 issue）。
-- `docs/superpowers/specs/`：产品设计与技术决策的设计文档（核心阅读闭环、UP1 UI 原型、最小可用竖切）。
-- `docs/superpowers/plans/`：里程碑 bite-sized 实现计划（MA1–MA5、竖切 P1–P4、RA 轨任务分解 + DAG）。
-- `docs/superpowers/ROADMAP.md`：**已退役**——历史里程碑/backlog 归档，仅作上下文参考；进度管理已转入上面的 GitHub Projects kanban，勿再当真相源或更新它。
+- `docs/specs/`：产品设计与技术决策的设计文档，**仅作留档**。新 spec 可以提交；对应需求**完成后该 spec 冻结，不得再改**（包括修路径、改链接）。设计有变就写一份新 spec，不要回头改旧的。
+- **实现计划（plan）不进仓库**：plan 只在本地用，**禁止提交**（`docs/plans/` 已在 `.gitignore` 中忽略）。历史 plans 已于 2026-09-24 移除，要看的话去 git 历史里找。
+- `docs/archive/`：**只读归档，内容不得变更**。`ROADMAP.md` / `ROADMAP-archive.md` 是已退役的历史里程碑与 backlog，仅作上下文参考；进度管理已转入上面的 GitHub Projects kanban，勿再当真相源。
 
 新功能开发前，先看 GitHub Projects kanban（`kanban` skill）与相关设计文档，了解进度、产品意图和架构约束。

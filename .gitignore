@@ -98,8 +98,8 @@ out/
 # IDE
 .zed/
 
-# Brainstorm visual companion (superpowers)
-.superpowers/
+# Implementation plans stay local (never committed)
+docs/plans/
 
 # Agent worktrees
 .worktrees/

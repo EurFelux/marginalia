@@ -2,7 +2,7 @@
  * AppService：Electron API 的抽象层（端口-适配器中的端口）。
  * 本模块不 import electron——main.ts 注入环境值与能力实现（适配器），
  * 业务/基础设施模块面向本抽象编程，整条依赖链无头可测。
- * Spec: docs/superpowers/specs/2026-06-07-app-service-design.md
+ * Spec: docs/specs/2026-06-07-app-service-design.md
  */
 import path from "node:path";
 
