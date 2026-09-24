@@ -78,9 +78,10 @@ describe("DeepSeek provider helpers", () => {
   it("resolveProviderBaseUrl derives DeepSeek per type, passes through otherwise", () => {
     const ds = { label: "DeepSeek", isBuiltin: true, baseUrl: null };
     expect(resolveProviderBaseUrl(ds, "openai-chat-completions")).toBe("https://api.deepseek.com");
+    expect(resolveProviderBaseUrl(ds, "openai-responses")).toBe("https://api.deepseek.com");
     expect(resolveProviderBaseUrl(ds, "anthropic")).toBe("https://api.deepseek.com/anthropic");
     // DeepSeek 不支持的 type → null（兜底）。
-    expect(resolveProviderBaseUrl(ds, "openai-responses")).toBeNull();
+    expect(resolveProviderBaseUrl(ds, "google-generate-content")).toBeNull();
     // 非 DeepSeek：原样返回存储值。
     const gw = { label: "Gw", isBuiltin: false, baseUrl: "https://gw/v1" };
     expect(resolveProviderBaseUrl(gw, "openai-chat-completions")).toBe("https://gw/v1");

@@ -1,4 +1,5 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
+import { createDeepSeek } from "@ai-sdk/deepseek";
 import { createGoogle } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
@@ -69,13 +70,23 @@ export function resolveLanguageModel(p: ResolveModelParams): ChatModel {
       return createAnthropic({ apiKey: p.apiKey, fetch, ...withBase(p.baseUrl) })(p.model);
     case "google-generate-content":
       return createGoogle({ apiKey: p.apiKey, fetch, ...withBase(p.baseUrl) })(p.model);
-    case "openai-chat-completions":
+    case "openai-chat-completions": {
       if (!p.baseUrl) throw new Error("openai-chat-completions provider requires a baseUrl");
+      // 官方 DeepSeek 端点换用 @ai-sdk/deepseek 引擎（线上同为 chat completions 协议）：
+      // 它把 DeepSeek 私有的 insufficient_system_resource 映射为 finishReason "error"
+      // （openai-compatible 只给 "other"，会被当 complete 静默落库），并原生解析
+      // reasoning_content 思考流与 prompt_cache_hit/miss_tokens 缓存元数据。
+      // 其它兼容端点（自建网关等）仍走 openai-compatible。
+      const normalized = p.baseUrl.replace(/\/+$/, "");
+      if (/^https:\/\/api\.deepseek\.com(\/v1)?$/.test(normalized)) {
+        return createDeepSeek({ apiKey: p.apiKey, fetch, baseURL: p.baseUrl })(p.model);
+      }
       return createOpenAICompatible({
         name: "openai-chat-completions",
         apiKey: p.apiKey,
         fetch,
         baseURL: p.baseUrl,
       })(p.model);
+    }
   }
 }

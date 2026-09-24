@@ -37,10 +37,11 @@ export const DEFAULT_PROVIDERS: DefaultProvider[] = [
     models: ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-3.1-pro-preview"],
   },
   {
-    // DeepSeek 同时兼容 OpenAI Chat Completions 与 Anthropic（两端点不同）：默认 chat-completions；
-    // baseUrl 不入 db（保持 null），由 provider-factory / resolveProviderBaseUrl 按 type 派生。
+    // DeepSeek 兼容 OpenAI Chat Completions / OpenAI Responses / Anthropic 三套协议（同 host，
+    // 端点不同）：默认 chat-completions；baseUrl 不入 db（保持 null），由 provider-factory /
+    // resolveProviderBaseUrl 按 type 派生。
     type: "openai-chat-completions",
-    compatibleApis: ["openai-chat-completions", "anthropic"],
+    compatibleApis: ["openai-chat-completions", "openai-responses", "anthropic"],
     label: "DeepSeek",
     models: ["deepseek-v4-flash", "deepseek-v4-pro"],
   },
@@ -48,19 +49,32 @@ export const DEFAULT_PROVIDERS: DefaultProvider[] = [
 
 /**
  * 启动时补齐缺失的内置 provider：对每条 DEFAULT_PROVIDERS，若不存在「同 label 的内置 provider」则插入
- * （isBuiltin=true、无 key/baseUrl、预填 models）。已存在则不动（保留用户填的 key / 改的 models）。
+ * （isBuiltin=true、无 key/baseUrl、预填 models）。已存在则仅**补齐 compatibleApis 缺项**（如 DeepSeek
+ * 后来支持 Responses API——既有行加上新选项，用户已选 type / key / models 一律不动）。
  * 用户自建的同名非内置 provider 不算数（只认 isBuiltin=1），故加 config 新项即自动出现，且不与用户数据冲突。
  */
 export function ensureBuiltinProviders(db: DB): void {
   const inserted: string[] = [];
+  const upgraded: string[] = [];
   for (const p of DEFAULT_PROVIDERS) {
-    const exists = db
-      .select({ id: providers.id })
+    const existing = db
+      .select({ id: providers.id, compatibleApis: providers.compatibleApis })
       .from(providers)
       .where(and(eq(providers.isBuiltin, true), eq(providers.label, p.label)))
       .limit(1)
       .all();
-    if (exists.length > 0) continue;
+    if (existing.length > 0) {
+      const row = existing[0];
+      const current = row.compatibleApis ?? [];
+      if (p.compatibleApis.some((api) => !current.includes(api))) {
+        db.update(providers)
+          .set({ compatibleApis: p.compatibleApis })
+          .where(eq(providers.id, row.id))
+          .run();
+        upgraded.push(p.label);
+      }
+      continue;
+    }
     db.insert(providers)
       .values({
         type: p.type,
@@ -74,5 +88,8 @@ export function ensureBuiltinProviders(db: DB): void {
   }
   if (inserted.length > 0) {
     log.info(`ensured builtin providers: ${inserted.join(", ")}`);
+  }
+  if (upgraded.length > 0) {
+    log.info(`upgraded builtin provider compatibleApis: ${upgraded.join(", ")}`);
   }
 }

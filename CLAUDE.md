@@ -105,7 +105,7 @@ Drizzle ORM over better-sqlite3，Schema 定义在 `src/main/db/schema.ts`。
 - **`instance.ts`**：DB 单例，`initDb()` 在 `app.ready` 事件中调用，`getDb()` 供其他模块获取实例。
 - **ID 策略**：主键统一使用 `uuidv7`（应用侧生成）；`books.id` 是 ePub 自然键（优先用 ePub 标识符，缺失时回退文件哈希）；`chapters` 使用代理 uuid 主键 + `UNIQUE(book_id, href)` 约束（spine id 跨书不唯一）。
 - **枚举列**：文本枚举列均附带 SQL `CHECK` 约束，在 DB 层强制合法值。
-- **消息存储**：`messages` 表持久化 AI SDK v6 的 `UIMessage`（存 `parts` 字段）；每次请求按需派生 `ModelMessage`，不持久化。
+- **消息存储**：`messages` 表持久化 AI SDK 的 `UIMessage`（存 `parts` 字段）；每次请求按需派生 `ModelMessage`，不持久化。
 
 ## 代码规范（日志）
 
@@ -138,7 +138,7 @@ Drizzle ORM over better-sqlite3，Schema 定义在 `src/main/db/schema.ts`。
 | 桌面框架    | Electron 41.7.1（锁定，勿升 42——见坑）+ Electron Forge + Vite 8                     |
 | 语言        | TypeScript 6（strict）                                                              |
 | UI          | React 19 + react-dom + i18next                                                      |
-| AI          | Vercel AI SDK v6（`ai`, `@ai-sdk/react`, `@ai-sdk/anthropic`）                      |
+| AI          | Vercel AI SDK v7（`ai`, `@ai-sdk/react`, `@ai-sdk/anthropic`, `@ai-sdk/deepseek`）  |
 | 数据库      | Drizzle ORM 1.0.0-rc.3 + better-sqlite3                                             |
 | 校验        | Zod 4                                                                               |
 | 测试        | vitest 4（Node 环境）                                                               |

@@ -29,11 +29,13 @@ export const PROVIDER_TYPE_LABEL: Record<AiProviderApiType, string> = {
 };
 
 /**
- * 内置 DeepSeek 的 per-type baseUrl —— DeepSeek 同时兼容 OpenAI Chat Completions 与 Anthropic，
- * 但两套 API 端点不同；其 `db.baseUrl` 存 null，按当前 type 派生（见 {@link resolveProviderBaseUrl}）。
+ * 内置 DeepSeek 的 per-type baseUrl —— DeepSeek 同时兼容 OpenAI Chat Completions、OpenAI Responses
+ * 与 Anthropic（三协议同 host，SDK 各自拼路径）；其 `db.baseUrl` 存 null，按当前 type 派生
+ * （见 {@link resolveProviderBaseUrl}）。
  */
 const DEEPSEEK_BASE_URL: Partial<Record<AiProviderApiType, string>> = {
   "openai-chat-completions": "https://api.deepseek.com",
+  "openai-responses": "https://api.deepseek.com",
   anthropic: "https://api.deepseek.com/anthropic",
 };
 

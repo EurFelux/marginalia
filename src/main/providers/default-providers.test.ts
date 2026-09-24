@@ -28,9 +28,13 @@ describe("ensureBuiltinProviders", () => {
     expect(byLabel.OpenAI.isBuiltin).toBe(true);
     expect(byLabel.Anthropic.type).toBe("anthropic");
     expect(byLabel.Gemini.label).toBe("Gemini");
-    // DeepSeek：双兼容 API，baseUrl 不入库（按 type 派生）。
+    // DeepSeek：三兼容 API，baseUrl 不入库（按 type 派生）。
     expect(byLabel.DeepSeek.type).toBe("openai-chat-completions");
-    expect(byLabel.DeepSeek.compatibleApis).toEqual(["openai-chat-completions", "anthropic"]);
+    expect(byLabel.DeepSeek.compatibleApis).toEqual([
+      "openai-chat-completions",
+      "openai-responses",
+      "anthropic",
+    ]);
     expect(byLabel.DeepSeek.baseUrl).toBeNull();
     expect(byLabel.DeepSeek.isBuiltin).toBe(true);
   });
@@ -58,6 +62,35 @@ describe("ensureBuiltinProviders", () => {
     expect(rows).toHaveLength(DEFAULT_PROVIDERS.length); // 补了 2 个，没重复 OpenAI
     const openai = rows.find((r) => r.label === "OpenAI");
     expect(openai?.models).toEqual(["custom-model"]); // 既有内置不被覆盖
+  });
+
+  it("upgrades an existing builtin's compatibleApis with newly supported APIs, preserving type/key/models", () => {
+    const db = freshDb();
+    // 预置 Responses API 支持之前的旧内置 DeepSeek 行（两项 compatibleApis，用户已选 anthropic、已填 key）。
+    db.insert(providers)
+      .values({
+        type: "anthropic",
+        compatibleApis: ["openai-chat-completions", "anthropic"],
+        label: "DeepSeek",
+        apiKey: "sk-user-key",
+        models: ["deepseek-v4-pro"],
+        isBuiltin: true,
+      })
+      .run();
+    ensureBuiltinProviders(db);
+    const ds = db
+      .select()
+      .from(providers)
+      .all()
+      .find((r) => r.isBuiltin && r.label === "DeepSeek");
+    expect(ds?.compatibleApis).toEqual([
+      "openai-chat-completions",
+      "openai-responses",
+      "anthropic",
+    ]);
+    expect(ds?.type).toBe("anthropic"); // 用户已选 type 不动
+    expect(ds?.apiKey).toBe("sk-user-key");
+    expect(ds?.models).toEqual(["deepseek-v4-pro"]);
   });
 
   it("a user's non-builtin provider with the same label does NOT block the builtin", () => {

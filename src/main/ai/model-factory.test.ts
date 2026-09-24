@@ -41,7 +41,21 @@ describe("resolveLanguageModel", () => {
       model: "llama-3.2",
     });
     expect(m.modelId).toBe("llama-3.2");
+    expect(m.provider).toBe("openai-chat-completions.chat");
   });
+  it.each(["https://api.deepseek.com", "https://api.deepseek.com/", "https://api.deepseek.com/v1"])(
+    "routes the official DeepSeek endpoint (%s) to the @ai-sdk/deepseek engine",
+    (baseUrl) => {
+      const m = resolveLanguageModel({
+        type: "openai-chat-completions",
+        baseUrl,
+        apiKey: "sk",
+        model: "deepseek-v4-pro",
+      });
+      expect(m.modelId).toBe("deepseek-v4-pro");
+      expect(m.provider).toBe("deepseek.chat");
+    },
+  );
   it("throws for openai-compatible without a baseUrl", () => {
     expect(() =>
       resolveLanguageModel({

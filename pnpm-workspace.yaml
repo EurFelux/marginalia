@@ -28,3 +28,15 @@ allowBuilds:
   macos-alias: true
 patchedDependencies:
   pdfjs-dist: patches/pdfjs-dist.patch
+minimumReleaseAgeExclude:
+  - "@ai-sdk/deepseek@3.0.51"
+  - "@ai-sdk/provider-utils@5.0.46"
+  - "@ai-sdk/provider@4.0.18"
+  - "@ai-sdk/anthropic@4.0.61"
+  - "@ai-sdk/gateway@4.0.90"
+  - "@ai-sdk/google@4.0.78"
+  - "@ai-sdk/mcp@2.0.56"
+  - "@ai-sdk/openai-compatible@3.0.54"
+  - "@ai-sdk/openai@4.0.73"
+  - "@ai-sdk/react@4.0.115"
+  - ai@7.0.112
