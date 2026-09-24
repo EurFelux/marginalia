@@ -68,9 +68,23 @@ export function searchRanges(doc: Document, query: string): Range[] {
   });
 }
 
+/**
+ * 每个 section 文档对当前查询的命中缓存。切换当前命中时只需换一条醒目高亮，不必对整章重建文本流、
+ * 重新匹配。文档内容只在 decorate（section 载入 / 标注重贴 <mark>）时变化，届时以 refresh 重算。
+ */
+const rangeCache = new WeakMap<Document, { query: string; ranges: Range[] }>();
+
+function cachedRanges(doc: Document, query: string, refresh: boolean): Range[] {
+  const cached = rangeCache.get(doc);
+  if (!refresh && cached?.query === query) return cached.ranges;
+  const ranges = searchRanges(doc, query);
+  rangeCache.set(doc, { query, ranges });
+  return ranges;
+}
+
 /** 取第 occurrence 个命中；数量对不上（解析差异）时退到最后一个，不静默失败。 */
 export function locateSearchHit(doc: Document, query: string, occurrence: number): Range | null {
-  const ranges = searchRanges(doc, query);
+  const ranges = cachedRanges(doc, query, false);
   return ranges[occurrence] ?? ranges.at(-1) ?? null;
 }
 
@@ -88,11 +102,15 @@ type HighlightWindow = Window & {
   Highlight?: new (...ranges: Range[]) => unknown;
 };
 
-/** 在该文档里高亮 query 的全部命中，并突出第 activeOccurrence 个；query 为 null 时清除。 */
+/**
+ * 在该文档里高亮 query 的全部命中，并突出第 activeOccurrence 个；query 为 null 时清除。
+ * refresh：文档内容可能已变（section 载入、标注重贴），丢弃缓存重新匹配。
+ */
 export function applySearchHighlights(
   doc: Document,
   query: string | null,
   activeOccurrence: number | null,
+  { refresh = false }: { refresh?: boolean } = {},
 ): void {
   // Highlight 与 registry 必须取自 iframe 自己的 window（跨 realm）。
   const win = doc.defaultView as HighlightWindow | null;
@@ -102,7 +120,7 @@ export function applySearchHighlights(
   registry.delete(ALL);
   registry.delete(ACTIVE);
   if (!query) return;
-  const ranges = searchRanges(doc, query);
+  const ranges = cachedRanges(doc, query, refresh);
   if (ranges.length === 0) return;
   registry.set(ALL, new Highlight(...ranges));
   if (activeOccurrence !== null) {

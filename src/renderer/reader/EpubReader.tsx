@@ -284,14 +284,16 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
   );
   const searchJump = useSearchStore((s) => s.jump);
 
+  const activeOccurrenceIn = (index: number) =>
+    searchActive?.target.format === "epub" && book?.indexOfHref(searchActive.target.href) === index
+      ? searchActive.target.occurrence
+      : null;
+
+  // section 载入 / 标注变化：重贴标注（改动 DOM），故搜索高亮以 refresh 重新匹配。
   const decorate = (index: number, doc: Document) => {
     if (!book) return;
     applyAnnotations(book, annotations.data ?? [], index, doc);
-    const active =
-      searchActive?.target.format === "epub" && book.indexOfHref(searchActive.target.href) === index
-        ? searchActive.target.occurrence
-        : null;
-    applySearchHighlights(doc, searchQuery, active);
+    applySearchHighlights(doc, searchQuery, activeOccurrenceIn(index), { refresh: true });
   };
   const onHighlightClick = (
     annoId: string,
@@ -306,10 +308,23 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
     setSelection(null);
   };
 
-  // 标注数据 / 搜索结果 / 当前命中变化 → 对在挂 section 重贴高亮。
+  // 标注数据变化 → 对在挂 section 重贴高亮。
   useEffect(() => {
     vRef.current?.redecorate();
-  }, [annotations.data, searchQuery, searchActive]);
+  }, [annotations.data]);
+
+  // 搜索查询 / 当前命中变化 → 只更新搜索高亮（不重贴标注；同一查询复用各文档的命中缓存）。
+  useEffect(() => {
+    const scroller = vRef.current?.getScrollerElement();
+    if (!scroller) return;
+    for (const el of scroller.querySelectorAll<HTMLElement>("[data-section-index]")) {
+      const doc = el.querySelector("iframe")?.contentDocument;
+      if (!doc?.body) continue;
+      applySearchHighlights(doc, searchQuery, activeOccurrenceIn(Number(el.dataset.sectionIndex)));
+    }
+    // activeOccurrenceIn 由 searchActive 派生；React Compiler 负责记忆化，依赖列出源头即可。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, searchActive]);
 
   // 搜索结果跳转（nonce 递增即一次新请求；同一命中再点也要重新跳）。
   useEffect(() => {

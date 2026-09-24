@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, ChevronUp, Search } from "lucide-react";
@@ -9,16 +10,14 @@ import { Button } from "@renderer/components/ui/button";
 import { Input } from "@renderer/components/ui/input";
 import { KbdGroup, Kbd, ModKey } from "@renderer/components/ui/kbd";
 import { ScrollArea } from "@renderer/components/ui/scroll-area";
+import { createLogger } from "@renderer/logger";
 import { qk } from "@renderer/query/keys";
 import { useSearchStore } from "@renderer/store/search-store";
+import { searchRows } from "./search-rows";
+
+const log = createLogger("reader");
 
 const DEBOUNCE_MS = 250;
-
-/** 连续命中按章节分组（PDF 无章节时按页）。 */
-function groupKey(hit: BookSearchHit): string {
-  if (hit.chapterId) return `ch:${hit.chapterId}`;
-  return hit.target.format === "pdf" ? `page:${hit.target.page}` : "none";
-}
 
 export function SearchPanel({ bookId }: { bookId: string }) {
   const { t } = useTranslation();
@@ -31,7 +30,16 @@ export function SearchPanel({ bookId }: { bookId: string }) {
   const activate = useSearchStore((s) => s.activate);
   const step = useSearchStore((s) => s.step);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const rowRefs = useRef(new Map<number, HTMLButtonElement>());
+  const listRef = useRef<VirtuosoHandle | null>(null);
+  // Virtuoso 以 ScrollArea 的 viewport 为滚动容器（保持侧栏统一的滚动条样式），只渲染可见行。
+  const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
+
+  // 打开搜索页即预热索引：大书建索引要几百毫秒，等用户输完第一个词时通常已就绪。
+  useEffect(() => {
+    void window.api.content
+      .prepareSearch({ bookId })
+      .catch((err: unknown) => log.warn("prepare book search failed", err));
+  }, [bookId]);
 
   const [debounced, setDebounced] = useState(query.trim());
   useEffect(() => {
@@ -61,10 +69,14 @@ export function SearchPanel({ bookId }: { bookId: string }) {
     inputRef.current?.select();
   }, [focusNonce]);
 
+  const hits = result?.kind === "ok" && result === search.data ? result.hits : [];
+  const { rows, rowOfHit } = searchRows(hits);
+
   useEffect(() => {
     if (activeIndex === null) return;
-    rowRefs.current.get(activeIndex)?.scrollIntoView({ block: "nearest" });
-  }, [activeIndex]);
+    const row = rowOfHit[activeIndex];
+    if (row !== undefined) listRef.current?.scrollIntoView({ index: row, behavior: "auto" });
+  }, [activeIndex, rowOfHit]);
 
   const onKeyDown = (e: ReactKeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
@@ -77,7 +89,6 @@ export function SearchPanel({ bookId }: { bookId: string }) {
     }
   };
 
-  const hits = result?.kind === "ok" && result === search.data ? result.hits : [];
   const settled = debounced.length > 0 && debounced === query.trim() && !search.isFetching;
   const count =
     result?.kind === "ok" && hits.length > 0
@@ -170,50 +181,84 @@ export function SearchPanel({ bookId }: { bookId: string }) {
         )}
       </div>
       {status ?? (
-        <ScrollArea className="min-h-0 flex-1">
-          <div className="p-2">
-            {hits.map((hit, i) => {
-              const newGroup = i === 0 || groupKey(hits[i - 1]!) !== groupKey(hit);
-              const page = hit.target.format === "pdf" ? hit.target.page : null;
-              return (
-                <div key={i}>
-                  {newGroup && (
-                    <div className="truncate px-1.5 pt-2 pb-1 text-[11px] font-medium text-muted-foreground">
-                      {hit.chapterTitle ??
-                        (page !== null
-                          ? t("reader.search.page", "第 {{page}} 页", { page })
-                          : t("reader.search.noChapter", "正文"))}
-                    </div>
+        <ScrollArea className="min-h-0 flex-1" viewportRef={setScroller}>
+          {scroller && (
+            <Virtuoso
+              ref={listRef}
+              customScrollParent={scroller}
+              data={rows}
+              computeItemKey={(_, row) => row.key}
+              increaseViewportBy={300}
+              // 内边距放在每行里：Virtuoso 内层列表按滚动容器撑满宽度，根节点加 padding 会向右溢出。
+              itemContent={(_, row) => (
+                <div className="px-2">
+                  {row.kind === "group" ? (
+                    <SearchGroupHeader hit={row.hit} />
+                  ) : (
+                    <SearchHitRow
+                      hit={row.hit}
+                      index={row.index}
+                      active={row.index === activeIndex}
+                      onActivate={activate}
+                    />
                   )}
-                  <button
-                    type="button"
-                    ref={(el) => {
-                      if (el) rowRefs.current.set(i, el);
-                      else rowRefs.current.delete(i);
-                    }}
-                    onClick={() => activate(i)}
-                    className={cn(
-                      "block w-full rounded-md px-1.5 py-1 text-start text-xs leading-relaxed text-muted-foreground hover:bg-accent",
-                      i === activeIndex && "bg-accent text-foreground",
-                    )}
-                  >
-                    {page !== null && hit.chapterTitle && (
-                      <span className="me-1 text-[10px] text-muted-foreground/70">
-                        {t("reader.search.pageShort", "p.{{page}}", { page })}
-                      </span>
-                    )}
-                    <span className="line-clamp-3">
-                      {hit.snippet.before}
-                      <strong className="font-semibold text-foreground">{hit.snippet.match}</strong>
-                      {hit.snippet.after}
-                    </span>
-                  </button>
                 </div>
-              );
-            })}
-          </div>
+              )}
+            />
+          )}
         </ScrollArea>
       )}
     </div>
+  );
+}
+
+function SearchGroupHeader({ hit }: { hit: BookSearchHit }) {
+  const { t } = useTranslation();
+  const page = hit.target.format === "pdf" ? hit.target.page : null;
+  return (
+    <div className="truncate px-1.5 pt-2 pb-1 text-[11px] font-medium text-muted-foreground">
+      {hit.chapterTitle ??
+        (page !== null
+          ? t("reader.search.page", "第 {{page}} 页", { page })
+          : t("reader.search.noChapter", "正文"))}
+    </div>
+  );
+}
+
+/** 单条命中：独立组件，切换当前命中时只有新旧两行重渲染（React Compiler 按 props 记忆化）。 */
+function SearchHitRow({
+  hit,
+  index,
+  active,
+  onActivate,
+}: {
+  hit: BookSearchHit;
+  index: number;
+  active: boolean;
+  onActivate: (index: number) => void;
+}) {
+  const { t } = useTranslation();
+  const page = hit.target.format === "pdf" ? hit.target.page : null;
+  return (
+    <button
+      type="button"
+      data-hit-index={index}
+      onClick={() => onActivate(index)}
+      className={cn(
+        "block w-full rounded-md px-1.5 py-1 text-start text-xs leading-relaxed text-muted-foreground hover:bg-accent",
+        active && "bg-accent text-foreground",
+      )}
+    >
+      {page !== null && hit.chapterTitle && (
+        <span className="me-1 text-[10px] text-muted-foreground/70">
+          {t("reader.search.pageShort", "p.{{page}}", { page })}
+        </span>
+      )}
+      <span className="line-clamp-3">
+        {hit.snippet.before}
+        <strong className="font-semibold text-foreground">{hit.snippet.match}</strong>
+        {hit.snippet.after}
+      </span>
+    </button>
   );
 }

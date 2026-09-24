@@ -76,8 +76,16 @@ PDF 主进程用与渲染层 `streamTextContent()` 相同的默认参数调用 `
 ### 6. 上限与性能
 
 - 命中上限 500，超出返回 `truncated: true`。
-- 主进程按 bookId 缓存构建好的文本流（LRU 2 本）。book id 是内容哈希，同一 id 的字节不变，缓存无需失效。
 - 渲染层输入防抖 250ms；React Query 以 `(bookId, query)` 为 key 缓存结果。
+
+以下取舍来自对真书的实测（最大 199MB / 280 万字的 ePub、700 页 PDF），初版在这些书上首次搜索卡住主进程 1.4 秒、每按一次 Enter 渲染层长任务约 95ms：
+
+- **索引预建**：规整（NFKC / 小写 / 空白折叠）与查询无关，却是匹配的主要开销。每个文本流建一次 `SearchIndex`（规整后文本 + `Int32Array` 起点映射，终点由原文字符长度推出），查询只剩 `indexOf`。最坏查询 184ms → 2ms；内存约为字数 × 6 字节。
+- **构建不阻塞主进程**：只解压 container / OPF 与 spine 正文（不碰图片），逐个 spine 文件 / 逐页建索引并 `setImmediate` 让出事件循环。最长单段阻塞 775ms → 28ms，其他 IPC（如流式 AI 回复）照常。
+- **预热**：打开搜索页即调 `content:prepare-search` 在后台建索引。
+- **缓存**：索引与章节列表（`listChapters` 为逐项查库，大书约 20ms）一起按 `bookId:parserVersion` 缓存，LRU 2 本；book id 是内容哈希，重建索引才会换章节 id，故键里带版本。
+- **结果列表虚拟化**：react-virtuoso 以 ScrollArea viewport 为滚动容器，只渲染可见行；每行独立组件。
+- **ePub 高亮缓存**：各 section 文档对当前查询的命中 Range 缓存在 WeakMap 中；切换当前命中只换醒目高亮，不重贴标注、不重新匹配。只有 decorate（section 载入 / 标注重贴改动 DOM）时刷新。
 
 ## 设计
 
@@ -107,7 +115,7 @@ interface BookSearchHit {
 - **`SearchPanel`**：输入框 + 「当前 / 总数」+ 上下按钮；Enter 下一个、⇧Enter 上一个；结果按章节（PDF 无章节时按页）分组，片段中命中部分加粗。空态：未输入提示、无结果、扫描版 PDF 说明、截断说明、错误信息。
 - **快捷键**：`ReaderView` 在 document 捕获阶段监听 ⌘F / Ctrl+F；ePub 正文在 iframe 内，`VirtualDocs` 新增 `onKeyDown` 回调由 `SectionFrame` 转发 iframe 的 keydown。
 - **ePub 跳转**：阅读位置状态机新增 `SEARCH_HIT_REQUESTED` 事件（loading 期间忽略；其余进入 following 并发 `notifyTtsUserNavigation` + `scrollToSearchHit`），执行器用 `scrollToSectionElement(index, doc => 命中起点所在元素)`，与标注跳转同一原语。
-- **ePub 高亮**：CSS Custom Highlight API（`::highlight(marginalia-search)` / `::highlight(marginalia-search-active)`），不改 DOM，不影响 CFI 与标注 `<mark>`。section 渲染时经 `decorate` 应用，hits / activeIndex 变化时对已挂载 section 重算。
+- **ePub 高亮**：CSS Custom Highlight API（`::highlight(marginalia-search)` / `::highlight(marginalia-search-active)`），不改 DOM，不影响 CFI 与标注 `<mark>`。section 渲染时经 `decorate` 应用；查询 / 当前命中变化时由独立 effect 更新已挂载 section（见「上限与性能」的高亮缓存）。
 - **PDF 跳转与高亮**：`PdfPage` 接收本页命中，按标注同款方式（`rangeFromOffsets` + `relativeRects`）画一层独立覆盖。跳转分两步：先 `scrollToIndex(page)` 把页滚进渲染范围；该页文本层就绪、当前命中矩形画出后回报其中心在页内的比例，再用 Virtuoso 自身的 `scrollToIndex({ align: "start", offset: zoomScrollOffset(...) })` 钉到视口中线。**不用 `scrollIntoView`**：实测会被 Virtuoso 的测高校正冲掉，且页已在屏时子组件先滚、父组件的 `scrollToIndex` 后到会覆盖它（以 nonce 守卫防覆盖）。
 - **ePub 对齐**：沿用 `scrollToSectionElement` 的顶部对齐（与标注、目录跳转一致）；书末段落无法顶对齐时停在可滚动的最底部。
 
