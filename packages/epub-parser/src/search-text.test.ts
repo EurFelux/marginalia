@@ -1,7 +1,10 @@
 import { strToU8, zipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 import { makeFixtureEpub } from "./fixture";
-import { sectionTextFlow, sectionTextFlows, spineHrefs } from "./search-text";
+import { sectionTextFlow, spineHrefs } from "./search-text";
+
+const allFlows = (bytes: Uint8Array) =>
+  spineHrefs(bytes).map((href) => sectionTextFlow(bytes, href)!);
 
 function oneFileEpub(body: string): Uint8Array {
   return zipSync({
@@ -21,23 +24,23 @@ function oneFileEpub(body: string): Uint8Array {
   });
 }
 
-describe("sectionTextFlows", () => {
+describe("sectionTextFlow", () => {
   it("returns one text flow per spine file in reading order", () => {
-    const flows = sectionTextFlows(makeFixtureEpub());
+    const flows = allFlows(makeFixtureEpub());
     expect(flows.map((f) => f.href)).toEqual(["OEBPS/ch1.xhtml", "OEBPS/ch2.xhtml"]);
     expect(flows[0]!.text).toBe("Chapter OneHello world.Second paragraph.");
     expect(flows[0]!.breaks).toEqual([0, 11, 23, 40]);
   });
 
   it("keeps text the AI extraction drops: tables and div paragraphs", () => {
-    const [flow] = sectionTextFlows(
+    const [flow] = allFlows(
       oneFileEpub(`<h1>Head</h1><div>div para</div><table><tr><td>cell</td></tr></table>`),
     );
     expect(flow!.text).toBe("Headdiv paracell");
   });
 
   it("decodes entities, skips head and scripts, and records element ids", () => {
-    const [flow] = sectionTextFlows(
+    const [flow] = allFlows(
       oneFileEpub(`<p id="a1">A &amp; B</p><script>x()</script><p><span id="a2">C</span></p>`),
     );
     expect(flow!.text).toBe("A & BC");

@@ -1,7 +1,7 @@
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
-import { makeFixtureEpub } from "@marginalia/epub-parser";
+import { makeFixtureEpub, type SectionTextFlow } from "@marginalia/epub-parser";
 import { fixturePageText, makeScannedPdf, makeTextPdf } from "@marginalia/pdf-parser/fixture";
 import { openPdf, pageTextFlow } from "@marginalia/pdf-parser";
 import { createDb, runMigrations } from "@main/db/client";
@@ -9,11 +9,12 @@ import { importBook } from "@main/library/repository";
 import { listChapters } from "@main/library/content";
 import { books } from "@main/db/schema";
 import {
-  indexCorpus,
+  bookSegments,
   prepareBookSearch,
   searchBook,
-  searchCorpus,
-  type SearchCorpus,
+  searchSegments,
+  withIndex,
+  type IndexedCorpus,
 } from "@main/library/search";
 import type { ChapterRefDto } from "@shared/library";
 
@@ -31,6 +32,19 @@ function freshDb() {
   return db;
 }
 
+type RawCorpus =
+  | { format: "epub"; sections: SectionTextFlow[] }
+  | { format: "pdf"; pages: Array<{ page: number; text: string; breaks: number[] }> };
+
+/** 在未建索引的语料上搜索（测试便捷入口）。 */
+function search(corpus: RawCorpus, chapters: ChapterRefDto[], query: string, limit?: number) {
+  const indexed: IndexedCorpus =
+    corpus.format === "epub"
+      ? { format: "epub", sections: corpus.sections.map(withIndex) }
+      : { format: "pdf", pages: corpus.pages.map(withIndex) };
+  return searchSegments(bookSegments(indexed, chapters), query, limit);
+}
+
 const chapter = (over: Partial<ChapterRefDto> & { id: string; href: string }): ChapterRefDto => ({
   title: over.id,
   anchor: null,
@@ -41,9 +55,9 @@ const chapter = (over: Partial<ChapterRefDto> & { id: string; href: string }): C
   ...over,
 });
 
-describe("searchCorpus (epub)", () => {
+describe("searchSegments (epub)", () => {
   // s1：前言 + 锚点章 aA；s2：孤儿文件（无目录项）→ 仍属 aA 那章；s3：新章
-  const corpus: SearchCorpus = {
+  const corpus: RawCorpus = {
     format: "epub",
     sections: [
       {
@@ -63,7 +77,7 @@ describe("searchCorpus (epub)", () => {
   ];
 
   it("numbers hits per spine file and attributes them to chapters", () => {
-    const { hits, truncated } = searchCorpus(indexCorpus(corpus), chapters, "margin");
+    const { hits, truncated } = search(corpus, chapters, "margin");
     expect(truncated).toBe(false);
     expect(hits.map((h) => [h.chapterId, h.target])).toEqual([
       ["pre", { format: "epub", href: "s1.xhtml", occurrence: 0 }],
@@ -74,28 +88,24 @@ describe("searchCorpus (epub)", () => {
   });
 
   it("builds a snippet around each hit", () => {
-    const { hits } = searchCorpus(indexCorpus(corpus), chapters, "orphan");
+    const { hits } = search(corpus, chapters, "orphan");
     expect(hits[0]!.snippet).toEqual({ before: "", match: "Orphan", after: " margin text." });
   });
 
   it("stops at the limit and reports truncation", () => {
-    const { hits, truncated } = searchCorpus(indexCorpus(corpus), chapters, "margin", 3);
+    const { hits, truncated } = search(corpus, chapters, "margin", 3);
     expect(hits).toHaveLength(3);
     expect(truncated).toBe(true);
   });
 
   it("attributes hits before any chapter to no chapter", () => {
-    const { hits } = searchCorpus(
-      indexCorpus(corpus),
-      [chapter({ id: "last", href: "s3.xhtml" })],
-      "preface",
-    );
+    const { hits } = search(corpus, [chapter({ id: "last", href: "s3.xhtml" })], "preface");
     expect(hits[0]!.chapterId).toBeNull();
   });
 });
 
-describe("searchCorpus (pdf)", () => {
-  const corpus: SearchCorpus = {
+describe("searchSegments (pdf)", () => {
+  const corpus: RawCorpus = {
     format: "pdf",
     pages: [
       { page: 1, text: "alpha beta", breaks: [] },
@@ -109,11 +119,21 @@ describe("searchCorpus (pdf)", () => {
       chapter({ id: "one", href: "pdf-ch:0", startPage: 1 }),
       chapter({ id: "two", href: "pdf-ch:1", startPage: 3, orderIndex: 1 }),
     ];
-    const { hits } = searchCorpus(indexCorpus(corpus), chapters, "beta");
+    const { hits } = search(corpus, chapters, "beta");
     expect(hits.map((h) => [h.chapterId, h.target])).toEqual([
       ["one", { format: "pdf", page: 1, start: 6, end: 10 }],
       ["two", { format: "pdf", page: 3, start: 0, end: 4 }],
     ]);
+  });
+
+  it("attributes pages exactly like the annotation list when outline order and page order differ", () => {
+    // 目录顺序 A(p.3) → B(p.2)：chapterIdAtPage 按目录顺序取最后一个起始页 ≤ 当前页的章 → 第 3 页归 B
+    const chapters = [
+      chapter({ id: "A", href: "pdf-ch:0", startPage: 3, orderIndex: 0 }),
+      chapter({ id: "B", href: "pdf-ch:1", startPage: 2, orderIndex: 1 }),
+    ];
+    const { hits } = search(corpus, chapters, "again");
+    expect(hits[0]!.chapterId).toBe("B");
   });
 });
 

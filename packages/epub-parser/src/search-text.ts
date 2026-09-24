@@ -40,8 +40,3 @@ export function sectionTextFlow(bytes: Uint8Array, href: string): SectionTextFlo
   const flow = buildTextFlow<Node>(body, htmlAdapter);
   return { href, text: flow.text, breaks: flow.breaks, anchors: Object.fromEntries(flow.anchors) };
 }
-
-/** 按 spine 顺序取全部文件的文本流（一次性同步版本；主进程构建时逐章调用 sectionTextFlow 并让出事件循环）。 */
-export function sectionTextFlows(bytes: Uint8Array): SectionTextFlow[] {
-  return spineHrefs(bytes).flatMap((href) => sectionTextFlow(bytes, href) ?? []);
-}

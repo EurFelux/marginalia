@@ -2,6 +2,9 @@ import { create } from "zustand";
 import type { ReadingContext } from "@shared/chat";
 import { useChatStore } from "@renderer/store/chat-store";
 
+/** 阅读器侧栏标签页（受控：⌘F 需要从外部切到搜索页）。value 字符串沿用既有 tab 值。 */
+export type SidebarTab = "toc" | "search" | "notes" | "conversations" | "book-notes";
+
 interface NavigationState {
   view: "library" | "stats" | "book";
   currentBookId: string | null;
@@ -10,6 +13,8 @@ interface NavigationState {
   readingContext: ReadingContext | null;
   /** 0–1 阅读进度（header 面包屑显示用；#48）。与 readingContext 分离——后者是 AI 聊天契约。 */
   readingPercent: number | null;
+  /** 阅读器侧栏当前标签页；跨书保留。 */
+  sidebarTab: SidebarTab;
 }
 interface NavigationActions {
   openBook: (bookId: string, chapterId?: string | null) => void;
@@ -20,6 +25,7 @@ interface NavigationActions {
   setCurrentChapter: (chapterId: string) => void;
   setReadingContext: (readingContext: ReadingContext | null) => void;
   setReadingPercent: (readingPercent: number | null) => void;
+  setSidebarTab: (sidebarTab: SidebarTab) => void;
 }
 
 export const NAVIGATION_INITIAL: NavigationState = {
@@ -29,6 +35,7 @@ export const NAVIGATION_INITIAL: NavigationState = {
   currentChapterId: null,
   readingContext: null,
   readingPercent: null,
+  sidebarTab: "toc",
 };
 
 export const useNavigationStore = create<NavigationState & NavigationActions>((set) => ({
@@ -61,4 +68,5 @@ export const useNavigationStore = create<NavigationState & NavigationActions>((s
   setCurrentChapter: (currentChapterId) => set({ currentChapterId }),
   setReadingContext: (readingContext) => set({ readingContext }),
   setReadingPercent: (readingPercent) => set({ readingPercent }),
+  setSidebarTab: (sidebarTab) => set({ sidebarTab }),
 }));

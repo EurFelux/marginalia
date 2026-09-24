@@ -1,4 +1,5 @@
 import { isMac } from "@renderer/lib/platform";
+import { useNavigationStore } from "@renderer/store/navigation-store";
 import { usePrefsStore } from "@renderer/store/prefs-store";
 import { useSearchStore } from "@renderer/store/search-store";
 
@@ -12,7 +13,8 @@ export function isFindShortcut(e: KeyboardEvent, mac = isMac): boolean {
 export function openBookSearch(): void {
   const { layout, updateLayout } = usePrefsStore.getState();
   if (!layout.sidebarOpen) updateLayout({ sidebarOpen: true });
-  useSearchStore.getState().openSearch();
+  useNavigationStore.getState().setSidebarTab("search");
+  useSearchStore.getState().requestFocus();
 }
 
 /** 阅读器 keydown 处理：document 与 ePub iframe 文档共用。 */

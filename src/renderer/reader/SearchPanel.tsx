@@ -54,13 +54,10 @@ export function SearchPanel({ bookId }: { bookId: string }) {
     staleTime: Infinity,
   });
 
-  // 结果写进 store 供阅读器高亮 / 跳转。面板随标签页切换重挂时，同一份结果不得重置当前命中。
+  // 结果写进 store 供阅读器高亮 / 跳转（查询尚在路上时保留上一份结果）。
   useEffect(() => {
-    const s = useSearchStore.getState();
-    const next = debounced.length === 0 ? null : (search.data ?? null);
-    if (debounced.length > 0 && !search.data) return;
-    if (s.bookId === bookId && s.resultQuery === debounced && s.result === next) return;
-    setResult(bookId, debounced, next);
+    if (debounced.length === 0) setResult(bookId, "", null);
+    else if (search.data) setResult(bookId, debounced, search.data);
   }, [bookId, debounced, search.data, setResult]);
 
   useEffect(() => {

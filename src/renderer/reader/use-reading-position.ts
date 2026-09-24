@@ -14,7 +14,7 @@ import {
   type ReadingPositionState,
 } from "./reading-position-machine";
 import { ttsController } from "./tts/tts-controller";
-import { locateSearchHit } from "./epub-search";
+import { searchHitElement } from "./epub-search";
 
 const log = createLogger("epub");
 
@@ -87,14 +87,7 @@ export function useReadingPosition({
         // 与标注跳转同一原语：滚到 section、等它渲染，再在 iframe 文档里锚定命中所在元素。
         void vRef.current?.scrollToSectionElement(
           index,
-          (doc) => {
-            const range = locateSearchHit(doc, effect.query, effect.occurrence);
-            const node = range?.startContainer ?? null;
-            // 跨 realm：iframe 节点不是外层 window 的 Element 实例，按 nodeType 判断。
-            return node?.nodeType === Node.ELEMENT_NODE
-              ? (node as Element)
-              : (node?.parentElement ?? null);
-          },
+          (doc) => searchHitElement(doc, effect.query, effect.occurrence),
           { owner: "user" },
         );
         return;

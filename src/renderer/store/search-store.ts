@@ -1,9 +1,6 @@
 import { create } from "zustand";
 import type { BookSearchHit, BookSearchResult } from "@shared/search";
 
-/** 阅读器侧栏标签页（受控：⌘F 需要切到搜索页）。value 字符串沿用既有 tab 值。 */
-export type SidebarTab = "toc" | "search" | "notes" | "conversations" | "book-notes";
-
 interface SearchState {
   /** 当前结果所属的书；换书时重置。 */
   bookId: string | null;
@@ -13,7 +10,6 @@ interface SearchState {
   result: BookSearchResult | null;
   resultQuery: string;
   activeIndex: number | null;
-  sidebarTab: SidebarTab;
   /** 命令信号：递增即请求聚焦搜索输入框。 */
   focusNonce: number;
   /** 命令信号：nonce 递增触发阅读器跳到该命中。 */
@@ -21,8 +17,7 @@ interface SearchState {
 }
 
 interface SearchActions {
-  openSearch: () => void;
-  setSidebarTab: (tab: SidebarTab) => void;
+  requestFocus: () => void;
   setQuery: (query: string) => void;
   setResult: (bookId: string, query: string, result: BookSearchResult | null) => void;
   activate: (index: number) => void;
@@ -37,18 +32,20 @@ export const SEARCH_INITIAL: SearchState = {
   result: null,
   resultQuery: "",
   activeIndex: null,
-  sidebarTab: "toc",
   focusNonce: 0,
   jump: null,
 };
 
 export const useSearchStore = create<SearchState & SearchActions>((set, get) => ({
   ...SEARCH_INITIAL,
-  openSearch: () => set((s) => ({ sidebarTab: "search", focusNonce: s.focusNonce + 1 })),
-  setSidebarTab: (sidebarTab) => set({ sidebarTab }),
+  requestFocus: () => set((s) => ({ focusNonce: s.focusNonce + 1 })),
   setQuery: (query) => set({ query }),
-  setResult: (bookId, resultQuery, result) =>
-    set({ bookId, resultQuery, result, activeIndex: null }),
+  setResult: (bookId, resultQuery, result) => {
+    // 同一份结果重复发布（面板随标签页切换重挂）不得清掉当前命中。
+    const s = get();
+    if (s.bookId === bookId && s.resultQuery === resultQuery && s.result === result) return;
+    set({ bookId, resultQuery, result, activeIndex: null });
+  },
   activate: (index) => {
     const { result, resultQuery, jump } = get();
     const hit = result?.kind === "ok" ? result.hits[index] : undefined;

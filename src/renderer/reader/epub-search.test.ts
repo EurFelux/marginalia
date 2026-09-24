@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 import { strToU8, zipSync } from "fflate";
 import { describe, expect, it } from "vitest";
-import { sectionTextFlows } from "@marginalia/epub-parser";
-import { domTextFlow, locateSearchHit, searchPositions, type DomPosition } from "./epub-search";
+import { sectionTextFlow } from "@marginalia/epub-parser";
+import { domTextFlow, searchHitElement, searchPositions, type DomPosition } from "./epub-search";
 
 const docOf = (body: string) =>
   new DOMParser().parseFromString(
@@ -24,7 +24,7 @@ function mainSideFlow(body: string) {
 </package>`),
     "s.xhtml": strToU8(`<html><head><title>t</title></head><body>${body}</body></html>`),
   });
-  return sectionTextFlows(bytes)[0]!;
+  return sectionTextFlow(bytes, "s.xhtml")!;
 }
 
 const BODY = `
@@ -71,19 +71,18 @@ describe("searchPositions", () => {
   });
 });
 
-describe("locateSearchHit", () => {
+describe("searchHitElement", () => {
   it("picks the occurrence the main process counted", () => {
     const doc = docOf(BODY);
-    const range = locateSearchHit(doc, "margin", 2);
-    expect(range?.startContainer.textContent).toBe("A div paragraph about margins.");
+    expect(searchHitElement(doc, "margin", 2)?.localName).toBe("div");
   });
 
   it("falls back to the last match when the occurrence is out of range", () => {
     const doc = docOf(BODY);
-    expect(locateSearchHit(doc, "margin", 99)?.startContainer.textContent).toBe("margin cell");
+    expect(searchHitElement(doc, "margin", 99)?.localName).toBe("td");
   });
 
   it("returns null when nothing matches", () => {
-    expect(locateSearchHit(docOf(BODY), "absent", 0)).toBeNull();
+    expect(searchHitElement(docOf(BODY), "absent", 0)).toBeNull();
   });
 });

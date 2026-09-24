@@ -8,7 +8,7 @@ export {
   htmlToText,
 } from "./content";
 export type { ChapterTextSlice, ReadOptions } from "./content";
-export { sectionTextFlow, sectionTextFlows, spineHrefs } from "./search-text";
+export { sectionTextFlow, spineHrefs } from "./search-text";
 export type { SectionTextFlow } from "./search-text";
 export { buildTextFlow } from "./text-flow";
 export type { FlowAdapter, TextFlow } from "./text-flow";

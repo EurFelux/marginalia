@@ -1,5 +1,8 @@
-import { describe, expect, it } from "vitest";
-import { isFindShortcut } from "./search-shortcut";
+import { beforeEach, describe, expect, it } from "vitest";
+import { NAVIGATION_INITIAL, useNavigationStore } from "@renderer/store/navigation-store";
+import { PREFS_INITIAL, usePrefsStore } from "@renderer/store/prefs-store";
+import { SEARCH_INITIAL, useSearchStore } from "@renderer/store/search-store";
+import { isFindShortcut, openBookSearch } from "./search-shortcut";
 
 const key = (over: Partial<KeyboardEvent>) =>
   ({
@@ -27,5 +30,22 @@ describe("isFindShortcut", () => {
 
   it("ignores a plain f", () => {
     expect(isFindShortcut(key({}), true)).toBe(false);
+  });
+});
+
+describe("openBookSearch", () => {
+  beforeEach(() => {
+    usePrefsStore.setState(PREFS_INITIAL);
+    useNavigationStore.setState(NAVIGATION_INITIAL);
+    useSearchStore.setState(SEARCH_INITIAL);
+  });
+
+  it("expands a collapsed sidebar, switches it to the search tab and asks for input focus", () => {
+    usePrefsStore.setState({ layout: { ...PREFS_INITIAL.layout, sidebarOpen: false } });
+    useNavigationStore.getState().setSidebarTab("notes");
+    openBookSearch();
+    expect(usePrefsStore.getState().layout.sidebarOpen).toBe(true);
+    expect(useNavigationStore.getState().sidebarTab).toBe("search");
+    expect(useSearchStore.getState().focusNonce).toBe(1);
   });
 });

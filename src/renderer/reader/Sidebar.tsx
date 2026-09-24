@@ -6,14 +6,14 @@ import { ChapterList } from "./ChapterList";
 import { AnnotationsList } from "./AnnotationsList";
 import { ConversationsTab } from "@renderer/ai/ConversationsTab";
 import { BookNotesPanel } from "@renderer/book-notes/BookNotesPanel";
-import { useSearchStore, type SidebarTab } from "@renderer/store/search-store";
+import { useNavigationStore, type SidebarTab } from "@renderer/store/navigation-store";
 import { SearchPanel } from "./SearchPanel";
 
 export function Sidebar({ bookId }: { bookId: string }) {
   const { t } = useTranslation();
-  // 受控：⌘F 需要从外部切到搜索页（search-store.openSearch）。
-  const tab = useSearchStore((s) => s.sidebarTab);
-  const setTab = useSearchStore((s) => s.setSidebarTab);
+  // 受控：⌘F 需要从外部切到搜索页（openBookSearch）。
+  const tab = useNavigationStore((s) => s.sidebarTab);
+  const setTab = useNavigationStore((s) => s.setSidebarTab);
   // shadcn 的 tabs 组件用 data-horizontal/data-vertical 控方向/高度，但 Base UI Tabs.Root 发的是
   // data-orientation（属性名不匹配，那些类是惰性的）——故此处显式 flex-col + TabsList h-8 兜底。
   // tab label 仅在选中态显示（i18n 宽度适配）：trigger 标 group/tab，文字 span 用 group-data-[active] 显隐；

@@ -53,6 +53,10 @@ async function ensureEpubIndexed(bookId: string): Promise<void> {
   }
 }
 
+/** 书内搜索读书文件的方式（searchBook 只在索引未缓存时才调用）。 */
+const searchBookBytes = (bookId: string) => (format: "epub" | "pdf") =>
+  readBookFile(appService.getPath("booksDir"), bookId, format);
+
 const toDto = (b: {
   id: string;
   title: string | null;
@@ -193,24 +197,13 @@ export const libraryBindings: Binding[] = [
   }),
 
   bind(C.contentSearch, async (input) => {
-    const db = getDb();
-    const book = getBook(db, input.bookId);
-    if (!book) throw new Error(`content: book ${input.bookId} not found`);
     await ensureEpubIndexed(input.bookId);
-    // 书文件只在未缓存时才读（searchBook 按 bookId 缓存索引）。
-    return await searchBook(db, input.bookId, input.query, () =>
-      readBookFile(appService.getPath("booksDir"), input.bookId, book.format),
-    );
+    return await searchBook(getDb(), input.bookId, input.query, searchBookBytes(input.bookId));
   }),
 
   bind(C.contentPrepareSearch, async (input) => {
-    const db = getDb();
-    const book = getBook(db, input.bookId);
-    if (!book) throw new Error(`content: book ${input.bookId} not found`);
     await ensureEpubIndexed(input.bookId);
-    await prepareBookSearch(db, input.bookId, () =>
-      readBookFile(appService.getPath("booksDir"), input.bookId, book.format),
-    );
+    await prepareBookSearch(getDb(), input.bookId, searchBookBytes(input.bookId));
   }),
 
   bind(C.contentChapterSummary, (input) =>

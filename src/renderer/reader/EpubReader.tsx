@@ -20,6 +20,9 @@ import { BookFileMissingPanel } from "./BookFileMissingPanel";
 import { epubPercent } from "./percent";
 import { epubReadingContext } from "./epub-reading-context";
 import { applySearchHighlights, SEARCH_HIGHLIGHT_CSS } from "./epub-search";
+import { elementOf } from "./element-of";
+import type { EpubBook } from "./epub-book";
+import type { BookSearchHit } from "@shared/search";
 import { handleFindShortcut } from "./search-shortcut";
 import { useSearchStore } from "@renderer/store/search-store";
 import { prefsToCss } from "./prefs-to-css";
@@ -94,8 +97,7 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
     if (!book) return null;
     const idAssertion = [...cfi.matchAll(/\[([^\]]+)\]/g)].at(-1)?.[1] ?? null;
     // 先试 rangeFromCfi（标注的 range CFI 走这条精确路）；失败再用 [id] 断言 getElementById（进度恢复）。
-    const node = book.rangeFromCfi(cfi, doc)?.startContainer ?? null;
-    const fromRange = node ? (node.nodeType === 1 ? (node as Element) : node.parentElement) : null;
+    const fromRange = elementOf(book.rangeFromCfi(cfi, doc)?.startContainer);
     return fromRange ?? (idAssertion ? doc.getElementById(idAssertion) : null);
   };
 
@@ -284,16 +286,13 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
   );
   const searchJump = useSearchStore((s) => s.jump);
 
-  const activeOccurrenceIn = (index: number) =>
-    searchActive?.target.format === "epub" && book?.indexOfHref(searchActive.target.href) === index
-      ? searchActive.target.occurrence
-      : null;
-
   // section 载入 / 标注变化：重贴标注（改动 DOM），故搜索高亮以 refresh 重新匹配。
   const decorate = (index: number, doc: Document) => {
     if (!book) return;
     applyAnnotations(book, annotations.data ?? [], index, doc);
-    applySearchHighlights(doc, searchQuery, activeOccurrenceIn(index), { refresh: true });
+    applySearchHighlights(doc, searchQuery, activeOccurrence(searchActive, book, index), {
+      refresh: true,
+    });
   };
   const onHighlightClick = (
     annoId: string,
@@ -320,11 +319,10 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
     for (const el of scroller.querySelectorAll<HTMLElement>("[data-section-index]")) {
       const doc = el.querySelector("iframe")?.contentDocument;
       if (!doc?.body) continue;
-      applySearchHighlights(doc, searchQuery, activeOccurrenceIn(Number(el.dataset.sectionIndex)));
+      const index = Number(el.dataset.sectionIndex);
+      applySearchHighlights(doc, searchQuery, activeOccurrence(searchActive, book, index));
     }
-    // activeOccurrenceIn 由 searchActive 派生；React Compiler 负责记忆化，依赖列出源头即可。
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, searchActive]);
+  }, [searchQuery, searchActive, book]);
 
   // 搜索结果跳转（nonce 递增即一次新请求；同一命中再点也要重新跳）。
   useEffect(() => {
@@ -428,6 +426,17 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
       />
     </div>
   );
+}
+
+/** 当前命中若落在第 index 个 section，返回它在该 section 内的序号；否则 null。 */
+function activeOccurrence(
+  hit: BookSearchHit | undefined,
+  book: EpubBook | null,
+  index: number,
+): number | null {
+  return hit?.target.format === "epub" && book?.indexOfHref(hit.target.href) === index
+    ? hit.target.occurrence
+    : null;
 }
 
 function ReaderError({ message }: { message: string }) {

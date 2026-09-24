@@ -44,7 +44,7 @@
 
 块级元素（含 `br`、`td`、`div` 等）的边界记为**虚拟断点**：不进入文本流本身（保证文本流偏移 = DOM 文本节点偏移），只在匹配时视作一个空白，避免相邻段落首尾粘连误匹配。
 
-文本流构建是一个**共享纯函数**（`@marginalia/epub-parser` 的 `buildTextFlow`，HTML 解析本就归该包），通过适配器同时作用于主进程的 node-html-parser 树（包内 `sectionTextFlows`）与渲染层的真实 DOM——两侧规则一字不差，命中序号才能对齐。
+文本流构建是一个**共享纯函数**（`@marginalia/epub-parser` 的 `buildTextFlow`，HTML 解析本就归该包），通过适配器同时作用于主进程的 node-html-parser 树（包内 `sectionTextFlow`）与渲染层的真实 DOM——两侧规则一字不差，命中序号才能对齐。
 
 ### 3. 匹配规则（`src/shared/text-search.ts`，纯函数）
 
@@ -110,13 +110,18 @@ interface BookSearchHit {
 
 ### 渲染层
 
-- **`search-store`**（zustand）：当前书的 `query`、`hits`、`activeIndex`、侧栏受控标签页 `sidebarTab`、`focusRequest`（自增以聚焦输入框）、`jump`（`{ hit, seq }`，阅读器据 seq 消费）。换书重置。
+- **`search-store`**（zustand）：当前书的 `query`、结果与其查询串、`activeIndex`、`focusNonce`（自增以聚焦输入框）、`jump`（`{ hit, query, nonce }`，阅读器据 nonce 消费）。换书重置；同一份结果重复发布不清当前命中（面板随标签页切换重挂）。
+- **侧栏标签页**：受控，状态在 `navigation-store.sidebarTab`（属阅读器布局，跨书保留）。⌘F 经 `openBookSearch` 展开侧栏、切到搜索页并请求聚焦。
 - **侧栏**：`Tabs` 改为受控（值来自 store），新增「搜索」标签页（第二位，紧随目录）。
 - **`SearchPanel`**：输入框 + 「当前 / 总数」+ 上下按钮；Enter 下一个、⇧Enter 上一个；结果按章节（PDF 无章节时按页）分组，片段中命中部分加粗。空态：未输入提示、无结果、扫描版 PDF 说明、截断说明、错误信息。
 - **快捷键**：`ReaderView` 在 document 捕获阶段监听 ⌘F / Ctrl+F；ePub 正文在 iframe 内，`VirtualDocs` 新增 `onKeyDown` 回调由 `SectionFrame` 转发 iframe 的 keydown。
 - **ePub 跳转**：阅读位置状态机新增 `SEARCH_HIT_REQUESTED` 事件（loading 期间忽略；其余进入 following 并发 `notifyTtsUserNavigation` + `scrollToSearchHit`），执行器用 `scrollToSectionElement(index, doc => 命中起点所在元素)`，与标注跳转同一原语。
 - **ePub 高亮**：CSS Custom Highlight API（`::highlight(marginalia-search)` / `::highlight(marginalia-search-active)`），不改 DOM，不影响 CFI 与标注 `<mark>`。section 渲染时经 `decorate` 应用；查询 / 当前命中变化时由独立 effect 更新已挂载 section（见「上限与性能」的高亮缓存）。
-- **PDF 跳转与高亮**：`PdfPage` 接收本页命中，按标注同款方式（`rangeFromOffsets` + `relativeRects`）画一层独立覆盖。跳转分两步：先 `scrollToIndex(page)` 把页滚进渲染范围；该页文本层就绪、当前命中矩形画出后回报其中心在页内的比例，再用 Virtuoso 自身的 `scrollToIndex({ align: "start", offset: zoomScrollOffset(...) })` 钉到视口中线。**不用 `scrollIntoView`**：实测会被 Virtuoso 的测高校正冲掉，且页已在屏时子组件先滚、父组件的 `scrollToIndex` 后到会覆盖它（以 nonce 守卫防覆盖）。
+- **PDF 跳转与高亮**：`PdfPage` 接收本页命中，与标注共用 `useTextLayerRects`（偏移 → Range → 相对页矩形）画一层独立覆盖。跳转分两步：父组件在 layout effect 里 `scrollToIndex(page)` 把页滚进渲染范围；该页文本层就绪后，子组件按当前命中的偏移现场量出其中心在页内的比例并回报，父组件再用 Virtuoso 自身的 `scrollToIndex({ align: "start", offset: zoomScrollOffset(...) })` 钉到视口中线。
+  - **不用 `scrollIntoView`**：实测会被 Virtuoso 的测高校正冲掉。
+  - **第一步用 layout effect**：页已在屏时，子组件在同一次提交的 passive effect 里就会回报；layout effect 保证「滚到页」先发、「对齐命中」后发。
+  - **现场量、不读矩形状态**：矩形状态由上一次 effect 算出，同页连续跳转时仍标着上一个命中（实测旧实现第 2 次起停在上一个命中的位置）。
+- **PDF 归章**：与标注列表共用 `@shared/pdf-chapter-at-page`，同一页在两处归到同一章。
 - **ePub 对齐**：沿用 `scrollToSectionElement` 的顶部对齐（与标注、目录跳转一致）；书末段落无法顶对齐时停在可滚动的最底部。
 
 ## 测试

@@ -1,9 +1,10 @@
 import { buildTextFlow, type FlowAdapter, type TextFlow } from "@marginalia/epub-parser";
 import { findMatches, type TextMatch } from "@shared/text-search";
+import { elementOf } from "./element-of";
 
 /**
  * ePub 搜索命中在 section iframe 文档里的锚定与高亮（spec 2026-09-24 in-book-search §4）。
- * 文本流规则与主进程 sectionTextFlows 共用 buildTextFlow，故「第 k 个命中」两侧一致。
+ * 文本流规则与主进程 sectionTextFlow 共用 buildTextFlow，故「第 k 个命中」两侧一致。
  */
 
 const ELEMENT_NODE = 1;
@@ -82,10 +83,10 @@ function cachedRanges(doc: Document, query: string, refresh: boolean): Range[] {
   return ranges;
 }
 
-/** 取第 occurrence 个命中；数量对不上（解析差异）时退到最后一个，不静默失败。 */
-export function locateSearchHit(doc: Document, query: string, occurrence: number): Range | null {
+/** 第 occurrence 个命中所在的元素（跳转目标）；数量对不上（解析差异）时退到最后一个，不静默失败。 */
+export function searchHitElement(doc: Document, query: string, occurrence: number): Element | null {
   const ranges = cachedRanges(doc, query, false);
-  return ranges[occurrence] ?? ranges.at(-1) ?? null;
+  return elementOf((ranges[occurrence] ?? ranges.at(-1))?.startContainer);
 }
 
 const ALL = "marginalia-search";
