@@ -141,8 +141,12 @@ export function streamAssistantReply(
     stream: result.stream,
     // 仅把错误格式化为 errorText：除 error chunk 外，tool-input-error / tool-output-error 也经此取文案，
     // 故不能据此判定流级错误（见上方 streamHadError）。流级错误已在 streamText onError 记过日志。
+    // 非法工具调用会先后经过两次：tool-input-error 带原始错误对象，SDK 随后合成的 tool-output-error
+    // 只带其文案字符串——跳过字符串，一次失败只留一条 warn。
     onError: (err) => {
-      if (!streamHadError) log.warn("tool call failed (error returned to model)", err);
+      if (!streamHadError && typeof err !== "string") {
+        log.warn("tool call failed (error returned to model)", err);
+      }
       return err instanceof Error ? err.message : String(err);
     },
     onFinish: ({ responseMessage, isAborted }) => {
