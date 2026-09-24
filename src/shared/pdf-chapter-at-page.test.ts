@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ChapterRefDto } from "@shared/library";
-import { chapterIdAtPage } from "./pdf-chapter-at-page";
+import { chapterIdAtPage } from "@shared/pdf-chapter-at-page";
 
 const ch = (id: string, startPage: number | null, orderIndex: number): ChapterRefDto => ({
   id,

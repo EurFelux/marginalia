@@ -16,7 +16,7 @@ import { BookFileMissingPanel } from "./BookFileMissingPanel";
 import { makePdfLocator, parsePdfLocator, parsePdfLocatorRange } from "./pdf-locator";
 import { pdfAnnosByPage, rangeFromOffsets, relativeRects } from "./pdf-annotations";
 import { buildPdfSelectionInfo, flatOffsetOf, pointInDomSelection } from "./pdf-selection";
-import { chapterIdAtPage } from "./pdf-chapter-at-page";
+import { chapterIdAtPage } from "@shared/pdf-chapter-at-page";
 import { clampPdfZoom, nextZoom } from "./pdf-zoom";
 import { pdfPercent } from "./percent";
 import {
@@ -29,16 +29,21 @@ import {
 import { findPdfTextLinks } from "./pdf-autolink";
 import { overlayClass } from "./highlight";
 import type { PdfPageAnno } from "./pdf-annotations";
-import { hitHighlight, usePdfHighlights } from "./use-pdf-highlights";
-import {
-  NO_SEARCH_MARKS,
-  usePdfSearchHighlights,
-  type PdfSearchMark,
-} from "./use-pdf-search-highlights";
+import { hitHighlight, useTextLayerRects } from "./use-pdf-highlights";
 import { useSearchStore } from "@renderer/store/search-store";
 import { useNoteHoverStore } from "@renderer/store/note-hover-store";
 
 const log = createLogger("pdf");
+
+/** 本页的一个搜索命中（文本层文本流偏移，与 PDF 标注同一坐标空间）。 */
+interface PdfSearchMark {
+  start: number;
+  end: number;
+  active: boolean;
+}
+
+/** 无命中的页共用同一引用，避免每次渲染都触发矩形重算。 */
+const NO_SEARCH_MARKS: PdfSearchMark[] = [];
 
 interface Props {
   bookId: string;
@@ -183,16 +188,13 @@ export function PdfReader({ bookId, chapters, persistProgress }: Props) {
 
   // 搜索结果跳转分两步：先把命中所在页滚进渲染范围；该页文本层就绪、量出命中在页内的位置后，
   // PdfPage 回报 onSearchHitMeasured，再用 Virtuoso 自身命令把命中钉到视口中线（裸改 scrollTop
-  // 会被 Virtuoso 的测高校正冲掉）。页已在屏时子组件的回报先于本 effect，故以 nonce 守卫防覆盖。
-  const alignedJumpNonce = useRef<number | null>(null);
-  useEffect(() => {
-    if (!book || !searchJump || searchJump.hit.target.format !== "pdf") return;
-    if (alignedJumpNonce.current === searchJump.nonce) return;
+  // 会被 Virtuoso 的测高校正冲掉）。第一步用 layout effect：页已在屏时子组件在同一次提交的 passive
+  // effect 里就会回报，layout effect 保证「滚到页」先发、「对齐命中」后发，后者不被覆盖。
+  useLayoutEffect(() => {
+    if (!book || searchJump?.hit.target.format !== "pdf") return;
     virtuosoRef.current?.scrollToIndex({ index: searchJump.hit.target.page - 1, align: "center" });
   }, [book, searchJump]);
-  const alignSearchHit = (nonce: number, page: number, centerRatio: number) => {
-    if (nonce !== searchJump?.nonce || alignedJumpNonce.current === nonce) return;
-    alignedJumpNonce.current = nonce;
+  const alignSearchHit = (page: number, centerRatio: number) => {
     const viewportH = containerRef.current?.clientHeight ?? 0;
     virtuosoRef.current?.scrollToIndex({
       index: page - 1,
@@ -522,7 +524,7 @@ export function PdfReader({ bookId, chapters, persistProgress }: Props) {
             annos={annosByPage.get(index + 1) ?? []}
             searchMarks={searchMarksByPage.get(index + 1) ?? NO_SEARCH_MARKS}
             searchJumpNonce={searchJumpPage === index + 1 ? searchJump!.nonce : null}
-            onSearchHitMeasured={(nonce, ratio) => alignSearchHit(nonce, index + 1, ratio)}
+            onSearchHitMeasured={(ratio) => alignSearchHit(index + 1, ratio)}
             onLinkPage={(pageNumber) =>
               virtuosoRef.current?.scrollToIndex({ index: pageNumber - 1, align: "start" })
             }
@@ -544,8 +546,8 @@ function PdfPage(props: {
   searchMarks: PdfSearchMark[];
   /** 当前搜索跳转落在本页时为其 nonce，否则 null。 */
   searchJumpNonce: number | null;
-  /** 当前命中矩形画出后回报其中心在页内的比例（每个 nonce 一次）。 */
-  onSearchHitMeasured: (nonce: number, centerRatio: number) => void;
+  /** 本页文本层就绪后回报当前命中中心在页内的比例（每次跳转一次）。 */
+  onSearchHitMeasured: (centerRatio: number) => void;
   onLinkPage: (pageNumber: number) => void;
 }) {
   const {
@@ -571,18 +573,23 @@ function PdfPage(props: {
   const hoverHighlight = useNoteHoverStore((s) => s.hoverHighlight);
   const leaveHighlight = useNoteHoverStore((s) => s.leaveHighlight);
   const lastNotedId = useRef<string | null>(null);
-  const highlights = usePdfHighlights(annos, textLayerRef.current, textReady);
-  const searchRects = usePdfSearchHighlights(searchMarks, textLayerRef.current, textReady);
+  const highlights = useTextLayerRects(annos, textLayerRef.current, textReady);
+  const searchRects = useTextLayerRects(searchMarks, textLayerRef.current, textReady);
   const measuredJumpNonce = useRef<number | null>(null);
 
-  // 每次跳转只回报一次：等本页文本层就绪、当前命中矩形画出来后，报出其中心在页内的比例。
+  // 每次跳转只回报一次：本页文本层就绪后，按当前命中的偏移现场量出其中心在页内的比例。
+  // 直接量而不读 searchRects：后者是上一次 effect 算出的状态，同页连续跳转时仍标着上一个命中。
   useEffect(() => {
     if (searchJumpNonce === null || measuredJumpNonce.current === searchJumpNonce) return;
-    const active = searchRects.find((r) => r.active);
-    if (!active || cssHeight <= 0) return;
+    const layer = textLayerRef.current;
+    const active = searchMarks.find((m) => m.active);
+    if (!textReady || !layer || !active || cssHeight <= 0) return;
+    const rect = rangeFromOffsets(layer, active.start, active.end)?.getBoundingClientRect();
+    if (!rect) return;
     measuredJumpNonce.current = searchJumpNonce;
-    onSearchHitMeasured(searchJumpNonce, (active.rect.top + active.rect.height / 2) / cssHeight);
-  }, [searchJumpNonce, searchRects, cssHeight, onSearchHitMeasured]);
+    const top = rect.top - layer.getBoundingClientRect().top;
+    onSearchHitMeasured((top + rect.height / 2) / cssHeight);
+  }, [searchJumpNonce, searchMarks, textReady, cssHeight, onSearchHitMeasured]);
   const [autoLinks, setAutoLinks] = useState<PdfAutoLink[]>([]);
 
   // 渲染策略：首次/滚动到新页 → 立即渲染；同页缩放（cssWidth 变）→ debounce 重渲，过程中可见
@@ -654,7 +661,7 @@ function PdfPage(props: {
         width: hit.rect.width,
         height: hit.rect.height,
       },
-      target: { type: "edit", annotationId: hit.annoId },
+      target: { type: "edit", annotationId: hit.id },
     });
   };
 
@@ -673,11 +680,11 @@ function PdfPage(props: {
     else layer.removeAttribute("data-pointer");
 
     const noted = hit?.hasNote ? hit : undefined;
-    const id = noted?.annoId ?? null;
+    const id = noted?.id ?? null;
     if (id !== lastNotedId.current) {
       lastNotedId.current = id;
       if (noted) {
-        hoverHighlight(noted.annoId, {
+        hoverHighlight(noted.id, {
           x: noted.rect.left + base.x,
           y: noted.rect.top + base.y,
           width: noted.rect.width,
@@ -724,7 +731,7 @@ function PdfPage(props: {
           <div className="pointer-events-none absolute inset-0">
             {highlights.map((h) => (
               <div
-                key={`${h.annoId}-${Math.round(h.rect.left)}-${Math.round(h.rect.top)}`}
+                key={`${h.id}-${Math.round(h.rect.left)}-${Math.round(h.rect.top)}`}
                 className={cn("absolute", overlayClass(h.style, h.hasNote))}
                 // 运行时计算的矩形几何
                 style={{
@@ -736,7 +743,7 @@ function PdfPage(props: {
               />
             ))}
           </div>
-          {/* 搜索命中 overlay：与标注 overlay 同层级、纯视觉。当前命中挂 ref 供跳转居中。 */}
+          {/* 搜索命中 overlay：与标注 overlay 同层级、纯视觉。 */}
           <div className="pointer-events-none absolute inset-0">
             {searchRects.map((h, i) => (
               <div
