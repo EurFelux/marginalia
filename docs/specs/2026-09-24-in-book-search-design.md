@@ -44,7 +44,7 @@
 
 块级元素（含 `br`、`td`、`div` 等）的边界记为**虚拟断点**：不进入文本流本身（保证文本流偏移 = DOM 文本节点偏移），只在匹配时视作一个空白，避免相邻段落首尾粘连误匹配。
 
-文本流构建是一个**共享纯函数**（`src/shared/text-flow.ts`），通过适配器同时作用于主进程的 node-html-parser 树与渲染层的真实 DOM——两侧规则一字不差，命中序号才能对齐。
+文本流构建是一个**共享纯函数**（`@marginalia/epub-parser` 的 `buildTextFlow`，HTML 解析本就归该包），通过适配器同时作用于主进程的 node-html-parser 树（包内 `sectionTextFlows`）与渲染层的真实 DOM——两侧规则一字不差，命中序号才能对齐。
 
 ### 3. 匹配规则（`src/shared/text-search.ts`，纯函数）
 
@@ -108,12 +108,13 @@ interface BookSearchHit {
 - **快捷键**：`ReaderView` 在 document 捕获阶段监听 ⌘F / Ctrl+F；ePub 正文在 iframe 内，`VirtualDocs` 新增 `onKeyDown` 回调由 `SectionFrame` 转发 iframe 的 keydown。
 - **ePub 跳转**：阅读位置状态机新增 `SEARCH_HIT_REQUESTED` 事件（loading 期间忽略；其余进入 following 并发 `notifyTtsUserNavigation` + `scrollToSearchHit`），执行器用 `scrollToSectionElement(index, doc => 命中起点所在元素)`，与标注跳转同一原语。
 - **ePub 高亮**：CSS Custom Highlight API（`::highlight(marginalia-search)` / `::highlight(marginalia-search-active)`），不改 DOM，不影响 CFI 与标注 `<mark>`。section 渲染时经 `decorate` 应用，hits / activeIndex 变化时对已挂载 section 重算。
-- **PDF 跳转与高亮**：`PdfPage` 接收本页命中，按标注同款方式（`rangeFromOffsets` + `relativeRects`）画一层独立覆盖；跳转时先 `scrollToIndex(page)`，页面文本层就绪后把当前命中矩形 `scrollIntoView({ block: "center" })`。
+- **PDF 跳转与高亮**：`PdfPage` 接收本页命中，按标注同款方式（`rangeFromOffsets` + `relativeRects`）画一层独立覆盖。跳转分两步：先 `scrollToIndex(page)` 把页滚进渲染范围；该页文本层就绪、当前命中矩形画出后回报其中心在页内的比例，再用 Virtuoso 自身的 `scrollToIndex({ align: "start", offset: zoomScrollOffset(...) })` 钉到视口中线。**不用 `scrollIntoView`**：实测会被 Virtuoso 的测高校正冲掉，且页已在屏时子组件先滚、父组件的 `scrollToIndex` 后到会覆盖它（以 nonce 守卫防覆盖）。
+- **ePub 对齐**：沿用 `scrollToSectionElement` 的顶部对齐（与标注、目录跳转一致）；书末段落无法顶对齐时停在可滚动的最底部。
 
 ## 测试
 
 - `text-search`：NFKC / 大小写 / 空白折叠 / CJK 间空白 / 虚拟断点 / 偏移映射 / 非重叠 / 片段。
-- `text-flow`：node-html-parser 适配器（主进程侧）与 happy-dom 适配器（渲染层侧）对同一 HTML 产出相同文本流、断点与锚点偏移；排除 script/style。
+- `text-flow`：node-html-parser 适配器（主进程侧）与 happy-dom 适配器（渲染层侧）对同一 HTML 产出相同文本流、断点与锚点偏移；排除 script/style。（happy-dom 的 `Range` 实现有缺陷——`setEnd` 会改写起点、`toString` 恒空——故渲染层单测断言「命中 → 节点 + 偏移」，`Range` 构造交给实机。）
 - 主进程 `searchBook`：fixture ePub（命中数、href、序号、章节归属）、fixture PDF（页码与偏移可在文本流中取回命中词）、扫描版 PDF → `no-text-layer`、上限截断。
 - 状态机：`SEARCH_HIT_REQUESTED` 在 loading 忽略、其余发出跳转 effect。
 - ePub 锚定：happy-dom 中按序号取回 Range，序号越界取最后一个。

@@ -181,11 +181,25 @@ export function PdfReader({ bookId, chapters, persistProgress }: Props) {
     if (r) virtuosoRef.current?.scrollToIndex({ index: r.page - 1, align: "start" });
   }, [book, scrollCommand]);
 
-  // 搜索结果跳转：先把命中所在页滚进视口；页面文本层就绪后由 PdfPage 把命中矩形居中。
+  // 搜索结果跳转分两步：先把命中所在页滚进渲染范围；该页文本层就绪、量出命中在页内的位置后，
+  // PdfPage 回报 onSearchHitMeasured，再用 Virtuoso 自身命令把命中钉到视口中线（裸改 scrollTop
+  // 会被 Virtuoso 的测高校正冲掉）。页已在屏时子组件的回报先于本 effect，故以 nonce 守卫防覆盖。
+  const alignedJumpNonce = useRef<number | null>(null);
   useEffect(() => {
     if (!book || !searchJump || searchJump.hit.target.format !== "pdf") return;
+    if (alignedJumpNonce.current === searchJump.nonce) return;
     virtuosoRef.current?.scrollToIndex({ index: searchJump.hit.target.page - 1, align: "center" });
   }, [book, searchJump]);
+  const alignSearchHit = (nonce: number, page: number, centerRatio: number) => {
+    if (nonce !== searchJump?.nonce || alignedJumpNonce.current === nonce) return;
+    alignedJumpNonce.current = nonce;
+    const viewportH = containerRef.current?.clientHeight ?? 0;
+    virtuosoRef.current?.scrollToIndex({
+      index: page - 1,
+      align: "start",
+      offset: zoomScrollOffset(centerRatio, pageH, viewportH / 2),
+    });
+  };
 
   // .selecting 清理挂 document 捕获：拖选释放在容器外（窗外/浮层上）时容器 onMouseUp
   // 不触发，class 残留会让该页链接层一直收不到 pointer 事件（链接永久不可点）。
@@ -508,6 +522,7 @@ export function PdfReader({ bookId, chapters, persistProgress }: Props) {
             annos={annosByPage.get(index + 1) ?? []}
             searchMarks={searchMarksByPage.get(index + 1) ?? NO_SEARCH_MARKS}
             searchJumpNonce={searchJumpPage === index + 1 ? searchJump!.nonce : null}
+            onSearchHitMeasured={(nonce, ratio) => alignSearchHit(nonce, index + 1, ratio)}
             onLinkPage={(pageNumber) =>
               virtuosoRef.current?.scrollToIndex({ index: pageNumber - 1, align: "start" })
             }
@@ -529,6 +544,8 @@ function PdfPage(props: {
   searchMarks: PdfSearchMark[];
   /** 当前搜索跳转落在本页时为其 nonce，否则 null。 */
   searchJumpNonce: number | null;
+  /** 当前命中矩形画出后回报其中心在页内的比例（每个 nonce 一次）。 */
+  onSearchHitMeasured: (nonce: number, centerRatio: number) => void;
   onLinkPage: (pageNumber: number) => void;
 }) {
   const {
@@ -540,6 +557,7 @@ function PdfPage(props: {
     annos,
     searchMarks,
     searchJumpNonce,
+    onSearchHitMeasured,
     onLinkPage,
   } = props;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -555,16 +573,16 @@ function PdfPage(props: {
   const lastNotedId = useRef<string | null>(null);
   const highlights = usePdfHighlights(annos, textLayerRef.current, textReady);
   const searchRects = usePdfSearchHighlights(searchMarks, textLayerRef.current, textReady);
-  const activeSearchRef = useRef<HTMLDivElement | null>(null);
-  const scrolledJumpNonce = useRef<number | null>(null);
+  const measuredJumpNonce = useRef<number | null>(null);
 
-  // 每次跳转只居中一次：等本页文本层就绪、当前命中矩形画出来后再滚。
+  // 每次跳转只回报一次：等本页文本层就绪、当前命中矩形画出来后，报出其中心在页内的比例。
   useEffect(() => {
-    if (searchJumpNonce === null || scrolledJumpNonce.current === searchJumpNonce) return;
-    if (!activeSearchRef.current) return;
-    scrolledJumpNonce.current = searchJumpNonce;
-    activeSearchRef.current.scrollIntoView({ block: "center", inline: "nearest" });
-  }, [searchJumpNonce, searchRects]);
+    if (searchJumpNonce === null || measuredJumpNonce.current === searchJumpNonce) return;
+    const active = searchRects.find((r) => r.active);
+    if (!active || cssHeight <= 0) return;
+    measuredJumpNonce.current = searchJumpNonce;
+    onSearchHitMeasured(searchJumpNonce, (active.rect.top + active.rect.height / 2) / cssHeight);
+  }, [searchJumpNonce, searchRects, cssHeight, onSearchHitMeasured]);
   const [autoLinks, setAutoLinks] = useState<PdfAutoLink[]>([]);
 
   // 渲染策略：首次/滚动到新页 → 立即渲染；同页缩放（cssWidth 变）→ debounce 重渲，过程中可见
@@ -723,11 +741,6 @@ function PdfPage(props: {
             {searchRects.map((h, i) => (
               <div
                 key={`search-${i}`}
-                ref={
-                  h.active && !searchRects.slice(0, i).some((r) => r.active)
-                    ? activeSearchRef
-                    : undefined
-                }
                 className={cn(
                   "absolute rounded-[2px]",
                   h.active ? "bg-orange-500/50" : "bg-yellow-400/35",
