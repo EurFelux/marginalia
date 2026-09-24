@@ -3,6 +3,7 @@ import {
   isStepCount,
   streamText,
   toUIMessageStream,
+  type FinishReason,
   type LanguageModelUsage,
   type ModelMessage,
   type UIMessageChunk,
@@ -12,6 +13,7 @@ import { conversations } from "@main/db/schema";
 import { createContextTools } from "@main/ai/context-tools";
 import { createMemoryTools } from "@main/ai/memory-tools";
 import { providerCallOptions, supportsImageToolResults } from "@main/ai/model-factory";
+import { finishFeedback } from "@main/ai/finish-feedback";
 import { withPromptCaching } from "@main/ai/prompt-caching";
 import { maybeCompactConversation } from "@main/ai/context-compaction";
 import { maybeConsolidateMemory } from "@main/ai/memory-consolidation";
@@ -84,6 +86,15 @@ export function streamAssistantReply(
   };
 
   let capturedUsage: LanguageModelUsage | undefined;
+  // 流级错误标志：仅由 streamText 的 onError 置位——它只在流中出现 error chunk 时触发。
+  // 工具层错误（非法 JSON / 参数不合 schema / 未知工具 / execute 抛错）走 tool-error part，
+  // SDK 将其作为工具结果喂回模型、循环继续，不算流级错误（spec 2026-09-24 chat-turn-outcome）。
+  let streamHadError = false;
+  let errorInfo: { name: string; message: string } | undefined;
+  // 最后一步的 finish reason：取自 onStepEnd（先于 UI finish chunk 到达），供落库与反馈共用判定。
+  let lastFinish: { finishReason: FinishReason; rawFinishReason: string | undefined } | undefined;
+  /** 本轮需给用户的反馈；已出现流级错误的回合不再追加（每轮至多一条错误反馈）。 */
+  const turnFeedback = () => (streamHadError || !lastFinish ? null : finishFeedback(lastFinish));
   const limit = stepLimit ?? DEFAULT_STEP_LIMIT;
   // 按 provider 应用 prompt caching 策略（显式断点型如 Anthropic 标 cache_control；隐式型原样透传）。
   const cached = withPromptCaching({
@@ -105,7 +116,16 @@ export function streamAssistantReply(
     onEnd: ({ usage }) => {
       capturedUsage = usage;
     },
-    onStepEnd: ({ finishReason, toolCalls, text }) => {
+    onError: ({ error }) => {
+      streamHadError = true;
+      errorInfo = {
+        name: error instanceof Error ? error.name : "Error",
+        message: error instanceof Error ? error.message : String(error),
+      };
+      log.warn("stream/model error", error);
+    },
+    onStepEnd: ({ finishReason, rawFinishReason, toolCalls, text }) => {
+      lastFinish = { finishReason, rawFinishReason };
       log.debug(
         `step finished (finishReason=${finishReason}, toolCalls=${toolCalls.length}, textChars=${text.length})`,
       );
@@ -117,18 +137,17 @@ export function streamAssistantReply(
     resolveDone = res;
   });
 
-  let streamHadError = false;
-  let errorInfo: { name: string; message: string } | undefined;
   const uiStream = toUIMessageStream({
     stream: result.stream,
+    // 仅把错误格式化为 errorText：除 error chunk 外，tool-input-error / tool-output-error 也经此取文案，
+    // 故不能据此判定流级错误（见上方 streamHadError）。流级错误已在 streamText onError 记过日志。
+    // 非法工具调用会先后经过两次：tool-input-error 带原始错误对象，SDK 随后合成的 tool-output-error
+    // 只带其文案字符串——跳过字符串，一次失败只留一条 warn。
     onError: (err) => {
-      streamHadError = true;
-      errorInfo = {
-        name: err instanceof Error ? err.name : "Error",
-        message: err instanceof Error ? err.message : String(err),
-      };
-      log.warn("stream/model error", err);
-      return errorInfo.message;
+      if (!streamHadError && typeof err !== "string") {
+        log.warn("tool call failed (error returned to model)", err);
+      }
+      return err instanceof Error ? err.message : String(err);
     },
     onFinish: ({ responseMessage, isAborted }) => {
       const stillExists = db
@@ -140,7 +159,13 @@ export function streamAssistantReply(
         log.debug("conversation deleted mid-stream; dropping assistant persist", conversationId);
         return;
       }
-      const status = streamHadError ? "error" : isAborted ? "aborted" : "complete";
+      const feedback = isAborted ? null : turnFeedback();
+      const status =
+        streamHadError || feedback?.code === "provider-error"
+          ? "error"
+          : isAborted
+            ? "aborted"
+            : "complete";
       const usage =
         capturedUsage?.inputTokens != null && capturedUsage.outputTokens != null
           ? { inputTokens: capturedUsage.inputTokens, outputTokens: capturedUsage.outputTokens }
@@ -154,6 +179,10 @@ export function streamAssistantReply(
           model: resolved.modelId,
           usage,
           error: streamHadError ? errorInfo : undefined,
+          finish:
+            feedback && lastFinish
+              ? { reason: lastFinish.finishReason, raw: lastFinish.rawFinishReason }
+              : undefined,
         },
       });
       if (status === "complete") {
@@ -183,7 +212,20 @@ export function streamAssistantReply(
     },
   });
 
-  const [internalStream, callerStream] = uiStream.tee();
+  const [internalStream, rawCallerStream] = uiStream.tee();
+  // 仅给渲染层那一路：异常 finish reason 在 finish chunk 前补一条 error chunk，复用既有错误横幅。
+  // 落库那一路不经此变换（status 由 onFinish 判定）。
+  const callerStream = rawCallerStream.pipeThrough(
+    new TransformStream<UIMessageChunk, UIMessageChunk>({
+      transform(chunk, controller) {
+        if (chunk.type === "finish") {
+          const feedback = turnFeedback();
+          if (feedback) controller.enqueue({ type: "error", errorText: feedback.message });
+        }
+        controller.enqueue(chunk);
+      },
+    }),
+  );
   void (async () => {
     try {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars

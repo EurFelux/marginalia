@@ -47,6 +47,13 @@ export const messageMetadataSchema = z.object({
       message: z.string(),
     })
     .optional(),
+  // 需向用户反馈的异常 finish reason（length / content-filter / error）；仅在有反馈时写入。
+  finish: z
+    .object({
+      reason: z.string(),
+      raw: z.string().optional(),
+    })
+    .optional(),
 });
 
 export type MessageMetadata = z.infer<typeof messageMetadataSchema>;

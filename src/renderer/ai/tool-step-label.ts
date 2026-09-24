@@ -13,14 +13,17 @@ export function isErrorShape(output: unknown): boolean {
   return typeof output === "object" && output !== null && "error" in output;
 }
 
-export type ToolStepStatus = "loading" | "done" | "failed";
+export type ToolStepStatus = "loading" | "done" | "failed" | "not-executed";
 
-/** 步骤行三态：failed 两条腿（硬 error state + 软 { error } result），其余 output-available 为 done。 */
-export function toolStepStatus(part: ToolPart): ToolStepStatus {
+/**
+ * 步骤行状态：failed 两条腿（硬 error state + 软 { error } result），其余 output-available 为 done。
+ * 无 output 时看回复是否仍在流式：仍在流 → loading；已结束 → not-executed（SDK 因异常 finish
+ * reason 跳过执行的悬空调用，状态不会再推进，#109）。本项目工具不走 approval。
+ */
+export function toolStepStatus(part: ToolPart, streaming: boolean): ToolStepStatus {
   if (part.state === "output-error") return "failed";
   if (part.state === "output-available") return isErrorShape(part.output) ? "failed" : "done";
-  // 其余 state（含未用到的 approval/denied 态）一律视作进行中；本项目工具不走 approval。
-  return "loading";
+  return streaming ? "loading" : "not-executed";
 }
 
 /**
