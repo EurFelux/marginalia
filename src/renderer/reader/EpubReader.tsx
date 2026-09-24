@@ -18,6 +18,7 @@ import { pickAnchorChapterId } from "./current-anchor-chapter";
 import { useEpubSession } from "./epub-session";
 import { BookFileMissingPanel } from "./BookFileMissingPanel";
 import { epubPercent } from "./percent";
+import { epubReadingContext } from "./epub-reading-context";
 import { prefsToCss } from "./prefs-to-css";
 import { readerThemeCss } from "./reader-theme-css";
 import { sectionSelectToSelectionInfo } from "./epub-selection";
@@ -38,8 +39,6 @@ interface Props {
   chapters: ChapterRefDto[];
   persistProgress: boolean;
 }
-
-const CURRENT_EPUB_READ_CHARS = 4_000;
 
 export function EpubReader({ bookId, chapters, persistProgress }: Props) {
   const { t } = useTranslation();
@@ -106,15 +105,7 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
 
   const reportPosition = (position: ReadingPosition) => {
     if (position.chapterId == null) return;
-    setReadingContext({
-      format: "epub",
-      chapterId: position.chapterId,
-      chapterTitle: position.chapterTitle,
-      offset: position.offset,
-      maxChars: CURRENT_EPUB_READ_CHARS,
-      spineIndex: position.index,
-      locator: position.cfi,
-    });
+    setReadingContext(epubReadingContext(position));
     topChapterIdRef.current = position.chapterId;
     if (position.chapterId !== currentChapterId) setCurrentChapter(position.chapterId);
   };
@@ -229,8 +220,8 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
     // 在恢复时精确还原；cfiFromElement 的 point CFI 在恢复时 toRange 解析不出）。退化到 section 起点 CFI。
     const topReadablePosition = (
       sectionIndex: number,
-    ): { cfi: string; textOffset: number | null } => {
-      const fallback = book!.cfiAtIndex(sectionIndex) ?? "";
+    ): { cfi: string | null; textOffset: number | null } => {
+      const fallback = book!.cfiAtIndex(sectionIndex);
       const frame = document.querySelector<HTMLIFrameElement>(
         `[data-section-index="${sectionIndex}"] iframe`,
       );
