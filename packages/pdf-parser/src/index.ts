@@ -3,7 +3,7 @@
 // 测试经 "@marginalia/pdf-parser/fixture" 子路径导入。
 export type { ParsedPdf, TocNode, ChapterRange, ChapterTextSlice } from "./types";
 export { parsePdf, openPdf, pageText, pageTextFlow } from "./parse";
-export { extractPdfText } from "./content";
+export { extractPdfText, chapterPdfText } from "./content";
 export type { PdfReadOptions } from "./content";
 export { renderPageImage } from "./render";
 export type { RenderOptions } from "./render";
