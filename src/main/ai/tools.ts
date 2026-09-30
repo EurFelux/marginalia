@@ -6,6 +6,7 @@ import type { DB } from "@main/db/client";
 import { chapters } from "@main/db/schema";
 import { listChapters, readChapterText } from "@main/library/content";
 import { getChapterSummaryView, getBookSummaryView } from "@main/ai/summary";
+import { searchBookCorpus } from "@main/ai/search-corpus";
 import { getBook, resolveChapterByHref } from "@main/library/repository";
 import { extractPdfText, renderPageImage } from "@marginalia/pdf-parser";
 import { createLogger } from "@main/logger";
@@ -115,6 +116,14 @@ export function createReadingTools(deps: ReadingToolsDeps) {
           const bytes = await loadBytes(bookId);
           return await readChapterText(db, bytes, bookId, id, { offset, maxChars });
         }),
+    }),
+    // spec 2026-09-30-ai-search-tool-design §5：固定 20 条 / ±50 字符片段，不开放 maxHits/radius。
+    searchBook: tool({
+      description:
+        "Search the full text of the current book for a keyword or phrase. Returns up to 20 hits in reading order, each with the chapter id/title, a snippet (~50 chars on each side of the match), and `chapterOffset` — the exact offset of the match in readChapterText's offset space: to read around a hit, call readChapterText with that chapterId and offset = chapterOffset minus a few hundred chars (clamped to 0). For PDFs, hits also include `page`, which you can pass to readPage. If `truncated` is true there are more matches than returned — retry with a more specific query. Prefer this over reading chapters one by one when the user asks where the book talks about something.",
+      inputSchema: z.object({ query: z.string().min(1).max(200) }),
+      execute: async ({ query }) =>
+        runTool("searchBook", () => searchBookCorpus(db, bookId, query, loadBytes)),
     }),
   };
 

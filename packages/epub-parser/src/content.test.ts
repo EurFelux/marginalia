@@ -1,12 +1,26 @@
 import { strToU8, zipSync } from "fflate";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+  createChapterTextSlicer,
   extractBookText,
   extractChapterAcrossSpine,
   extractChapterText,
   htmlToText,
 } from "./content";
 import { makeFixtureEpub } from "./fixture";
+
+// parseHtml 调用计数（性能断言用；行为透传原实现）。
+const counters = vi.hoisted(() => ({ parse: 0 }));
+vi.mock("node-html-parser", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node-html-parser")>();
+  return {
+    ...actual,
+    parse: (...args: Parameters<typeof actual.parse>) => {
+      counters.parse++;
+      return actual.parse(...args);
+    },
+  };
+});
 
 /**
  * 三段 spine 的 epub：中间文件 s2 不在任何目录项里（孤儿），逻辑上属于 s1 那一章。
@@ -230,5 +244,31 @@ describe("extractChapterAcrossSpine", () => {
     expect(r.text.length).toBe(4);
     expect(r.hasMore).toBe(true);
     expect(r.nextOffset).toBe(4);
+  });
+});
+
+describe("createChapterTextSlicer", () => {
+  const xhtml = `<html><body><p><span id="c1">一</span></p><p>第一章正文。</p><p><span id="c2">二</span></p><p>第二章正文。</p><p><span id="c3">三</span></p><p>第三章正文。</p></body></html>`;
+  const spine = ["s1.xhtml"];
+  const fileText = () => xhtml;
+
+  it("slices consecutive chapter bounds with the same semantics as chapterTextAcrossSpine", () => {
+    const slice = createChapterTextSlicer(fileText, spine);
+    expect(slice({ href: "s1.xhtml", anchor: "c1" }, { href: "s1.xhtml", anchor: "c2" })).toBe(
+      "一\n第一章正文。",
+    );
+    expect(slice({ href: "s1.xhtml", anchor: "c2" }, { href: "s1.xhtml", anchor: "c3" })).toBe(
+      "二\n第二章正文。",
+    );
+    expect(slice({ href: "s1.xhtml", anchor: "c3" }, undefined)).toBe("三\n第三章正文。");
+  });
+
+  it("parses a multi-chapter spine file once, however many chapter bounds slice it", () => {
+    counters.parse = 0;
+    const slice = createChapterTextSlicer(fileText, spine);
+    slice({ href: "s1.xhtml", anchor: "c1" }, { href: "s1.xhtml", anchor: "c2" });
+    slice({ href: "s1.xhtml", anchor: "c2" }, { href: "s1.xhtml", anchor: "c3" });
+    slice({ href: "s1.xhtml", anchor: "c3" }, undefined);
+    expect(counters.parse).toBe(1);
   });
 });

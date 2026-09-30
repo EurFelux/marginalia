@@ -65,6 +65,8 @@ export default {
   "ai.toolStep.readChapterTextFallback": "读取章节文本",
   "ai.toolStep.readPage": "读取第 {{page}} 页",
   "ai.toolStep.readPageFallback": "读取页面",
+  "ai.toolStep.searchBook": "搜索书内：{{query}}",
+  "ai.toolStep.searchBookFallback": "搜索书内全文",
   "ai.toolStep.webSearch": "联网搜索：{{query}}",
   "ai.toolStep.webSearchFallback": "联网搜索",
   "ai.webSearch.hover": "启用后 AI 可联网搜索（Exa）",

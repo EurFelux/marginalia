@@ -65,6 +65,8 @@ export default {
   "ai.toolStep.readChapterTextFallback": "Reading chapter text",
   "ai.toolStep.readPage": "Reading page {{page}}",
   "ai.toolStep.readPageFallback": "Reading page",
+  "ai.toolStep.searchBook": "Searching the book: {{query}}",
+  "ai.toolStep.searchBookFallback": "Searching the book",
   "ai.toolStep.webSearch": "Web search: {{query}}",
   "ai.toolStep.webSearchFallback": "Web search",
   "ai.webSearch.hover": "Let the assistant search the web (Exa)",
