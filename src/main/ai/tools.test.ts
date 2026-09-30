@@ -220,6 +220,45 @@ describe("readPage tool (pdf)", () => {
   });
 });
 
+describe("searchBook tool", () => {
+  // 语料缓存按书 id 键（跨测试错开 title，避免不同 DB 的章节 id 串缓存）。
+  async function setupSearchable(title: string) {
+    const db = createDb(":memory:");
+    runMigrations(db, MIGRATIONS);
+    const bytes = makeFixtureEpub({ title });
+    const book = await importBook(db, { bytes });
+    const loadBytes: LoadBytes = async () => bytes;
+    const tools = createReadingTools({ db, bookId: book.id, loadBytes });
+    return { db, book, tools };
+  }
+
+  it("returns hits whose chapterOffset the read tools accept verbatim", async () => {
+    const { tools } = await setupSearchable("Search Tool Check");
+    const result = (await tools.searchBook.execute!({ query: "hello" }, opts)) as {
+      hits: Array<{ chapterId: string; chapterTitle: string | null; chapterOffset: number }>;
+      truncated: boolean;
+    };
+    expect(result.truncated).toBe(false);
+    expect(result.hits).toHaveLength(1);
+    const hit = result.hits[0]!;
+    expect(hit.chapterTitle).toBe("Chapter One");
+    // 工具链闭环：searchBook 的 chapterOffset 直接喂 readChapterText，切片即以命中原文开头。
+    const slice = (await tools.readChapterText.execute!(
+      { chapterId: hit.chapterId, offset: hit.chapterOffset, maxChars: 20 },
+      opts,
+    )) as ChapterTextSlice;
+    expect(slice.text.startsWith("Hello world.")).toBe(true);
+  });
+
+  it("soft-fails with a clear error for a scanned pdf", async () => {
+    const { tools } = await setupPdf({ scanned: true });
+    const result = (await tools.searchBook.execute!({ query: "anything" }, opts)) as {
+      error?: string;
+    };
+    expect(result.error).toMatch(/no text layer/);
+  });
+});
+
 describe("resolveChapterRef", () => {
   it("returns a valid id unchanged and resolves an href to that id", async () => {
     const { db, book, ch1 } = await setup();

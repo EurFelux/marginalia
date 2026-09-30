@@ -1,4 +1,4 @@
-import { and, asc, eq, gt } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import {
   extractBookText,
   extractChapterAcrossSpine,
@@ -31,6 +31,49 @@ export function getToc(db: DB, bookId: string): TocNode[] {
   });
 }
 
+export interface EpubChapterSpan {
+  /** 本章起点（目录项的 href + 可选锚点）。 */
+  start: { href: string; anchor?: string };
+  /** 本章终点 = 下一目录项的起点（之前为止）；undefined = 读到书末。 */
+  end: { href: string; anchor?: string } | undefined;
+}
+
+/**
+ * 全书的 ePub 章节区间（readChapterText 与 AI 搜索语料共用此单一边界来源，保证两侧语义一致）：
+ * 本章正文 = 从本章 (href, anchor) 起，到「下一目录项」(阅读顺序 = orderIndex 递增) 的 (href, anchor)
+ * 之前，按 spine 顺序跨文件拼接。下一目录项可能在另一个 spine 文件，中间没有独立目录项的孤儿
+ * spine 文件（如《七个习惯》第二章正文所在的 split 文件）由 extractChapterAcrossSpine 归入本章——
+ * 单 href 抽取会把它们整段漏掉。末章（无下一项）读到全书末尾。
+ */
+export function listEpubChapterSpans(db: DB, bookId: string): Map<string, EpubChapterSpan> {
+  const rows = db
+    .select({
+      id: chapters.id,
+      href: chapters.href,
+      anchor: chapters.anchor,
+      orderIndex: chapters.orderIndex,
+    })
+    .from(chapters)
+    .where(eq(chapters.bookId, bookId))
+    .orderBy(asc(chapters.orderIndex))
+    .all();
+  const spans = new Map<string, EpubChapterSpan>();
+  for (let i = 0; i < rows.length; i++) {
+    const ch = rows[i]!;
+    let end: EpubChapterSpan["end"];
+    if (ch.orderIndex != null) {
+      // 「下一目录项」= orderIndex 严格更大的第一行（null 不参与比较；升序排列下 null 只出现在
+      // 非空值之前，从 i+1 扫到的非空行必然 orderIndex >= 本行，取第一个严格更大者即等价原 gt 查询）。
+      const next = rows
+        .slice(i + 1)
+        .find((r) => r.orderIndex != null && r.orderIndex > ch.orderIndex!);
+      if (next) end = { href: next.href, anchor: next.anchor ?? undefined };
+    }
+    spans.set(ch.id, { start: { href: ch.href, anchor: ch.anchor ?? undefined }, end });
+  }
+  return spans;
+}
+
 export async function readChapterText(
   db: DB,
   bytes: Uint8Array,
@@ -42,9 +85,6 @@ export async function readChapterText(
   if (!book) throw new Error(`content: book ${bookId} not found`);
   const ch = db
     .select({
-      href: chapters.href,
-      anchor: chapters.anchor,
-      orderIndex: chapters.orderIndex,
       startPage: chapters.startPage,
       endPage: chapters.endPage,
     })
@@ -64,27 +104,9 @@ export async function readChapterText(
       maxChars: opts.maxChars,
     });
   }
-  // epub：本章正文 = 从本章 (href, anchor) 起，到「下一目录项」(阅读顺序 = orderIndex 递增) 的
-  // (href, anchor) 之前，按 spine 顺序跨文件拼接。下一目录项可能在另一个 spine 文件，中间没有独立
-  // 目录项的孤儿 spine 文件（如《七个习惯》第二章正文所在的 split 文件）由 extractChapterAcrossSpine
-  // 归入本章——单 href 抽取会把它们整段漏掉。末章（无下一项）读到全书末尾。
-  let end: { href: string; anchor?: string } | undefined;
-  if (ch.orderIndex != null) {
-    const next = db
-      .select({ href: chapters.href, anchor: chapters.anchor })
-      .from(chapters)
-      .where(and(eq(chapters.bookId, bookId), gt(chapters.orderIndex, ch.orderIndex)))
-      .orderBy(asc(chapters.orderIndex))
-      .limit(1)
-      .get();
-    if (next) end = { href: next.href, anchor: next.anchor ?? undefined };
-  }
-  return extractChapterAcrossSpine(
-    bytes,
-    { href: ch.href, anchor: ch.anchor ?? undefined },
-    end,
-    opts,
-  );
+  const span = listEpubChapterSpans(db, bookId).get(chapterId);
+  if (!span) throw new Error(`content: chapter ${chapterId} not found in book ${bookId}`);
+  return extractChapterAcrossSpine(bytes, span.start, span.end, opts);
 }
 
 /**

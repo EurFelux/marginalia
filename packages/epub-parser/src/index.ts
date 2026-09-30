@@ -1,7 +1,8 @@
 export { makeFixtureEpub } from "./fixture";
-export { parseEpub, readSpine } from "./parse";
+export { parseEpub, readSpine, unzipEntry } from "./parse";
 export type { ParsedEpub, SpineItem, TocNode } from "./types";
 export {
+  chapterTextAcrossSpine,
   extractBookText,
   extractChapterAcrossSpine,
   extractChapterText,

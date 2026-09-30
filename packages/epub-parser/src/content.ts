@@ -123,7 +123,8 @@ export function extractChapterText(
 }
 
 /**
- * 取「一个 TOC 章节」的纯文本——可横跨多个连续 spine 文档（分页）。纯函数：不碰 DB/fs。
+ * 取「一个 TOC 章节」的纯文本——可横跨多个连续 spine 文档（不分页）。纯函数：不碰 DB/fs，
+ * 文件内容通过惰性访问器 `fileText` 取（缺 entry 的报错语义由调用方的访问器决定）。
  *
  * 背景：一个目录项的正文常被切成多个 spine 文件（如 `part_012`=标题 + `part_013`=正文主体），
  * 而中间那些没有独立目录项的「孤儿」spine 文件逻辑上属于本章。按单 href 抽取会整段漏掉它们。
@@ -137,19 +138,12 @@ export function extractChapterText(
  * 防御：start.href 不在 spine、或 end 早于 start / 不在 spine（畸形 TOC）⇒ 保守只抽 start 文件，
  * 既不静默丢正文、也不把后文整本拽进本章。
  */
-export function extractChapterAcrossSpine(
-  bytes: Uint8Array,
+export function chapterTextAcrossSpine(
+  fileText: (href: string) => string,
+  spine: string[],
   start: { href: string; anchor?: string },
   end: { href: string; anchor?: string } | undefined,
-  opts: ReadOptions,
-): ChapterTextSlice {
-  const files = unzipSync(bytes);
-  const fileText = (href: string): string => {
-    const entry = files[href];
-    if (!entry) throw new Error(`epub: missing entry ${href}`);
-    return strFromU8(entry);
-  };
-  const spine = readSpine(files).map((s) => s.href);
+): string {
   const startIdx = spine.indexOf(start.href);
   const endIdx = end ? spine.indexOf(end.href) : spine.length;
 
@@ -174,7 +168,25 @@ export function extractChapterAcrossSpine(
     // 边界异常（end 早于 start / 不在 spine）：保守只取 start 文件，不臆测区间。
     segments.push(sliceFileBlocks(fileText(start.href), start.anchor, undefined));
   }
-  return paginate(segments.filter(Boolean).join("\n"), opts);
+  return segments.filter(Boolean).join("\n");
+}
+
+/** 取「一个 TOC 章节」的纯文本（分页）：薄壳——解压 + 构造 fileText 访问器 + readSpine，
+ * 区间语义见核心 chapterTextAcrossSpine。纯函数：不碰 DB/fs。 */
+export function extractChapterAcrossSpine(
+  bytes: Uint8Array,
+  start: { href: string; anchor?: string },
+  end: { href: string; anchor?: string } | undefined,
+  opts: ReadOptions,
+): ChapterTextSlice {
+  const files = unzipSync(bytes);
+  const fileText = (href: string): string => {
+    const entry = files[href];
+    if (!entry) throw new Error(`epub: missing entry ${href}`);
+    return strFromU8(entry);
+  };
+  const spine = readSpine(files).map((s) => s.href);
+  return paginate(chapterTextAcrossSpine(fileText, spine, start, end), opts);
 }
 
 /**
