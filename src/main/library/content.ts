@@ -64,10 +64,14 @@ export function listEpubChapterSpans(db: DB, bookId: string): Map<string, EpubCh
     if (ch.orderIndex != null) {
       // 「下一目录项」= orderIndex 严格更大的第一行（null 不参与比较；升序排列下 null 只出现在
       // 非空值之前，从 i+1 扫到的非空行必然 orderIndex >= 本行，取第一个严格更大者即等价原 gt 查询）。
-      const next = rows
-        .slice(i + 1)
-        .find((r) => r.orderIndex != null && r.orderIndex > ch.orderIndex!);
-      if (next) end = { href: next.href, anchor: next.anchor ?? undefined };
+      // 手动扫而非 slice().find()：常见情况 j=i+1 即命中，避免每行一次 O(n) 数组分配。
+      for (let j = i + 1; j < rows.length; j++) {
+        const r = rows[j]!;
+        if (r.orderIndex != null && r.orderIndex > ch.orderIndex) {
+          end = { href: r.href, anchor: r.anchor ?? undefined };
+          break;
+        }
+      }
     }
     spans.set(ch.id, { start: { href: ch.href, anchor: ch.anchor ?? undefined }, end });
   }

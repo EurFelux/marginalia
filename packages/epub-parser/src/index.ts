@@ -3,6 +3,7 @@ export { parseEpub, readSpine, unzipEntry } from "./parse";
 export type { ParsedEpub, SpineItem, TocNode } from "./types";
 export {
   chapterTextAcrossSpine,
+  createChapterTextSlicer,
   extractBookText,
   extractChapterAcrossSpine,
   extractChapterText,
