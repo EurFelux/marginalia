@@ -136,6 +136,19 @@ describe("toolStepLabel", () => {
     const p = part("tool-web_search", { input: {}, state: "input-streaming" }) as any;
     expect(toolStepLabel(p, [], t)).toBeTruthy();
   });
+
+  it("labels searchBook with the query", () => {
+    const p = part("tool-searchBook", {
+      input: { query: "unreliable narrator" },
+      state: "input-available",
+    }) as any;
+    expect(toolStepLabel(p, [], t)).toBe("搜索书内：unreliable narrator");
+  });
+
+  it("falls back when searchBook query missing (streaming partial input)", () => {
+    const p = part("tool-searchBook", { input: {}, state: "input-streaming" }) as any;
+    expect(toolStepLabel(p, [], t)).toBe("搜索书内全文");
+  });
 });
 
 describe("isErrorShape", () => {
