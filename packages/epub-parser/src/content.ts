@@ -61,12 +61,12 @@ function sliceTextByAnchor(xhtml: string, anchor: string, nextAnchor?: string): 
 }
 
 /**
- * 取单个 spine 文件内 [fromAnchor 所在块, toAnchor 所在块) 的块级文本（跨文件抽取的逐文件原语）。
- * fromAnchor 省略 ⇒ 从文件开头；toAnchor 省略 ⇒ 到文件结尾。锚点元素找不到时该端退化为开头/结尾
- * （不静默丢正文）。与 sliceTextByAnchor 的差异：fromAnchor 缺失时按「从头」取块，而非整文件 htmlToText 回退。
+ * 已解析树上取单个 spine 文件内 [fromAnchor 所在块, toAnchor 所在块) 的块级文本（跨文件抽取的
+ * 逐文件原语）。fromAnchor 省略 ⇒ 从文件开头；toAnchor 省略 ⇒ 到文件结尾。锚点元素找不到时该端
+ * 退化为开头/结尾（不静默丢正文）。与 sliceTextByAnchor 的差异：fromAnchor 缺失时按「从头」取块，
+ * 而非整文件 htmlToText 回退。收已解析树而非 xhtml 字符串：批量切片同一文件时免去重复 parseHtml。
  */
-function sliceFileBlocks(xhtml: string, fromAnchor?: string, toAnchor?: string): string {
-  const root = parseHtml(xhtml);
+function sliceBlocksFromRoot(root: HTMLElement, fromAnchor?: string, toAnchor?: string): string {
   const body = (root.querySelector("body") ?? root) as HTMLElement;
   const fromEl = fromAnchor ? root.getElementById(fromAnchor) : null;
   const fromOffset = fromEl ? fromEl.range[0] : 0;
@@ -137,6 +137,9 @@ export function extractChapterText(
  *     开头起、本章不含它。
  * 防御：start.href 不在 spine、或 end 早于 start / 不在 spine（畸形 TOC）⇒ 保守只抽 start 文件，
  * 既不静默丢正文、也不把后文整本拽进本章。
+ *
+ * 批量场景（全书语料构建）请用 createChapterTextSlicer——本函数每章一次解析同一文件，
+ * 单文件多章的书会退化成 O(章数 × 文件大小) 的重复 parseHtml。
  */
 export function chapterTextAcrossSpine(
   fileText: (href: string) => string,
@@ -144,31 +147,58 @@ export function chapterTextAcrossSpine(
   start: { href: string; anchor?: string },
   end: { href: string; anchor?: string } | undefined,
 ): string {
-  const startIdx = spine.indexOf(start.href);
-  const endIdx = end ? spine.indexOf(end.href) : spine.length;
+  return createChapterTextSlicer(fileText, spine)(start, end);
+}
 
-  const segments: string[] = [];
-  if (startIdx === -1) {
-    // start.href 不在 spine（异常）：退化为仅该文件，同文件 end 才参与切界。
-    const sameFileEnd = end && end.href === start.href ? end.anchor : undefined;
-    segments.push(sliceFileBlocks(fileText(start.href), start.anchor, sameFileEnd));
-  } else if (end && endIdx === startIdx) {
-    // 同一 spine 文件内的相邻锚点边界（含「父章 → 首个子节」）：[start.anchor, end.anchor)。
-    segments.push(sliceFileBlocks(fileText(start.href), start.anchor, end.anchor));
-  } else if (!end || endIdx > startIdx) {
-    // 正常跨文件，或读到书末（end 省略）。
-    const lastExclusive = end ? endIdx : spine.length;
-    segments.push(sliceFileBlocks(fileText(start.href), start.anchor, undefined));
-    for (let i = startIdx + 1; i < lastExclusive; i++) {
-      segments.push(sliceFileBlocks(fileText(spine[i]!), undefined, undefined));
+/**
+ * 构造一个章节文本切取器（区间语义见 chapterTextAcrossSpine）：内部按 href memoize 解析树，
+ * 同一 spine 文件无论被多少章的边界切片都只 parseHtml 一次，全书构建从 O(章数 × 文件大小)
+ * 降到 O(文件 + 章数)。memo 的解析树随切取器存活（单文件大书即整书的树），调用方应在一次
+ * 构建内使用、用完丢弃。缺 entry 的报错语义同样由调用方的 fileText 决定（惰性：只解析碰到的文件）。
+ */
+export function createChapterTextSlicer(
+  fileText: (href: string) => string,
+  spine: string[],
+): (
+  start: { href: string; anchor?: string },
+  end: { href: string; anchor?: string } | undefined,
+) => string {
+  const parsed = new Map<string, HTMLElement>();
+  const rootOf = (href: string): HTMLElement => {
+    let root = parsed.get(href);
+    if (!root) {
+      root = parseHtml(fileText(href));
+      parsed.set(href, root);
     }
-    if (end?.anchor)
-      segments.push(sliceFileBlocks(fileText(spine[endIdx]!), undefined, end.anchor));
-  } else {
-    // 边界异常（end 早于 start / 不在 spine）：保守只取 start 文件，不臆测区间。
-    segments.push(sliceFileBlocks(fileText(start.href), start.anchor, undefined));
-  }
-  return segments.filter(Boolean).join("\n");
+    return root;
+  };
+  return (start, end) => {
+    const startIdx = spine.indexOf(start.href);
+    const endIdx = end ? spine.indexOf(end.href) : spine.length;
+
+    const segments: string[] = [];
+    if (startIdx === -1) {
+      // start.href 不在 spine（异常）：退化为仅该文件，同文件 end 才参与切界。
+      const sameFileEnd = end && end.href === start.href ? end.anchor : undefined;
+      segments.push(sliceBlocksFromRoot(rootOf(start.href), start.anchor, sameFileEnd));
+    } else if (end && endIdx === startIdx) {
+      // 同一 spine 文件内的相邻锚点边界（含「父章 → 首个子节」）：[start.anchor, end.anchor)。
+      segments.push(sliceBlocksFromRoot(rootOf(start.href), start.anchor, end.anchor));
+    } else if (!end || endIdx > startIdx) {
+      // 正常跨文件，或读到书末（end 省略）。
+      const lastExclusive = end ? endIdx : spine.length;
+      segments.push(sliceBlocksFromRoot(rootOf(start.href), start.anchor, undefined));
+      for (let i = startIdx + 1; i < lastExclusive; i++) {
+        segments.push(sliceBlocksFromRoot(rootOf(spine[i]!), undefined, undefined));
+      }
+      if (end?.anchor)
+        segments.push(sliceBlocksFromRoot(rootOf(spine[endIdx]!), undefined, end.anchor));
+    } else {
+      // 边界异常（end 早于 start / 不在 spine）：保守只取 start 文件，不臆测区间。
+      segments.push(sliceBlocksFromRoot(rootOf(start.href), start.anchor, undefined));
+    }
+    return segments.filter(Boolean).join("\n");
+  };
 }
 
 /** 取「一个 TOC 章节」的纯文本（分页）：薄壳——解压 + 构造 fileText 访问器 + readSpine，

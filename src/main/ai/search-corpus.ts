@@ -1,10 +1,11 @@
 // src/main/ai/search-corpus.ts —— AI 书内搜索语料（spec 2026-09-30-ai-search-tool-design）。
 // 与 UI 搜索（src/main/library/search.ts）相互独立：这里以**章**为单位构建全文语料，
-// 每章文本就是 readChapterText 分页前的那根字符串（同一构造函数：epub 走 chapterTextAcrossSpine，
-// pdf 走 chapterPdfText），故命中的 chapterOffset 与 readChapterText 的 offset 坐标**逐字节对齐**，
+// 每章文本就是 readChapterText 分页前的那根字符串（epub 两侧共用同一套切片实现——
+// createChapterTextSlicer，readChapterText 侧的 chapterTextAcrossSpine 亦委托给它；pdf 走
+// chapterPdfText），故命中的 chapterOffset 与 readChapterText 的 offset 坐标**逐字节对齐**，
 // 模型可直接带窗口精读，无需估计。搜索覆盖因此恰好等于模型经 readChapterText 可达的内容。
 import { strFromU8 } from "fflate";
-import { chapterTextAcrossSpine, spineHrefs, unzipEntry } from "@marginalia/epub-parser";
+import { createChapterTextSlicer, spineHrefs, unzipEntry } from "@marginalia/epub-parser";
 import { chapterPdfText, openPdf } from "@marginalia/pdf-parser";
 import type { DB } from "@main/db/client";
 import { getBook } from "@main/library/repository";
@@ -80,12 +81,16 @@ export function buildEpubCorpus(
     fileCache.set(href, text);
     return text;
   };
+  // 解析树 memo 在切片器内（随本次构建存活、用完即弃）：含 k 章的 spine 文件只 parseHtml 一次，
+  // 单文件多章的书（Gutenberg 系常见）构建从 O(章数 × 文件大小) 降到 O(文件 + 章数)；
+  // 逐章迭代仍保留事件循环让出。
+  const sliceChapter = createChapterTextSlicer(fileText, spine);
   return (async () => {
     const corpus: ChapterCorpus[] = [];
     for (const ch of listChapters(db, bookId)) {
       const span = spans.get(ch.id);
       if (!span) continue;
-      const text = chapterTextAcrossSpine(fileText, spine, span.start, span.end);
+      const text = sliceChapter(span.start, span.end);
       corpus.push({
         chapterId: ch.id,
         chapterTitle: ch.title,
