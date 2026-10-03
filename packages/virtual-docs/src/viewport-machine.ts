@@ -33,8 +33,12 @@ export interface ViewportState {
   phase: ViewportPhase;
   /** 已开放加载的 section 下界；小于它的保持轻量占位。只减不增。 */
   loadedFromIndex: number;
-  /** 是否发生过用户级导航（含命令式跳章）。只进不退；恢复不计。 */
-  everUserNavigated: boolean;
+  /**
+   * 顶部预挂载是否已解锁：用户向上滚过，或发生过用户级跳转（含命令式跳章）。只进不退；恢复不计。
+   * 向下滚动不解锁：解锁会让上方 section 首次渲染，virtuoso 只在向上滚动时补偿其尺寸差，
+   * 向下滚动时内容会整体下移；向下滚本也用不上顶部预挂载。
+   */
+  topOverscanUnlocked: boolean;
   nextRunId: number;
 }
 
@@ -43,8 +47,11 @@ export type ViewportEvent =
   | { type: "JUMP_REQUESTED"; index: number }
   /** offset = 目标元素相对 section 顶的偏移；null 表示元素尚不可解析。 */
   | { type: "ALIGN_TICK"; runId: number; aligned: boolean; offset: number | null }
-  /** scrollIntent 区分「明确推动阅读位置的输入」（wheel/touch/key）与裸 pointerdown。 */
-  | { type: "USER_INPUT"; scrollIntent: boolean }
+  /**
+   * scrollIntent 区分「明确推动阅读位置的输入」（wheel/touch/key）与裸 pointerdown；
+   * upward = 认得出是向上（往回）滚的输入，只有它解锁顶部预挂载。
+   */
+  | { type: "USER_INPUT"; scrollIntent: boolean; upward: boolean }
   | { type: "VISIBLE_TOP_CHANGED"; index: number };
 
 export type ViewportEffect =
@@ -63,7 +70,7 @@ export function initialViewportState(initialIndex: number): ViewportState {
   return {
     phase: { kind: "systemOwned" },
     loadedFromIndex: initialIndex,
-    everUserNavigated: false,
+    topOverscanUnlocked: false,
     nextRunId: 1,
   };
 }
@@ -90,7 +97,7 @@ export function reduceViewport(state: ViewportState, event: ViewportEvent): View
             streak: 0,
           },
           loadedFromIndex: Math.min(state.loadedFromIndex, event.index),
-          everUserNavigated: state.everUserNavigated || event.owner === "user",
+          topOverscanUnlocked: state.topOverscanUnlocked || event.owner === "user",
           nextRunId: runId + 1,
         },
         effects: [
@@ -107,7 +114,7 @@ export function reduceViewport(state: ViewportState, event: ViewportEvent): View
           ...state,
           phase: { kind: "systemOwned" },
           loadedFromIndex: Math.min(state.loadedFromIndex, event.index),
-          everUserNavigated: true,
+          topOverscanUnlocked: true,
         },
         effects: [...cancelEffects(state), { kind: "scrollToIndex", index: event.index }],
       };
@@ -157,7 +164,11 @@ export function reduceViewport(state: ViewportState, event: ViewportEvent): View
           effects,
         };
       return {
-        next: { ...state, phase: { kind: "userOwned" }, everUserNavigated: true },
+        next: {
+          ...state,
+          phase: { kind: "userOwned" },
+          topOverscanUnlocked: state.topOverscanUnlocked || event.upward,
+        },
         effects,
       };
     }
@@ -172,9 +183,9 @@ export function reduceViewport(state: ViewportState, event: ViewportEvent): View
 }
 
 /**
- * 深处冷启且用户尚未导航过时禁用顶部预挂载：上方 section 的迟到测高会推走恢复目标。
- * 一旦发生用户级导航即永久恢复双向 overscan。
+ * 深处冷启且顶部预挂载未解锁时禁用顶部预挂载：上方 section 的迟到测高会推走恢复目标。
+ * 用户第一次向上滚或发生用户级跳转后永久恢复双向 overscan。
  */
 export function overscanTop(state: ViewportState, initialIndex: number, fullTop: number): number {
-  return initialIndex > 0 && !state.everUserNavigated ? 0 : fullTop;
+  return initialIndex > 0 && !state.topOverscanUnlocked ? 0 : fullTop;
 }

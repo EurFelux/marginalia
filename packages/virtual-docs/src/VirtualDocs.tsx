@@ -18,6 +18,7 @@ import {
   type ViewportEvent,
 } from "./viewport-machine";
 import { useMachine, type TransitionRecord } from "./use-machine";
+import { isUpwardScrollIntent } from "./scroll-intent";
 
 /** 未缓存 section 的默认占位高度（px）；缓存命中后用真实测高。 */
 const DEFAULT_ESTIMATE = 600;
@@ -318,13 +319,16 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
     setScrollerReady((n) => n + 1);
   }, []);
   const handleUserNavigation = useCallback(() => {
-    raise({ type: "USER_INPUT", scrollIntent: false });
+    raise({ type: "USER_INPUT", scrollIntent: false, upward: false });
     onUserNavigationRef.current?.();
   }, [raise]);
-  const handleUserScrollNavigation = useCallback(() => {
-    raise({ type: "USER_INPUT", scrollIntent: true });
-    onUserNavigationRef.current?.();
-  }, [raise]);
+  const handleUserScrollNavigation = useCallback(
+    (e: Event) => {
+      raise({ type: "USER_INPUT", scrollIntent: true, upward: isUpwardScrollIntent(e) });
+      onUserNavigationRef.current?.();
+    },
+    [raise],
+  );
 
   // A new imperative command cancels the previous one above; genuine user input also owns the
   // viewport from that point onward, so stale restoration retries must not pull it back.
@@ -557,7 +561,7 @@ function LazySection({
   decorateNonce?: number;
   onContentMouseDown?: () => void;
   onUserNavigation?: () => void;
-  onUserScrollNavigation?: () => void;
+  onUserScrollNavigation?: (e: Event) => void;
   onInternalLink?: (e: { index: number; href: string }) => void;
   onExternalLink?: (url: string) => void;
   onKeyDown?: (e: KeyboardEvent) => void;

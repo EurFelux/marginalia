@@ -33,8 +33,8 @@ interface Props {
   onContentMouseDown?: () => void;
   /** iframe 内普通指针操作；父滚动容器收不到这些跨文档事件。 */
   onUserNavigation?: () => void;
-  /** iframe 内明确会推动阅读位置的输入；用于渐进开放前置 section。 */
-  onUserScrollNavigation?: () => void;
+  /** iframe 内明确会推动阅读位置的输入；用于渐进开放前置 section。事件随附以判别滚动方向。 */
+  onUserScrollNavigation?: (e: Event) => void;
   /** 点 iframe 内站内 <a>（相对路径 / #fragment）时回调；消费方据此 resolve 到 section+anchor 跳转。 */
   onInternalLink?: (e: { index: number; href: string }) => void;
   /** 点 iframe 内外链（http/https/mailto）时回调；消费方开系统浏览器。 */
@@ -171,7 +171,7 @@ export function SectionFrame({
     };
     const onUserNavigationInput = () => cbRef.current.onUserNavigation?.();
     const onDocKeyDown = (e: KeyboardEvent) => cbRef.current.onKeyDown?.(e);
-    const onUserScrollNavigationInput = () => cbRef.current.onUserScrollNavigation?.();
+    const onUserScrollNavigationInput = (e: Event) => cbRef.current.onUserScrollNavigation?.(e);
     // 上次命中的带笔记高亮 id（仅在变化时上报，减少无谓 store 写入与重渲染）。
     let lastNotedId: string | null = null;
     const reportLeaveIfNeeded = () => {
