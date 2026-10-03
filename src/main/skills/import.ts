@@ -148,6 +148,8 @@ export async function scanImportable(
         continue;
       }
       const parsed = await readSkill(source);
+      // 没有 SKILL.md 的文件夹不是 skill（如 ~/.claude/skills/synced），不列出来当「无效」制造噪音。
+      if (!parsed.ok && parsed.error === "missingSkillMd") continue;
       bySource.set(source, {
         source,
         foundAt: [foundAt],

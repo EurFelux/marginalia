@@ -584,7 +584,7 @@ export default {
   "settings.skills.openSkillFolder": "打开 {{name}} 的文件夹",
   "settings.skills.overwriteConfirm": "覆盖并导入",
   "settings.skills.overwriteDesc":
-    "{{names}} 已经装过，内容和这次要导入的不同。继续会用新内容替换它们，你在应用里对它们做过的改动会丢失。",
+    "已装过、但内容和这次要导入的不同：{{names}}。继续会用新内容替换已安装的版本，你在应用里做过的改动会丢失。",
   "settings.skills.overwriteTitle": "覆盖已安装的同名技能？",
   "settings.skills.rescan": "重新扫描",
   "settings.skills.scanning": "正在扫描…",

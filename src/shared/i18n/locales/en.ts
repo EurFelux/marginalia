@@ -624,7 +624,7 @@ export default {
   "settings.skills.openSkillFolder": "Open the folder of {{name}}",
   "settings.skills.overwriteConfirm": "Replace and import",
   "settings.skills.overwriteDesc":
-    "{{names}} already installed with different content. Continuing replaces them with the new content, and any changes you made to them in the app will be lost.",
+    "Already installed with different content: {{names}}. Continuing replaces the installed copies with the new content, and any changes you made to them in the app will be lost.",
   "settings.skills.overwriteTitle": "Replace installed skills with the same name?",
   "settings.skills.rescan": "Scan again",
   "settings.skills.scanning": "Scanning…",

@@ -48,6 +48,7 @@ beforeEach(() => {
   symlinkSync(path.join(agents, "notes"), path.join(claude, "notes"));
   symlinkSync(path.join(base, "nowhere"), path.join(claude, "dangling"));
   write(path.join(claude, "only-claude", "SKILL.md"), md("only-claude"));
+  mkdirSync(path.join(claude, "synced", "some-bucket"), { recursive: true });
 });
 
 const roots = () => [agents, claude];

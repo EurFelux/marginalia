@@ -9,6 +9,7 @@ import { qk } from "@renderer/query/keys";
 import { usePrefsStore } from "@renderer/store/prefs-store";
 import { ipcErrorMessage } from "@renderer/lib/ipc-error";
 import { cn } from "@renderer/lib/utils";
+import { formatList } from "@renderer/lib/list-format";
 import { Button } from "@renderer/components/ui/button";
 import { Checkbox } from "@renderer/components/ui/checkbox";
 import { Switch } from "@renderer/components/ui/switch";
@@ -173,7 +174,7 @@ function InstalledSkills() {
                 <div className="min-w-0 flex-1">
                   <span className="block truncate font-mono text-xs font-medium">{skill.name}</span>
                   {skill.description && (
-                    <span className="mt-0.5 line-clamp-2 block text-[11px] leading-relaxed text-muted-foreground">
+                    <span className="mt-0.5 line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
                       {skill.description}
                     </span>
                   )}
@@ -317,9 +318,7 @@ function importSummary(result: SkillImportResult, t: TFunction): string {
 function ImportSkills() {
   const { t, i18n } = useTranslation();
   // 来源目录与大小上限等规则值取自共享常量，插值进文案，不写死在翻译里。
-  const sources = new Intl.ListFormat(i18n.language, { type: "conjunction" }).format(
-    SKILL_IMPORT_ROOTS,
-  );
+  const sources = formatList(SKILL_IMPORT_ROOTS, i18n.language);
   const qc = useQueryClient();
   const [selected, setSelected] = useState<string[]>([]);
   const [confirmOverwrite, setConfirmOverwrite] = useState(false);
@@ -363,15 +362,21 @@ function ImportSkills() {
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">{t("settings.skills.import", "从其他位置导入")}</h3>
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled={candidates.isFetching}
-          onClick={() => void candidates.refetch()}
-        >
-          <RefreshCw data-icon="inline-start" />
-          {t("settings.skills.rescan", "重新扫描")}
-        </Button>
+        {/* 列表可能很长：操作按钮放在列表上方，勾选后不用滚到底。 */}
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={candidates.isFetching}
+            onClick={() => void candidates.refetch()}
+          >
+            <RefreshCw data-icon="inline-start" />
+            {t("settings.skills.rescan", "重新扫描")}
+          </Button>
+          <Button size="sm" disabled={chosen.length === 0 || run.isPending} onClick={start}>
+            {t("settings.skills.importSelected", "导入所选（{{count}}）", { count: chosen.length })}
+          </Button>
+        </div>
       </div>
       <p className="text-[11px] leading-relaxed text-muted-foreground">
         {t(
@@ -409,7 +414,7 @@ function ImportSkills() {
                     <StatusTag candidate={c} />
                   </span>
                   {c.description && (
-                    <span className="mt-0.5 line-clamp-1 block text-[11px] text-muted-foreground">
+                    <span className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground">
                       {c.description}
                     </span>
                   )}
@@ -427,11 +432,6 @@ function ImportSkills() {
           })}
         </ul>
       )}
-      <div className="flex justify-end">
-        <Button size="sm" disabled={chosen.length === 0 || run.isPending} onClick={start}>
-          {t("settings.skills.importSelected", "导入所选（{{count}}）", { count: chosen.length })}
-        </Button>
-      </div>
 
       <AlertDialog open={confirmOverwrite} onOpenChange={setConfirmOverwrite}>
         <AlertDialogContent>
@@ -441,7 +441,7 @@ function ImportSkills() {
           <AlertDialogDescription>
             {t(
               "settings.skills.overwriteDesc",
-              "{{names}} 已经装过，内容和这次要导入的不同。继续会用新内容替换它们，你在应用里对它们做过的改动会丢失。",
+              "已装过、但内容和这次要导入的不同：{{names}}。继续会用新内容替换已安装的版本，你在应用里做过的改动会丢失。",
               { names: overwriting.map((c) => c.name).join("、") },
             )}
           </AlertDialogDescription>
