@@ -102,6 +102,9 @@ export const autoScrollSpeedSchema = z.number().int().positive();
 /** autoScrollSpeed 出厂值：10 档 = 1.0×。 */
 export const DEFAULT_AUTO_SCROLL_SPEED = 10;
 
+/** 命令工作目录：绝对路径或 null（= 默认工作区）。 */
+export const bashWorkdirSchema = z.string().startsWith("/").nullable();
+
 /**
  * 可持久化用户偏好的单一源：key → 值 Zod schema。
  * 新增偏好＝在此注册一个 key + schema；DB / 服务 / IPC / 类型全部据此推导。
@@ -129,8 +132,12 @@ export const PREFERENCE_SCHEMAS = {
   webSearch: webSearchConfig,
   webSearchEnabled: z.boolean(),
   autoScrollSpeed: autoScrollSpeedSchema,
+  /** AI 执行命令总开关：默认关（未存 = false），关着时 bash 工具不注册（spec 2026-10-03 §6.3）。 */
+  bashEnabled: z.boolean(),
   /** AI 执行命令「总是批准」：默认关（未存 = false）；拒绝规则仍生效（spec 2026-10-03 §5.5）。 */
   bashAlwaysApprove: z.boolean(),
+  /** 命令的工作目录（绝对路径）；null / 未存 = 默认 <userData>/workspace（spec 2026-10-03 §6.2）。 */
+  bashWorkdir: bashWorkdirSchema,
 } as const;
 
 export type PreferenceKey = keyof typeof PREFERENCE_SCHEMAS;
@@ -171,6 +178,8 @@ export const setPreferenceInput = z.discriminatedUnion("key", [
   z.object({ key: z.literal("webSearch"), value: webSearchConfig }),
   z.object({ key: z.literal("webSearchEnabled"), value: z.boolean() }),
   z.object({ key: z.literal("autoScrollSpeed"), value: autoScrollSpeedSchema }),
+  z.object({ key: z.literal("bashEnabled"), value: z.boolean() }),
   z.object({ key: z.literal("bashAlwaysApprove"), value: z.boolean() }),
+  z.object({ key: z.literal("bashWorkdir"), value: bashWorkdirSchema }),
 ]);
 export type SetPreferenceInput = z.infer<typeof setPreferenceInput>;

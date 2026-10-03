@@ -19,7 +19,13 @@ export interface AppServiceEnv {
 
 /** 数据路径 key（类型化，按需扩展）——dir/file 语义编码在 key 名里：*Dir 目录、*File 完整文件路径。
  * logsDir → LoggerService；booksDir → 书籍副本；dbFile → SQLite 数据库（历史布局均零迁移） */
-export type DataPathKey = "logsDir" | "booksDir" | "dbFile" | "tmpDir" | "preRestoreDir";
+export type DataPathKey =
+  | "logsDir"
+  | "booksDir"
+  | "dbFile"
+  | "tmpDir"
+  | "preRestoreDir"
+  | "workspaceDir";
 
 /** key → 相对 dataDir 的路径。映射是 AppService 的内部策略——布局与文件名知识收归此处 */
 const DATA_PATHS: Record<DataPathKey, string> = {
@@ -28,6 +34,7 @@ const DATA_PATHS: Record<DataPathKey, string> = {
   dbFile: "marginalia.db", // 历史布局：db 三件套在 dataDir 根（改动布局需数据迁移）
   tmpDir: "tmp", // 备份导出/还原的同盘暂存区（rename 不跨设备）
   preRestoreDir: "pre-restore", // 还原前的当前数据安全副本父目录（pre-restore/<ts>/）
+  workspaceDir: "workspace", // AI 执行命令的默认工作目录（spec 2026-10-03-bash-skills-permissions-design §6.2）
 };
 
 /** 类不导出：消费方只能经 barrel 拿 appService，无法绕过封装 */

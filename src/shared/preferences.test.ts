@@ -25,6 +25,8 @@ describe("preferences schemas", () => {
       "avatarBlobId",
       "backgroundConcurrency",
       "bashAlwaysApprove",
+      "bashEnabled",
+      "bashWorkdir",
       "chatModel",
       "colorMode",
       "instructions",

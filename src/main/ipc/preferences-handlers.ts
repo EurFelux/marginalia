@@ -62,7 +62,11 @@ export const preferencesBindings: Binding[] = [
         return setPreference(getDb(), input.key, input.value);
       case "autoScrollSpeed":
         return setPreference(getDb(), input.key, input.value);
+      case "bashEnabled":
+        return setPreference(getDb(), input.key, input.value);
       case "bashAlwaysApprove":
+        return setPreference(getDb(), input.key, input.value);
+      case "bashWorkdir":
         return setPreference(getDb(), input.key, input.value);
       default: {
         // 穷尽性守卫：注册新 preference key 后漏补本 switch 的 case 会在此编译报错。
