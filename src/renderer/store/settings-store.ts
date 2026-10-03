@@ -8,6 +8,7 @@ export type SettingsCategory =
   | "memory"
   | "webSearch"
   | "commands"
+  | "skills"
   | "advanced";
 
 interface SettingsState {

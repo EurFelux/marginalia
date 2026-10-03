@@ -70,3 +70,15 @@ describe("prefs-store", () => {
     expect(PREFS_INITIAL.backgroundConcurrency).toBe(DEFAULT_BACKGROUND_CONCURRENCY);
   });
 });
+
+describe("setSkillEnabled", () => {
+  it("adds and removes names from the disabled list and persists it", () => {
+    usePrefsStore.setState({ disabledSkills: [] });
+    usePrefsStore.getState().setSkillEnabled("notes", false);
+    usePrefsStore.getState().setSkillEnabled("notes", false);
+    expect(usePrefsStore.getState().disabledSkills).toEqual(["notes"]);
+    usePrefsStore.getState().setSkillEnabled("notes", true);
+    expect(usePrefsStore.getState().disabledSkills).toEqual([]);
+    expect(persistPreference).toHaveBeenLastCalledWith({ key: "disabledSkills", value: [] });
+  });
+});

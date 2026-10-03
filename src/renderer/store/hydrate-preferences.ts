@@ -55,4 +55,5 @@ export function hydratePreferences(): void {
     usePrefsStore.setState({ bashAlwaysApprove: snap.bashAlwaysApprove });
   }
   if (snap.bashWorkdir !== undefined) usePrefsStore.setState({ bashWorkdir: snap.bashWorkdir });
+  if (snap.disabledSkills) usePrefsStore.setState({ disabledSkills: snap.disabledSkills });
 }

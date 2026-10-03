@@ -3,7 +3,16 @@ import type { ChatStatus } from "ai";
 import { getToolName } from "ai";
 import { useQuery } from "@tanstack/react-query";
 import type { LucideIcon } from "lucide-react";
-import { BookOpen, FileText, List, ScrollText, Search, Sparkles, Wrench } from "lucide-react";
+import {
+  BookOpen,
+  FileText,
+  List,
+  ScrollText,
+  Search,
+  Sparkles,
+  WandSparkles,
+  Wrench,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { AssistantAvatar } from "@renderer/ai/AssistantAvatar";
 import { BashBlock } from "@renderer/ai/BashBlock";
@@ -327,6 +336,7 @@ const TOOL_ICONS: Record<string, LucideIcon> = {
   readChapterText: BookOpen,
   readPage: FileText,
   searchBook: Search,
+  loadSkill: WandSparkles,
 };
 
 function ToolStepRow({
