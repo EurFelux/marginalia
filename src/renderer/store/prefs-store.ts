@@ -10,6 +10,7 @@ import {
   type Soul,
   type SummaryModel,
   type TtsPrefs,
+  DEFAULT_BASH_ENABLED,
 } from "@shared/preferences";
 import { DEFAULT_WEB_SEARCH, type WebSearchConfig } from "@shared/web-search";
 import type { ReaderLayout, ReaderPrefs } from "@renderer/types";
@@ -56,6 +57,12 @@ interface PrefsState {
   webSearch: WebSearchConfig | null;
   /** 联网搜索 composer 开关（per-message toggle；持久化，重启恢复）。 */
   webSearchEnabled: boolean;
+  /** 允许 AI 执行命令（默认开，见 DEFAULT_BASH_ENABLED；spec 2026-10-03-bash-skills-permissions-design §6.3）。 */
+  bashEnabled: boolean;
+  /** 命令「总是批准」（默认关；拒绝规则仍生效，§5.5）。 */
+  bashAlwaysApprove: boolean;
+  /** 命令工作目录；null = 默认工作区（§6.2）。 */
+  bashWorkdir: string | null;
 }
 interface PrefsActions {
   setAutoSummarize: (v: boolean) => void;
@@ -78,6 +85,9 @@ interface PrefsActions {
   setAvatarBlobId: (v: string | null) => void;
   setWebSearch: (v: WebSearchConfig) => void;
   setWebSearchEnabled: (v: boolean) => void;
+  setBashEnabled: (v: boolean) => void;
+  setBashAlwaysApprove: (v: boolean) => void;
+  setBashWorkdir: (v: string | null) => void;
 }
 
 export const PREFS_INITIAL: PrefsState = {
@@ -101,6 +111,9 @@ export const PREFS_INITIAL: PrefsState = {
   avatarBlobId: null,
   webSearch: DEFAULT_WEB_SEARCH,
   webSearchEnabled: false,
+  bashEnabled: DEFAULT_BASH_ENABLED,
+  bashAlwaysApprove: false,
+  bashWorkdir: null,
 };
 
 /**
@@ -191,5 +204,17 @@ export const usePrefsStore = create<PrefsState & PrefsActions>()((set) => ({
   setWebSearchEnabled: (webSearchEnabled) => {
     persistPreference({ key: "webSearchEnabled", value: webSearchEnabled });
     set({ webSearchEnabled });
+  },
+  setBashEnabled: (bashEnabled) => {
+    persistPreference({ key: "bashEnabled", value: bashEnabled });
+    set({ bashEnabled });
+  },
+  setBashAlwaysApprove: (bashAlwaysApprove) => {
+    persistPreference({ key: "bashAlwaysApprove", value: bashAlwaysApprove });
+    set({ bashAlwaysApprove });
+  },
+  setBashWorkdir: (bashWorkdir) => {
+    persistPreference({ key: "bashWorkdir", value: bashWorkdir });
+    set({ bashWorkdir });
   },
 }));

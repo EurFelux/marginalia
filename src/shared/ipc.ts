@@ -64,6 +64,18 @@ import { searchBookInput } from "@shared/search";
 import type { MemoryDto } from "@shared/memory";
 import { deleteMemoryInput, updateMemoryInput } from "@shared/memory";
 import type { AvatarPickResult } from "@shared/agent";
+import type { BashWorkdirInfo } from "@shared/bash";
+import type {
+  PermissionCancel,
+  PermissionRequest,
+  PermissionRespondResult,
+  PermissionRuleDto,
+} from "@shared/permissions";
+import {
+  addPermissionRuleInput,
+  permissionRespondInput,
+  permissionRuleIdInput,
+} from "@shared/permissions";
 import type {
   CancelReadingReportResult,
   GenerateReadingReportResult,
@@ -368,6 +380,39 @@ export const C = {
   memoriesList: def("memories:list", "invoke", z.void(), out<MemoryDto[]>()),
   memoriesUpdate: def("memories:update", "invoke", updateMemoryInput, out<MemoryDto | null>()),
   memoriesDelete: def("memories:delete", "invoke", deleteMemoryInput, out<void>()),
+
+  // permissions（工具审批；spec 2026-10-03-bash-skills-permissions-design §5、§9）
+  permissionRequest: def("permission:request", "event", z.void(), out<PermissionRequest>()),
+  permissionCancel: def("permission:cancel", "event", z.void(), out<PermissionCancel>()),
+  permissionRespond: def(
+    "permission:respond",
+    "invoke",
+    permissionRespondInput,
+    out<PermissionRespondResult>(),
+  ),
+  permissionRulesList: def(
+    "permissions:rules:list",
+    "invoke",
+    z.void(),
+    out<PermissionRuleDto[]>(),
+  ),
+  permissionRulesAdd: def(
+    "permissions:rules:add",
+    "invoke",
+    addPermissionRuleInput,
+    out<PermissionRuleDto>(),
+  ),
+  permissionRulesDelete: def(
+    "permissions:rules:delete",
+    "invoke",
+    permissionRuleIdInput,
+    out<void>(),
+  ),
+
+  // bash（命令工作目录；spec 2026-10-03-bash-skills-permissions-design §8）
+  bashWorkdirInfo: def("bash:workdir-info", "invoke", z.void(), out<BashWorkdirInfo>()),
+  bashPickWorkdir: def("bash:pick-workdir", "invoke", z.void(), out<string | null>()),
+  bashOpenWorkdir: def("bash:open-workdir", "invoke", z.void(), out<void>()),
 
   // logging
   logWrite: def("log:write", "invoke", logWriteInput, out<void>()),

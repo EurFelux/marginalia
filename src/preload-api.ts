@@ -2,6 +2,7 @@ import type { z } from "zod";
 import { C, type Contract } from "@shared/ipc";
 import type { AiStreamEvent, AppNotification } from "@shared/chat";
 import type { PreferencesSnapshot } from "@shared/preferences";
+import type { PermissionCancel, PermissionRequest } from "@shared/permissions";
 
 /** 由注入的 invoke 生成类型化调用函数；类型从 contract 流出，零手写标注。__channel 供漂移测试走树收集。 */
 export function invoker<S extends z.ZodType, O>(
@@ -164,6 +165,27 @@ export function createApi(d: PreloadDeps) {
     agent: {
       resetAvatar: inv(C.agentResetAvatar),
       setAvatar: inv(C.agentSetAvatar),
+    },
+
+    bash: {
+      workdirInfo: inv(C.bashWorkdirInfo),
+      pickWorkdir: inv(C.bashPickWorkdir),
+      openWorkdir: inv(C.bashOpenWorkdir),
+    },
+
+    permissions: {
+      respond: inv(C.permissionRespond),
+      rules: {
+        list: inv(C.permissionRulesList),
+        add: inv(C.permissionRulesAdd),
+        delete: inv(C.permissionRulesDelete),
+      },
+      /** 订阅主进程的审批请求；返回退订函数。 */
+      onRequest: (cb: (request: PermissionRequest) => void): (() => void) =>
+        d.on(C.permissionRequest.channel, (payload) => cb(payload as PermissionRequest)),
+      /** 订阅请求撤销（本轮中止 / 会话删除 / 重载）；返回退订函数。 */
+      onCancel: (cb: (cancel: PermissionCancel) => void): (() => void) =>
+        d.on(C.permissionCancel.channel, (payload) => cb(payload as PermissionCancel)),
     },
   };
 }

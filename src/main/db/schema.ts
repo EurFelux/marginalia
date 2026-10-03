@@ -313,3 +313,21 @@ export const blob = sqliteTable("blob", {
   mimeType: text("mime_type").notNull(), // 写入时 magic-byte 嗅探一次存入；读时直接用
   createdAt: nowMs(),
 });
+
+// 工具权限规则（spec 2026-10-03-bash-skills-permissions-design §5.3）。只由用户在审批操作栏 / 设置页创建，
+// 模型没有任何写入途径。pattern 是规范化后的词前缀（见 @shared/shell-command 的 formatPattern）。
+export const permissionRules = sqliteTable(
+  "permission_rules",
+  {
+    id: pkUuid(),
+    tool: text("tool", { enum: ["bash"] }).notNull(),
+    decision: text("decision", { enum: ["allow", "deny"] }).notNull(),
+    pattern: text("pattern").notNull(),
+    createdAt: nowMs(),
+  },
+  (t) => [
+    check("permission_rules_tool_check", sql`${t.tool} in ('bash')`),
+    check("permission_rules_decision_check", sql`${t.decision} in ('allow','deny')`),
+    unique("permission_rules_unique").on(t.tool, t.decision, t.pattern),
+  ],
+);

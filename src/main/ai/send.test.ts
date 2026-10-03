@@ -18,6 +18,7 @@ import { appendMessage, getMessage, listMessages } from "@main/chat/messages";
 import { buildChips } from "@main/ai/chips";
 import type { ResolvedModel } from "@main/ai/assistant-model";
 import type { LoadBytes } from "@main/ai/tools";
+import { createBashTool } from "@main/ai/bash-tool";
 import { runResend, runSend, type SendDeps, type SendInput } from "@main/ai/send";
 import { __resetNamingRuntime } from "@main/chat/conversation-title";
 import type { RunBackground } from "@main/ai/background-limiter";
@@ -821,6 +822,65 @@ describe("reading report submission stays out of chat", () => {
       expect(seen.system).not.toContain("submitReport");
     },
   );
+});
+
+describe("bash tool registration", () => {
+  beforeEach(() => __resetNamingRuntime());
+
+  function capturingModel() {
+    const seen = { tools: [] as string[] };
+    const model = new MockLanguageModelV4({
+      doStream: async ({ tools }) => {
+        seen.tools = (tools ?? []).map((candidate) => candidate.name);
+        return {
+          stream: simulateReadableStream({
+            chunks: [
+              { type: "text-start", id: "t1" },
+              { type: "text-delta", id: "t1", delta: "ok" },
+              { type: "text-end", id: "t1" },
+              finishChunk("stop"),
+            ],
+          }),
+        };
+      },
+    });
+    return { model, seen };
+  }
+
+  it("does not offer bash unless the factory is injected", async () => {
+    const { model, seen } = capturingModel();
+    const { db, book, deps } = await setup({ ok: true, model, modelId: "mock" });
+    const convo = createConversation(db, { bookId: book.id });
+    const res = await runSend(deps, input(book.id, convo.id));
+    if (!res.ok) throw new Error(res.reason);
+    await res.finished;
+    expect(seen.tools).not.toContain("bash");
+  });
+
+  it("offers bash built for the turn's conversation when injected", async () => {
+    const { model, seen } = capturingModel();
+    const { db, deps } = await setup({ ok: true, model, modelId: "mock" });
+    const convo = createConversation(db, { bookId: null });
+    const factory = vi.fn(({ conversationId }: { conversationId: string }) =>
+      createBashTool({
+        conversationId,
+        gate: { check: async () => ({ allowed: false, by: "cancelled" }) },
+        resolveWorkdir: async () => "/ws",
+        getShellEnv: async () => ({ shell: "/bin/sh", env: {}, source: "login" }),
+        run: async () => {
+          throw new Error("not called");
+        },
+      }),
+    );
+    const res = await runSend(
+      { ...deps, createBashTools: factory },
+      { bookId: null, conversationId: convo.id, chips: [], userText: "list my workspace" },
+    );
+    if (!res.ok) throw new Error(res.reason);
+    await res.finished;
+    expect(factory).toHaveBeenCalledWith({ conversationId: convo.id });
+    expect(seen.tools).toContain("bash");
+  });
 });
 
 describe("runResend", () => {

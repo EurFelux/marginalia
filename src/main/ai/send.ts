@@ -45,6 +45,11 @@ export interface SendDeps {
   };
   /** 当前联网搜索配置快照（settings 级）。 */
   webSearchConfig?: WebSearchConfig;
+  /**
+   * bash 工具工厂（spec 2026-10-03-bash-skills-permissions-design §6.3）：仅「允许 AI 执行命令」开着时注入，
+   * 未注入即不注册。按会话建：审批闸门的「本会话允许」按 conversationId 区分。
+   */
+  createBashTools?: (ctx: { conversationId: string }) => Record<string, unknown>;
   /** main→renderer 通知端口（后台记忆整理完成的 toast）。 */
   notify: (n: AppNotification) => void;
 }

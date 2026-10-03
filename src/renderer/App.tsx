@@ -9,6 +9,7 @@ import { ThemeController } from "@renderer/theme/ThemeController";
 import { Toaster } from "@renderer/components/ui/sonner";
 import { useStartupUpdateCheck } from "@renderer/update/useStartupUpdateCheck";
 import { useAppNotifications } from "@renderer/notifications/app-notifications";
+import { usePermissionRequests } from "@renderer/store/permission-store";
 
 export function App() {
   const view = useNavigationStore((s) => s.view);
@@ -18,6 +19,7 @@ export function App() {
   }, []);
   useStartupUpdateCheck();
   useAppNotifications();
+  usePermissionRequests();
   return (
     <TooltipProvider>
       <ThemeController />
