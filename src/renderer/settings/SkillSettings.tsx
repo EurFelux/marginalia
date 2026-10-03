@@ -3,15 +3,17 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
-import { FolderOpen, RefreshCw, Trash2 } from "lucide-react";
+import { FolderOpen, RefreshCw, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { qk } from "@renderer/query/keys";
 import { usePrefsStore } from "@renderer/store/prefs-store";
 import { ipcErrorMessage } from "@renderer/lib/ipc-error";
 import { cn } from "@renderer/lib/utils";
 import { formatList } from "@renderer/lib/list-format";
+import { filterSkills } from "@renderer/settings/skill-filter";
 import { Button } from "@renderer/components/ui/button";
 import { Checkbox } from "@renderer/components/ui/checkbox";
+import { Input } from "@renderer/components/ui/input";
 import { Switch } from "@renderer/components/ui/switch";
 import { ScrollArea } from "@renderer/components/ui/scroll-area";
 import {
@@ -322,6 +324,7 @@ function ImportSkills() {
   const sources = formatList(SKILL_IMPORT_ROOTS, i18n.language);
   const qc = useQueryClient();
   const [selected, setSelected] = useState<string[]>([]);
+  const [query, setQuery] = useState("");
   const [confirmOverwrite, setConfirmOverwrite] = useState(false);
   const candidates = useQuery({
     queryKey: qk.skillCandidates,
@@ -350,6 +353,8 @@ function ImportSkills() {
   const list = [...(candidates.data ?? [])].sort(
     (a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status],
   );
+  // 搜索只影响显示：被筛掉的已勾选项仍算在「导入所选」里。
+  const visible = filterSkills(list, query);
   const chosen = list.filter((c) => selected.includes(c.source) && selectable(c));
   const overwriting = chosen.filter((c) => c.status === "conflict");
   const toggle = (source: string, on: boolean) =>
@@ -393,53 +398,73 @@ function ImportSkills() {
             : t("settings.skills.noCandidates", "{{sources}} 里都没有找到技能。", { sources })}
         </p>
       ) : (
-        <ScrollArea
-          className="overflow-hidden rounded-md border border-border"
-          viewportClassName="max-h-96"
-        >
-          {/* 候选可能有几十个：放进限高的滚动容器，不把整页撑得很长。 */}
-          <ul className="divide-y divide-border">
-            {list.map((c) => {
-              const id = `skill-import-${c.source}`;
-              const can = selectable(c);
-              return (
-                <li
-                  key={c.source}
-                  className={cn("flex items-start gap-3 px-3 py-2", !can && "opacity-60")}
-                >
-                  <Checkbox
-                    id={id}
-                    checked={can && selected.includes(c.source)}
-                    disabled={!can}
-                    onCheckedChange={(checked) => toggle(c.source, checked)}
-                    className="mt-0.5"
-                  />
-                  <label htmlFor={id} className={cn("min-w-0 flex-1", can && "cursor-pointer")}>
-                    <span className="flex items-center gap-2">
-                      <span className="truncate font-mono text-xs font-medium">{c.name}</span>
-                      <StatusTag candidate={c} />
-                    </span>
-                    {c.description && (
-                      <span className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground">
-                        {c.description}
-                      </span>
-                    )}
-                    <span
-                      className="mt-0.5 block truncate font-mono text-[10px] text-muted-foreground/70"
-                      title={c.foundAt.join("\n")}
+        <div className="space-y-2">
+          <div className="relative">
+            <Search className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t("settings.skills.searchPlaceholder", "搜索名称或描述")}
+              aria-label={t("settings.skills.searchPlaceholder", "搜索名称或描述")}
+              className="h-8 pl-7 text-sm"
+            />
+          </div>
+          {visible.length === 0 ? (
+            <p className="text-[11px] text-muted-foreground/70">
+              {t("settings.skills.noMatch", "没有匹配「{{query}}」的技能。", {
+                query: query.trim(),
+              })}
+            </p>
+          ) : (
+            <ScrollArea
+              className="overflow-hidden rounded-md border border-border"
+              viewportClassName="max-h-96"
+            >
+              {/* 候选可能有几十个：放进限高的滚动容器，不把整页撑得很长。 */}
+              <ul className="divide-y divide-border">
+                {visible.map((c) => {
+                  const id = `skill-import-${c.source}`;
+                  const can = selectable(c);
+                  return (
+                    <li
+                      key={c.source}
+                      className={cn("flex items-start gap-3 px-3 py-2", !can && "opacity-60")}
                     >
-                      {c.foundAt[0]}
-                      {c.foundAt.length > 1 &&
-                        t("settings.skills.alsoAt", " 等 {{count}} 处", {
-                          count: c.foundAt.length,
-                        })}
-                    </span>
-                  </label>
-                </li>
-              );
-            })}
-          </ul>
-        </ScrollArea>
+                      <Checkbox
+                        id={id}
+                        checked={can && selected.includes(c.source)}
+                        disabled={!can}
+                        onCheckedChange={(checked) => toggle(c.source, checked)}
+                        className="mt-0.5"
+                      />
+                      <label htmlFor={id} className={cn("min-w-0 flex-1", can && "cursor-pointer")}>
+                        <span className="flex items-center gap-2">
+                          <span className="truncate font-mono text-xs font-medium">{c.name}</span>
+                          <StatusTag candidate={c} />
+                        </span>
+                        {c.description && (
+                          <span className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground">
+                            {c.description}
+                          </span>
+                        )}
+                        <span
+                          className="mt-0.5 block truncate font-mono text-[10px] text-muted-foreground/70"
+                          title={c.foundAt.join("\n")}
+                        >
+                          {c.foundAt[0]}
+                          {c.foundAt.length > 1 &&
+                            t("settings.skills.alsoAt", " 等 {{count}} 处", {
+                              count: c.foundAt.length,
+                            })}
+                        </span>
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+            </ScrollArea>
+          )}
+        </div>
       )}
 
       <AlertDialog open={confirmOverwrite} onOpenChange={setConfirmOverwrite}>
