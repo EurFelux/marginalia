@@ -13,6 +13,8 @@ import {
 } from "@shared/preferences";
 import { createSearchTools } from "@main/ai/search/web-search-tool";
 import { createBashTool } from "@main/ai/bash-tool";
+import { createSkillTools } from "@main/ai/skill-tools";
+import { enabledSkills } from "@main/ai/agent-context";
 import { getPermissionGate } from "@main/permissions/instance";
 import { getShellEnv } from "@main/shell/instance";
 import { runShell } from "@main/shell/run-shell";
@@ -74,6 +76,13 @@ export function makeSendDeps(): SendDeps {
               run: runShell,
             })
         : undefined,
+    createSkillTools: () =>
+      enabledSkills(db).length > 0
+        ? createSkillTools({
+            skillsDir: appService.getPath("skillsDir"),
+            disabled: () => new Set(getPreference(db, "disabledSkills") ?? []),
+          })
+        : {},
     notify: notifyRenderer,
   };
 }

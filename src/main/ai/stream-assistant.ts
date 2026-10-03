@@ -76,6 +76,7 @@ export function streamAssistantReply(
 
   const contextTools = createContextTools({ db, bookId, loadBytes, imageToolResults });
   const bashTools = deps.createBashTools?.({ conversationId }) ?? {};
+  const skillTools = deps.createSkillTools?.() ?? {};
   const tools = {
     ...contextTools,
     ...Object.fromEntries(
@@ -85,6 +86,7 @@ export function streamAssistantReply(
     ),
     ...searchTools,
     ...bashTools,
+    ...skillTools,
   };
 
   let capturedUsage: LanguageModelUsage | undefined;

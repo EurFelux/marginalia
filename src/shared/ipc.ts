@@ -65,6 +65,8 @@ import type { MemoryDto } from "@shared/memory";
 import { deleteMemoryInput, updateMemoryInput } from "@shared/memory";
 import type { AvatarPickResult } from "@shared/agent";
 import type { BashWorkdirInfo } from "@shared/bash";
+import type { SkillDto, SkillImportCandidate, SkillImportResult } from "@shared/skills";
+import { importSkillsInput, openSkillsDirInput, skillFolderInput } from "@shared/skills";
 import type {
   PermissionCancel,
   PermissionRequest,
@@ -413,6 +415,18 @@ export const C = {
   bashWorkdirInfo: def("bash:workdir-info", "invoke", z.void(), out<BashWorkdirInfo>()),
   bashPickWorkdir: def("bash:pick-workdir", "invoke", z.void(), out<string | null>()),
   bashOpenWorkdir: def("bash:open-workdir", "invoke", z.void(), out<void>()),
+
+  // skills（spec 2026-10-03-bash-skills-permissions-design §7、§9）
+  skillsList: def("skills:list", "invoke", z.void(), out<SkillDto[]>()),
+  skillsScanImportable: def(
+    "skills:scan-importable",
+    "invoke",
+    z.void(),
+    out<SkillImportCandidate[]>(),
+  ),
+  skillsImport: def("skills:import", "invoke", importSkillsInput, out<SkillImportResult>()),
+  skillsDelete: def("skills:delete", "invoke", skillFolderInput, out<void>()),
+  skillsOpenDir: def("skills:open-dir", "invoke", openSkillsDirInput, out<void>()),
 
   // logging
   logWrite: def("log:write", "invoke", logWriteInput, out<void>()),
