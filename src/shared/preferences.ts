@@ -144,6 +144,8 @@ export const PREFERENCE_SCHEMAS = {
   bashAlwaysApprove: z.boolean(),
   /** 命令的工作目录（绝对路径）；null / 未存 = 默认 <userData>/workspace（spec 2026-10-03 §6.2）。 */
   bashWorkdir: bashWorkdirSchema,
+  /** 停用的 skill（存 name）；不在列表里即启用，新放进来的 skill 默认启用（spec 2026-10-03 §7.3）。 */
+  disabledSkills: z.array(z.string()),
 } as const;
 
 export type PreferenceKey = keyof typeof PREFERENCE_SCHEMAS;
@@ -187,5 +189,6 @@ export const setPreferenceInput = z.discriminatedUnion("key", [
   z.object({ key: z.literal("bashEnabled"), value: z.boolean() }),
   z.object({ key: z.literal("bashAlwaysApprove"), value: z.boolean() }),
   z.object({ key: z.literal("bashWorkdir"), value: bashWorkdirSchema }),
+  z.object({ key: z.literal("disabledSkills"), value: z.array(z.string()) }),
 ]);
 export type SetPreferenceInput = z.infer<typeof setPreferenceInput>;

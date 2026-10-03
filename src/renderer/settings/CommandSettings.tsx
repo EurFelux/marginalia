@@ -18,7 +18,7 @@ import {
   AlertDialogTitle,
 } from "@renderer/components/ui/alert-dialog";
 import type { PermissionDecision, PermissionRuleDto } from "@shared/permissions";
-import { parsePattern } from "@shared/shell-command";
+import { parsePattern, SHELL_OPERATOR_HINT } from "@shared/shell-command";
 import { ipcErrorMessage } from "@renderer/lib/ipc-error";
 
 export function CommandSettings() {
@@ -233,7 +233,8 @@ function RulesSection() {
         <p className="text-[11px] leading-relaxed text-muted-foreground">
           {t(
             "settings.commands.rulesDesc",
-            "规则按命令开头的完整词匹配：「git status」会放行 git status -s，但不放行 git log。允许规则只对不含 ; | & > 等符号的简单命令生效；拒绝规则会检查组合命令的每一段，「总是批准」也绕不过。",
+            "规则按命令开头的完整词匹配：「git status」会放行 git status -s，但不放行 git log。允许规则只对不含 {{symbols}} 等符号的简单命令生效；拒绝规则会检查组合命令的每一段，「总是批准」也绕不过。",
+            { symbols: SHELL_OPERATOR_HINT.join(" ") },
           )}
         </p>
       </div>
@@ -295,7 +296,8 @@ function RulesSection() {
         <p className="text-[11px] text-destructive">
           {t(
             "settings.commands.ruleInvalid",
-            "规则只能是命令开头的普通词，不能包含 ; | & > $ 或换行",
+            "规则只能是命令开头的普通词，不能包含 {{symbols}} 或换行",
+            { symbols: SHELL_OPERATOR_HINT.join(" ") },
           )}
         </p>
       )}

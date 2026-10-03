@@ -69,6 +69,12 @@ function simpleTokens(command: string): string[] | null {
   return tokens.length > 0 ? tokens : null;
 }
 
+/**
+ * 提示文案里列出的代表性 shell 符号（插值进「规则不能包含…」类文案，不写死在翻译里）。
+ * 完整判定以 simpleTokens 为准：另含换行、括号、重定向等。
+ */
+export const SHELL_OPERATOR_HINT = [";", "|", "&", ">", "<", "$", "`"] as const;
+
 /** 词序列 → 规范化前缀文本（每个词按 shell 引用规则转义，单空格连接）。 */
 export function formatPattern(tokens: string[]): string {
   return quote(tokens);

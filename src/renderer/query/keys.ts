@@ -22,4 +22,6 @@ export const qk = {
   memories: ["memories"] as const,
   permissionRules: ["permission-rules"] as const,
   bashWorkdir: ["bash-workdir"] as const,
+  skills: ["skills"] as const,
+  skillCandidates: ["skill-candidates"] as const,
 };

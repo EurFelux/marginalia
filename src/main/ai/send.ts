@@ -50,6 +50,11 @@ export interface SendDeps {
    * 未注入即不注册。按会话建：审批闸门的「本会话允许」按 conversationId 区分。
    */
   createBashTools?: (ctx: { conversationId: string }) => Record<string, unknown>;
+  /**
+   * loadSkill 工具工厂（spec 2026-10-03 §7.5）：有可用 skill 时返回工具，否则返回空对象——
+   * 与系统提示词里的技能索引同时出现、同时消失。未注入即不注册。
+   */
+  createSkillTools?: () => Record<string, unknown>;
   /** main→renderer 通知端口（后台记忆整理完成的 toast）。 */
   notify: (n: AppNotification) => void;
 }

@@ -29,6 +29,7 @@ describe("preferences schemas", () => {
       "bashWorkdir",
       "chatModel",
       "colorMode",
+      "disabledSkills",
       "instructions",
       "language",
       "lastHighlightStyle",

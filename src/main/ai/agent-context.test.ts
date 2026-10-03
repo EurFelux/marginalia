@@ -1,16 +1,20 @@
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { appService } from "@main/app";
 import { createDb, runMigrations } from "@main/db/client";
 import { setPreference } from "@main/preferences/repository";
 import { createMemory } from "@main/memory/repository";
 import {
   dropAgentContext,
+  enabledSkills,
   getAgentContext,
   invalidateAllAgentContexts,
   renderAssistantIdentity,
   renderAgentContext,
   renderMemoryIndex,
   renderReaderInstructions,
+  renderSkillsIndex,
 } from "@main/ai/agent-context";
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
@@ -92,5 +96,48 @@ describe("session snapshot freeze", () => {
     setPreference(db, "memoryEnabled", false);
     invalidateAllAgentContexts();
     expect(getAgentContext(db, "conv-1")).not.toContain("[m]");
+  });
+});
+
+describe("skills index", () => {
+  const skillsDir = appService.getPath("skillsDir");
+  const addSkill = (name: string, description: string, extra = "") => {
+    mkdirSync(path.join(skillsDir, name), { recursive: true });
+    writeFileSync(
+      path.join(skillsDir, name, "SKILL.md"),
+      `---\nname: ${name}\ndescription: ${description}\n${extra}---\n\nBody\n`,
+    );
+  };
+
+  beforeEach(() => rmSync(skillsDir, { recursive: true, force: true }));
+  afterAll(() => rmSync(skillsDir, { recursive: true, force: true }));
+
+  it("is omitted when there are no skills", () => {
+    expect(renderSkillsIndex([])).toBeNull();
+    expect(renderAgentContext(freshDb())).not.toContain("## Skills");
+  });
+
+  it("lists enabled, model-invocable skills with one-line descriptions", () => {
+    addSkill("export-notes", "|\n  Export notes\n  to Obsidian.");
+    addSkill("handoff", "Manual only", "disable-model-invocation: true\n");
+    addSkill("zz-off", "Disabled one");
+    const db = freshDb();
+    setPreference(db, "disabledSkills", ["zz-off"]);
+    const text = renderAgentContext(db);
+    expect(text).toContain("## Skills");
+    expect(text).toContain("call loadSkill with its name");
+    expect(text).toContain("- export-notes: Export notes to Obsidian.");
+    expect(text).not.toContain("handoff");
+    expect(text).not.toContain("zz-off");
+    expect(enabledSkills(db).map((s) => s.name)).toEqual(["export-notes"]);
+  });
+
+  it("stays frozen in a conversation's snapshot until invalidated", () => {
+    const db = freshDb();
+    expect(getAgentContext(db, "c-skills")).not.toContain("## Skills");
+    addSkill("late", "Added mid-conversation");
+    expect(getAgentContext(db, "c-skills")).not.toContain("late");
+    invalidateAllAgentContexts();
+    expect(getAgentContext(db, "c-skills")).toContain("- late: Added mid-conversation");
   });
 });

@@ -89,6 +89,17 @@ export function toolStepLabel(part: ToolPart, chapters: ChapterRefDto[], t: TFun
         ? t("ai.toolStep.webSearch", "联网搜索：{{query}}", { query })
         : t("ai.toolStep.webSearchFallback", "联网搜索");
     }
+    case "loadSkill": {
+      const skill = input?.name;
+      const file = input?.path;
+      if (typeof skill !== "string") return t("ai.toolStep.loadSkillFallback", "加载技能");
+      return typeof file === "string"
+        ? t("ai.toolStep.loadSkillFile", "读取技能「{{name}}」中的 {{path}}", {
+            name: skill,
+            path: file,
+          })
+        : t("ai.toolStep.loadSkill", "加载技能「{{name}}」", { name: skill });
+    }
     default:
       return name;
   }

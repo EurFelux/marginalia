@@ -1,10 +1,12 @@
-// src/main/ai/agent-context.ts —— system prompt 中间三层（instructions + SOUL + 记忆索引）的
+// src/main/ai/agent-context.ts —— system prompt 中间几层（instructions + SOUL + 记忆索引 + 技能索引）的
 // 渲染与会话快照冻结（spec 2026-06-10 §3/§5）。
 // 快照不持久化：进程内 Map，app 重启即重渲染（provider 缓存 TTL 早过期，语义零损失）。
 import type { DB } from "@main/db/client";
 import { getPreference } from "@main/preferences/repository";
 import { listMemories } from "@main/memory/repository";
 import { DEFAULT_SOUL } from "@shared/preferences";
+import { appService } from "@main/app";
+import { availableSkills, type AvailableSkill } from "@main/skills/repository";
 
 const snapshots = new Map<string, string>();
 
@@ -27,9 +29,29 @@ export function renderMemoryIndex(db: DB): string | null {
   return `## Memory index\n\n${lines.join("\n")}`;
 }
 
-/** 纯渲染（测试直测）：instructions 段 + SOUL 段 + 记忆索引段；空段整体省略。 */
+/** 当前可用的 skill（有效、非手动调用型、未停用），技能索引与 loadSkill 工具共用。 */
+export function enabledSkills(db: DB): AvailableSkill[] {
+  return availableSkills(
+    appService.getPath("skillsDir"),
+    new Set(getPreference(db, "disabledSkills") ?? []),
+  );
+}
+
+/** 技能索引（spec 2026-10-03-bash-skills-permissions-design §7.4）：只放「名字 + 描述」，正文由 loadSkill 按需取。 */
+export function renderSkillsIndex(skills: AvailableSkill[]): string | null {
+  if (skills.length === 0) return null;
+  const lines = skills.map((s) => `- ${s.name}: ${s.description.replace(/\s+/g, " ")}`);
+  return `## Skills\n\nSkills are instructions for specific tasks. When a task matches a skill, call loadSkill with its name before acting, then follow it.\n${lines.join("\n")}`;
+}
+
+/** 纯渲染（测试直测）：instructions 段 + SOUL 段 + 记忆索引段 + 技能索引段；空段整体省略。 */
 export function renderAgentContext(db: DB): string {
-  return [renderReaderInstructions(db), renderAssistantIdentity(db), renderMemoryIndex(db)]
+  return [
+    renderReaderInstructions(db),
+    renderAssistantIdentity(db),
+    renderMemoryIndex(db),
+    renderSkillsIndex(enabledSkills(db)),
+  ]
     .filter((section): section is string => section !== null)
     .join("\n\n");
 }

@@ -296,6 +296,7 @@ Skills are instructions for specific tasks. When a task matches a skill, call lo
 ### 7.7 从外部目录导入
 
 - **扫描**：打开「技能」设置页时（以及点「重新扫描」时），扫描 `~/.agents/skills/*/SKILL.md` 和 `~/.claude/skills/*/SKILL.md`。顶层的 skill 目录若是符号链接则跟随，因为本机 `~/.claude/skills` 下全是链接。按 realpath 去重，同一个 skill 只列一次，注明来源。
+- 没有 SKILL.md 的文件夹不是 skill（如 `~/.claude/skills/synced`），扫描时直接跳过，不列成「无效」。frontmatter 的 `name` 与源文件夹名不一致不算错（如 `zod-skill` 里写 `name: zod`）：导入时按 `name` 建文件夹。只有 app 技能目录里文件夹名与 `name` 不一致才标为无效。
 - **候选列表**：显示名称、描述、来源路径和状态：可导入 / 已导入（内容相同）/ 同名已存在（内容不同）/ 手动调用型（§7.6）/ 无效（附原因）。
 - **导入**：把勾选的 skill 整个目录复制到 `skillsDir/<name>/`。这是一次快照，不随源目录同步；源目录更新后再导入一次即可更新。
   - **跳过 skill 目录内部的符号链接**并在结果里提示。否则一个指向 `~/.ssh` 的链接会被复制进来，模型再用不需审批的 `loadSkill` 读走。

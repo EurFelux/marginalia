@@ -63,6 +63,8 @@ interface PrefsState {
   bashAlwaysApprove: boolean;
   /** 命令工作目录；null = 默认工作区（§6.2）。 */
   bashWorkdir: string | null;
+  /** 停用的 skill（存 name）；不在列表里即启用（§7.3）。 */
+  disabledSkills: string[];
 }
 interface PrefsActions {
   setAutoSummarize: (v: boolean) => void;
@@ -88,6 +90,7 @@ interface PrefsActions {
   setBashEnabled: (v: boolean) => void;
   setBashAlwaysApprove: (v: boolean) => void;
   setBashWorkdir: (v: string | null) => void;
+  setSkillEnabled: (name: string, enabled: boolean) => void;
 }
 
 export const PREFS_INITIAL: PrefsState = {
@@ -114,6 +117,7 @@ export const PREFS_INITIAL: PrefsState = {
   bashEnabled: DEFAULT_BASH_ENABLED,
   bashAlwaysApprove: false,
   bashWorkdir: null,
+  disabledSkills: [],
 };
 
 /**
@@ -217,4 +221,11 @@ export const usePrefsStore = create<PrefsState & PrefsActions>()((set) => ({
     persistPreference({ key: "bashWorkdir", value: bashWorkdir });
     set({ bashWorkdir });
   },
+  setSkillEnabled: (name, enabled) =>
+    set((s) => {
+      const rest = s.disabledSkills.filter((n) => n !== name);
+      const disabledSkills = enabled ? rest : [...rest, name];
+      persistPreference({ key: "disabledSkills", value: disabledSkills });
+      return { disabledSkills };
+    }),
 }));

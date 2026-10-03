@@ -25,7 +25,8 @@ export type DataPathKey =
   | "dbFile"
   | "tmpDir"
   | "preRestoreDir"
-  | "workspaceDir";
+  | "workspaceDir"
+  | "skillsDir";
 
 /** key → 相对 dataDir 的路径。映射是 AppService 的内部策略——布局与文件名知识收归此处 */
 const DATA_PATHS: Record<DataPathKey, string> = {
@@ -35,6 +36,7 @@ const DATA_PATHS: Record<DataPathKey, string> = {
   tmpDir: "tmp", // 备份导出/还原的同盘暂存区（rename 不跨设备）
   preRestoreDir: "pre-restore", // 还原前的当前数据安全副本父目录（pre-restore/<ts>/）
   workspaceDir: "workspace", // AI 执行命令的默认工作目录（spec 2026-10-03-bash-skills-permissions-design §6.2）
+  skillsDir: "skills", // app 自己的 skill 目录（同 spec §7.2）
 };
 
 /** 类不导出：消费方只能经 barrel 拿 appService，无法绕过封装 */
