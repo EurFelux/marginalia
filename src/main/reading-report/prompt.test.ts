@@ -79,6 +79,21 @@ describe("buildReadingReportSystemPrompt", () => {
     expect(prompt).not.toContain("saveMemory");
   });
 
+  it("delivers the report only through submitReport, after memory changes", () => {
+    const prompt = buildReadingReportSystemPrompt(freshDb());
+
+    expect(prompt).toContain("## Delivering the report");
+    expect(prompt).toContain("calling submitReport with the complete Markdown");
+    expect(prompt).toContain("anything else you write is discarded");
+    expect(prompt).toContain("Make memory changes before calling submitReport");
+
+    const db = freshDb();
+    setPreference(db, "memoryEnabled", false);
+    const withoutMemory = buildReadingReportSystemPrompt(db);
+    expect(withoutMemory).toContain("## Delivering the report");
+    expect(withoutMemory).not.toContain("Make memory changes before calling submitReport");
+  });
+
   it("keeps internal evidence handles out of the reader-facing report", () => {
     const prompt = buildReadingReportSystemPrompt(freshDb());
 

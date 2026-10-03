@@ -1,6 +1,7 @@
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { ToolSet } from "ai";
+import { MockLanguageModelV4 } from "ai/test";
 import { eq } from "drizzle-orm";
 import { createDb, runMigrations } from "@main/db/client";
 import { annotations, books, memories } from "@main/db/schema";
@@ -19,7 +20,7 @@ import {
   startReadingReportGeneration,
   type ReadingReportServiceDeps,
 } from "@main/reading-report/service";
-import type { RunReadingReportAgentInput } from "@main/reading-report/agent";
+import { runReadingReportAgent, type RunReadingReportAgentInput } from "@main/reading-report/agent";
 
 const { warn } = vi.hoisted(() => ({ warn: vi.fn() }));
 
@@ -45,6 +46,42 @@ async function executeAgentTool(
   const candidate = (input.tools as ToolSet)[name];
   if (!candidate?.execute) throw new Error(`${name} tool missing`);
   return candidate.execute(toolInput as never, toolOptions);
+}
+
+/** 替 mock 的 agent 调 submitReport——生产中这一步由模型发起。 */
+function submitReport(input: RunReadingReportAgentInput, markdown: string) {
+  return executeAgentTool(input, "submitReport", { markdown });
+}
+
+const USAGE = {
+  inputTokens: { total: 1, noCache: undefined, cacheRead: undefined, cacheWrite: undefined },
+  outputTokens: { total: 1, text: undefined, reasoning: undefined },
+};
+
+type ModelStep = Awaited<ReturnType<NonNullable<MockLanguageModelV4["doGenerate"]>>>;
+type ModelContent = ModelStep["content"];
+
+function modelStep(content: ModelContent): ModelStep {
+  const finish = content.some((part) => part.type === "tool-call") ? "tool-calls" : "stop";
+  return { content, finishReason: { unified: finish, raw: undefined }, usage: USAGE, warnings: [] };
+}
+
+function toolCall(id: string, toolName: string, input: unknown): ModelContent[number] {
+  return { type: "tool-call", toolCallId: id, toolName, input: JSON.stringify(input) };
+}
+
+/** 按脚本逐步作答的模型；记录每次调用时模型实际收到的工具名。 */
+function scriptedModel(steps: ModelContent[]) {
+  const toolNames: string[][] = [];
+  const model = new MockLanguageModelV4({
+    doGenerate: async ({ tools }) => {
+      toolNames.push((tools ?? []).map((candidate) => candidate.name));
+      const next = steps[toolNames.length - 1];
+      if (!next) throw new Error("model called more times than scripted");
+      return modelStep(next);
+    },
+  });
+  return { model, toolNames };
 }
 
 function deferred<T>() {
@@ -81,7 +118,9 @@ function setup(options: { report?: string; evidence?: boolean } = {}) {
       .run();
   }
   const task = deferred<string>();
-  const runAgent = vi.fn(() => task.promise);
+  const runAgent = vi.fn(async (input: RunReadingReportAgentInput) => {
+    await submitReport(input, await task.promise);
+  });
   const background: Promise<unknown>[] = [];
   const deps: ReadingReportServiceDeps = {
     db,
@@ -171,7 +210,7 @@ describe("reading report service", () => {
     deps.resolveModel = () => ({ ok: true, model: {} as never, modelId: "summary" });
     deps.runAgent = async (input) => {
       await input.tools.listAnnotations!.execute!({ offset: 0, limit: 50 }, {} as never);
-      return task.promise;
+      await submitReport(input, await task.promise);
     };
 
     startReadingReportGeneration(deps, session.id);
@@ -247,9 +286,9 @@ describe("reading report service", () => {
     const { deps, session, task, drain } = setup();
     let signal: AbortSignal | undefined;
     deps.resolveModel = () => ({ ok: true, model: {} as never, modelId: "summary" });
-    deps.runAgent = vi.fn((input) => {
+    deps.runAgent = vi.fn(async (input) => {
       signal = input.abortSignal;
-      return task.promise;
+      await submitReport(input, await task.promise);
     });
 
     startReadingReportGeneration(deps, session.id);
@@ -269,9 +308,9 @@ describe("reading report service", () => {
     const { deps, session, task, drain } = setup({ report: "# Old" });
     let signal: AbortSignal | undefined;
     deps.resolveModel = () => ({ ok: true, model: {} as never, modelId: "summary" });
-    deps.runAgent = vi.fn((input) => {
+    deps.runAgent = vi.fn(async (input) => {
       signal = input.abortSignal;
-      return task.promise;
+      await submitReport(input, await task.promise);
     });
 
     startReadingReportGeneration(deps, session.id);
@@ -299,7 +338,7 @@ describe("reading report service", () => {
     deps.runAgent = vi.fn(async (input) => {
       await executeAgentTool(input, "saveMemory", memoryInput);
       staged.resolve();
-      return finish.promise;
+      await submitReport(input, await finish.promise);
     });
 
     startReadingReportGeneration(deps, session.id);
@@ -321,7 +360,7 @@ describe("reading report service", () => {
     deps.resolveModel = () => ({ ok: true, model: {} as never, modelId: "summary" });
     deps.runAgent = vi.fn(async (input) => {
       prompts.push(input.instructions);
-      return prompts.length === 1 ? "# First" : "# Second";
+      await submitReport(input, prompts.length === 1 ? "# First" : "# Second");
     });
 
     startReadingReportGeneration(deps, session.id);
@@ -344,7 +383,7 @@ describe("reading report service", () => {
     deps.runAgent = vi.fn(async (input) => {
       memoryToolAvailable = "saveMemory" in input.tools;
       if (memoryToolAvailable) await executeAgentTool(input, "saveMemory", memoryInput);
-      return "# Report";
+      await submitReport(input, "# Report");
     });
 
     startReadingReportGeneration(deps, session.id);
@@ -386,7 +425,7 @@ describe("reading report service", () => {
       memoryToolAvailable = "saveMemory" in input.tools;
       if (memoryToolAvailable) await executeAgentTool(input, "saveMemory", memoryInput);
       staged.resolve();
-      return finish.promise;
+      await submitReport(input, await finish.promise);
     });
 
     startReadingReportGeneration(deps, session.id);
@@ -409,6 +448,7 @@ describe("reading report service", () => {
     const staged = deferred<void>();
     const finish = deferred<string>();
     let memoryToolAvailable = false;
+    let submission: unknown;
     deps.resolveModel = () => ({ ok: true, model: {} as never, modelId: "summary" });
     deps.runAgent = vi.fn(async (input) => {
       memoryToolAvailable = "updateMemory" in input.tools;
@@ -419,7 +459,7 @@ describe("reading report service", () => {
         });
       }
       staged.resolve();
-      return finish.promise;
+      submission = await submitReport(input, await finish.promise);
     });
 
     startReadingReportGeneration(deps, session.id);
@@ -433,11 +473,84 @@ describe("reading report service", () => {
     await drain();
 
     expect(memoryToolAvailable).toBe(true);
+    expect(submission).toMatchObject({
+      saved: false,
+      error: expect.stringContaining("retrying will not help"),
+    });
     // progress 不入断言：该用例真的调了 updateMemory，时间线里会留下那一步。
     expect(getReadingSessionDetail(deps, session.id).report).toMatchObject({
       status: "regeneration-failed",
       content: "# Old",
     });
     expect(getMemoryBySlug(deps.db, "durable-insight")?.body).toBe("External update.");
+  });
+  describe("with the real report agent", () => {
+    const REPORT = "# 读完《思考，快与慢》\n\n你最在意的是默认选项。";
+    const SIGN_OFF = "报告已写成。两条新的记忆也存下了。上面那份报告是可编辑的。";
+
+    function withAgent(steps: ModelContent[]) {
+      const { deps, session, drain } = setup();
+      const scripted = scriptedModel(steps);
+      deps.runAgent = runReadingReportAgent;
+      deps.resolveModel = () => ({ ok: true, model: scripted.model, modelId: "report" });
+      return { deps, session, drain, toolNames: scripted.toolNames };
+    }
+
+    it("never persists the agent's free text, even when it holds the report", async () => {
+      warn.mockClear();
+      const { deps, session, drain } = withAgent([
+        [{ type: "text", text: REPORT }, toolCall("m1", "saveMemory", memoryInput)],
+        [{ type: "text", text: SIGN_OFF }],
+      ]);
+
+      startReadingReportGeneration(deps, session.id);
+      await drain();
+
+      expect(getReadingSessionDetail(deps, session.id).report.status).toBe("generation-failed");
+      expect(getMemoryBySlug(deps.db, "durable-insight")).toBeNull();
+      expect(warn).toHaveBeenCalledWith(
+        `generation failed for session ${session.id}`,
+        expect.objectContaining({ message: expect.stringContaining("without submitting") }),
+      );
+    });
+
+    it("saves the submitted report with staged memory and ends the run there", async () => {
+      const { deps, session, drain, toolNames } = withAgent([
+        [
+          toolCall("m1", "saveMemory", memoryInput),
+          toolCall("r1", "submitReport", { markdown: REPORT }),
+        ],
+        [{ type: "text", text: SIGN_OFF }],
+      ]);
+
+      startReadingReportGeneration(deps, session.id);
+      await drain();
+
+      expect(getReadingSessionDetail(deps, session.id).report).toEqual({
+        status: "ready",
+        content: REPORT,
+      });
+      expect(getMemoryBySlug(deps.db, "durable-insight")?.body).toBe("A durable insight.");
+      expect(toolNames).toHaveLength(1);
+      expect(toolNames[0]).toContain("submitReport");
+    });
+
+    it("closes memory once the report is submitted in the same step", async () => {
+      const { deps, session, drain } = withAgent([
+        [
+          toolCall("r1", "submitReport", { markdown: REPORT }),
+          toolCall("m1", "saveMemory", memoryInput),
+        ],
+      ]);
+
+      startReadingReportGeneration(deps, session.id);
+      await drain();
+
+      expect(getReadingSessionDetail(deps, session.id).report).toEqual({
+        status: "ready",
+        content: REPORT,
+      });
+      expect(getMemoryBySlug(deps.db, "durable-insight")).toBeNull();
+    });
   });
 });

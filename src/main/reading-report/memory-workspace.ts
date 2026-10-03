@@ -36,7 +36,14 @@ export type ReadingReportMemoryMutation =
 export interface ReadingReportMemoryWorkspace {
   tools: ToolSet;
   mutations: () => ReadingReportMemoryMutation[];
+  /**
+   * 报告提交后调用。此后 save/update 如实拒绝：同一步里排在 submitReport 之后的记忆调用
+   * 在事务后才执行，若照常暂存会回 saved:true 却永远不落库。
+   */
+  close: () => void;
 }
+
+const CLOSED_HINT = "the report has already been submitted; memory changes are closed";
 
 function neighbor(memory: WorkspaceMemory) {
   return {
@@ -48,7 +55,7 @@ function neighbor(memory: WorkspaceMemory) {
 
 export function createReadingReportMemoryWorkspace(db: DB): ReadingReportMemoryWorkspace {
   if (!(getPreference(db, "memoryEnabled") ?? true)) {
-    return { tools: {}, mutations: () => [] };
+    return { tools: {}, mutations: () => [], close: () => {} };
   }
 
   const baseBySlug = new Map<string, WorkspaceMemory>();
@@ -66,6 +73,7 @@ export function createReadingReportMemoryWorkspace(db: DB): ReadingReportMemoryW
     [...baseBySlug].map(([slug, memory]) => [slug, { ...memory }] as const),
   );
   const dirtySlugs = new Set<string>();
+  let closed = false;
 
   const tools: ToolSet = {
     readMemory: tool({
@@ -96,7 +104,7 @@ export function createReadingReportMemoryWorkspace(db: DB): ReadingReportMemoryW
     }),
     saveMemory: tool({
       description:
-        "Stage a new durable memory about the reader: a lasting preference, viewpoint, recurring concept, framework, correction, or cross-book connection. Not for book content, the complete report, or a one-off thought. The memory is saved only if the report succeeds.",
+        "Stage a new durable memory about the reader: a lasting preference, viewpoint, recurring concept, framework, correction, or cross-book connection. Not for book content, the complete report, or a one-off thought. Saved together with the report when submitReport succeeds.",
       inputSchema: z.object({
         slug: memorySlug,
         title: z.string().min(1),
@@ -104,6 +112,7 @@ export function createReadingReportMemoryWorkspace(db: DB): ReadingReportMemoryW
         body: z.string().min(1),
       }),
       execute: async ({ slug, title, description, body }) => {
+        if (closed) return { saved: false as const, slug, hint: CLOSED_HINT };
         if (currentBySlug.has(slug)) {
           return {
             saved: false as const,
@@ -125,7 +134,7 @@ export function createReadingReportMemoryWorkspace(db: DB): ReadingReportMemoryW
     }),
     updateMemory: tool({
       description:
-        "Stage an update to an existing durable memory. Prefer this over creating near-duplicates. The final values are saved only if the report succeeds.",
+        "Stage an update to an existing durable memory. Prefer this over creating near-duplicates. The final values are saved together with the report when submitReport succeeds.",
       inputSchema: z.object({
         slug: memorySlug,
         title: z.string().min(1).optional(),
@@ -133,6 +142,7 @@ export function createReadingReportMemoryWorkspace(db: DB): ReadingReportMemoryW
         body: z.string().min(1).optional(),
       }),
       execute: async ({ slug, title, description, body }) => {
+        if (closed) return { updated: false as const, slug, hint: CLOSED_HINT };
         const existing = currentBySlug.get(slug);
         if (!existing) return { updated: false as const, slug, hint: "no such memory" };
         currentBySlug.set(slug, {
@@ -149,6 +159,9 @@ export function createReadingReportMemoryWorkspace(db: DB): ReadingReportMemoryW
 
   return {
     tools,
+    close: () => {
+      closed = true;
+    },
     mutations: () =>
       [...dirtySlugs].sort().flatMap((slug): ReadingReportMemoryMutation[] => {
         const current = currentBySlug.get(slug)!;

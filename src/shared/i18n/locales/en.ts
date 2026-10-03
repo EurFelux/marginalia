@@ -339,6 +339,7 @@ export default {
   "readingReport.progress.tool.readMemory": "Reading memory",
   "readingReport.progress.tool.readPage": "Rereading a page",
   "readingReport.progress.tool.saveMemory": "Saving a memory",
+  "readingReport.progress.tool.submitReport": "Saving the report",
   "readingReport.progress.tool.unknown": "Working",
   "readingReport.progress.tool.updateMemory": "Updating a memory",
   "readingReport.reference": "Open text for reference",

@@ -114,6 +114,43 @@ describe("createReadingReportMemoryWorkspace", () => {
     expect(read.danglingLinks).toEqual(["missing-memory"]);
   });
 
+  it("refuses to stage changes once closed", async () => {
+    const existing = createMemory(db, {
+      slug: "systems-thinking",
+      title: "Systems thinking",
+      description: "Old description.",
+      body: "Old body.",
+    });
+    const workspace = createReadingReportMemoryWorkspace(db);
+    await executeTool(workspace, "saveMemory", {
+      slug: "before-close",
+      title: "Before close",
+      description: "Staged before the report was submitted.",
+      body: "Kept.",
+    });
+    workspace.close();
+
+    const saved = await executeTool(workspace, "saveMemory", {
+      slug: "after-close",
+      title: "After close",
+      description: "Staged after the report was submitted.",
+      body: "Dropped.",
+    });
+    const updated = await executeTool(workspace, "updateMemory", {
+      slug: existing.slug,
+      body: "Dropped.",
+    });
+
+    expect(saved).toMatchObject({ saved: false, hint: expect.stringContaining("closed") });
+    expect(updated).toMatchObject({ updated: false, hint: expect.stringContaining("closed") });
+    expect(workspace.mutations()).toEqual([
+      expect.objectContaining({ kind: "create", slug: "before-close" }),
+    ]);
+    await expect(executeTool(workspace, "readMemory", { slug: existing.slug })).resolves.toEqual(
+      expect.objectContaining({ found: true, body: "Old body." }),
+    );
+  });
+
   it("returns no tools or mutations when memory is disabled", () => {
     setPreference(db, "memoryEnabled", false);
 

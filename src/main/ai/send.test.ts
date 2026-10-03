@@ -773,6 +773,56 @@ describe("runSend library context", () => {
   });
 });
 
+describe("reading report submission stays out of chat", () => {
+  beforeEach(() => __resetNamingRuntime());
+
+  /** 记录模型实际收到的工具名与系统提示——断言在模型这一侧，而非我们传的参数。 */
+  function capturingModel() {
+    const seen = { tools: [] as string[], system: "" };
+    const model = new MockLanguageModelV4({
+      doStream: async ({ prompt, tools }) => {
+        seen.tools = (tools ?? []).map((candidate) => candidate.name);
+        const sys = prompt.find((m) => m.role === "system");
+        seen.system = sys && typeof sys.content === "string" ? sys.content : "";
+        return {
+          stream: simulateReadableStream({
+            chunks: [
+              { type: "text-start", id: "t1" },
+              { type: "text-delta", id: "t1", delta: "ok" },
+              { type: "text-end", id: "t1" },
+              finishChunk("stop"),
+            ],
+          }),
+        };
+      },
+    });
+    return { model, seen };
+  }
+
+  it.each(["reader", "library"] as const)(
+    "never offers submitReport to %s chat",
+    async (context) => {
+      const { model, seen } = capturingModel();
+      const { db, book, deps } = await setup({ ok: true, model, modelId: "mock" });
+      const bookId = context === "reader" ? book.id : null;
+      const convo = createConversation(db, { bookId });
+
+      const res = await runSend(deps, {
+        bookId,
+        conversationId: convo.id,
+        chips: [],
+        userText: "what did I think about this book?",
+      });
+      if (!res.ok) throw new Error(res.reason);
+      await res.finished;
+
+      expect(seen.tools).toContain("listReadingSessions");
+      expect(seen.tools).not.toContain("submitReport");
+      expect(seen.system).not.toContain("submitReport");
+    },
+  );
+});
+
 describe("runResend", () => {
   beforeEach(() => __resetNamingRuntime());
 
