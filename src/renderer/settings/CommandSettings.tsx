@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { qk } from "@renderer/query/keys";
 import { usePrefsStore } from "@renderer/store/prefs-store";
 import { Button } from "@renderer/components/ui/button";
-import { Checkbox } from "@renderer/components/ui/checkbox";
+import { Switch } from "@renderer/components/ui/switch";
 import { Input } from "@renderer/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@renderer/components/ui/toggle-group";
 import {
@@ -46,7 +46,7 @@ export function CommandSettings() {
               )}
             </span>
           </label>
-          <Checkbox
+          <Switch
             id="bash-enabled"
             checked={bashEnabled}
             onCheckedChange={setBashEnabled}
@@ -68,7 +68,7 @@ export function CommandSettings() {
               )}
             </span>
           </label>
-          <Checkbox
+          <Switch
             id="bash-always-approve"
             checked={alwaysApprove}
             onCheckedChange={(checked) =>
