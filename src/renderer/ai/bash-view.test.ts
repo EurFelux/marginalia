@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { BashToolOutput } from "@shared/bash";
 import type { PermissionRequest } from "@shared/permissions";
-import { bashView, durationParts, tailLines } from "@renderer/ai/bash-view";
+import { bashView, durationParts } from "@renderer/ai/bash-view";
 import type { ToolPart } from "@renderer/ai/segments";
 
 const input = { command: "node -v" };
@@ -122,18 +122,6 @@ describe("bashView", () => {
       badge: { kind: "error" },
       errorMessage: "bad input",
     });
-  });
-});
-
-describe("tailLines", () => {
-  it("keeps the last n lines and counts the rest", () => {
-    expect(tailLines("1\n2\n3\n4\n5\n6\n", 4, false)).toEqual({ hidden: 2, text: "3\n4\n5\n6" });
-    expect(tailLines("1\n2\n3\n4\n5\n6\n", 4, true)).toEqual({
-      hidden: 0,
-      text: "1\n2\n3\n4\n5\n6",
-    });
-    expect(tailLines("only", 4, false)).toEqual({ hidden: 0, text: "only" });
-    expect(tailLines("", 4, false)).toEqual({ hidden: 0, text: "" });
   });
 });
 

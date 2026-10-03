@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   Check,
   ChevronDown,
+  ChevronRight,
   CircleSlash,
   LoaderCircle,
   Timer,
@@ -23,20 +24,12 @@ import {
 } from "@renderer/components/ui/dropdown-menu";
 import { cn } from "@renderer/lib/utils";
 import { ipcErrorMessage } from "@renderer/lib/ipc-error";
-import {
-  bashView,
-  durationParts,
-  tailLines,
-  type BashBadge,
-  type BashView,
-} from "@renderer/ai/bash-view";
+import { bashView, durationParts, type BashBadge, type BashView } from "@renderer/ai/bash-view";
 import type { ToolPart } from "@renderer/ai/segments";
 import { respondToPermission, usePermissionStore } from "@renderer/store/permission-store";
 import { usePrefsStore } from "@renderer/store/prefs-store";
 import { analyzeCommand, isTokenPrefix, parsePattern } from "@shared/shell-command";
 import type { PermissionRequest, PermissionRespondInput } from "@shared/permissions";
-
-const TAIL_LINES = 4;
 
 function Badge({ badge }: { badge: BashBadge }) {
   const { t } = useTranslation();
@@ -127,63 +120,112 @@ export function BashBlock({ part, streaming }: { part: ToolPart; streaming: bool
   const { t } = useTranslation();
   const request = usePermissionStore((s) => s.pending[part.toolCallId]);
   const view = bashView(part, request, streaming);
+  // 默认收成一行，点整行展开（spec 2026-10-03-bash-block-collapse §3）；
+  // 待批时命令强制完整显示、不可收起——批准前得看清整条命令（§3.3）。
   const [expanded, setExpanded] = useState(false);
-  const tail = tailLines(view.output, TAIL_LINES, expanded);
+  const pending = view.request !== null;
   const auto = autoApprovalLabel(view, t);
   const meta = [
     view.durationMs !== null ? formatDuration(view.durationMs, t) : null,
     view.truncated ? t("ai.bash.truncated", "输出已截断") : null,
   ].filter((s): s is string => s !== null);
 
+  const command = (
+    <>
+      <span className="shrink-0 text-emerald-400 select-none">$</span>
+      <span
+        className={cn(
+          "min-w-0 flex-1",
+          expanded || pending ? "whitespace-pre-wrap break-all" : "truncate",
+        )}
+      >
+        {view.command}
+      </span>
+      <Badge badge={view.badge} />
+    </>
+  );
+
   return (
     <div className="overflow-hidden rounded-lg bg-zinc-950 font-mono text-[11px] leading-relaxed text-zinc-100 ring-1 ring-black/20">
-      <div className="flex items-start gap-2 px-2.5 pt-2">
-        <span className="shrink-0 text-emerald-400 select-none">$</span>
-        <span className="min-w-0 flex-1 whitespace-pre-wrap break-all">{view.command}</span>
-        <Badge badge={view.badge} />
-      </div>
-
-      {tail.text && (
-        <div className="px-2.5 pt-1 text-zinc-400">
-          {tail.hidden > 0 && (
-            <button
-              type="button"
-              onClick={() => setExpanded(true)}
-              className="text-zinc-500 hover:text-zinc-300"
-            >
-              {t("ai.bash.moreLines", "… 还有 {{count}} 行，展开", { count: tail.hidden })}
-            </button>
+      {pending ? (
+        <div className="flex items-start gap-2 px-2.5 py-2">{command}</div>
+      ) : (
+        // 整行可点；不用 <button> 包住命令，好让展开后的命令能拖选复制（拖选松手不算点击）。
+        // 键盘操作走行尾的箭头按钮，它的点击冒泡到这一行。
+        <div
+          onClick={(e) => {
+            const sel = window.getSelection();
+            if (sel && !sel.isCollapsed && e.currentTarget.contains(sel.anchorNode)) return;
+            setExpanded(!expanded);
+          }}
+          className={cn(
+            "flex cursor-pointer items-start gap-2 px-2.5 pt-2 hover:bg-white/5",
+            expanded ? "pb-1" : "pb-2",
           )}
-          <pre className="max-h-56 overflow-auto whitespace-pre-wrap break-all">{tail.text}</pre>
+        >
+          {command}
+          <button
+            type="button"
+            aria-expanded={expanded}
+            aria-label={
+              expanded ? t("ai.bash.collapse", "收起详情") : t("ai.bash.expand", "展开详情")
+            }
+            className="mt-0.5 shrink-0 rounded text-zinc-500 outline-none hover:text-zinc-300 focus-visible:ring-1 focus-visible:ring-zinc-500"
+          >
+            <ChevronRight
+              className={cn("size-3.5 transition-transform", expanded && "rotate-90")}
+              aria-hidden
+            />
+          </button>
         </div>
       )}
 
-      {view.denial && (
-        <p className="px-2.5 pt-1 text-zinc-400">
-          {view.denial.by === "rule"
-            ? t("ai.bash.deniedByRule", "# 命中拒绝规则「{{rule}}」", { rule: view.denial.rule })
-            : view.denial.reason
-              ? t("ai.bash.deniedWithReason", "# 你拒绝了：{{reason}}", {
-                  reason: view.denial.reason,
-                })
-              : t("ai.bash.deniedNoReason", "# 你拒绝了")}
-        </p>
-      )}
+      {expanded && !pending && (
+        <div className="space-y-1 px-2.5 pb-2">
+          {view.output && (
+            <pre
+              ref={scrollToEnd}
+              className="max-h-56 overflow-auto whitespace-pre-wrap break-all text-zinc-400"
+            >
+              {view.output}
+            </pre>
+          )}
 
-      {view.errorMessage && (
-        <p className="px-2.5 pt-1 whitespace-pre-wrap break-all text-red-300">
-          {view.errorMessage}
-        </p>
-      )}
+          {view.denial && (
+            <p className="text-zinc-400">
+              {view.denial.by === "rule"
+                ? t("ai.bash.deniedByRule", "# 命中拒绝规则「{{rule}}」", {
+                    rule: view.denial.rule,
+                  })
+                : view.denial.reason
+                  ? t("ai.bash.deniedWithReason", "# 你拒绝了：{{reason}}", {
+                      reason: view.denial.reason,
+                    })
+                  : t("ai.bash.deniedNoReason", "# 你拒绝了")}
+            </p>
+          )}
 
-      <div className="flex items-center gap-2 px-2.5 pt-1 pb-2 font-sans text-[10px] text-zinc-500">
-        {meta.length > 0 && <span>{meta.join(" · ")}</span>}
-        {auto && <span>{auto}</span>}
-      </div>
+          {view.errorMessage && (
+            <p className="whitespace-pre-wrap break-all text-red-300">{view.errorMessage}</p>
+          )}
+
+          {(meta.length > 0 || auto) && (
+            <div className="flex items-center gap-2 font-sans text-[10px] text-zinc-500">
+              {meta.length > 0 && <span>{meta.join(" · ")}</span>}
+              {auto && <span>{auto}</span>}
+            </div>
+          )}
+        </div>
+      )}
 
       {view.request && <ActionBar request={view.request} />}
     </div>
   );
+}
+
+/** 展开时输出停在末尾：结果、报错多在最后几行。 */
+function scrollToEnd(el: HTMLPreElement | null) {
+  if (el) el.scrollTop = el.scrollHeight;
 }
 
 function ActionBar({ request }: { request: PermissionRequest }) {

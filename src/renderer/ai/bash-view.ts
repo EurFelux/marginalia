@@ -102,18 +102,6 @@ export function bashView(
   }
 }
 
-/** 末尾 n 行之前被折叠的行数与要显示的文本；末尾换行不算一行。 */
-export function tailLines(
-  output: string,
-  n: number,
-  expanded: boolean,
-): { hidden: number; text: string } {
-  const lines = output.replace(/\n$/, "").split("\n");
-  if (output === "") return { hidden: 0, text: "" };
-  const hidden = expanded ? 0 : Math.max(0, lines.length - n);
-  return { hidden, text: lines.slice(hidden).join("\n") };
-}
-
 /** 耗时的展示分解（整数运算）：一分钟内精确到百分之一秒，之上到秒。 */
 export function durationParts(
   ms: number,
