@@ -321,6 +321,7 @@ export default {
   "readingReport.progress.tool.readMemory": "读取记忆",
   "readingReport.progress.tool.readPage": "回读书页",
   "readingReport.progress.tool.saveMemory": "写下一条记忆",
+  "readingReport.progress.tool.submitReport": "保存报告",
   "readingReport.progress.tool.unknown": "处理中",
   "readingReport.progress.tool.updateMemory": "更新一条记忆",
   "readingReport.reference": "打开正文参考",

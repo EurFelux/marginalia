@@ -12,9 +12,13 @@ export const REPORT_INVESTIGATION_GUIDANCE = `## Investigating this reading
 
 Start with listConversations, listAnnotations, and listBookNotes to see the full scope before reading anything in depth. Each listed conversation reports its size; use that to budget. Read a small conversation directly with readConversation, paging with nextAfterSeq while hasMore is true. For a large conversation, call investigateConversation instead of paging it yourself—it returns the reader's questions, judgments, and turning points with the message range each came from. When a returned point deserves the reader's own words, read that range directly. If investigateConversation reports busy or failed, page the conversation yourself and prefer breadth over completeness. A conversation with compacted context offers a background summary; read it first to orient, then decide which stretches to read closely. Do not begin writing while any listed conversation remains uninspected; if evidence is incomplete, say less rather than guessing.`;
 
+const REPORT_SUBMISSION_GUIDANCE = `## Delivering the report
+
+Deliver the finished report by calling submitReport with the complete Markdown. Only the submitted Markdown reaches the reader; anything else you write is discarded. If submitReport returns an error, follow it. Once it reports saved, the task is complete.`;
+
 const REPORT_MEMORY_GUIDANCE = `## Memory guidance for this report
 
-Use readMemory when an indexed memory may clarify the reader's durable viewpoint. Use saveMemory only for a new lasting preference, viewpoint, recurring concept, framework, correction, or cross-book connection. Use updateMemory instead of creating a near-duplicate. Never store book content, the complete report, or a one-off thought. Memory content follows the reader's language; slugs use English kebab-case.`;
+Use readMemory when an indexed memory may clarify the reader's durable viewpoint. Use saveMemory only for a new lasting preference, viewpoint, recurring concept, framework, correction, or cross-book connection. Use updateMemory instead of creating a near-duplicate. Never store book content, the complete report, or a one-off thought. Memory content follows the reader's language; slugs use English kebab-case. Make memory changes before calling submitReport: they are saved together with the report, and memory tools close once it is saved.`;
 
 export function buildReadingReportSystemPrompt(db: DB): string {
   const memoryEnabled = getPreference(db, "memoryEnabled") ?? true;
@@ -27,6 +31,7 @@ export function buildReadingReportSystemPrompt(db: DB): string {
     renderAssistantIdentity(db),
     renderMemoryIndex(db),
     REPORT_INVESTIGATION_GUIDANCE,
+    REPORT_SUBMISSION_GUIDANCE,
     memoryEnabled ? REPORT_MEMORY_GUIDANCE : null,
     prioritizedInstructions,
   ]

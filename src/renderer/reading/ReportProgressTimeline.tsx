@@ -34,6 +34,7 @@ const TOOL_LABEL_KEYS = {
   readMemory: "readingReport.progress.tool.readMemory",
   readPage: "readingReport.progress.tool.readPage",
   saveMemory: "readingReport.progress.tool.saveMemory",
+  submitReport: "readingReport.progress.tool.submitReport",
   updateMemory: "readingReport.progress.tool.updateMemory",
 } as const;
 

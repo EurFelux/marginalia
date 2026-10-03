@@ -14,6 +14,7 @@ import { buildReadingReportSystemPrompt } from "@main/reading-report/prompt";
 import { withProgress } from "@main/reading-report/progress";
 import { createReadingReportMemoryWorkspace } from "@main/reading-report/memory-workspace";
 import { ReadingReportRuntime, type GenerationKind } from "@main/reading-report/runtime";
+import { createReadingReportSubmission } from "@main/reading-report/submission";
 import { createReadingReportTools } from "@main/reading-report/tools";
 import {
   getReadingSession,
@@ -102,10 +103,27 @@ export function startReadingReportGeneration(
       }),
     });
     const memoryWorkspace = createReadingReportMemoryWorkspace(deps.db);
-    const content = await deps.runAgent({
+    // 报告由 agent 调 submitReport 落库；这里只提供那次写入，并在它成功时结束本次生成。
+    const submission = createReadingReportSubmission({
+      signal: claim.signal,
+      commit: (markdown) => {
+        if (!deps.runtime.isCurrent(session.id, claim.generation)) {
+          throw new Error("this report generation is no longer current");
+        }
+        const committedAt = deps.now().epochMilliseconds;
+        deps.db.transaction((tx) => {
+          saveReadingReportInTransaction(tx, session.id, markdown);
+          applyReadingReportMemoryMutations(tx, memoryWorkspace.mutations(), committedAt);
+        });
+        memoryWorkspace.close();
+        // 落库即完成：UI 立刻显示报告；此后这一轮的进度与写入都因世代失效而成空操作。
+        deps.runtime.succeed(session.id, claim.generation);
+      },
+    });
+    await deps.runAgent({
       resolved,
       tools: withProgress(
-        { ...tools, ...memoryWorkspace.tools },
+        { ...tools, ...memoryWorkspace.tools, ...submission.tools },
         deps.runtime.sink(session.id, claim.generation),
       ),
       instructions: buildReadingReportSystemPrompt(deps.db),
@@ -114,23 +132,17 @@ export function startReadingReportGeneration(
       completedAt: session.completedAt!,
       activeSeconds: readingSessionSeconds(deps.db, session.id),
       abortSignal: claim.signal,
+      isSubmitted: submission.submitted,
     });
-    return { content, memoryMutations: memoryWorkspace.mutations() };
-  })()
-    .then((result) => {
-      if (!deps.runtime.isCurrent(session.id, claim.generation)) return;
-      const committedAt = deps.now().epochMilliseconds;
-      deps.db.transaction((tx) => {
-        saveReadingReportInTransaction(tx, session.id, result.content);
-        applyReadingReportMemoryMutations(tx, result.memoryMutations, committedAt);
-      });
-      deps.runtime.succeed(session.id, claim.generation);
-    })
-    .catch((err: unknown) => {
-      if (!deps.runtime.isCurrent(session.id, claim.generation)) return;
-      log.warn(`generation failed for session ${session.id}`, err);
-      deps.runtime.fail(session.id, { kind }, claim.generation);
-    });
+    if (!submission.submitted()) {
+      throw new Error("reading report agent finished without submitting a report");
+    }
+  })().catch((err: unknown) => {
+    // 已提交（runtime 已 succeed）或已取消/被顶替时不再是当前世代，之后的错误一律无关。
+    if (!deps.runtime.isCurrent(session.id, claim.generation)) return;
+    log.warn(`generation failed for session ${session.id}`, err);
+    deps.runtime.fail(session.id, { kind }, claim.generation);
+  });
   return { outcome: "accepted" };
 }
 
