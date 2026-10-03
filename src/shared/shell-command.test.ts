@@ -5,7 +5,7 @@ import {
   isTokenPrefix,
   parsePattern,
   suggestPrefix,
-} from "@main/permissions/command";
+} from "@shared/shell-command";
 
 describe("analyzeCommand: simple commands", () => {
   it.each([

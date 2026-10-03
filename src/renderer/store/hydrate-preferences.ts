@@ -50,4 +50,9 @@ export function hydratePreferences(): void {
   if (snap.webSearchEnabled !== undefined) {
     usePrefsStore.setState({ webSearchEnabled: snap.webSearchEnabled });
   }
+  if (snap.bashEnabled !== undefined) usePrefsStore.setState({ bashEnabled: snap.bashEnabled });
+  if (snap.bashAlwaysApprove !== undefined) {
+    usePrefsStore.setState({ bashAlwaysApprove: snap.bashAlwaysApprove });
+  }
+  if (snap.bashWorkdir !== undefined) usePrefsStore.setState({ bashWorkdir: snap.bashWorkdir });
 }

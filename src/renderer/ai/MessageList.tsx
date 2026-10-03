@@ -6,6 +6,7 @@ import type { LucideIcon } from "lucide-react";
 import { BookOpen, FileText, List, ScrollText, Search, Sparkles, Wrench } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { AssistantAvatar } from "@renderer/ai/AssistantAvatar";
+import { BashBlock } from "@renderer/ai/BashBlock";
 import { assistantActivity, type AssistantActivity } from "@renderer/ai/assistant-activity";
 import { chipLabel } from "@renderer/ai/chip-label";
 import { useChatActions } from "@renderer/ai/chat-actions";
@@ -305,6 +306,9 @@ function AssistantBubble({
             <LocalizedStreamdown key={i} animated={STREAM_ANIMATION} isAnimating={streaming}>
               {s.text}
             </LocalizedStreamdown>
+          ) : getToolName(s.part) === "bash" ? (
+            // bash 不走灰色单行步骤：渲染为终端块（含审批操作栏，spec 2026-10-03 §6.4）
+            <BashBlock key={i} part={s.part} streaming={streaming} />
           ) : (
             <ToolStepRow key={i} part={s.part} chapters={chapters} streaming={streaming} />
           ),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyzeCommand, parsePattern } from "@main/permissions/command";
+import { analyzeCommand, parsePattern } from "@shared/shell-command";
 import { decide, type PolicyContext } from "@main/permissions/policy";
 
 const rule = (pattern: string) => ({ pattern, tokens: parsePattern(pattern)! });

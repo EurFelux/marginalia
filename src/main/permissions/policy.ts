@@ -1,6 +1,6 @@
 // src/main/permissions/policy.ts —— 判定顺序（spec 2026-10-03 §5.1）。纯函数，命中即停：
 // 拒绝规则 → 总是批准 → 允许规则 → 本会话允许 → 询问。
-import { isTokenPrefix, type CommandAnalysis } from "@main/permissions/command";
+import { isTokenPrefix, type CommandAnalysis } from "@shared/shell-command";
 
 export interface PolicyRule {
   pattern: string;

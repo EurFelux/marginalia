@@ -20,4 +20,6 @@ export const qk = {
   messages: (conversationId: string) => ["messages", conversationId] as const,
   stats: (dailyDays: number) => ["stats", dailyDays] as const,
   memories: ["memories"] as const,
+  permissionRules: ["permission-rules"] as const,
+  bashWorkdir: ["bash-workdir"] as const,
 };

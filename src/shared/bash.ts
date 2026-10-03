@@ -36,3 +36,12 @@ export interface BashCancelledOutput {
 }
 
 export type BashToolOutput = BashRanOutput | BashDeniedOutput | BashCancelledOutput;
+
+/** 设置页展示的工作目录状态。 */
+export interface BashWorkdirInfo {
+  /** 实际生效的路径（自定义或默认工作区）。 */
+  path: string;
+  isDefault: boolean;
+  /** 自定义目录可能已被删除；默认工作区首次使用前也不存在（用时自动创建）。 */
+  exists: boolean;
+}

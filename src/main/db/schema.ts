@@ -315,7 +315,7 @@ export const blob = sqliteTable("blob", {
 });
 
 // 工具权限规则（spec 2026-10-03-bash-skills-permissions-design §5.3）。只由用户在审批操作栏 / 设置页创建，
-// 模型没有任何写入途径。pattern 是规范化后的词前缀（见 @main/permissions/command 的 formatPattern）。
+// 模型没有任何写入途径。pattern 是规范化后的词前缀（见 @shared/shell-command 的 formatPattern）。
 export const permissionRules = sqliteTable(
   "permission_rules",
   {

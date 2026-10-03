@@ -2,7 +2,7 @@
 import { and, asc, eq } from "drizzle-orm";
 import type { DB } from "@main/db/client";
 import { permissionRules } from "@main/db/schema";
-import { formatPattern, parsePattern } from "@main/permissions/command";
+import { formatPattern, parsePattern } from "@shared/shell-command";
 import type {
   AddPermissionRuleInput,
   PermissionRuleDto,

@@ -64,6 +64,7 @@ import { searchBookInput } from "@shared/search";
 import type { MemoryDto } from "@shared/memory";
 import { deleteMemoryInput, updateMemoryInput } from "@shared/memory";
 import type { AvatarPickResult } from "@shared/agent";
+import type { BashWorkdirInfo } from "@shared/bash";
 import type {
   PermissionCancel,
   PermissionRequest,
@@ -407,6 +408,11 @@ export const C = {
     permissionRuleIdInput,
     out<void>(),
   ),
+
+  // bash（命令工作目录；spec 2026-10-03-bash-skills-permissions-design §8）
+  bashWorkdirInfo: def("bash:workdir-info", "invoke", z.void(), out<BashWorkdirInfo>()),
+  bashPickWorkdir: def("bash:pick-workdir", "invoke", z.void(), out<string | null>()),
+  bashOpenWorkdir: def("bash:open-workdir", "invoke", z.void(), out<void>()),
 
   // logging
   logWrite: def("log:write", "invoke", logWriteInput, out<void>()),

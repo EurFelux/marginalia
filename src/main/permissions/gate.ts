@@ -2,12 +2,7 @@
 // 工具的 execute 里 await check()：规则能定的当场返回，定不了的经注入的端口推给渲染层，
 // 挂起直到用户答复、本轮被中止或渲染层重载。不碰 Electron / DB，依赖全部注入。
 import { v7 as uuidv7 } from "uuid";
-import {
-  analyzeCommand,
-  formatPattern,
-  isTokenPrefix,
-  parsePattern,
-} from "@main/permissions/command";
+import { analyzeCommand, formatPattern, isTokenPrefix, parsePattern } from "@shared/shell-command";
 import { decide, type PolicyContext, type PolicyRule } from "@main/permissions/policy";
 import { createLogger } from "@main/logger";
 import type {

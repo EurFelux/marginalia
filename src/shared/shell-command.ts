@@ -1,5 +1,5 @@
-// src/main/permissions/command.ts —— 命令分析：分词、简单/复合判定、拆段、建议前缀
-// （spec 2026-10-03-bash-skills-permissions-design §5.2–§5.4）。纯函数，不碰 Electron / DB。
+// src/shared/shell-command.ts —— 命令分析：分词、简单/复合判定、拆段、建议前缀
+// （spec 2026-10-03-bash-skills-permissions-design §5.2–§5.4）。纯函数，主进程判定与渲染层审批操作栏共用。
 import { parse, quote, type ParseEntry } from "shell-quote";
 
 export interface CommandAnalysis {

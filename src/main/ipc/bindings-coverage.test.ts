@@ -15,6 +15,7 @@ import { memoryBindings } from "@main/ipc/memory-handlers";
 import { agentBindings } from "@main/ipc/agent-handlers";
 import { readingSessionBindings } from "@main/ipc/reading-sessions-handlers";
 import { permissionBindings } from "@main/ipc/permission-handlers";
+import { bashBindings } from "@main/ipc/bash-handlers";
 
 const allBindings = [
   ...appBindings,
@@ -32,6 +33,7 @@ const allBindings = [
   ...agentBindings,
   ...readingSessionBindings,
   ...permissionBindings,
+  ...bashBindings,
 ];
 
 describe("ipc bindings coverage", () => {

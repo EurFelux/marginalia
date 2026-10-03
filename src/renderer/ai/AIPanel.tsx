@@ -12,6 +12,7 @@ import { createIpcChatTransport } from "@renderer/ai/ipc-chat-transport";
 import type { ChatUIMessage } from "@renderer/ai/types";
 import { MessageList } from "@renderer/ai/MessageList";
 import { Composer } from "@renderer/ai/Composer";
+import { AlwaysApproveBar } from "@renderer/ai/AlwaysApproveBar";
 import { ConversationsTab } from "@renderer/ai/ConversationsTab";
 import { messagesToUI } from "@renderer/ai/message-history";
 import {
@@ -402,6 +403,7 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
             </div>
           )}
 
+          <AlwaysApproveBar />
           <Composer status={status} onStop={stop} onSend={handleSend} context={context} />
         </>
       )}

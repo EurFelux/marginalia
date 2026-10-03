@@ -7,6 +7,7 @@ export type SettingsCategory =
   | "agent"
   | "memory"
   | "webSearch"
+  | "commands"
   | "advanced";
 
 interface SettingsState {

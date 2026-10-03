@@ -167,6 +167,12 @@ export function createApi(d: PreloadDeps) {
       setAvatar: inv(C.agentSetAvatar),
     },
 
+    bash: {
+      workdirInfo: inv(C.bashWorkdirInfo),
+      pickWorkdir: inv(C.bashPickWorkdir),
+      openWorkdir: inv(C.bashOpenWorkdir),
+    },
+
     permissions: {
       respond: inv(C.permissionRespond),
       rules: {
