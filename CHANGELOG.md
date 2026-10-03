@@ -1,5 +1,18 @@
 # marginalia
 
+## 0.21.0
+
+### Minor Changes
+
+- cb9eb07: Auto-scroll in the reader. Click the new double-chevron button in the reader header to scroll the book at a steady pace, teleprompter-style, for hands-free reading. A floating bar lets you pause, resume, stop, and change the speed from 0.1× to 2.0× (remembered across sessions). Auto-scroll pauses as soon as you scroll, click, or press a key in the text, jump to a chapter, annotation, or search result, or resize the window enough to reflow the text; it stops by itself at the end of the book and when you start reading aloud. Works for ePub and PDF.
+
+### Patch Changes
+
+- a0e67d5: Keep your place in ePub books when the light/dark theme switches (including automatic switches that follow the system appearance). Previously a theme change could jump the reader elsewhere in the book and save that wrong position as your progress.
+- 53123b5: Fix the ePub reader jumping back about two screens on the first scroll after reopening a book, which then saved that wrong spot as your progress.
+- de9e3f0: Fix sudden jumps in ePub books when scrolling back up, or while reading, caused by sections above the screen finishing loading late (images, fonts) and pushing the text down.
+- 0cb33a3: Keep your place in ePub books when the text reflows — after changing font size, line spacing, column width or typeface, or resizing the window. The reader now returns to the paragraph you were reading instead of drifting elsewhere, and no longer saves the drifted position as your progress.
+
 ## 0.20.0
 
 ### Minor Changes
@@ -224,6 +237,7 @@
 - d6a5e93: You can now edit a book's title and author right from the library: right-click a book cover and choose "Edit details". This finally gives you a way to clean up messy metadata from repackaged files (site-suffixed titles, garbled authors) or name books that imported without a title — no more deleting and re-importing. Leaving the author field empty shows the book as "Unknown author"; titles can't be empty. Changes show up immediately on the library card and inside the reader.
 - 2065af2: Conversations in the sidebar can now be deleted — right-click one or hover and hit the trash icon, then confirm. Deleting the conversation you're currently in clears the AI panel back to a fresh-start state, and if the AI is mid-reply for it, the stream is stopped cleanly. All of the conversation's messages are removed with it.
 - d10e0dd: Add a "Continue reading" shelf, manual library ordering, and reading progress display
+
   - **Continue reading shelf**: the library now shows your 3 most recently read books above the grid, as info cards with cover, title, author, and a reading progress bar. Click a card to jump back in. The shelf hides itself until you've read something.
   - **Drag to reorder**: rearrange books in the library grid by dragging. Your custom order persists; newly imported books land at the front.
   - **Reading progress in the reader**: the header breadcrumb now shows how far you are — a percentage for ePubs, page numbers plus percentage for PDFs (e.g. `12 / 304 · 4%`).
