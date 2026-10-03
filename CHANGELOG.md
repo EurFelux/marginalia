@@ -1,5 +1,12 @@
 # marginalia
 
+## 0.22.0
+
+### Minor Changes
+
+- 5766e2e: Add skills: reusable instructions (in the Agent Skills `SKILL.md` format) that teach the AI how to do a specific task. When a task matches a skill, the AI reads its instructions before acting, and any scripts that come with it run as commands that still need your approval. Manage them in Settings › Skills: turn each one on or off, open its folder, or move it to the Trash. You can import skills you already have in `~/.agents/skills` and `~/.claude/skills`; importing copies them into the app, and you're asked before an import replaces a skill of the same name. Skills meant to be invoked by hand aren't supported yet and show as unavailable.
+- fb34b13: The AI can now run shell commands on your computer, so it can work with your own scripts and other tools. It's on by default, and no command runs without your say-so: each one waits for your approval in the conversation, where you can allow it once, allow commands that start the same way for the rest of the conversation, or always allow them as a saved rule. Deny a command, optionally with a reason, and the AI won't retry it. Commands with `;`, `|`, `&&` and similar always ask unless you turn on "Always approve", and deny rules you add block a command even then. Commands run in a workspace folder you can change, see the same tools as your terminal (Homebrew, nvm, mise and so on), and stop after a timeout or when you press Stop. You can turn all of this off in Settings › Commands.
+
 ## 0.21.1
 
 ### Patch Changes
