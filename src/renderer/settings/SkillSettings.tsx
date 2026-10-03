@@ -13,6 +13,7 @@ import { formatList } from "@renderer/lib/list-format";
 import { Button } from "@renderer/components/ui/button";
 import { Checkbox } from "@renderer/components/ui/checkbox";
 import { Switch } from "@renderer/components/ui/switch";
+import { ScrollArea } from "@renderer/components/ui/scroll-area";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -392,45 +393,53 @@ function ImportSkills() {
             : t("settings.skills.noCandidates", "{{sources}} 里都没有找到技能。", { sources })}
         </p>
       ) : (
-        <ul className="divide-y divide-border rounded-md border border-border">
-          {list.map((c) => {
-            const id = `skill-import-${c.source}`;
-            const can = selectable(c);
-            return (
-              <li
-                key={c.source}
-                className={cn("flex items-start gap-3 px-3 py-2", !can && "opacity-60")}
-              >
-                <Checkbox
-                  id={id}
-                  checked={can && selected.includes(c.source)}
-                  disabled={!can}
-                  onCheckedChange={(checked) => toggle(c.source, checked)}
-                  className="mt-0.5"
-                />
-                <label htmlFor={id} className={cn("min-w-0 flex-1", can && "cursor-pointer")}>
-                  <span className="flex items-center gap-2">
-                    <span className="truncate font-mono text-xs font-medium">{c.name}</span>
-                    <StatusTag candidate={c} />
-                  </span>
-                  {c.description && (
-                    <span className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground">
-                      {c.description}
+        <ScrollArea
+          className="overflow-hidden rounded-md border border-border"
+          viewportClassName="max-h-96"
+        >
+          {/* 候选可能有几十个：放进限高的滚动容器，不把整页撑得很长。 */}
+          <ul className="divide-y divide-border">
+            {list.map((c) => {
+              const id = `skill-import-${c.source}`;
+              const can = selectable(c);
+              return (
+                <li
+                  key={c.source}
+                  className={cn("flex items-start gap-3 px-3 py-2", !can && "opacity-60")}
+                >
+                  <Checkbox
+                    id={id}
+                    checked={can && selected.includes(c.source)}
+                    disabled={!can}
+                    onCheckedChange={(checked) => toggle(c.source, checked)}
+                    className="mt-0.5"
+                  />
+                  <label htmlFor={id} className={cn("min-w-0 flex-1", can && "cursor-pointer")}>
+                    <span className="flex items-center gap-2">
+                      <span className="truncate font-mono text-xs font-medium">{c.name}</span>
+                      <StatusTag candidate={c} />
                     </span>
-                  )}
-                  <span
-                    className="mt-0.5 block truncate font-mono text-[10px] text-muted-foreground/70"
-                    title={c.foundAt.join("\n")}
-                  >
-                    {c.foundAt[0]}
-                    {c.foundAt.length > 1 &&
-                      t("settings.skills.alsoAt", " 等 {{count}} 处", { count: c.foundAt.length })}
-                  </span>
-                </label>
-              </li>
-            );
-          })}
-        </ul>
+                    {c.description && (
+                      <span className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground">
+                        {c.description}
+                      </span>
+                    )}
+                    <span
+                      className="mt-0.5 block truncate font-mono text-[10px] text-muted-foreground/70"
+                      title={c.foundAt.join("\n")}
+                    >
+                      {c.foundAt[0]}
+                      {c.foundAt.length > 1 &&
+                        t("settings.skills.alsoAt", " 等 {{count}} 处", {
+                          count: c.foundAt.length,
+                        })}
+                    </span>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+        </ScrollArea>
       )}
 
       <AlertDialog open={confirmOverwrite} onOpenChange={setConfirmOverwrite}>
