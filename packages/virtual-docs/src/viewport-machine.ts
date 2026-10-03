@@ -183,6 +183,15 @@ export function reduceViewport(state: ViewportState, event: ViewportEvent): View
 }
 
 /**
+ * 此刻能否把视口交给用户（如自动滚动开始）：没有进行中的定位，或其目标已对齐过（最近一次 tick 已对齐）。
+ * 目标首次对齐前接管会取消整个定位、视口停在 section 顶；对齐之后再接管只取消收敛窗口的尾巴——
+ * 深处开书的顶部预挂载锁定、上方 section 高度暂存，目标对齐后不会再被推走。
+ */
+export function canClaimViewport(state: ViewportState): boolean {
+  return state.phase.kind !== "aligning" || state.phase.streak >= 1;
+}
+
+/**
  * 深处冷启且顶部预挂载未解锁时禁用顶部预挂载：上方 section 的迟到测高会推走恢复目标。
  * 用户第一次向上滚或发生用户级跳转后永久恢复双向 overscan。
  */

@@ -14,6 +14,7 @@ import {
   type ReadingPositionState,
 } from "./reading-position-machine";
 import { ttsController } from "./tts/tts-controller";
+import { autoScrollController } from "./auto-scroll/auto-scroll-controller";
 import { searchHitElement } from "./epub-search";
 
 const log = createLogger("epub");
@@ -99,8 +100,9 @@ export function useReadingPosition({
         else vRef.current?.scrollToIndex(target.index);
         return;
       }
-      case "notifyTtsUserNavigation":
+      case "notifyUserNavigation":
         ttsController.notifyUserNavigation();
+        autoScrollController.notifyUserNavigation();
         return;
       case "reportPosition":
         setReadingPercent(effect.position.percent);

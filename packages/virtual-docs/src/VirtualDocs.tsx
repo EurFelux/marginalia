@@ -10,6 +10,7 @@ import {
   topVisibleSection,
 } from "./precision";
 import {
+  canClaimViewport,
   initialViewportState,
   overscanTop,
   reduceViewport,
@@ -60,6 +61,16 @@ export interface VirtualDocsHandle {
   redecorate: () => void;
   /** 真实滚动容器；消费方做视口几何计算时用，避免全局选择器耦合。 */
   getScrollerElement: () => HTMLElement | null;
+  /**
+   * 此刻接管视口是否安全：没有进行中的定位，或其目标已对齐过。目标首次对齐前接管会取消整个定位
+   * （开书恢复停在 section 顶）。调用方应等它为 true 再 claimViewport。
+   */
+  canClaimViewport: () => boolean;
+  /**
+   * 宣告用户接管视口（如自动滚动开始 / 继续）：取消进行中的定位收敛，效果同一次向下的滚动输入。
+   * 不解锁顶部预挂载、不写入暂存高度，也不回调 onUserNavigation——调用方自己知道这次接管。
+   */
+  claimViewport: () => void;
 }
 
 export interface VirtualDocsProps {
@@ -238,8 +249,11 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
     const el = doc && docRoot && docRoot.scrollHeight > 0 ? resolveEl(doc) : null;
     if (!el || !docRoot || !frame) return { aligned: false, offset: null };
     const offset = el.getBoundingClientRect().top - docRoot.getBoundingClientRect().top;
-    const delta = frame.getBoundingClientRect().top + offset - scroller.getBoundingClientRect().top;
-    return { aligned: Math.abs(delta) <= 4, offset };
+    const frameRect = frame.getBoundingClientRect();
+    const delta = frameRect.top + offset - scroller.getBoundingClientRect().top;
+    // 目标须在 iframe 当前高度之内：section 尚未撑到真高时，元素几何上可能已在视口顶，却被 iframe
+    // 裁掉，屏幕上显示的是下一个 section。这不算对齐（canClaimViewport 据此判断能否接管视口）。
+    return { aligned: Math.abs(delta) <= 4 && offset < frameRect.height, offset };
   }, []);
 
   const runViewportEffect = (effect: ViewportEffect) => {
@@ -280,7 +294,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
     }
   };
 
-  const [viewport, raise] = useMachine(
+  const [viewport, raise, getViewport] = useMachine(
     reduceViewport,
     initialViewportState(initialIndex ?? 0),
     runViewportEffect,
@@ -317,8 +331,10 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
       scrollToSectionElement,
       redecorate: () => setDecorateNonce((n) => n + 1),
       getScrollerElement: () => scrollerEl.current,
+      canClaimViewport: () => canClaimViewport(getViewport()),
+      claimViewport: () => raise({ type: "USER_INPUT", scrollIntent: true, upward: false }),
     };
-  }, [raise]);
+  }, [raise, getViewport]);
 
   const ioSupported = typeof IntersectionObserver !== "undefined";
 

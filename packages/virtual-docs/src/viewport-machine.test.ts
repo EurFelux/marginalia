@@ -3,6 +3,7 @@ import {
   ALIGN_MAX_ATTEMPTS,
   ALIGN_MINIMUM_ATTEMPTS,
   ALIGN_SUCCESSES_REQUIRED,
+  canClaimViewport,
   initialViewportState,
   overscanTop,
   reduceViewport,
@@ -225,5 +226,27 @@ describe("reduceViewport", () => {
       upward: true,
     }).next;
     expect(overscanTop(owned, 40, 2400)).toBe(2400);
+  });
+});
+
+describe("canClaimViewport", () => {
+  const userInput: ViewportEvent = { type: "USER_INPUT", scrollIntent: true, upward: false };
+
+  it("allows claiming when nothing is being aligned", () => {
+    expect(canClaimViewport(initialViewportState(40))).toBe(true);
+    const owned = reduceViewport(initialViewportState(40), userInput).next;
+    expect(canClaimViewport(owned)).toBe(true);
+  });
+
+  it("waits until the alignment target has been reached once", () => {
+    const started = reduceViewport(initialViewportState(40), align).next;
+    expect(canClaimViewport(started)).toBe(false);
+    expect(canClaimViewport(tick(started, 3, false))).toBe(false);
+    expect(canClaimViewport(tick(started, 1, true))).toBe(true);
+  });
+
+  it("waits again if the target drifts away before the alignment settles", () => {
+    const started = reduceViewport(initialViewportState(40), align).next;
+    expect(canClaimViewport(tick(tick(started, 2, true), 1, false))).toBe(false);
   });
 });

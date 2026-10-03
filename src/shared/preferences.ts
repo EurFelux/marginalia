@@ -94,6 +94,15 @@ export type TtsPrefs = z.infer<typeof ttsPrefsSchema>;
 export const DEFAULT_TTS_PREFS: TtsPrefs = { rate: 1, voiceByLang: {} };
 
 /**
+ * 阅读器自动滚动速度档位（ePub / PDF 共用）：整数，10 = 1.0×，每档 0.1×。存整数档位而非浮点倍率，
+ * 落盘与运算都没有浮点误差。schema 只校验正整数，上下限归渲染层夹住（auto-scroll.ts 的 clampSpeedLevel）。
+ */
+export const autoScrollSpeedSchema = z.number().int().positive();
+
+/** autoScrollSpeed 出厂值：10 档 = 1.0×。 */
+export const DEFAULT_AUTO_SCROLL_SPEED = 10;
+
+/**
  * 可持久化用户偏好的单一源：key → 值 Zod schema。
  * 新增偏好＝在此注册一个 key + schema；DB / 服务 / IPC / 类型全部据此推导。
  */
@@ -119,6 +128,7 @@ export const PREFERENCE_SCHEMAS = {
   avatarBlobId: z.string().nullable(),
   webSearch: webSearchConfig,
   webSearchEnabled: z.boolean(),
+  autoScrollSpeed: autoScrollSpeedSchema,
 } as const;
 
 export type PreferenceKey = keyof typeof PREFERENCE_SCHEMAS;
@@ -158,5 +168,6 @@ export const setPreferenceInput = z.discriminatedUnion("key", [
   z.object({ key: z.literal("avatarBlobId"), value: z.string().nullable() }),
   z.object({ key: z.literal("webSearch"), value: webSearchConfig }),
   z.object({ key: z.literal("webSearchEnabled"), value: z.boolean() }),
+  z.object({ key: z.literal("autoScrollSpeed"), value: autoScrollSpeedSchema }),
 ]);
 export type SetPreferenceInput = z.infer<typeof setPreferenceInput>;

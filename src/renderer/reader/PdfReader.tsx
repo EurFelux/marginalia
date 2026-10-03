@@ -32,6 +32,7 @@ import type { PdfPageAnno } from "./pdf-annotations";
 import { hitHighlight, useTextLayerRects } from "./use-pdf-highlights";
 import { useSearchStore } from "@renderer/store/search-store";
 import { useNoteHoverStore } from "@renderer/store/note-hover-store";
+import { autoScrollController } from "./auto-scroll/auto-scroll-controller";
 
 const log = createLogger("pdf");
 
@@ -169,12 +170,21 @@ export function PdfReader({ bookId, chapters, persistProgress }: Props) {
     };
   }, []);
 
+  // 自动滚动：book 就绪即挂接；卸载 / 换书 detach（内部停止）。PDF 跳转是一次性 scrollToIndex、
+  // 没有收敛重试，无需 claimViewport（spec §6）。
+  useEffect(() => {
+    if (!book) return;
+    autoScrollController.attach({ getScroller: () => scrollerRef.current });
+    return () => autoScrollController.detach();
+  }, [book]);
+
   // 跳章：currentChapterId 变化（ChapterList 点击）→ 滚到章起始页。
   useEffect(() => {
     if (!book || currentChapterId == null) return;
     if (currentChapterId === topChapterIdRef.current) return; // 由滚动引起的同步，不回滚
     const ch = chapters.find((c) => c.id === currentChapterId);
     if (ch?.startPage == null) return;
+    autoScrollController.notifyUserNavigation();
     virtuosoRef.current?.scrollToIndex({ index: ch.startPage - 1, align: "start" });
   }, [book, currentChapterId, chapters]);
 
@@ -183,7 +193,9 @@ export function PdfReader({ bookId, chapters, persistProgress }: Props) {
   useEffect(() => {
     if (!book || !scrollCommand) return;
     const r = parsePdfLocatorRange(scrollCommand.locator);
-    if (r) virtuosoRef.current?.scrollToIndex({ index: r.page - 1, align: "start" });
+    if (!r) return;
+    autoScrollController.notifyUserNavigation();
+    virtuosoRef.current?.scrollToIndex({ index: r.page - 1, align: "start" });
   }, [book, scrollCommand]);
 
   // 搜索结果跳转分两步：先把命中所在页滚进渲染范围；该页文本层就绪、量出命中在页内的位置后，
@@ -192,6 +204,7 @@ export function PdfReader({ bookId, chapters, persistProgress }: Props) {
   // effect 里就会回报，layout effect 保证「滚到页」先发、「对齐命中」后发，后者不被覆盖。
   useLayoutEffect(() => {
     if (!book || searchJump?.hit.target.format !== "pdf") return;
+    autoScrollController.notifyUserNavigation();
     virtuosoRef.current?.scrollToIndex({ index: searchJump.hit.target.page - 1, align: "center" });
   }, [book, searchJump]);
   const alignSearchHit = (page: number, centerRatio: number) => {
@@ -525,9 +538,10 @@ export function PdfReader({ bookId, chapters, persistProgress }: Props) {
             searchMarks={searchMarksByPage.get(index + 1) ?? NO_SEARCH_MARKS}
             searchJumpNonce={searchJumpPage === index + 1 ? searchJump!.nonce : null}
             onSearchHitMeasured={(ratio) => alignSearchHit(index + 1, ratio)}
-            onLinkPage={(pageNumber) =>
-              virtuosoRef.current?.scrollToIndex({ index: pageNumber - 1, align: "start" })
-            }
+            onLinkPage={(pageNumber) => {
+              autoScrollController.notifyUserNavigation();
+              virtuosoRef.current?.scrollToIndex({ index: pageNumber - 1, align: "start" });
+            }}
           />
         )}
       />
