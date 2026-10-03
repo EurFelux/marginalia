@@ -14,8 +14,6 @@ export type BashBadge =
   | { kind: "timedOut" }
   | { kind: "aborted" }
   | { kind: "denied"; by: "user" | "rule" }
-  /** 回复已结束却没有结果（异常结束等）。 */
-  | { kind: "notRun" }
   | { kind: "error" };
 
 export interface BashView {
@@ -64,7 +62,9 @@ export function bashView(
   }
   if (part.state !== "output-available") {
     if (request) return { ...base(command, { kind: "pending" }), request };
-    if (!streaming) return base(command, { kind: "notRun" });
+    // 回复已结束却没有结果：几乎都是用户点了停止（等待批准时或运行中），中断整轮后结果来不及回传；
+    // 两种情况此处分不开，统一显示「已中止」。
+    if (!streaming) return base(command, { kind: "aborted" });
     return base(command, part.state === "input-streaming" ? { kind: "none" } : { kind: "running" });
   }
 

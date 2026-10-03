@@ -93,12 +93,6 @@ function Badge({ badge }: { badge: BashBadge }) {
           {t("ai.bash.status.aborted", "已中止")}
         </span>
       );
-    case "notRun":
-      return (
-        <span className={cn(base, "bg-zinc-400/15 text-zinc-300")}>
-          {t("ai.bash.status.notRun", "未执行")}
-        </span>
-      );
     case "error":
       return (
         <span className={cn(base, "bg-red-400/15 text-red-300")}>

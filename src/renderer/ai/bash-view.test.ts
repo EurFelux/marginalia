@@ -51,8 +51,8 @@ describe("bashView", () => {
     });
   });
 
-  it("is not-run when the reply ended without a result", () => {
-    expect(bashView(part("input-available"), undefined, false).badge).toEqual({ kind: "notRun" });
+  it("is aborted when the reply ended without a result (stopped while waiting or running)", () => {
+    expect(bashView(part("input-available"), undefined, false).badge).toEqual({ kind: "aborted" });
   });
 
   it("maps a finished run to ok / failed / timed out / aborted", () => {

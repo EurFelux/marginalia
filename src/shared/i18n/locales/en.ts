@@ -34,7 +34,6 @@ export default {
   "ai.bash.status.denied": "Denied",
   "ai.bash.status.deniedByRule": "Blocked by rule",
   "ai.bash.status.error": "Error",
-  "ai.bash.status.notRun": "Not run",
   "ai.bash.status.pending": "Needs approval",
   "ai.bash.status.running": "Running",
   "ai.bash.status.timedOut": "Timed out",
@@ -490,7 +489,8 @@ export default {
   "settings.commands.ruleAddFailed": "Couldn't add the rule: {{message}}",
   "settings.commands.ruleDelete": "Delete rule {{pattern}}",
   "settings.commands.ruleDeleteFailed": "Couldn't delete the rule. Please try again.",
-  "settings.commands.ruleInvalid": "A rule can only be plain words from the start of a command, without ; | & > $ or line breaks",
+  "settings.commands.ruleInvalid":
+    "A rule can only be plain words from the start of a command, without ; | & > $ or line breaks",
   "settings.commands.rulePlaceholder": "Start of a command, e.g. git status or rm",
   "settings.commands.rules": "Rules",
   "settings.commands.rulesDesc":

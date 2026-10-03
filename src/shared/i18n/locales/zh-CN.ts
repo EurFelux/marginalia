@@ -33,7 +33,6 @@ export default {
   "ai.bash.status.denied": "已拒绝",
   "ai.bash.status.deniedByRule": "被规则拒绝",
   "ai.bash.status.error": "出错",
-  "ai.bash.status.notRun": "未执行",
   "ai.bash.status.pending": "等待批准",
   "ai.bash.status.running": "运行中",
   "ai.bash.status.timedOut": "超时",
