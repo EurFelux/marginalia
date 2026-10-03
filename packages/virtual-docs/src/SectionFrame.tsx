@@ -45,6 +45,8 @@ interface Props {
   estimatedHeight?: number;
   /** 内容就绪测得稳定高度、以及之后重测出不同高度时回调（index, heightPx），供 VirtualDocs 写测高缓存。 */
   onMeasured?: (index: number, height: number) => void;
+  /** 写入 iframe 高度（VirtualDocs 借此暂缓视口上方 section 的高度变化）；不传则直接写。 */
+  writeHeight?: (index: number, iframe: HTMLIFrameElement, px: number) => void;
 }
 
 /** 等待图片/字体就绪的整体超时（ms），到时即用当前高度兜底，绝不无限等。 */
@@ -69,6 +71,7 @@ export function SectionFrame({
   onUserScrollNavigation,
   estimatedHeight,
   onMeasured,
+  writeHeight,
   onInternalLink,
   onExternalLink,
   onKeyDown,
@@ -87,6 +90,7 @@ export function SectionFrame({
     onUserScrollNavigation,
     estimatedHeight,
     onMeasured,
+    writeHeight,
     onInternalLink,
     onExternalLink,
     onKeyDown,
@@ -103,6 +107,7 @@ export function SectionFrame({
     onUserScrollNavigation,
     estimatedHeight,
     onMeasured,
+    writeHeight,
     onInternalLink,
     onExternalLink,
     onKeyDown,
@@ -246,6 +251,11 @@ export function SectionFrame({
       doc = null;
       docRef.current = null;
     };
+    const setHeight = (px: number) => {
+      const write = cbRef.current.writeHeight;
+      if (write) write(index, iframe, px);
+      else iframe.style.height = `${px}px`;
+    };
     const onLoad = () => {
       detach();
       doc = iframe.contentDocument;
@@ -254,7 +264,7 @@ export function SectionFrame({
       // srcDoc 构建到 load 之间 paintCss 可能已变（如加载途中切了主题），以最新值为准。
       applyPaintCss(d, paintCssRef.current ?? "");
       // 占位：就绪前先用估高，避免 iframe 默认高度造成的跳变。
-      iframe.style.height = `${cbRef.current.estimatedHeight ?? 0}px`;
+      setHeight(cbRef.current.estimatedHeight ?? 0);
 
       let measuredHeight = 0;
       // 就绪后的重测（栏宽变化、图片晚到等）：高度确有变化才写回并回报，让测高缓存跟上真高——
@@ -263,7 +273,7 @@ export function SectionFrame({
         const h = d.documentElement.scrollHeight;
         if (h === measuredHeight) return;
         measuredHeight = h;
-        iframe.style.height = `${h}px`;
+        setHeight(h);
         cbRef.current.onMeasured?.(index, h);
       };
       let settled = false;
@@ -272,7 +282,7 @@ export function SectionFrame({
         settled = true;
         const h = d.documentElement.scrollHeight;
         measuredHeight = h;
-        iframe.style.height = `${h}px`;
+        setHeight(h);
         cbRef.current.onMeasured?.(index, h);
         // 就绪后才挂 ResizeObserver，服务后续真实内容变化（如改字号偏好），debounce 抑抖。
         ro = new ResizeObserver(() => {
@@ -328,6 +338,9 @@ export function SectionFrame({
   // 回落到估高，视口随之丢失阅读位置（#115）。
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const srcDoc = useMemo(() => buildSrcDoc(html, styleCss, paintCssRef.current), [html, styleCss]);
+  // 只取首次渲染的估高：之后高度一律经 setHeight（→ VirtualDocs.writeHeight）写入。若随 prop 变化，
+  // 测得真高后的下一次重渲会由 React 直接写 DOM，绕过「视口上方暂缓写入」造成无补偿的位移。
+  const initialHeight = useRef(estimatedHeight ?? 0).current;
 
   return (
     <iframe
@@ -338,9 +351,8 @@ export function SectionFrame({
       scrolling="no"
       // height 初值必须随首次渲染就位：iframe 从挂载到 load 事件之间若无 height，会以 Chromium
       // 默认 150px 参与布局——视口上方的 section 重挂时高度瞬时塌缩再恢复，virtuoso 的 scrollTop
-      // 补偿与用户滚动竞争，正是「向上翻大跳」的主根因。load 后由 measure 手写真高接管（React
-      // 仅在 estimatedHeight 值变化时重写该属性，且届时缓存值已等于真高，不会回退）。
-      style={{ width: "100%", border: 0, display: "block", height: estimatedHeight ?? 0 }}
+      // 补偿与用户滚动竞争，正是「向上翻大跳」的主根因。load 后由 setHeight 手写真高接管。
+      style={{ width: "100%", border: 0, display: "block", height: initialHeight }}
     />
   );
 }

@@ -174,6 +174,13 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
   const [scrollerReady, setScrollerReady] = useState(0);
 
   const heightCache = useRef<Map<number, number>>(new Map());
+  /**
+   * 未测量 section 的估高在首次算出时冻结：calibratedEstimate 随已测样本漂移，若占位 / iframe 初始高度
+   * 随之在挂载后改变，就是一次没有补偿的位移。测得真高后以 heightCache 为准。
+   */
+  const frozenEstimates = useRef<Map<number, number>>(new Map());
+  /** 视口上方 section 暂缓写入的 iframe 高度：等用户上滚（virtuoso 会补偿）或该 section 进入视口时再写。 */
+  const pendingHeights = useRef<Map<number, { iframe: HTMLIFrameElement; px: number }>>(new Map());
   // 已 unload 的 section 集：避免重复 unload；section 重新进入保留区时移除（届时会 reload）。
   const unloaded = useRef<Set<number>>(new Set());
   const observedEls = useRef<Map<number, HTMLElement>>(new Map());
@@ -191,6 +198,15 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
       const r = el.getBoundingClientRect();
       return { index, top: r.top, bottom: r.bottom };
     });
+    // 暂存高度的 section 若已不在视口上方（跳转 / 重排使其进入视口），立即写入；已卸载的丢弃。
+    for (const [i, pending] of pendingHeights.current) {
+      const el = observedEls.current.get(i);
+      if (!el || !pending.iframe.isConnected) pendingHeights.current.delete(i);
+      else if (el.getBoundingClientRect().bottom > vt + 1) {
+        pending.iframe.style.height = `${pending.px}px`;
+        pendingHeights.current.delete(i);
+      }
+    }
     const section = topVisibleSection(secs, vt);
     if (section) raise({ type: "VISIBLE_TOP_CHANGED", index: section.index });
     if (section && (section.index !== lastTop.current || force)) {
@@ -324,7 +340,10 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
   }, [raise]);
   const handleUserScrollNavigation = useCallback(
     (e: Event) => {
-      raise({ type: "USER_INPUT", scrollIntent: true, upward: isUpwardScrollIntent(e) });
+      const upward = isUpwardScrollIntent(e);
+      // 先于浏览器滚动写入暂存高度：随后的上滚事件让 virtuoso 补偿这批尺寸变化。
+      if (upward) flushPendingHeights();
+      raise({ type: "USER_INPUT", scrollIntent: true, upward });
       onUserNavigationRef.current?.();
     },
     [raise],
@@ -405,6 +424,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
     if (prevStyleCss.current === styleCss) return;
     prevStyleCss.current = styleCss;
     heightCache.current.clear();
+    frozenEstimates.current.clear();
     onReflowRef.current?.("style");
   }, [styleCss]);
 
@@ -428,12 +448,56 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
   const onMeasured = useCallback((i: number, h: number) => {
     const prev = heightCache.current.get(i);
     heightCache.current.set(i, h);
+    frozenEstimates.current.delete(i);
     // 宽度变化窗口内首个高度变化 = 文字确实重排了；每个窗口只报一次（拖动窗口时连续布防，下游幂等）。
     if (prev !== undefined && prev !== h && performance.now() < widthReflowDeadline.current) {
       widthReflowDeadline.current = 0;
       onReflowRef.current?.("width");
     }
   }, []);
+  // section 整段位于视口线以上时，它的高度变化会把视口内容整体推移。virtuoso 只在用户正向上滚的瞬间
+  // 补偿这类变化（最后一次滚动事件 50ms 后它把方向重置为 none），而 section 高度是异步到达的（iframe
+  // 载入、图片解码、重测），常落在窗口之外。自己补偿会与它的启发式打架（其补偿后的 200ms 内任何滚动
+  // 都会让它再补一次），故不抢：上方 section 的新高度先暂存，等用户上滚（输入事件先于滚动，virtuoso
+  // 随后补偿）或该 section 进入视口时再写。上方内容不可见，暂用旧高度无妨。
+  const writeHeight = useCallback((index: number, iframe: HTMLIFrameElement, px: number) => {
+    const scroller = scrollerEl.current;
+    const outer = observedEls.current.get(index);
+    const above =
+      scroller != null &&
+      outer != null &&
+      outer.getBoundingClientRect().bottom <= scroller.getBoundingClientRect().top + 1;
+    if (above) {
+      pendingHeights.current.set(index, { iframe, px });
+      return;
+    }
+    pendingHeights.current.delete(index);
+    iframe.style.height = `${px}px`;
+  }, []);
+
+  const flushPendingHeights = useCallback(() => {
+    const pending = pendingHeights.current;
+    if (pending.size === 0) return;
+    for (const { iframe, px } of pending.values()) iframe.style.height = `${px}px`;
+    pending.clear();
+  }, []);
+
+  const estimateFor = (index: number): number => {
+    const cached = heightCache.current.get(index);
+    if (cached != null) return cached;
+    const frozen = frozenEstimates.current.get(index);
+    if (frozen != null) return frozen;
+    const estimate = calibratedEstimate(
+      heightCache.current,
+      sectionWeight,
+      index,
+      DEFAULT_ESTIMATE,
+      initialPxPerWeight,
+    );
+    frozenEstimates.current.set(index, estimate);
+    return estimate;
+  };
+
   const itemContent = useCallback(
     (index: number) => (
       <LazySection
@@ -455,14 +519,9 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
         onInternalLink={onInternalLink}
         onExternalLink={onExternalLink}
         onKeyDown={onKeyDown}
-        estimatedHeight={calibratedEstimate(
-          heightCache.current,
-          sectionWeight,
-          index,
-          DEFAULT_ESTIMATE,
-          initialPxPerWeight,
-        )}
+        estimatedHeight={estimateFor(index)}
         onMeasured={onMeasured}
+        writeHeight={writeHeight}
         registerSection={registerSection}
         unregisterSection={unregisterSection}
       />
@@ -489,6 +548,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
       onExternalLink,
       onKeyDown,
       onMeasured,
+      writeHeight,
       registerSection,
       unregisterSection,
     ],
@@ -544,6 +604,7 @@ function LazySection({
   onKeyDown,
   estimatedHeight,
   onMeasured,
+  writeHeight,
   registerSection,
   unregisterSection,
 }: {
@@ -567,6 +628,7 @@ function LazySection({
   onKeyDown?: (e: KeyboardEvent) => void;
   estimatedHeight?: number;
   onMeasured?: (index: number, height: number) => void;
+  writeHeight?: (index: number, iframe: HTMLIFrameElement, px: number) => void;
   registerSection: (index: number, el: HTMLElement) => void;
   unregisterSection: (index: number, el: HTMLElement) => void;
 }) {
@@ -622,6 +684,7 @@ function LazySection({
           onKeyDown={onKeyDown}
           estimatedHeight={estimatedHeight}
           onMeasured={onMeasured}
+          writeHeight={writeHeight}
         />
       )}
     </div>
