@@ -15,9 +15,9 @@ Marginalia 是一个基于 Electron + React 的桌面 AI 阅读器，支持 ePub
 pnpm dev            # 启动 Electron 开发模式（会阻塞）
 pnpm package        # 打包
 pnpm make           # 制作分发包
-pnpm release        # 发布到 GitHub Release（draft+prerelease；发布前先 pnpm changeset version，发完跑 pnpm release:notes。token 现取自 gh keyring。注意 pnpm publish 是 pnpm 内置命令＝发 npm，勿用）
+pnpm release        # 发布到 GitHub Release（直接发 Latest；token 现取自 gh keyring）。只是发版的一步，发版一律走 release skill（见下）。注意 pnpm publish 是 pnpm 内置命令＝发 npm，勿用
 pnpm changeset      # 合并分支前写一条用户向英文 changelog 条目（合并前收尾步骤之一；用户不可见的分支不写）
-pnpm release:notes  # 从 CHANGELOG.md 抽当前版本段填进 GitHub Release draft 的 notes（--dry-run 仅打印不调 gh）
+pnpm release:notes  # 从 CHANGELOG.md 抽当前版本段填进 GitHub Release 的 notes（--dry-run 仅打印不调 gh）
 
 # 类型检查 / Lint / 格式化
 pnpm typecheck      # tsc --noEmit
@@ -42,6 +42,8 @@ pnpm i18n:status    # 翻译覆盖率概览
 pnpm db:generate    # drizzle-kit generate（修改 schema 后生成迁移）
 pnpm db:rebuild:electron  # 将 better-sqlite3 编译为 Electron ABI（已由 postinstall 自动跑，一般无需手动）
 ```
+
+**发版一律走 `release` skill**（`.claude/skills/release`）：用户说「发版」「出一版」「更新 tap」等即调用，按其六步走完——changeset version → format → 提交 → **先 push main** → `pnpm release` + `release:notes` → 更新 Homebrew tap。顺序敏感，且 tap 不更新则 `brew upgrade` 拿不到新版；别只照上面的单条命令拼流程。
 
 ## 关键注意事项（坑）
 
