@@ -500,7 +500,7 @@ export default {
   "settings.commands.workdirDesc":
     "Every command starts in this folder. By default it's the app's own workspace.",
   "settings.commands.workdirMissing": "Folder not found",
-  "settings.commands.workdirOpen": "Show in Finder",
+  "settings.commands.workdirOpen": "Open folder",
   "settings.commands.workdirPick": "Choose folder…",
   "settings.commands.workdirReset": "Use default",
   "settings.dark": "Dark",

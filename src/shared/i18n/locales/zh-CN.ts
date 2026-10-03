@@ -469,7 +469,7 @@ export default {
   "settings.commands.workdirDefault": "默认",
   "settings.commands.workdirDesc": "每条命令都从这个文件夹开始执行。默认是应用自己的工作区。",
   "settings.commands.workdirMissing": "文件夹不存在",
-  "settings.commands.workdirOpen": "在访达中打开",
+  "settings.commands.workdirOpen": "打开文件夹",
   "settings.commands.workdirPick": "选择文件夹…",
   "settings.commands.workdirReset": "恢复默认",
   "settings.dark": "深色",

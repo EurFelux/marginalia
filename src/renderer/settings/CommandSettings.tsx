@@ -181,7 +181,7 @@ function WorkdirRow() {
           </Button>
         )}
         <Button type="button" variant="ghost" size="sm" onClick={() => void open()}>
-          {t("settings.commands.workdirOpen", "在访达中打开")}
+          {t("settings.commands.workdirOpen", "打开文件夹")}
         </Button>
       </div>
     </div>
