@@ -43,7 +43,7 @@ describe("reduceReadingPosition", () => {
       locator: null,
       targetIndex: null,
     });
-    expect(next).toEqual({ kind: "following" });
+    expect(next).toEqual({ kind: "following", last: null });
     expect(effects).toEqual([]);
   });
 
@@ -53,7 +53,7 @@ describe("reduceReadingPosition", () => {
       locator: "epubcfi(/6/999!/4)",
       targetIndex: null,
     });
-    expect(next).toEqual({ kind: "following" });
+    expect(next).toEqual({ kind: "following", last: null });
     expect(effects).toEqual([]);
   });
 
@@ -68,7 +68,8 @@ describe("reduceReadingPosition", () => {
     for (const result of ["settled", "timeout", "cancelled"] as const) {
       const restoring = reduceReadingPosition(initialReadingPositionState(), ready).next;
       const { next } = reduceReadingPosition(restoring, { type: "RESTORE_FINISHED", result });
-      expect(next).toEqual({ kind: "following" });
+      // 恢复结束即以恢复目标为锚：还没滚动就重排时也有处可回。
+      expect(next).toEqual({ kind: "following", last: { cfi: "epubcfi(/6/24!/4)", index: 11 } });
     }
   });
 
@@ -97,7 +98,7 @@ describe("reduceReadingPosition", () => {
   it("hands control to the user mid-restore", () => {
     const restoring = reduceReadingPosition(initialReadingPositionState(), ready).next;
     const { next } = reduceReadingPosition(restoring, { type: "USER_NAVIGATED" });
-    expect(next).toEqual({ kind: "following" });
+    expect(next).toEqual({ kind: "following", last: { cfi: "epubcfi(/6/24!/4)", index: 11 } });
   });
 
   it("ignores navigation requests while loading", () => {
@@ -120,7 +121,7 @@ describe("reduceReadingPosition", () => {
       type: "CHAPTER_REQUESTED",
       chapterId: "ch-2",
     });
-    expect(next).toEqual({ kind: "following" });
+    expect(next).toEqual({ kind: "following", last: null });
     expect(effects).toEqual([
       { kind: "notifyTtsUserNavigation" },
       { kind: "scrollToChapter", chapterId: "ch-2" },
@@ -132,7 +133,7 @@ describe("reduceReadingPosition", () => {
       type: "ANNOTATION_SCROLL",
       locator: "epubcfi(/6/8!/4/2)",
     });
-    expect(next).toEqual({ kind: "following" });
+    expect(next).toEqual({ kind: "following", last: null });
     expect(effects).toEqual([
       { kind: "notifyTtsUserNavigation" },
       { kind: "scrollToAnnotation", locator: "epubcfi(/6/8!/4/2)" },
@@ -146,7 +147,7 @@ describe("reduceReadingPosition", () => {
       type: "SEARCH_HIT_REQUESTED",
       ...hit,
     });
-    expect(next).toEqual({ kind: "following" });
+    expect(next).toEqual({ kind: "following", last: null });
     expect(effects).toEqual([
       { kind: "notifyTtsUserNavigation" },
       { kind: "scrollToSearchHit", ...hit },
@@ -169,5 +170,74 @@ describe("reduceReadingPosition", () => {
     const { next, effects } = reduceReadingPosition(following(), { type: "BOOK_CHANGED" });
     expect(next).toEqual({ kind: "loading" });
     expect(effects).toEqual([]);
+  });
+});
+
+describe("re-anchoring after reflow", () => {
+  const reading = () =>
+    reduceReadingPosition(following(), { type: "TOP_SECTION_CHANGED", position }).next;
+
+  it("remembers the last position while following", () => {
+    expect(reading()).toEqual({
+      kind: "following",
+      last: { cfi: position.cfi, index: position.index },
+    });
+  });
+
+  it("keeps the previous anchor when the new position has no CFI", () => {
+    const blank = { ...position, index: 13, cfi: null };
+    const { next } = reduceReadingPosition(reading(), {
+      type: "TOP_SECTION_CHANGED",
+      position: blank,
+    });
+    expect(next).toEqual(reading());
+  });
+
+  it("re-aligns to the pre-reflow position without persisting the transients", () => {
+    const { next, effects } = reduceReadingPosition(reading(), { type: "REFLOWED" });
+    expect(next).toEqual({ kind: "restoring", targetIndex: 12, locator: position.cfi });
+    expect(effects).toEqual([{ kind: "restoreToCfi", locator: position.cfi, targetIndex: 12 }]);
+
+    // 重排途中视口顶报来的中间位置：只上报、不存盘、不改目标。
+    const transient = { ...position, index: 40, cfi: "epubcfi(/6/82!/4/2)" };
+    const during = reduceReadingPosition(next, {
+      type: "TOP_SECTION_CHANGED",
+      position: transient,
+    });
+    expect(during.next).toBe(next);
+    expect(during.effects).toEqual([{ kind: "reportPosition", position: transient }]);
+  });
+
+  it("lets the in-flight alignment absorb a reflow during restore", () => {
+    // 收敛逐 tick 重测目标元素；重发会让上一轮以 cancelled 收场、提前结束 restoring。
+    const restoring = reduceReadingPosition(reading(), { type: "REFLOWED" }).next;
+    const { next, effects } = reduceReadingPosition(restoring, { type: "REFLOWED" });
+    expect(next).toBe(restoring);
+    expect(effects).toEqual([]);
+  });
+
+  it("returns to following anchored at the target once re-aligned", () => {
+    const restoring = reduceReadingPosition(reading(), { type: "REFLOWED" }).next;
+    const { next } = reduceReadingPosition(restoring, {
+      type: "RESTORE_FINISHED",
+      result: "settled",
+    });
+    expect(next).toEqual(reading());
+  });
+
+  it("ignores a reflow before any position is known", () => {
+    const loading = initialReadingPositionState();
+    expect(reduceReadingPosition(loading, { type: "REFLOWED" })).toEqual({
+      next: loading,
+      effects: [],
+    });
+    const jumped = reduceReadingPosition(following(), {
+      type: "CHAPTER_REQUESTED",
+      chapterId: "ch-2",
+    }).next;
+    expect(reduceReadingPosition(jumped, { type: "REFLOWED" })).toEqual({
+      next: jumped,
+      effects: [],
+    });
   });
 });

@@ -32,6 +32,11 @@ const KEEP_DISTANCE = 5;
 const OVERSCAN_PX = { top: 2400, bottom: 2400 };
 /** 收敛重试间隔（ms）。 */
 const ALIGN_TICK_MS = 100;
+/**
+ * 滚动容器宽度变化后，等待 section 重测出新高度的窗口（ms）。SectionFrame 的重测有 100ms debounce，
+ * 1s 足够覆盖；窗口内无高度变化 = 正文栏被 maxWidth 卡住、文字没重排，不上报。
+ */
+const WIDTH_REFLOW_WINDOW_MS = 1000;
 
 export interface VirtualDocsHandle {
   /** 滚到第 index 个 section 顶（无收敛重试）。 */
@@ -95,6 +100,13 @@ export interface VirtualDocsProps {
   onContentMouseDown?: () => void;
   /** 用户直接操作滚动区时触发；消费方可据此放弃尚未完成的位置恢复。 */
   onUserNavigation?: () => void;
+  /**
+   * 正文重排时回调：style = styleCss 变化（已清空测高缓存、section 将重载）；width = 滚动容器
+   * 宽度变化且确实有 section 重测出不同高度。像素 scrollTop 不变而内容已移位，消费方据此把视口
+   * 对齐回重排前的内容位置。回调时视口内容尚未因重排而变化（style：新文档未载入；width：在重测
+   * 写回高度的同一时刻同步回调）。
+   */
+  onReflow?: (reason: "style" | "width") => void;
   /** 点 iframe 内站内 <a>（相对路径 / #fragment）时回调；消费方据此 resolve 到 section+anchor 跳转。 */
   onInternalLink?: (e: { index: number; href: string }) => void;
   /** 点 iframe 内外链（http/https/mailto）时回调；消费方开系统浏览器。 */
@@ -127,6 +139,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
     onHighlightLeave,
     onContentMouseDown,
     onUserNavigation,
+    onReflow,
     onInternalLink,
     onExternalLink,
     onKeyDown,
@@ -152,6 +165,10 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
   const raiseRef = useRef<((event: ViewportEvent) => void) | null>(null);
   const onUserNavigationRef = useRef(onUserNavigation);
   onUserNavigationRef.current = onUserNavigation;
+  const onReflowRef = useRef(onReflow);
+  onReflowRef.current = onReflow;
+  /** 宽度变化后等待重测的截止时刻（performance.now()）；0 = 未布防。 */
+  const widthReflowDeadline = useRef(0);
   const [decorateNonce, setDecorateNonce] = useState(0);
   const [scrollerReady, setScrollerReady] = useState(0);
 
@@ -377,14 +394,41 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scrollerReady, ioSupported]);
 
-  // styleCss（排版偏好）变更会改变所有 section 高度 → 整体失效缓存。paintCss 不改高度，不在此列。
+  // styleCss（排版偏好）变更会改变所有 section 高度 → 整体失效缓存并上报重排。paintCss 不改高度，不在此列。
+  // 比对上一值而非依赖 effect 首跑：挂载不是重排。
+  const prevStyleCss = useRef(styleCss);
   useEffect(() => {
+    if (prevStyleCss.current === styleCss) return;
+    prevStyleCss.current = styleCss;
     heightCache.current.clear();
+    onReflowRef.current?.("style");
   }, [styleCss]);
+
+  // 宽度变化只布防；是否真的重排由随后的重测决定（见 onMeasured）。高度变化（如收起顶栏）不重排正文。
+  useEffect(() => {
+    const scroller = scrollerEl.current;
+    if (!scroller || typeof ResizeObserver === "undefined") return;
+    let lastWidth: number | null = null;
+    const ro = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width;
+      if (width == null) return;
+      if (lastWidth != null && Math.abs(width - lastWidth) >= 1)
+        widthReflowDeadline.current = performance.now() + WIDTH_REFLOW_WINDOW_MS;
+      lastWidth = width;
+    });
+    ro.observe(scroller);
+    return () => ro.disconnect();
+  }, [scrollerReady]);
 
   // itemContent 身份每渲染变会让 virtuoso 重渲全部在挂行 → 手动 useCallback 稳定（见上）。
   const onMeasured = useCallback((i: number, h: number) => {
+    const prev = heightCache.current.get(i);
     heightCache.current.set(i, h);
+    // 宽度变化窗口内首个高度变化 = 文字确实重排了；每个窗口只报一次（拖动窗口时连续布防，下游幂等）。
+    if (prev !== undefined && prev !== h && performance.now() < widthReflowDeadline.current) {
+      widthReflowDeadline.current = 0;
+      onReflowRef.current?.("width");
+    }
   }, []);
   const itemContent = useCallback(
     (index: number) => (

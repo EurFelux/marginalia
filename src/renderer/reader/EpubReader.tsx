@@ -406,6 +406,10 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
         onHighlightLeave={leaveHighlight}
         onContentMouseDown={onContentMouseDown}
         onUserNavigation={() => raise({ type: "USER_NAVIGATED" })}
+        onReflow={(reason) => {
+          log.debug("content reflow", reason);
+          raise({ type: "REFLOWED" });
+        }}
         onTransition={(r) => log.debug("viewport transition", r)}
         onInternalLink={onInternalLink}
         onExternalLink={onExternalLink}

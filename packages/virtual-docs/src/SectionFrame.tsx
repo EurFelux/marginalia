@@ -43,7 +43,7 @@ interface Props {
   onKeyDown?: (e: KeyboardEvent) => void;
   /** 就绪前的占位高度（来自 VirtualDocs 测高缓存）；避免就绪前 0/默认高度造成跳变。 */
   estimatedHeight?: number;
-  /** 内容就绪、测得稳定高度后回调（index, heightPx），供 VirtualDocs 写测高缓存。 */
+  /** 内容就绪测得稳定高度、以及之后重测出不同高度时回调（index, heightPx），供 VirtualDocs 写测高缓存。 */
   onMeasured?: (index: number, height: number) => void;
 }
 
@@ -256,14 +256,22 @@ export function SectionFrame({
       // 占位：就绪前先用估高，避免 iframe 默认高度造成的跳变。
       iframe.style.height = `${cbRef.current.estimatedHeight ?? 0}px`;
 
+      let measuredHeight = 0;
+      // 就绪后的重测（栏宽变化、图片晚到等）：高度确有变化才写回并回报，让测高缓存跟上真高——
+      // 否则 section 重挂时先按旧缓存占位、再跳到真高。
       const measure = () => {
-        iframe.style.height = `${d.documentElement.scrollHeight}px`;
+        const h = d.documentElement.scrollHeight;
+        if (h === measuredHeight) return;
+        measuredHeight = h;
+        iframe.style.height = `${h}px`;
+        cbRef.current.onMeasured?.(index, h);
       };
       let settled = false;
       const reportStable = () => {
         if (settled) return;
         settled = true;
         const h = d.documentElement.scrollHeight;
+        measuredHeight = h;
         iframe.style.height = `${h}px`;
         cbRef.current.onMeasured?.(index, h);
         // 就绪后才挂 ResizeObserver，服务后续真实内容变化（如改字号偏好），debounce 抑抖。
