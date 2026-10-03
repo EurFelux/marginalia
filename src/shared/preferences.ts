@@ -129,6 +129,8 @@ export const PREFERENCE_SCHEMAS = {
   webSearch: webSearchConfig,
   webSearchEnabled: z.boolean(),
   autoScrollSpeed: autoScrollSpeedSchema,
+  /** AI 执行命令「总是批准」：默认关（未存 = false）；拒绝规则仍生效（spec 2026-10-03 §5.5）。 */
+  bashAlwaysApprove: z.boolean(),
 } as const;
 
 export type PreferenceKey = keyof typeof PREFERENCE_SCHEMAS;
@@ -169,5 +171,6 @@ export const setPreferenceInput = z.discriminatedUnion("key", [
   z.object({ key: z.literal("webSearch"), value: webSearchConfig }),
   z.object({ key: z.literal("webSearchEnabled"), value: z.boolean() }),
   z.object({ key: z.literal("autoScrollSpeed"), value: autoScrollSpeedSchema }),
+  z.object({ key: z.literal("bashAlwaysApprove"), value: z.boolean() }),
 ]);
 export type SetPreferenceInput = z.infer<typeof setPreferenceInput>;

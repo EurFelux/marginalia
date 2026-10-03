@@ -24,6 +24,7 @@ describe("preferences schemas", () => {
       "autoSummarize",
       "avatarBlobId",
       "backgroundConcurrency",
+      "bashAlwaysApprove",
       "chatModel",
       "colorMode",
       "instructions",

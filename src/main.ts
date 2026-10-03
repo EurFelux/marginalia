@@ -22,6 +22,8 @@ import { registerBackupHandlers } from "@main/ipc/backup-handlers";
 import { registerMemoryHandlers } from "@main/ipc/memory-handlers";
 import { registerAgentHandlers } from "@main/ipc/agent-handlers";
 import { registerReadingSessionHandlers } from "@main/ipc/reading-sessions-handlers";
+import { registerPermissionHandlers } from "@main/ipc/permission-handlers";
+import { getPermissionGate } from "@main/permissions/instance";
 import { initReadingClock, bindWindowToClock } from "@main/stats/clock-wiring";
 import { registerCoverProtocol, registerCoverProtocolScheme } from "@main/library/cover-protocol";
 import { registerMediaProtocol, registerMediaProtocolScheme } from "@main/media/media-protocol";
@@ -116,6 +118,14 @@ const createWindow = () => {
     if (isExternalUrl(url)) void shell.openExternal(url);
   });
 
+  // 渲染层重载 / 崩溃 / 销毁后，挂起的审批请求再也没人能答，一律按拒绝撤销（spec 2026-10-03 §5.6）。
+  const cancelPendingApprovals = () => getPermissionGate().cancelAll();
+  mainWindow.webContents.on("did-start-navigation", ({ isMainFrame, isSameDocument }) => {
+    if (isMainFrame && !isSameDocument) cancelPendingApprovals();
+  });
+  mainWindow.webContents.on("render-process-gone", cancelPendingApprovals);
+  mainWindow.webContents.on("destroyed", cancelPendingApprovals);
+
   bindWindowToClock(mainWindow);
 
   // Open the DevTools.
@@ -158,6 +168,7 @@ app.on("ready", async () => {
   registerPreferenceHandlers();
   registerAgentHandlers();
   registerAiHandlers();
+  registerPermissionHandlers();
   registerLogHandlers();
   registerStatsHandlers();
   registerBackupHandlers();

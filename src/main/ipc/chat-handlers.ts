@@ -11,6 +11,7 @@ import {
 import { listMessagesPaginated } from "@main/chat/messages";
 import { abortConversationStreams } from "@main/ipc/ai-handlers";
 import { bind, register, type Binding } from "@main/ipc/registry";
+import { getPermissionGate } from "@main/permissions/instance";
 
 export const chatBindings: Binding[] = [
   bind(C.conversationsListByBook, (input) => listConversationsByBook(getDb(), input.bookId)),
@@ -19,6 +20,7 @@ export const chatBindings: Binding[] = [
   bind(C.conversationsDelete, (input) => {
     // 先中止该会话的在跑流（防删行后继续推送/落库），再删行（messages 级联）。
     abortConversationStreams(input.id);
+    getPermissionGate().clearSession(input.id);
     deleteConversation(getDb(), input.id);
   }),
   bind(C.messagesListByConversation, (input) =>
