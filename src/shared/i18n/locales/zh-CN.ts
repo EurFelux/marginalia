@@ -461,6 +461,7 @@ export default {
   "settings.commands.ruleAddFailed": "规则没能添加：{{message}}",
   "settings.commands.ruleDelete": "删除规则 {{pattern}}",
   "settings.commands.ruleDeleteFailed": "规则删除失败，请重试",
+  "settings.commands.ruleInvalid": "规则只能是命令开头的普通词，不能包含 ; | & > $ 或换行",
   "settings.commands.rulePlaceholder": "命令开头，如 git status 或 rm",
   "settings.commands.rules": "规则",
   "settings.commands.rulesDesc":

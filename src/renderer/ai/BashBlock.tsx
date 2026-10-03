@@ -22,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@renderer/components/ui/dropdown-menu";
 import { cn } from "@renderer/lib/utils";
+import { ipcErrorMessage } from "@renderer/lib/ipc-error";
 import {
   bashView,
   durationParts,
@@ -206,7 +207,7 @@ function ActionBar({ request }: { request: PermissionRequest }) {
     respondToPermission(input).catch((err: unknown) => {
       toast.error(
         t("ai.bash.respondFailed", "没能提交你的选择：{{message}}", {
-          message: err instanceof Error ? err.message : String(err),
+          message: ipcErrorMessage(err),
         }),
       );
     });

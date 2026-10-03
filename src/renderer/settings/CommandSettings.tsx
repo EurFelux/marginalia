@@ -18,8 +18,8 @@ import {
   AlertDialogTitle,
 } from "@renderer/components/ui/alert-dialog";
 import type { PermissionDecision, PermissionRuleDto } from "@shared/permissions";
-
-const errorMessage = (err: unknown) => (err instanceof Error ? err.message : String(err));
+import { parsePattern } from "@shared/shell-command";
+import { ipcErrorMessage } from "@renderer/lib/ipc-error";
 
 export function CommandSettings() {
   const { t } = useTranslation();
@@ -136,7 +136,7 @@ function WorkdirRow() {
       .catch((err: unknown) =>
         toast.error(
           t("settings.commands.openFailed", "没能打开工作目录：{{message}}", {
-            message: errorMessage(err),
+            message: ipcErrorMessage(err),
           }),
         ),
       );
@@ -211,7 +211,7 @@ function RulesSection() {
     onError: (err) =>
       toast.error(
         t("settings.commands.ruleAddFailed", "规则没能添加：{{message}}", {
-          message: errorMessage(err),
+          message: ipcErrorMessage(err),
         }),
       ),
   });
@@ -223,6 +223,8 @@ function RulesSection() {
 
   const all = rules.data ?? [];
   const group = (d: PermissionDecision) => all.filter((r) => r.decision === d);
+  // 与主进程同一套校验：含 ; | & > $ 或换行的前缀永远匹配不上命令，提交前就拦下。
+  const invalid = pattern.trim() !== "" && parsePattern(pattern) === null;
 
   return (
     <div className="space-y-3">
@@ -253,10 +255,10 @@ function RulesSection() {
       />
 
       <form
-        className="flex items-center gap-2"
+        className="flex flex-wrap items-center gap-2"
         onSubmit={(e) => {
           e.preventDefault();
-          if (pattern.trim()) add.mutate();
+          if (pattern.trim() && !invalid) add.mutate();
         }}
       >
         <ToggleGroup
@@ -277,17 +279,26 @@ function RulesSection() {
           value={pattern}
           onChange={(e) => setPattern(e.target.value)}
           placeholder={t("settings.commands.rulePlaceholder", "命令开头，如 git status 或 rm")}
-          className="font-mono text-xs"
+          aria-invalid={invalid}
+          className="min-w-0 flex-1 font-mono text-xs"
         />
         <Button
           type="submit"
           variant="outline"
           size="sm"
-          disabled={!pattern.trim() || add.isPending}
+          disabled={!pattern.trim() || invalid || add.isPending}
         >
           {t("settings.commands.ruleAdd", "添加")}
         </Button>
       </form>
+      {invalid && (
+        <p className="text-[11px] text-destructive">
+          {t(
+            "settings.commands.ruleInvalid",
+            "规则只能是命令开头的普通词，不能包含 ; | & > $ 或换行",
+          )}
+        </p>
+      )}
     </div>
   );
 }
