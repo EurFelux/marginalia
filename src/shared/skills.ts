@@ -6,6 +6,12 @@ export const SKILL_NAME_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 export const SKILL_NAME_MAX = 64;
 export const SKILL_DESCRIPTION_MAX = 1024;
 
+/** 单个 skill 的导入大小上限（字节，MiB 的整数倍）：防止误把 node_modules 之类带进来。 */
+export const SKILL_MAX_BYTES = 20 * 1024 * 1024;
+
+/** 导入时扫描的来源目录（`~` = 用户家目录，主进程展开）。 */
+export const SKILL_IMPORT_ROOTS = ["~/.agents/skills", "~/.claude/skills"] as const;
+
 /** SKILL.md 校验失败的原因（渲染层据此本地化展示）。 */
 export const skillErrorCode = z.enum([
   "missingSkillMd",

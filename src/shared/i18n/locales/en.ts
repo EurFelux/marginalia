@@ -493,11 +493,11 @@ export default {
   "settings.commands.ruleDelete": "Delete rule {{pattern}}",
   "settings.commands.ruleDeleteFailed": "Couldn't delete the rule. Please try again.",
   "settings.commands.ruleInvalid":
-    "A rule can only be plain words from the start of a command, without ; | & > $ or line breaks",
+    "A rule can only be plain words from the start of a command, without {{symbols}} or line breaks",
   "settings.commands.rulePlaceholder": "Start of a command, e.g. git status or rm",
   "settings.commands.rules": "Rules",
   "settings.commands.rulesDesc":
-    'Rules match whole words at the start of a command: "git status" allows git status -s but not git log. Allow rules only apply to simple commands without ; | & > and similar symbols; deny rules check every part of a multi-part command and apply even when always approve is on.',
+    'Rules match whole words at the start of a command: "git status" allows git status -s but not git log. Allow rules only apply to simple commands without {{symbols}} and similar symbols; deny rules check every part of a multi-part command and apply even when always approve is on.',
   "settings.commands.workdir": "Working folder",
   "settings.commands.workdirDefault": "Default",
   "settings.commands.workdirDesc":
@@ -592,9 +592,9 @@ export default {
     "No skills yet. Import some below, or put skill folders straight into the skills folder.",
   "settings.skills.enable": "Enable {{name}}",
   "settings.skills.error.badName":
-    "name may only use lowercase letters, digits and hyphens, up to 64 characters",
+    "name may only use lowercase letters, digits and hyphens, up to {{max}} characters",
   "settings.skills.error.badYaml": "The properties block isn't valid YAML",
-  "settings.skills.error.descriptionTooLong": "description is longer than 1024 characters",
+  "settings.skills.error.descriptionTooLong": "description is longer than {{max}} characters",
   "settings.skills.error.missingDescription": "description is missing",
   "settings.skills.error.missingFrontmatter":
     "SKILL.md doesn't start with a properties block wrapped in ---",
@@ -606,10 +606,10 @@ export default {
   "settings.skills.failure.invalid": "invalid format",
   "settings.skills.failure.manualOnly": "needs to be run by hand, not supported yet",
   "settings.skills.failure.notFound": "no longer in its original place; scan again",
-  "settings.skills.failure.tooLarge": "larger than 20 MB",
+  "settings.skills.failure.tooLarge": "larger than {{size}} MB",
   "settings.skills.import": "Import from other places",
   "settings.skills.importDesc":
-    "Scans ~/.agents/skills and ~/.claude/skills. Importing copies a skill into the app's skills folder; it won't follow later changes in the original place, so import again after the original is updated. Symbolic links inside a skill are not copied.",
+    "Scans {{sources}}. Importing copies a skill into the app's skills folder; it won't follow later changes in the original place, so import again after the original is updated. Symbolic links inside a skill are not copied.",
   "settings.skills.imported_one": "Imported {{count}} skill",
   "settings.skills.imported_other": "Imported {{count}} skills",
   "settings.skills.importFailed": "Import failed: {{message}}",
@@ -618,7 +618,7 @@ export default {
   "settings.skills.importSelected_other": "Import selected ({{count}})",
   "settings.skills.installed": "Installed",
   "settings.skills.manualOnly": "Needs to be run by hand, not supported yet",
-  "settings.skills.noCandidates": "No skills found in either place.",
+  "settings.skills.noCandidates": "No skills found in {{sources}}.",
   "settings.skills.openFailed": "Couldn't open the folder: {{message}}",
   "settings.skills.openFolder": "Open skills folder",
   "settings.skills.openSkillFolder": "Open the folder of {{name}}",

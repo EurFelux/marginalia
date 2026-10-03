@@ -19,6 +19,12 @@ import {
   AlertDialogFooter,
   AlertDialogTitle,
 } from "@renderer/components/ui/alert-dialog";
+import {
+  SKILL_DESCRIPTION_MAX,
+  SKILL_IMPORT_ROOTS,
+  SKILL_MAX_BYTES,
+  SKILL_NAME_MAX,
+} from "@shared/skills";
 import type {
   SkillDto,
   SkillErrorCode,
@@ -43,12 +49,15 @@ function errorLabel(code: SkillErrorCode, t: TFunction): string {
     case "badName":
       return t(
         "settings.skills.error.badName",
-        "name 只能用小写字母、数字和连字符，最长 64 个字符",
+        "name 只能用小写字母、数字和连字符，最长 {{max}} 个字符",
+        { max: SKILL_NAME_MAX },
       );
     case "missingDescription":
       return t("settings.skills.error.missingDescription", "缺少 description");
     case "descriptionTooLong":
-      return t("settings.skills.error.descriptionTooLong", "description 超过 1024 个字符");
+      return t("settings.skills.error.descriptionTooLong", "description 超过 {{max}} 个字符", {
+        max: SKILL_DESCRIPTION_MAX,
+      });
     case "nameMismatch":
       return t("settings.skills.error.nameMismatch", "文件夹名和 name 不一致");
   }
@@ -63,7 +72,9 @@ function failureLabel(reason: SkillImportFailure, t: TFunction): string {
     case "manualOnly":
       return t("settings.skills.failure.manualOnly", "需要手动调用，暂不支持");
     case "tooLarge":
-      return t("settings.skills.failure.tooLarge", "超过 20 MB");
+      return t("settings.skills.failure.tooLarge", "超过 {{size}} MB", {
+        size: SKILL_MAX_BYTES / (1024 * 1024),
+      });
     case "copyFailed":
       return t("settings.skills.failure.copyFailed", "复制失败");
   }
@@ -304,7 +315,11 @@ function importSummary(result: SkillImportResult, t: TFunction): string {
 }
 
 function ImportSkills() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  // 来源目录与大小上限等规则值取自共享常量，插值进文案，不写死在翻译里。
+  const sources = new Intl.ListFormat(i18n.language, { type: "conjunction" }).format(
+    SKILL_IMPORT_ROOTS,
+  );
   const qc = useQueryClient();
   const [selected, setSelected] = useState<string[]>([]);
   const [confirmOverwrite, setConfirmOverwrite] = useState(false);
@@ -361,14 +376,15 @@ function ImportSkills() {
       <p className="text-[11px] leading-relaxed text-muted-foreground">
         {t(
           "settings.skills.importDesc",
-          "扫描 ~/.agents/skills 和 ~/.claude/skills。导入会复制一份到应用的技能文件夹，之后不随原处同步，原处更新了就再导入一次。技能内部的符号链接不会被复制。",
+          "扫描 {{sources}}。导入会复制一份到应用的技能文件夹，之后不随原处同步，原处更新了就再导入一次。技能内部的符号链接不会被复制。",
+          { sources },
         )}
       </p>
       {list.length === 0 ? (
         <p className="text-[11px] text-muted-foreground/70">
           {candidates.isFetching
             ? t("settings.skills.scanning", "正在扫描…")
-            : t("settings.skills.noCandidates", "这两个位置都没有找到技能。")}
+            : t("settings.skills.noCandidates", "{{sources}} 里都没有找到技能。", { sources })}
         </p>
       ) : (
         <ul className="divide-y divide-border rounded-md border border-border">

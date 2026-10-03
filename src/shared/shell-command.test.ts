@@ -4,6 +4,7 @@ import {
   formatPattern,
   isTokenPrefix,
   parsePattern,
+  SHELL_OPERATOR_HINT,
   suggestPrefix,
 } from "@shared/shell-command";
 
@@ -120,6 +121,15 @@ describe("patterns", () => {
   it("rejects patterns that are not plain token sequences", () => {
     for (const p of ["ls; rm", "a | b", "echo $HOME", "", "ls\nrm"]) {
       expect(parsePattern(p)).toBeNull();
+    }
+  });
+});
+
+describe("SHELL_OPERATOR_HINT", () => {
+  it("lists only symbols that really make a rule pattern invalid", () => {
+    for (const symbol of SHELL_OPERATOR_HINT) {
+      expect(parsePattern(`ls ${symbol} x`), symbol).toBeNull();
+      expect(parsePattern(`ls${symbol}x`), symbol).toBeNull();
     }
   });
 });

@@ -16,6 +16,7 @@ import { homedir } from "node:os";
 import path from "node:path";
 import { createLogger } from "@main/logger";
 import { parseSkillMd, type ParsedSkill } from "@main/skills/skill-file";
+import { SKILL_IMPORT_ROOTS, SKILL_MAX_BYTES } from "@shared/skills";
 import type {
   SkillImportCandidate,
   SkillImportFailure,
@@ -25,11 +26,9 @@ import type {
 
 const log = createLogger("skills");
 
-/** 单个 skill 的大小上限：防止误把 node_modules 之类带进来。 */
-export const MAX_SKILL_BYTES = 20 * 1024 * 1024;
-
+/** 展开 SKILL_IMPORT_ROOTS 里的 `~`。 */
 export function defaultImportRoots(home = homedir()): string[] {
-  return [path.join(home, ".agents", "skills"), path.join(home, ".claude", "skills")];
+  return SKILL_IMPORT_ROOTS.map((root) => path.join(home, root.replace(/^~\//, "")));
 }
 
 class TooLargeError extends Error {}
@@ -193,7 +192,7 @@ export async function importSkills(opts: {
     const retired = path.join(opts.skillsDir, `.replaced-${randomUUID()}`);
     const target = path.join(opts.skillsDir, candidate.name);
     try {
-      const links = await copyTree(source, staging, opts.maxBytes ?? MAX_SKILL_BYTES);
+      const links = await copyTree(source, staging, opts.maxBytes ?? SKILL_MAX_BYTES);
       const replacing = await isDirectory(target);
       if (replacing) await rename(target, retired);
       await rename(staging, target);
