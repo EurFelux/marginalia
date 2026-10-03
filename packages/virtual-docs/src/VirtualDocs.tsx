@@ -63,6 +63,12 @@ export interface VirtualDocsProps {
    */
   loadSection: (index: number) => Promise<string>;
   styleCss?: string;
+  /**
+   * 只影响绘制、不改变排版的 CSS（如明暗主题配色），注入在 styleCss 之后、书自带样式之前。
+   * 与 styleCss 的区别：变化时原地替换各已载入文档里的样式，**不重载 iframe、不失效测高缓存**，
+   * 阅读位置不受影响。放入改变尺寸的规则会被 ResizeObserver 重测高度，但不保证位置。
+   */
+  paintCss?: string;
   initialIndex?: number;
   /**
    * section 的相对体量（如字符数），供未测量 section 按「已测 px/权重比」外推估高。
@@ -108,6 +114,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
     count,
     loadSection,
     styleCss,
+    paintCss,
     initialIndex,
     sectionWeight,
     initialPxPerWeight,
@@ -370,7 +377,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scrollerReady, ioSupported]);
 
-  // styleCss（排版偏好/主题）变更会改变所有 section 高度 → 整体失效缓存。
+  // styleCss（排版偏好）变更会改变所有 section 高度 → 整体失效缓存。paintCss 不改高度，不在此列。
   useEffect(() => {
     heightCache.current.clear();
   }, [styleCss]);
@@ -386,6 +393,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
         deferLoad={deferBeforeLoadedIndex(viewport.loadedFromIndex, index)}
         loadSection={loadSection}
         styleCss={styleCss}
+        paintCss={paintCss}
         onSelect={onSelect}
         onSelectionCleared={onSelectionCleared}
         decorate={decorate}
@@ -416,6 +424,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
       initialIndex,
       viewport.loadedFromIndex,
       styleCss,
+      paintCss,
       sectionWeight,
       initialPxPerWeight,
       onSelect,
@@ -471,6 +480,7 @@ function LazySection({
   deferLoad,
   loadSection,
   styleCss,
+  paintCss,
   onSelect,
   onSelectionCleared,
   decorate,
@@ -493,6 +503,7 @@ function LazySection({
   deferLoad: boolean;
   loadSection: (index: number) => Promise<string>;
   styleCss?: string;
+  paintCss?: string;
   onSelect?: (e: SectionSelectEvent) => void;
   onSelectionCleared?: () => void;
   decorate?: (index: number, doc: Document) => void;
@@ -547,6 +558,7 @@ function LazySection({
           index={index}
           html={html}
           styleCss={styleCss}
+          paintCss={paintCss}
           onSelect={onSelect}
           onSelectionCleared={onSelectionCleared}
           decorate={decorate}

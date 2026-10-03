@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
+import { applyPaintCss, buildSrcDoc } from "./frame-doc";
 import { toViewportRect, type ViewportRect } from "./geometry";
 import { classifyLink } from "./link-target";
 
@@ -14,6 +15,8 @@ interface Props {
   index: number;
   html: string;
   styleCss?: string;
+  /** 只影响绘制的 CSS（如明暗配色）：变化时原地替换，不重载 iframe（见 VirtualDocsProps.paintCss）。 */
+  paintCss?: string;
   onSelect?: (e: SectionSelectEvent) => void;
   onSelectionCleared?: () => void;
   /** iframe 内容加载后（及 decorateNonce 变化时）回调，供消费方在文档上贴装饰（如高亮 mark）。 */
@@ -44,24 +47,16 @@ interface Props {
   onMeasured?: (index: number, height: number) => void;
 }
 
-const STYLE_ID = "vd-style";
-
 /** 等待图片/字体就绪的整体超时（ms），到时即用当前高度兜底，绝不无限等。 */
 const READY_TIMEOUT_MS = 2000;
 /** 就绪后真实内容变化（如改字号偏好）重测的 debounce（ms）。 */
 const RO_DEBOUNCE_MS = 100;
 
-/** 把（可能是片段或完整文档的）HTML 包成带注入 style 的完整文档串。 */
-function buildSrcDoc(html: string, styleCss?: string): string {
-  const style = `<style id="${STYLE_ID}">${styleCss ?? ""}</style>`;
-  if (/<head[\s>]/i.test(html)) return html.replace(/<head([^>]*)>/i, `<head$1>${style}`);
-  return `<!doctype html><html><head><meta charset="utf-8">${style}</head><body>${html}</body></html>`;
-}
-
 export function SectionFrame({
   index,
   html,
   styleCss,
+  paintCss,
   onSelect,
   onSelectionCleared,
   decorate,
@@ -113,6 +108,9 @@ export function SectionFrame({
     onKeyDown,
   };
   const docRef = useRef<Document | null>(null);
+  // srcDoc 构建时取最新 paintCss，但不把它列为重建依赖：换主题只走下方 applyPaintCss 原地更新。
+  const paintCssRef = useRef(paintCss);
+  paintCssRef.current = paintCss;
 
   useEffect(() => {
     const iframe = iframeRef.current;
@@ -253,6 +251,8 @@ export function SectionFrame({
       doc = iframe.contentDocument;
       if (!doc) return;
       const d = doc; // 窄化给闭包
+      // srcDoc 构建到 load 之间 paintCss 可能已变（如加载途中切了主题），以最新值为准。
+      applyPaintCss(d, paintCssRef.current ?? "");
       // 占位：就绪前先用估高，避免 iframe 默认高度造成的跳变。
       iframe.style.height = `${cbRef.current.estimatedHeight ?? 0}px`;
 
@@ -312,7 +312,14 @@ export function SectionFrame({
     if (docRef.current) cbRef.current.decorate?.(index, docRef.current);
   }, [decorateNonce, index]);
 
-  const srcDoc = useMemo(() => buildSrcDoc(html, styleCss), [html, styleCss]);
+  useEffect(() => {
+    if (docRef.current) applyPaintCss(docRef.current, paintCss ?? "");
+  }, [paintCss]);
+
+  // paintCss 有意不进依赖（经 ref 读取）：它变化时若重建 srcDoc，iframe 会整页重载、section 高度
+  // 回落到估高，视口随之丢失阅读位置（#115）。
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const srcDoc = useMemo(() => buildSrcDoc(html, styleCss, paintCssRef.current), [html, styleCss]);
 
   return (
     <iframe
