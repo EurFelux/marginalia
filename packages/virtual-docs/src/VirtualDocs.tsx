@@ -36,6 +36,7 @@ const ALIGN_TICK_MS = 100;
 /**
  * 滚动容器宽度变化后，等待 section 重测出新高度的窗口（ms）。SectionFrame 的重测有 100ms debounce，
  * 1s 足够覆盖；窗口内无高度变化 = 正文栏被 maxWidth 卡住、文字没重排，不上报。
+ * 窗口内也不上报视口顶位置（见 recomputeTop）。
  */
 const WIDTH_REFLOW_WINDOW_MS = 1000;
 
@@ -209,6 +210,10 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
     }
     const section = topVisibleSection(secs, vt);
     if (section) raise({ type: "VISIBLE_TOP_CHANGED", index: section.index });
+    // 宽度变化窗口内不上报：iframe 里的文字已按新宽度折行，section 高度与「确实重排」的判定却要等
+    // 重测才到。此时若有滚动（如自动滚动），上报的是重排后的视口顶段落，消费方会把它当作重排前的
+    // 阅读位置、对齐到错的地方。窗口结束时补报（见宽度 ResizeObserver）。
+    if (performance.now() < widthReflowDeadline.current) return;
     if (section && (section.index !== lastTop.current || force)) {
       lastTop.current = section.index;
       onTopSectionChange?.(section.index, { scrollRatio: sectionScrollRatio(section, vt) });
@@ -429,19 +434,33 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
   }, [styleCss]);
 
   // 宽度变化只布防；是否真的重排由随后的重测决定（见 onMeasured）。高度变化（如收起顶栏）不重排正文。
+  // 窗口到期仍未判定重排（正文栏被 maxWidth 卡住）：补报一次窗口内压下的视口顶位置。判定了重排则
+  // onMeasured 已把截止时刻清零，消费方自会重新对齐，不补报。
   useEffect(() => {
     const scroller = scrollerEl.current;
     if (!scroller || typeof ResizeObserver === "undefined") return;
     let lastWidth: number | null = null;
+    let windowTimer: ReturnType<typeof setTimeout> | null = null;
     const ro = new ResizeObserver((entries) => {
       const width = entries[0]?.contentRect.width;
       if (width == null) return;
-      if (lastWidth != null && Math.abs(width - lastWidth) >= 1)
+      if (lastWidth != null && Math.abs(width - lastWidth) >= 1) {
         widthReflowDeadline.current = performance.now() + WIDTH_REFLOW_WINDOW_MS;
+        if (windowTimer) clearTimeout(windowTimer);
+        windowTimer = setTimeout(() => {
+          windowTimer = null;
+          if (widthReflowDeadline.current === 0) return;
+          widthReflowDeadline.current = 0;
+          recomputeRef.current(true);
+        }, WIDTH_REFLOW_WINDOW_MS);
+      }
       lastWidth = width;
     });
     ro.observe(scroller);
-    return () => ro.disconnect();
+    return () => {
+      ro.disconnect();
+      if (windowTimer) clearTimeout(windowTimer);
+    };
   }, [scrollerReady]);
 
   // itemContent 身份每渲染变会让 virtuoso 重渲全部在挂行 → 手动 useCallback 稳定（见上）。
