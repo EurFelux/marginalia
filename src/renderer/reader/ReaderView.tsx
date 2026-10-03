@@ -6,6 +6,7 @@ import { createLogger } from "@renderer/logger";
 const log = createLogger("reader");
 import {
   ArrowLeft,
+  ChevronsDown,
   PanelLeftClose,
   PanelLeftOpen,
   PanelRightClose,
@@ -40,6 +41,9 @@ import { openPanelAndFocusComposer } from "@renderer/ai/composer-focus";
 import { TtsControlBar } from "@renderer/reader/TtsControlBar";
 import { ttsController } from "@renderer/reader/tts/tts-controller";
 import { useTtsStore } from "@renderer/store/tts-store";
+import { AutoScrollControlBar } from "@renderer/reader/AutoScrollControlBar";
+import { autoScrollController } from "@renderer/reader/auto-scroll/auto-scroll-controller";
+import { useAutoScrollStore } from "@renderer/store/auto-scroll-store";
 import { EpubSessionProvider } from "@renderer/reader/epub-session";
 import { CompleteReadingDialog } from "@renderer/reading/CompleteReadingDialog";
 import { useSearchStore } from "@renderer/store/search-store";
@@ -64,6 +68,7 @@ export function ReaderView({ mode }: { mode: "active" | "reference" }) {
   const setPanelWidth = usePaneSizeStore((s) => s.setPanelWidth);
   const qc = useQueryClient();
   const ttsStatus = useTtsStore((s) => s.status);
+  const autoScrollStatus = useAutoScrollStore((s) => s.status);
   const resetSearch = useSearchStore((s) => s.resetForBook);
 
   // 书内搜索：换书即丢弃上一本的查询与结果。
@@ -131,6 +136,28 @@ export function ReaderView({ mode }: { mode: "active" | "reference" }) {
   })();
   const breadcrumb = [book.data?.title, chapterTitle, progressLabel].filter(Boolean).join(" · ");
 
+  // 朗读与自动滚动互斥（spec §3.4）：各自开始前先停掉对方，控制器之间不互相 import。
+  const toggleTts = () => {
+    if (ttsStatus !== "idle") {
+      ttsController.stop();
+      return;
+    }
+    autoScrollController.stop();
+    void ttsController.playFromViewport();
+  };
+  const toggleAutoScroll = () => {
+    if (autoScrollStatus !== "idle") {
+      autoScrollController.stop();
+      return;
+    }
+    ttsController.stop();
+    autoScrollController.start();
+  };
+  const autoScrollLabel =
+    autoScrollStatus === "idle"
+      ? t("reader.autoScroll.start", "自动滚动")
+      : t("reader.autoScroll.stop", "停止自动滚动");
+
   return (
     <div className="relative flex h-screen flex-col bg-background font-sans text-foreground">
       <CollapsiblePane
@@ -195,11 +222,7 @@ export function ReaderView({ mode }: { mode: "active" | "reference" }) {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() =>
-                        ttsStatus === "idle"
-                          ? void ttsController.playFromViewport()
-                          : ttsController.stop()
-                      }
+                      onClick={toggleTts}
                       aria-label={
                         ttsStatus === "idle"
                           ? t("reader.tts.start", "朗读")
@@ -216,6 +239,26 @@ export function ReaderView({ mode }: { mode: "active" | "reference" }) {
                     ? t("reader.tts.start", "朗读")
                     : t("reader.tts.stop", "停止")}
                 </TooltipContent>
+              </Tooltip>
+            )}
+            {!book.isPending && (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={toggleAutoScroll}
+                      aria-label={autoScrollLabel}
+                      className="text-muted-foreground"
+                    />
+                  }
+                >
+                  <ChevronsDown
+                    className={autoScrollStatus !== "idle" ? "text-primary" : undefined}
+                  />
+                </TooltipTrigger>
+                <TooltipContent>{autoScrollLabel}</TooltipContent>
               </Tooltip>
             )}
             <Tooltip>
@@ -302,6 +345,7 @@ export function ReaderView({ mode }: { mode: "active" | "reference" }) {
               />
             )}
             <TtsControlBar />
+            <AutoScrollControlBar />
           </main>
           <CollapsiblePane
             side="right"

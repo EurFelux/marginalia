@@ -123,7 +123,7 @@ describe("reduceReadingPosition", () => {
     });
     expect(next).toEqual({ kind: "following", last: null });
     expect(effects).toEqual([
-      { kind: "notifyTtsUserNavigation" },
+      { kind: "notifyUserNavigation" },
       { kind: "scrollToChapter", chapterId: "ch-2" },
     ]);
   });
@@ -135,7 +135,7 @@ describe("reduceReadingPosition", () => {
     });
     expect(next).toEqual({ kind: "following", last: null });
     expect(effects).toEqual([
-      { kind: "notifyTtsUserNavigation" },
+      { kind: "notifyUserNavigation" },
       { kind: "scrollToAnnotation", locator: "epubcfi(/6/8!/4/2)" },
     ]);
   });
@@ -149,7 +149,7 @@ describe("reduceReadingPosition", () => {
     });
     expect(next).toEqual({ kind: "following", last: null });
     expect(effects).toEqual([
-      { kind: "notifyTtsUserNavigation" },
+      { kind: "notifyUserNavigation" },
       { kind: "scrollToSearchHit", ...hit },
     ]);
   });

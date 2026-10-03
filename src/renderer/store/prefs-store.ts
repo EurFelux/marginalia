@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { AnnotationStyle } from "@shared/annotations";
 import {
+  DEFAULT_AUTO_SCROLL_SPEED,
   DEFAULT_BACKGROUND_CONCURRENCY,
   DEFAULT_SOUL,
   DEFAULT_STEP_LIMIT,
@@ -29,6 +30,8 @@ interface PrefsState {
   layout: ReaderLayout;
   /** PDF 缩放倍率（相对适宽）；落盘记忆，重启恢复。存倍率非档位索引（见 @shared/preferences）。 */
   pdfZoom: number;
+  /** 阅读器自动滚动速度档位（整数，10 = 1.0×）；落盘记忆，重启恢复。使用处经 clampSpeedLevel 夹住。 */
+  autoScrollSpeed: number;
   /** AI 对话 agent 循环的多步上限；0 = 不限制。落盘记忆，重启恢复。 */
   stepLimit: number;
   /** 后台模型调用全局并发上限（章节/全书摘要 + 命名 + 压缩）；前台对话不受限。落盘记忆。 */
@@ -62,6 +65,7 @@ interface PrefsActions {
   setLastHighlightStyle: (style: AnnotationStyle) => void;
   updateLayout: (patch: Partial<ReaderLayout>) => void;
   setPdfZoom: (v: number) => void;
+  setAutoScrollSpeed: (v: number) => void;
   setStepLimit: (v: number) => void;
   setBackgroundConcurrency: (v: number) => void;
   setOnboardingDismissed: (v: boolean) => void;
@@ -84,6 +88,7 @@ export const PREFS_INITIAL: PrefsState = {
   lastHighlightStyle: "yellow",
   layout: { sidebarOpen: true, panelOpen: false, headerOpen: true },
   pdfZoom: 1,
+  autoScrollSpeed: DEFAULT_AUTO_SCROLL_SPEED,
   stepLimit: DEFAULT_STEP_LIMIT,
   backgroundConcurrency: DEFAULT_BACKGROUND_CONCURRENCY,
   onboardingDismissed: false,
@@ -135,6 +140,10 @@ export const usePrefsStore = create<PrefsState & PrefsActions>()((set) => ({
   setPdfZoom: (pdfZoom) => {
     persistPreference({ key: "pdfZoom", value: pdfZoom });
     set({ pdfZoom });
+  },
+  setAutoScrollSpeed: (autoScrollSpeed) => {
+    persistPreference({ key: "autoScrollSpeed", value: autoScrollSpeed });
+    set({ autoScrollSpeed });
   },
   setStepLimit: (stepLimit) => {
     persistPreference({ key: "stepLimit", value: stepLimit });

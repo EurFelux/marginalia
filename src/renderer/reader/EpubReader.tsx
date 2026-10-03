@@ -30,6 +30,7 @@ import { sectionSelectToSelectionInfo } from "./epub-selection";
 import { applyAnnotations } from "./apply-annotations";
 import { useThemeStore } from "../store/theme-store";
 import { ttsController } from "./tts/tts-controller";
+import { autoScrollController } from "./auto-scroll/auto-scroll-controller";
 import { readableTextOffsetAtRange, readableTextRangeAtY } from "./epub-text-position";
 import { useReadingPosition } from "./use-reading-position";
 import type { ReadingPosition } from "./reading-position-machine";
@@ -156,6 +157,21 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
     });
     return () => ttsController.detach();
   }, [book]);
+
+  // 自动滚动：同 TTS 的挂接方式。等开书恢复 / 跳转的目标对齐过再接管视口（spec §5.1），
+  // 接管时顺带推进 reading-position 到 following，自动滚动产生的位置才会落盘（spec §5）。
+  useEffect(() => {
+    if (!book) return;
+    autoScrollController.attach({
+      getScroller: () => vRef.current?.getScrollerElement() ?? null,
+      canClaimViewport: () => vRef.current?.canClaimViewport() ?? true,
+      claimViewport: () => {
+        vRef.current?.claimViewport();
+        raise({ type: "USER_NAVIGATED" });
+      },
+    });
+    return () => autoScrollController.detach();
+  }, [book, raise]);
 
   const onSelect = (e: SectionSelectEvent) => {
     const cfiRange = book ? book.cfiFromRange(e.index, e.range) : null;
@@ -405,9 +421,15 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
         onHighlightHover={hoverHighlight}
         onHighlightLeave={leaveHighlight}
         onContentMouseDown={onContentMouseDown}
-        onUserNavigation={() => raise({ type: "USER_NAVIGATED" })}
+        onUserNavigation={() => {
+          autoScrollController.pause();
+          raise({ type: "USER_NAVIGATED" });
+        }}
         onReflow={(reason) => {
           log.debug("content reflow", reason);
+          // 重排对齐是一轮收敛，会与逐帧滚动拉扯 → 暂停（spec §3.3）。不经状态机 effect：
+          // 那条路径也会停掉朗读，而重排不该打断朗读。
+          autoScrollController.pause();
           raise({ type: "REFLOWED" });
         }}
         onTransition={(r) => log.debug("viewport transition", r)}

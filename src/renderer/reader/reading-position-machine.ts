@@ -54,7 +54,7 @@ export type ReadingPositionEffect =
   | { kind: "scrollToChapter"; chapterId: string }
   | { kind: "scrollToAnnotation"; locator: string }
   | { kind: "scrollToSearchHit"; href: string; occurrence: number; query: string }
-  | { kind: "notifyTtsUserNavigation" }
+  | { kind: "notifyUserNavigation" }
   | { kind: "reportPosition"; position: ReadingPosition }
   | { kind: "persistProgress"; position: ReadingPosition };
 
@@ -110,7 +110,7 @@ export function reduceReadingPosition(
       return {
         next: FOLLOWING_UNANCHORED,
         effects: [
-          { kind: "notifyTtsUserNavigation" },
+          { kind: "notifyUserNavigation" },
           { kind: "scrollToChapter", chapterId: event.chapterId },
         ],
       };
@@ -120,7 +120,7 @@ export function reduceReadingPosition(
       return {
         next: FOLLOWING_UNANCHORED,
         effects: [
-          { kind: "notifyTtsUserNavigation" },
+          { kind: "notifyUserNavigation" },
           { kind: "scrollToAnnotation", locator: event.locator },
         ],
       };
@@ -131,7 +131,7 @@ export function reduceReadingPosition(
       return {
         next: FOLLOWING_UNANCHORED,
         effects: [
-          { kind: "notifyTtsUserNavigation" },
+          { kind: "notifyUserNavigation" },
           { kind: "scrollToSearchHit", href, occurrence, query },
         ],
       };

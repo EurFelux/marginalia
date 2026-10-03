@@ -20,6 +20,7 @@ describe("preferences schemas", () => {
 
   it("registers exactly the keys with current consumers", () => {
     expect(Object.keys(PREFERENCE_SCHEMAS).sort()).toEqual([
+      "autoScrollSpeed",
       "autoSummarize",
       "avatarBlobId",
       "backgroundConcurrency",

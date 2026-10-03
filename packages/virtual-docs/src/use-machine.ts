@@ -22,6 +22,7 @@ export interface UseMachineOptions<S> {
 /**
  * 把「纯 reducer + effect 描述」接进 React：dispatch 是唯一的状态写入口，
  * effects 在提交后按序执行，每次迁移经 onTransition 打点。
+ * 第三项 getState 同步读最新状态，供渲染之外的命令式查询（渲染返回的 state 可能落后一次提交）。
  *
  * 本包不过 React Compiler，故内部回调一律手写 useCallback / ref 稳定身份。
  */
@@ -30,7 +31,7 @@ export function useMachine<S, E extends { type: string }, F extends { kind: stri
   initial: S,
   runEffect: (effect: F) => void,
   options?: UseMachineOptions<S>,
-): [S, (event: E) => void] {
+): [S, (event: E) => void, () => S] {
   const runEffectRef = useRef(runEffect);
   runEffectRef.current = runEffect;
   const optionsRef = useRef(options);
@@ -71,5 +72,7 @@ export function useMachine<S, E extends { type: string }, F extends { kind: stri
     for (const effect of queue) runEffectRef.current(effect);
   });
 
-  return [stateRef.current, raise];
+  const getState = useCallback(() => stateRef.current, []);
+
+  return [stateRef.current, raise, getState];
 }
