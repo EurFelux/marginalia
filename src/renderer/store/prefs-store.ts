@@ -10,6 +10,7 @@ import {
   type Soul,
   type SummaryModel,
   type TtsPrefs,
+  DEFAULT_BASH_ENABLED,
 } from "@shared/preferences";
 import { DEFAULT_WEB_SEARCH, type WebSearchConfig } from "@shared/web-search";
 import type { ReaderLayout, ReaderPrefs } from "@renderer/types";
@@ -56,7 +57,7 @@ interface PrefsState {
   webSearch: WebSearchConfig | null;
   /** 联网搜索 composer 开关（per-message toggle；持久化，重启恢复）。 */
   webSearchEnabled: boolean;
-  /** 允许 AI 执行命令（默认关；spec 2026-10-03-bash-skills-permissions-design §6.3）。 */
+  /** 允许 AI 执行命令（默认开，见 DEFAULT_BASH_ENABLED；spec 2026-10-03-bash-skills-permissions-design §6.3）。 */
   bashEnabled: boolean;
   /** 命令「总是批准」（默认关；拒绝规则仍生效，§5.5）。 */
   bashAlwaysApprove: boolean;
@@ -110,7 +111,7 @@ export const PREFS_INITIAL: PrefsState = {
   avatarBlobId: null,
   webSearch: DEFAULT_WEB_SEARCH,
   webSearchEnabled: false,
-  bashEnabled: false,
+  bashEnabled: DEFAULT_BASH_ENABLED,
   bashAlwaysApprove: false,
   bashWorkdir: null,
 };

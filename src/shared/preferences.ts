@@ -102,6 +102,12 @@ export const autoScrollSpeedSchema = z.number().int().positive();
 /** autoScrollSpeed 出厂值：10 档 = 1.0×。 */
 export const DEFAULT_AUTO_SCROLL_SPEED = 10;
 
+/**
+ * bashEnabled 缺省值：默认开（2026-10-03 用户决定）——每条命令仍要用户批准，审批本身就是安全边界。
+ * 主进程（工具注册）与渲染层初值共用单一源。
+ */
+export const DEFAULT_BASH_ENABLED = true;
+
 /** 命令工作目录：绝对路径或 null（= 默认工作区）。 */
 export const bashWorkdirSchema = z.string().startsWith("/").nullable();
 
@@ -132,7 +138,7 @@ export const PREFERENCE_SCHEMAS = {
   webSearch: webSearchConfig,
   webSearchEnabled: z.boolean(),
   autoScrollSpeed: autoScrollSpeedSchema,
-  /** AI 执行命令总开关：默认关（未存 = false），关着时 bash 工具不注册（spec 2026-10-03 §6.3）。 */
+  /** AI 执行命令总开关：未存 = DEFAULT_BASH_ENABLED（开）；关着时 bash 工具不注册（spec 2026-10-03 §6.3）。 */
   bashEnabled: z.boolean(),
   /** AI 执行命令「总是批准」：默认关（未存 = false）；拒绝规则仍生效（spec 2026-10-03 §5.5）。 */
   bashAlwaysApprove: z.boolean(),

@@ -4,7 +4,11 @@ vi.mock("@renderer/store/persist-preference", () => ({ persistPreference: vi.fn(
 
 import { persistPreference } from "@renderer/store/persist-preference";
 import { usePrefsStore, PREFS_INITIAL } from "@renderer/store/prefs-store";
-import { DEFAULT_STEP_LIMIT, DEFAULT_BACKGROUND_CONCURRENCY } from "@shared/preferences";
+import {
+  DEFAULT_STEP_LIMIT,
+  DEFAULT_BACKGROUND_CONCURRENCY,
+  DEFAULT_BASH_ENABLED,
+} from "@shared/preferences";
 
 beforeEach(() => {
   usePrefsStore.setState(PREFS_INITIAL);
@@ -51,6 +55,11 @@ describe("prefs-store", () => {
   });
   it("stepLimit defaults to DEFAULT_STEP_LIMIT", () => {
     expect(PREFS_INITIAL.stepLimit).toBe(DEFAULT_STEP_LIMIT);
+  });
+  it("bash is enabled by default and always-approve is not", () => {
+    expect(DEFAULT_BASH_ENABLED).toBe(true);
+    expect(PREFS_INITIAL.bashEnabled).toBe(DEFAULT_BASH_ENABLED);
+    expect(PREFS_INITIAL.bashAlwaysApprove).toBe(false);
   });
   it("setBackgroundConcurrency updates value and persists", () => {
     usePrefsStore.getState().setBackgroundConcurrency(5);
