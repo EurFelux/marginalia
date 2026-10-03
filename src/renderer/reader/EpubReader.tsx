@@ -19,21 +19,17 @@ import { useEpubSession } from "./epub-session";
 import { BookFileMissingPanel } from "./BookFileMissingPanel";
 import { epubPercent } from "./percent";
 import { epubReadingContext } from "./epub-reading-context";
-import { applySearchHighlights, SEARCH_HIGHLIGHT_CSS } from "./epub-search";
+import { applySearchHighlights } from "./epub-search";
 import { elementOf } from "./element-of";
 import type { EpubBook } from "./epub-book";
 import type { BookSearchHit } from "@shared/search";
 import { handleFindShortcut } from "./search-shortcut";
 import { useSearchStore } from "@renderer/store/search-store";
-import { prefsToCss } from "./prefs-to-css";
-import { readerThemeCss } from "./reader-theme-css";
+import { epubFrameCss } from "./epub-frame-css";
 import { sectionSelectToSelectionInfo } from "./epub-selection";
 import { applyAnnotations } from "./apply-annotations";
-import { ANNO_IFRAME_CSS } from "./highlight";
-import { fontFaceCss } from "./reader-fonts";
 import { useThemeStore } from "../store/theme-store";
 import { ttsController } from "./tts/tts-controller";
-import { TTS_IFRAME_CSS } from "./tts/tts-css";
 import { readableTextOffsetAtRange, readableTextRangeAtY } from "./epub-text-position";
 import { useReadingPosition } from "./use-reading-position";
 import type { ReadingPosition } from "./reading-position-machine";
@@ -386,6 +382,8 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
     );
   }
 
+  const frameCss = epubFrameCss(prefs, resolvedTheme === "dark");
+
   return (
     <div className="h-full">
       <VirtualDocs
@@ -395,19 +393,8 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
         loadSection={book.loadSection}
         sectionWeight={book.textLengthAtIndex}
         initialPxPerWeight={0.1}
-        styleCss={
-          fontFaceCss(prefs.fontFamily) +
-          "\n" +
-          prefsToCss(prefs) +
-          "\n" +
-          ANNO_IFRAME_CSS +
-          "\n" +
-          readerThemeCss(resolvedTheme === "dark") +
-          "\n" +
-          TTS_IFRAME_CSS +
-          "\n" +
-          SEARCH_HIGHLIGHT_CSS
-        }
+        styleCss={frameCss.styleCss}
+        paintCss={frameCss.paintCss}
         initialIndex={initialIndex}
         onTopSectionChange={onTopSectionChange}
         onUnloadSection={(i) => book.unloadSection(i)}
@@ -419,6 +406,10 @@ export function EpubReader({ bookId, chapters, persistProgress }: Props) {
         onHighlightLeave={leaveHighlight}
         onContentMouseDown={onContentMouseDown}
         onUserNavigation={() => raise({ type: "USER_NAVIGATED" })}
+        onReflow={(reason) => {
+          log.debug("content reflow", reason);
+          raise({ type: "REFLOWED" });
+        }}
         onTransition={(r) => log.debug("viewport transition", r)}
         onInternalLink={onInternalLink}
         onExternalLink={onExternalLink}

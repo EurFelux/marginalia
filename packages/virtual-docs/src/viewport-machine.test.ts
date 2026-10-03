@@ -39,7 +39,7 @@ describe("reduceViewport", () => {
 
   it("does not treat restoration as user navigation", () => {
     const { next } = reduceViewport(initialViewportState(40), align);
-    expect(next.everUserNavigated).toBe(false);
+    expect(next.topOverscanUnlocked).toBe(false);
   });
 
   it("settles only after the stability window and a full success streak", () => {
@@ -137,10 +137,29 @@ describe("reduceViewport", () => {
     const { next, effects } = reduceViewport(started, {
       type: "USER_INPUT",
       scrollIntent: true,
+      upward: true,
     });
     expect(next.phase.kind).toBe("userOwned");
-    expect(next.everUserNavigated).toBe(true);
+    expect(next.topOverscanUnlocked).toBe(true);
     expect(effects).toContainEqual({ kind: "reportAlignResult", result: "cancelled" });
+  });
+
+  it("keeps the top overscan locked when the user first scrolls down", () => {
+    // 解锁会让上方 section 首次渲染；virtuoso 只在向上滚动时补偿其尺寸差，向下滚动时
+    // 内容会整体下移（#115：开书后第一次向下滚跳约两屏）。向下滚本也用不上顶部预挂载。
+    const started = reduceViewport(initialViewportState(40), align).next;
+    const { next, effects } = reduceViewport(started, {
+      type: "USER_INPUT",
+      scrollIntent: true,
+      upward: false,
+    });
+    expect(next.phase.kind).toBe("userOwned");
+    expect(next.topOverscanUnlocked).toBe(false);
+    expect(effects).toContainEqual({ kind: "reportAlignResult", result: "cancelled" });
+    expect(overscanTop(next, 40, 2400)).toBe(0);
+
+    const up = reduceViewport(next, { type: "USER_INPUT", scrollIntent: true, upward: true }).next;
+    expect(overscanTop(up, 40, 2400)).toBe(2400);
   });
 
   it("cancels alignment on a bare pointerdown without taking ownership", () => {
@@ -148,9 +167,10 @@ describe("reduceViewport", () => {
     const { next, effects } = reduceViewport(started, {
       type: "USER_INPUT",
       scrollIntent: false,
+      upward: false,
     });
     expect(next.phase.kind).toBe("systemOwned");
-    expect(next.everUserNavigated).toBe(false);
+    expect(next.topOverscanUnlocked).toBe(false);
     expect(effects).toContainEqual({ kind: "reportAlignResult", result: "cancelled" });
   });
 
@@ -159,7 +179,11 @@ describe("reduceViewport", () => {
     const ignored = reduceViewport(initial, { type: "VISIBLE_TOP_CHANGED", index: 12 });
     expect(ignored.next.loadedFromIndex).toBe(40);
 
-    const owned = reduceViewport(initial, { type: "USER_INPUT", scrollIntent: true }).next;
+    const owned = reduceViewport(initial, {
+      type: "USER_INPUT",
+      scrollIntent: true,
+      upward: false,
+    }).next;
     const advanced = reduceViewport(owned, { type: "VISIBLE_TOP_CHANGED", index: 12 }).next;
     expect(advanced.loadedFromIndex).toBe(12);
   });
@@ -168,6 +192,7 @@ describe("reduceViewport", () => {
     const owned = reduceViewport(initialViewportState(40), {
       type: "USER_INPUT",
       scrollIntent: true,
+      upward: false,
     }).next;
     const back = reduceViewport(owned, { type: "VISIBLE_TOP_CHANGED", index: 12 }).next;
     const forward = reduceViewport(back, { type: "VISIBLE_TOP_CHANGED", index: 30 }).next;
@@ -180,7 +205,7 @@ describe("reduceViewport", () => {
       index: 3,
     });
     expect(next.phase.kind).toBe("systemOwned");
-    expect(next.everUserNavigated).toBe(true);
+    expect(next.topOverscanUnlocked).toBe(true);
     expect(next.loadedFromIndex).toBe(3);
     expect(effects).toEqual([{ kind: "scrollToIndex", index: 3 }]);
   });
@@ -193,8 +218,12 @@ describe("reduceViewport", () => {
     // 从头开书（initialIndex=0）没有「上方 section 推走目标」的风险，照常双向 overscan。
     expect(overscanTop(initial, 0, 2400)).toBe(2400);
 
-    // 一旦发生过用户级导航（即使仍是深处冷启的 initialIndex），latch 永久翻转，恢复双向 overscan。
-    const owned = reduceViewport(initial, { type: "USER_INPUT", scrollIntent: true }).next;
+    // 用户第一次向上滚（即使仍是深处冷启的 initialIndex），latch 永久翻转，恢复双向 overscan。
+    const owned = reduceViewport(initial, {
+      type: "USER_INPUT",
+      scrollIntent: true,
+      upward: true,
+    }).next;
     expect(overscanTop(owned, 40, 2400)).toBe(2400);
   });
 });

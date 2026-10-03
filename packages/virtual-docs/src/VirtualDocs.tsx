@@ -18,6 +18,7 @@ import {
   type ViewportEvent,
 } from "./viewport-machine";
 import { useMachine, type TransitionRecord } from "./use-machine";
+import { isUpwardScrollIntent } from "./scroll-intent";
 
 /** 未缓存 section 的默认占位高度（px）；缓存命中后用真实测高。 */
 const DEFAULT_ESTIMATE = 600;
@@ -32,6 +33,11 @@ const KEEP_DISTANCE = 5;
 const OVERSCAN_PX = { top: 2400, bottom: 2400 };
 /** 收敛重试间隔（ms）。 */
 const ALIGN_TICK_MS = 100;
+/**
+ * 滚动容器宽度变化后，等待 section 重测出新高度的窗口（ms）。SectionFrame 的重测有 100ms debounce，
+ * 1s 足够覆盖；窗口内无高度变化 = 正文栏被 maxWidth 卡住、文字没重排，不上报。
+ */
+const WIDTH_REFLOW_WINDOW_MS = 1000;
 
 export interface VirtualDocsHandle {
   /** 滚到第 index 个 section 顶（无收敛重试）。 */
@@ -63,6 +69,12 @@ export interface VirtualDocsProps {
    */
   loadSection: (index: number) => Promise<string>;
   styleCss?: string;
+  /**
+   * 只影响绘制、不改变排版的 CSS（如明暗主题配色），注入在 styleCss 之后、书自带样式之前。
+   * 与 styleCss 的区别：变化时原地替换各已载入文档里的样式，**不重载 iframe、不失效测高缓存**，
+   * 阅读位置不受影响。放入改变尺寸的规则会被 ResizeObserver 重测高度，但不保证位置。
+   */
+  paintCss?: string;
   initialIndex?: number;
   /**
    * section 的相对体量（如字符数），供未测量 section 按「已测 px/权重比」外推估高。
@@ -89,6 +101,13 @@ export interface VirtualDocsProps {
   onContentMouseDown?: () => void;
   /** 用户直接操作滚动区时触发；消费方可据此放弃尚未完成的位置恢复。 */
   onUserNavigation?: () => void;
+  /**
+   * 正文重排时回调：style = styleCss 变化（已清空测高缓存、section 将重载）；width = 滚动容器
+   * 宽度变化且确实有 section 重测出不同高度。像素 scrollTop 不变而内容已移位，消费方据此把视口
+   * 对齐回重排前的内容位置。回调时视口内容尚未因重排而变化（style：新文档未载入；width：在重测
+   * 写回高度的同一时刻同步回调）。
+   */
+  onReflow?: (reason: "style" | "width") => void;
   /** 点 iframe 内站内 <a>（相对路径 / #fragment）时回调；消费方据此 resolve 到 section+anchor 跳转。 */
   onInternalLink?: (e: { index: number; href: string }) => void;
   /** 点 iframe 内外链（http/https/mailto）时回调；消费方开系统浏览器。 */
@@ -108,6 +127,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
     count,
     loadSection,
     styleCss,
+    paintCss,
     initialIndex,
     sectionWeight,
     initialPxPerWeight,
@@ -120,6 +140,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
     onHighlightLeave,
     onContentMouseDown,
     onUserNavigation,
+    onReflow,
     onInternalLink,
     onExternalLink,
     onKeyDown,
@@ -145,10 +166,21 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
   const raiseRef = useRef<((event: ViewportEvent) => void) | null>(null);
   const onUserNavigationRef = useRef(onUserNavigation);
   onUserNavigationRef.current = onUserNavigation;
+  const onReflowRef = useRef(onReflow);
+  onReflowRef.current = onReflow;
+  /** 宽度变化后等待重测的截止时刻（performance.now()）；0 = 未布防。 */
+  const widthReflowDeadline = useRef(0);
   const [decorateNonce, setDecorateNonce] = useState(0);
   const [scrollerReady, setScrollerReady] = useState(0);
 
   const heightCache = useRef<Map<number, number>>(new Map());
+  /**
+   * 未测量 section 的估高在首次算出时冻结：calibratedEstimate 随已测样本漂移，若占位 / iframe 初始高度
+   * 随之在挂载后改变，就是一次没有补偿的位移。测得真高后以 heightCache 为准。
+   */
+  const frozenEstimates = useRef<Map<number, number>>(new Map());
+  /** 视口上方 section 暂缓写入的 iframe 高度：等用户上滚（virtuoso 会补偿）或该 section 进入视口时再写。 */
+  const pendingHeights = useRef<Map<number, { iframe: HTMLIFrameElement; px: number }>>(new Map());
   // 已 unload 的 section 集：避免重复 unload；section 重新进入保留区时移除（届时会 reload）。
   const unloaded = useRef<Set<number>>(new Set());
   const observedEls = useRef<Map<number, HTMLElement>>(new Map());
@@ -166,6 +198,15 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
       const r = el.getBoundingClientRect();
       return { index, top: r.top, bottom: r.bottom };
     });
+    // 暂存高度的 section 若已不在视口上方（跳转 / 重排使其进入视口），立即写入；已卸载的丢弃。
+    for (const [i, pending] of pendingHeights.current) {
+      const el = observedEls.current.get(i);
+      if (!el || !pending.iframe.isConnected) pendingHeights.current.delete(i);
+      else if (el.getBoundingClientRect().bottom > vt + 1) {
+        pending.iframe.style.height = `${pending.px}px`;
+        pendingHeights.current.delete(i);
+      }
+    }
     const section = topVisibleSection(secs, vt);
     if (section) raise({ type: "VISIBLE_TOP_CHANGED", index: section.index });
     if (section && (section.index !== lastTop.current || force)) {
@@ -294,13 +335,19 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
     setScrollerReady((n) => n + 1);
   }, []);
   const handleUserNavigation = useCallback(() => {
-    raise({ type: "USER_INPUT", scrollIntent: false });
+    raise({ type: "USER_INPUT", scrollIntent: false, upward: false });
     onUserNavigationRef.current?.();
   }, [raise]);
-  const handleUserScrollNavigation = useCallback(() => {
-    raise({ type: "USER_INPUT", scrollIntent: true });
-    onUserNavigationRef.current?.();
-  }, [raise]);
+  const handleUserScrollNavigation = useCallback(
+    (e: Event) => {
+      const upward = isUpwardScrollIntent(e);
+      // 先于浏览器滚动写入暂存高度：随后的上滚事件让 virtuoso 补偿这批尺寸变化。
+      if (upward) flushPendingHeights();
+      raise({ type: "USER_INPUT", scrollIntent: true, upward });
+      onUserNavigationRef.current?.();
+    },
+    [raise],
+  );
 
   // A new imperative command cancels the previous one above; genuine user input also owns the
   // viewport from that point onward, so stale restoration retries must not pull it back.
@@ -370,15 +417,87 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scrollerReady, ioSupported]);
 
-  // styleCss（排版偏好/主题）变更会改变所有 section 高度 → 整体失效缓存。
+  // styleCss（排版偏好）变更会改变所有 section 高度 → 整体失效缓存并上报重排。paintCss 不改高度，不在此列。
+  // 比对上一值而非依赖 effect 首跑：挂载不是重排。
+  const prevStyleCss = useRef(styleCss);
   useEffect(() => {
+    if (prevStyleCss.current === styleCss) return;
+    prevStyleCss.current = styleCss;
     heightCache.current.clear();
+    frozenEstimates.current.clear();
+    onReflowRef.current?.("style");
   }, [styleCss]);
+
+  // 宽度变化只布防；是否真的重排由随后的重测决定（见 onMeasured）。高度变化（如收起顶栏）不重排正文。
+  useEffect(() => {
+    const scroller = scrollerEl.current;
+    if (!scroller || typeof ResizeObserver === "undefined") return;
+    let lastWidth: number | null = null;
+    const ro = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width;
+      if (width == null) return;
+      if (lastWidth != null && Math.abs(width - lastWidth) >= 1)
+        widthReflowDeadline.current = performance.now() + WIDTH_REFLOW_WINDOW_MS;
+      lastWidth = width;
+    });
+    ro.observe(scroller);
+    return () => ro.disconnect();
+  }, [scrollerReady]);
 
   // itemContent 身份每渲染变会让 virtuoso 重渲全部在挂行 → 手动 useCallback 稳定（见上）。
   const onMeasured = useCallback((i: number, h: number) => {
+    const prev = heightCache.current.get(i);
     heightCache.current.set(i, h);
+    frozenEstimates.current.delete(i);
+    // 宽度变化窗口内首个高度变化 = 文字确实重排了；每个窗口只报一次（拖动窗口时连续布防，下游幂等）。
+    if (prev !== undefined && prev !== h && performance.now() < widthReflowDeadline.current) {
+      widthReflowDeadline.current = 0;
+      onReflowRef.current?.("width");
+    }
   }, []);
+  // section 整段位于视口线以上时，它的高度变化会把视口内容整体推移。virtuoso 只在用户正向上滚的瞬间
+  // 补偿这类变化（最后一次滚动事件 50ms 后它把方向重置为 none），而 section 高度是异步到达的（iframe
+  // 载入、图片解码、重测），常落在窗口之外。自己补偿会与它的启发式打架（其补偿后的 200ms 内任何滚动
+  // 都会让它再补一次），故不抢：上方 section 的新高度先暂存，等用户上滚（输入事件先于滚动，virtuoso
+  // 随后补偿）或该 section 进入视口时再写。上方内容不可见，暂用旧高度无妨。
+  const writeHeight = useCallback((index: number, iframe: HTMLIFrameElement, px: number) => {
+    const scroller = scrollerEl.current;
+    const outer = observedEls.current.get(index);
+    const above =
+      scroller != null &&
+      outer != null &&
+      outer.getBoundingClientRect().bottom <= scroller.getBoundingClientRect().top + 1;
+    if (above) {
+      pendingHeights.current.set(index, { iframe, px });
+      return;
+    }
+    pendingHeights.current.delete(index);
+    iframe.style.height = `${px}px`;
+  }, []);
+
+  const flushPendingHeights = useCallback(() => {
+    const pending = pendingHeights.current;
+    if (pending.size === 0) return;
+    for (const { iframe, px } of pending.values()) iframe.style.height = `${px}px`;
+    pending.clear();
+  }, []);
+
+  const estimateFor = (index: number): number => {
+    const cached = heightCache.current.get(index);
+    if (cached != null) return cached;
+    const frozen = frozenEstimates.current.get(index);
+    if (frozen != null) return frozen;
+    const estimate = calibratedEstimate(
+      heightCache.current,
+      sectionWeight,
+      index,
+      DEFAULT_ESTIMATE,
+      initialPxPerWeight,
+    );
+    frozenEstimates.current.set(index, estimate);
+    return estimate;
+  };
+
   const itemContent = useCallback(
     (index: number) => (
       <LazySection
@@ -386,6 +505,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
         deferLoad={deferBeforeLoadedIndex(viewport.loadedFromIndex, index)}
         loadSection={loadSection}
         styleCss={styleCss}
+        paintCss={paintCss}
         onSelect={onSelect}
         onSelectionCleared={onSelectionCleared}
         decorate={decorate}
@@ -399,14 +519,9 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
         onInternalLink={onInternalLink}
         onExternalLink={onExternalLink}
         onKeyDown={onKeyDown}
-        estimatedHeight={calibratedEstimate(
-          heightCache.current,
-          sectionWeight,
-          index,
-          DEFAULT_ESTIMATE,
-          initialPxPerWeight,
-        )}
+        estimatedHeight={estimateFor(index)}
         onMeasured={onMeasured}
+        writeHeight={writeHeight}
         registerSection={registerSection}
         unregisterSection={unregisterSection}
       />
@@ -416,6 +531,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
       initialIndex,
       viewport.loadedFromIndex,
       styleCss,
+      paintCss,
       sectionWeight,
       initialPxPerWeight,
       onSelect,
@@ -432,6 +548,7 @@ export const VirtualDocs = forwardRef<VirtualDocsHandle, VirtualDocsProps>(funct
       onExternalLink,
       onKeyDown,
       onMeasured,
+      writeHeight,
       registerSection,
       unregisterSection,
     ],
@@ -471,6 +588,7 @@ function LazySection({
   deferLoad,
   loadSection,
   styleCss,
+  paintCss,
   onSelect,
   onSelectionCleared,
   decorate,
@@ -486,6 +604,7 @@ function LazySection({
   onKeyDown,
   estimatedHeight,
   onMeasured,
+  writeHeight,
   registerSection,
   unregisterSection,
 }: {
@@ -493,6 +612,7 @@ function LazySection({
   deferLoad: boolean;
   loadSection: (index: number) => Promise<string>;
   styleCss?: string;
+  paintCss?: string;
   onSelect?: (e: SectionSelectEvent) => void;
   onSelectionCleared?: () => void;
   decorate?: (index: number, doc: Document) => void;
@@ -502,12 +622,13 @@ function LazySection({
   decorateNonce?: number;
   onContentMouseDown?: () => void;
   onUserNavigation?: () => void;
-  onUserScrollNavigation?: () => void;
+  onUserScrollNavigation?: (e: Event) => void;
   onInternalLink?: (e: { index: number; href: string }) => void;
   onExternalLink?: (url: string) => void;
   onKeyDown?: (e: KeyboardEvent) => void;
   estimatedHeight?: number;
   onMeasured?: (index: number, height: number) => void;
+  writeHeight?: (index: number, iframe: HTMLIFrameElement, px: number) => void;
   registerSection: (index: number, el: HTMLElement) => void;
   unregisterSection: (index: number, el: HTMLElement) => void;
 }) {
@@ -547,6 +668,7 @@ function LazySection({
           index={index}
           html={html}
           styleCss={styleCss}
+          paintCss={paintCss}
           onSelect={onSelect}
           onSelectionCleared={onSelectionCleared}
           decorate={decorate}
@@ -562,6 +684,7 @@ function LazySection({
           onKeyDown={onKeyDown}
           estimatedHeight={estimatedHeight}
           onMeasured={onMeasured}
+          writeHeight={writeHeight}
         />
       )}
     </div>
