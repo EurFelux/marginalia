@@ -1,10 +1,7 @@
 import type { DB } from "@main/db/client";
 import { dailyTotals, perBookTotals } from "@main/stats/reading-daily";
 import { localDayKey } from "@main/stats/day-key";
-import type { DailyPoint, ReadingStatsDto } from "@shared/stats";
-
-/** 当天合计达此秒数才算「读过书的一天」（streak / readingDays 计入门槛）。 */
-export const STREAK_MIN_SECONDS = 60;
+import { STREAK_MIN_SECONDS, type DailyPoint, type ReadingStatsDto } from "@shared/stats";
 
 /** 'YYYY-MM-DD' 加减天（按本地分量构造 Date 做日历运算，时区稳定）。 */
 function addDays(day: string, delta: number): string {

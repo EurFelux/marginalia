@@ -1,14 +1,10 @@
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { UsageBucket, UsageStatsDto } from "@shared/stats";
 import { formatTokens } from "@renderer/lib/format-tokens";
 import { cn } from "@renderer/lib/utils";
-import { bucketLabel, bucketSegments, chartScale } from "@renderer/stats/usage/usage-view";
-
-/** 绘图区高度（px），与 h-40 一致；柱段高度按它换算。 */
-const PLOT_HEIGHT = 160;
-/** 悬停提示框宽度（px），与 w-44 一致；用于把提示框夹在图内。 */
-const TIP_WIDTH = 176;
+import { BarChartFrame } from "@renderer/stats/BarChartFrame";
+import { bucketLabel, chartScale } from "@renderer/stats/chart-scale";
+import { bucketSegments } from "@renderer/stats/usage/usage-view";
 
 type Segment = "read" | "rest" | "out";
 const SEGMENTS: Segment[] = ["read", "rest", "out"];
@@ -22,18 +18,15 @@ const SEGMENT_CLASS: Record<Segment, string> = {
 /** 用量图：每根柱子自下而上叠缓存命中 / 其余输入 / 输出（spec 2026-10-12-ai-usage-stats-design §3.4）。 */
 export function UsageChart({ data }: { data: UsageStatsDto }) {
   const { t, i18n } = useTranslation();
-  const [active, setActive] = useState<number | null>(null);
   const lang = i18n.language;
   const series = data.series;
-  const max = series.reduce((m, b) => Math.max(m, b.inputTokens + b.outputTokens), 0);
-  const { top, ticks } = chartScale(max);
+  const scale = chartScale(series.reduce((m, b) => Math.max(m, b.inputTokens + b.outputTokens), 0));
   const label = (b: UsageBucket) => bucketLabel(b.key, data.granularity, lang);
   const segmentName: Record<Segment, string> = {
     read: t("stats.usage.cacheRead", "缓存命中"),
     rest: t("stats.usage.otherInput", "其余输入"),
     out: t("stats.usage.output", "输出"),
   };
-  const activeBucket = active == null ? null : series[active];
 
   return (
     <div className="rounded-xl border border-border bg-card p-4">
@@ -52,101 +45,60 @@ export function UsageChart({ data }: { data: UsageStatsDto }) {
           ))}
         </div>
       </div>
-      <div className="relative grid grid-cols-[auto_minmax(0,1fr)] gap-x-2.5">
-        <div
-          className="relative h-40 w-10 text-[11px] tabular-nums text-muted-foreground"
-          aria-hidden
-        >
-          {ticks.map((v) => (
-            <span
-              key={v}
-              className="absolute right-0 translate-y-1/2"
-              style={{ bottom: `${(v / top) * 100}%` }}
-            >
-              {formatTokens(v, lang)}
-            </span>
-          ))}
-        </div>
-        <div className="relative h-40">
-          {ticks.map((v) => (
+      <BarChartFrame
+        items={series}
+        keyOf={(b) => b.key}
+        scale={scale}
+        formatTick={(v) => formatTokens(v, lang)}
+        plotClassName="h-40"
+        xLabel={label}
+        ariaLabel={(b) => `${label(b)}: ${formatTokens(b.inputTokens + b.outputTokens, lang)}`}
+        renderBar={(b, active) => {
+          const segs = bucketSegments(b);
+          const total = b.inputTokens + b.outputTokens;
+          if (total <= 0) return <div className="h-0.5 w-[min(24px,72%)] rounded-full bg-muted" />;
+          return (
             <div
-              key={v}
-              className="absolute inset-x-0 h-px bg-border/70"
-              style={{ bottom: `${(v / top) * 100}%` }}
-            />
-          ))}
-          <div className="absolute inset-0 flex items-end" onMouseLeave={() => setActive(null)}>
-            {series.map((b, i) => {
-              const segs = bucketSegments(b);
-              const total = b.inputTokens + b.outputTokens;
-              return (
+              className={cn(
+                "flex w-[min(24px,72%)] flex-col-reverse gap-0.5",
+                active && "brightness-90",
+              )}
+              // 柱高按 token 数占顶值的比例（运行时计算值）；各段在柱内按 token 数分高度
+              style={{ height: `${(total / scale.top) * 100}%` }}
+            >
+              {SEGMENTS.filter((s) => segs[s] > 0).map((s) => (
                 <div
-                  key={b.key}
-                  tabIndex={0}
-                  aria-label={`${label(b)}: ${formatTokens(total, lang)}`}
-                  className="flex h-full flex-1 items-end justify-center rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-                  onMouseEnter={() => setActive(i)}
-                  onFocus={() => setActive(i)}
-                  onBlur={() => setActive(null)}
-                >
-                  {total > 0 ? (
-                    <div
-                      className={cn(
-                        "flex w-[min(24px,72%)] flex-col-reverse gap-0.5",
-                        active === i && "brightness-90",
-                      )}
-                    >
-                      {SEGMENTS.filter((s) => segs[s] > 0).map((s) => (
-                        <div
-                          key={s}
-                          className={cn(SEGMENT_CLASS[s], "last:rounded-t-[4px]")}
-                          // 段高按 token 数换算（运行时计算值）；扣掉 2px 段间隙，最矮 2px 保证可见
-                          style={{ height: `${Math.max(2, (segs[s] / top) * PLOT_HEIGHT - 2)}px` }}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="h-0.5 w-[min(24px,72%)] rounded-full bg-muted" />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-        {activeBucket && active != null && (
-          <div
-            className="pointer-events-none absolute top-0 z-10 grid w-44 grid-cols-[1fr_auto] gap-x-3 gap-y-0.5 rounded-lg border border-border bg-popover p-2.5 text-xs text-popover-foreground shadow-lg"
-            // 提示框跟随柱子水平居中，并夹在图内（运行时计算值）
-            style={{
-              left: `clamp(0px, calc(${((active + 0.5) / series.length) * 100}% - ${TIP_WIDTH / 2}px), calc(100% - ${TIP_WIDTH}px))`,
-            }}
-          >
-            <span className="col-span-2 mb-0.5 font-semibold">{label(activeBucket)}</span>
-            {SEGMENTS.map((s) => (
-              <TipRow
-                key={s}
-                swatch={SEGMENT_CLASS[s]}
-                name={segmentName[s]}
-                value={formatTokens(bucketSegments(activeBucket)[s], lang)}
-              />
-            ))}
-            <span className="mt-0.5 border-t border-border pt-1 text-muted-foreground">
-              {t("stats.usage.tipTotal", "合计 · {{count}} 次调用", {
-                count: activeBucket.requests,
-              })}
-            </span>
-            <span className="mt-0.5 border-t border-border pt-1 text-end tabular-nums">
-              {formatTokens(activeBucket.inputTokens + activeBucket.outputTokens, lang)}
-            </span>
-          </div>
-        )}
-        {series.length > 0 && (
-          <div className="col-start-2 mt-1.5 flex justify-between text-[11px] tabular-nums text-muted-foreground">
-            <span>{label(series[0])}</span>
-            <span>{label(series[series.length - 1])}</span>
-          </div>
-        )}
-      </div>
+                  key={s}
+                  className={cn(SEGMENT_CLASS[s], "min-h-0.5 basis-0 last:rounded-t-[4px]")}
+                  style={{ flexGrow: segs[s] }}
+                />
+              ))}
+            </div>
+          );
+        }}
+        renderTip={(b) => {
+          const segs = bucketSegments(b);
+          return (
+            <div className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5">
+              <span className="col-span-2 mb-0.5 font-semibold">{label(b)}</span>
+              {SEGMENTS.map((s) => (
+                <TipRow
+                  key={s}
+                  swatch={SEGMENT_CLASS[s]}
+                  name={segmentName[s]}
+                  value={formatTokens(segs[s], lang)}
+                />
+              ))}
+              <span className="mt-0.5 border-t border-border pt-1 text-muted-foreground">
+                {t("stats.usage.tipTotal", "合计 · {{count}} 次调用", { count: b.requests })}
+              </span>
+              <span className="mt-0.5 border-t border-border pt-1 text-end tabular-nums">
+                {formatTokens(b.inputTokens + b.outputTokens, lang)}
+              </span>
+            </div>
+          );
+        }}
+      />
     </div>
   );
 }
