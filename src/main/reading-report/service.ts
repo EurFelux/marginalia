@@ -3,6 +3,7 @@ import type { ResolvedModel } from "@main/ai/assistant-model";
 import type { RunBackground } from "@main/ai/background-limiter";
 import type { DB } from "@main/db/client";
 import { books } from "@main/db/schema";
+import { meteredModel } from "@main/usage/metered-model";
 import { createLogger } from "@main/logger";
 import { applyReadingReportMemoryMutations } from "@main/memory/repository";
 import { supportsImageToolResults } from "@main/ai/model-factory";
@@ -86,6 +87,11 @@ export function startReadingReportGeneration(
   // 让它长期占用后台并发额度既会挡住真正的后台摘要，也会与其派出的 subagent 互等成死锁。
   void (async () => {
     claim.signal.throwIfAborted();
+    // 写报告的 agent 与其调查子任务共用这一个计量后的模型，用量记为 report（spec 2026-10-12 §4.3）
+    const metered = {
+      ...resolved,
+      model: meteredModel(resolved, { db: deps.db, purpose: "report", bookId: session.bookId }),
+    };
     const title =
       deps.db.select({ title: books.title }).from(books).where(eq(books.id, session.bookId)).get()
         ?.title ?? null;
@@ -97,7 +103,7 @@ export function startReadingReportGeneration(
       investigate: deps.createInvestigator({
         db: deps.db,
         session,
-        resolved,
+        resolved: metered,
         runBackground: deps.runBackground,
         abortSignal: claim.signal,
       }),
@@ -121,7 +127,7 @@ export function startReadingReportGeneration(
       },
     });
     await deps.runAgent({
-      resolved,
+      resolved: metered,
       tools: withProgress(
         { ...tools, ...memoryWorkspace.tools, ...submission.tools },
         deps.runtime.sink(session.id, claim.generation),

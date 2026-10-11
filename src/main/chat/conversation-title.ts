@@ -5,6 +5,7 @@ import type { DB } from "@main/db/client";
 import { conversations } from "@main/db/schema";
 import type { ResolvedModel } from "@main/ai/assistant-model";
 import type { RunBackground } from "@main/ai/background-limiter";
+import { meteredModel } from "@main/usage/metered-model";
 import { createLogger } from "@main/logger";
 
 const log = createLogger("chat");
@@ -75,9 +76,15 @@ export async function nameConversation(
   }
   namingInFlight.add(conversationId);
   try {
+    const bookId =
+      deps.db
+        .select({ bookId: conversations.bookId })
+        .from(conversations)
+        .where(eq(conversations.id, conversationId))
+        .get()?.bookId ?? null;
     const { text } = await deps.runBackground(() =>
       generateText({
-        model: resolved.model,
+        model: meteredModel(resolved, { db: deps.db, purpose: "naming", bookId }),
         reasoning: resolved.reasoningEffort, // v7 顶层 reasoning；undefined = provider 默认
         instructions: NAMING_SYSTEM,
         prompt: `用户：${userText}\n\n助手：${assistantText}`,

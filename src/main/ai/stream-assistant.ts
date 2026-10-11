@@ -21,6 +21,7 @@ import { nameConversation } from "@main/chat/conversation-title";
 import { appendMessage } from "@main/chat/messages";
 import { textOfParts } from "@main/ai/prompt";
 import { summarizeUsage } from "@main/ai/usage";
+import { meteredModel } from "@main/usage/metered-model";
 import type { ResolvedModel } from "@main/ai/assistant-model";
 import type { SendDeps } from "@main/ai/send";
 import { DEFAULT_STEP_LIMIT } from "@shared/preferences";
@@ -109,7 +110,7 @@ export function streamAssistantReply(
     messages,
   });
   const result = streamText({
-    model: resolved.model,
+    model: meteredModel(resolved, { db, purpose: "chat", bookId }),
     // 顶层 reasoning（v7）：SDK 按 provider 翻译成各自原生推理配置；undefined = provider 默认。
     reasoning: resolved.reasoningEffort,
     instructions: cached.system,

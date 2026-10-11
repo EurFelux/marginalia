@@ -7,6 +7,7 @@ import { MockLanguageModelV4, simulateReadableStream } from "ai/test";
 import { makeFixtureEpub } from "@marginalia/epub-parser";
 import { makeTextPdf } from "@marginalia/pdf-parser/fixture";
 import { createDb, runMigrations } from "@main/db/client";
+import { aiUsage } from "@main/db/schema";
 import { importBook } from "@main/library/repository";
 import {
   createConversation,
@@ -267,6 +268,16 @@ describe("runSend", () => {
     if (!r.ok) return;
     await r.finished;
 
+    // 账本按模型请求记：两步回合两行
+    expect(
+      db
+        .select({ purpose: aiUsage.purpose, bookId: aiUsage.bookId, input: aiUsage.inputTokens })
+        .from(aiUsage)
+        .all(),
+    ).toEqual([
+      { purpose: "chat", bookId: book.id, input: 100 },
+      { purpose: "chat", bookId: book.id, input: 150 },
+    ]);
     const assistant = listMessages(db, r.conversationId).find((m) => m.role === "assistant")!;
     expect(assistant.metadata?.usage).toEqual({
       inputTokens: 250,
@@ -466,6 +477,19 @@ describe("runSend", () => {
     if (!r.ok) return;
     await r.finished;
     await vi.waitFor(() => expect(getConversation(db, convo.id)?.title).toBe("AI 标题"));
+    // 用量账本：对话回复一行 + 后台命名一行，都归到这本书
+    await vi.waitFor(() =>
+      expect(
+        db
+          .select({ purpose: aiUsage.purpose, model: aiUsage.model, bookId: aiUsage.bookId })
+          .from(aiUsage)
+          .all()
+          .sort((a, b) => a.purpose.localeCompare(b.purpose)),
+      ).toEqual([
+        { purpose: "chat", model: "mock", bookId: book.id },
+        { purpose: "naming", model: "summary-model", bookId: book.id },
+      ]),
+    );
   });
 
   it("does not rename a conversation that already has a title", async () => {

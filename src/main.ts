@@ -30,6 +30,7 @@ import { initReadingClock, bindWindowToClock } from "@main/stats/clock-wiring";
 import { registerCoverProtocol, registerCoverProtocolScheme } from "@main/library/cover-protocol";
 import { registerMediaProtocol, registerMediaProtocolScheme } from "@main/media/media-protocol";
 import { maybeSeedSampleBook } from "@main/onboarding/seed-sample";
+import { backfillUsageLedger } from "@main/usage/backfill";
 import { appService } from "@main/app";
 
 // dev 与 production 各用独立的 userData 目录（分库，避免两环境互相污染数据）。
@@ -148,6 +149,12 @@ app.on("ready", async () => {
     dbLog.error("failed to initialize", err);
     app.quit();
     return;
+  }
+  // 用量账本首次回填（只做一次；失败不挡启动，下次启动重来——spec 2026-10-12-ai-usage-stats-design §4.4）
+  try {
+    backfillUsageLedger(getDb());
+  } catch (err) {
+    dbLog.warn("usage ledger backfill failed; will retry on next launch", err);
   }
   // 主进程 i18n：读已存语言偏好（null → undefined 退系统 locale 匹配）
   // 首启语言解析一次，i18n 与样书播种共用（书与界面语言一致）

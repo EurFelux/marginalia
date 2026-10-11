@@ -8,6 +8,7 @@ import type { SummaryStatus } from "@shared/library";
 import type { ResolvedModel } from "@main/ai/assistant-model";
 import type { RunBackground } from "@main/ai/background-limiter";
 import type { LoadBytes } from "@main/ai/tools";
+import { meteredModel } from "@main/usage/metered-model";
 import { createLogger } from "@main/logger";
 
 const log = createLogger("summary");
@@ -111,7 +112,7 @@ export async function ensureChapterSummary(
         maxChars: SUMMARY_INPUT_MAX_CHARS,
       });
       const generated = await generateText({
-        model: resolved.model,
+        model: meteredModel(resolved, { db, purpose: "summary", bookId }),
         reasoning: resolved.reasoningEffort, // v7 顶层 reasoning；undefined = provider 默认
         instructions: SUMMARY_SYSTEM,
         prompt: slice.text,
@@ -207,7 +208,7 @@ export async function ensureBookSummary(
       // streamText 遇错发 error chunk 并正常关流（textStream 不 throw），故用 onError 标志兜——否则会把半截落库。
       let hadError = false;
       const result = streamText({
-        model: resolved.model,
+        model: meteredModel(resolved, { db, purpose: "summary", bookId }),
         reasoning: resolved.reasoningEffort, // v7 顶层 reasoning；undefined = provider 默认
         instructions: BOOK_SUMMARY_SYSTEM,
         prompt: text,

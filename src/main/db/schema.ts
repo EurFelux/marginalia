@@ -15,6 +15,7 @@ import { v7 as uuidv7 } from "uuid";
 import type { UIMessage } from "ai";
 import type { AiProviderApiType } from "@shared/providers";
 import type { MessageMetadata, TocNode } from "@shared/types";
+import { USAGE_PURPOSES } from "@shared/stats";
 
 const pkUuid = () =>
   text("id")
@@ -329,5 +330,34 @@ export const permissionRules = sqliteTable(
     check("permission_rules_tool_check", sql`${t.tool} in ('bash')`),
     check("permission_rules_decision_check", sql`${t.decision} in ('allow','deny')`),
     unique("permission_rules_unique").on(t.tool, t.decision, t.pattern),
+  ],
+);
+
+// AI 用量账本（spec 2026-10-12-ai-usage-stats-design §4.1）：只追加，一次模型请求一行（回填的旧对话一轮一行）。
+// book_id 刻意不设外键：为空 = 不属于某本书；有值但 books 查无 = 书已删除。删书置空会让两者混在一起。
+export const aiUsage = sqliteTable(
+  "ai_usage",
+  {
+    id: pkUuid(),
+    createdAt: nowMs(),
+    purpose: text("purpose", { enum: USAGE_PURPOSES }).notNull(),
+    model: text("model"),
+    bookId: text("book_id"),
+    /** 这一行代表的模型请求次数：实时记录恒为 1，回填行取 stepCount。 */
+    requests: integer("requests").notNull().default(1),
+    inputTokens: integer("input_tokens").notNull(),
+    outputTokens: integer("output_tokens").notNull(),
+    // provider 没报的项为 null（未知），不写 0
+    cacheReadTokens: integer("cache_read_tokens"),
+    cacheWriteTokens: integer("cache_write_tokens"),
+    noCacheTokens: integer("no_cache_tokens"),
+    reasoningTokens: integer("reasoning_tokens"),
+  },
+  (t) => [
+    check(
+      "ai_usage_purpose_check",
+      sql`${t.purpose} in ('chat','summary','report','compaction','memory','naming')`,
+    ),
+    index("ai_usage_created_at_idx").on(t.createdAt),
   ],
 );
