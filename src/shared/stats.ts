@@ -19,10 +19,16 @@ export const USAGE_PURPOSES = [
 ] as const;
 export type UsagePurpose = (typeof USAGE_PURPOSES)[number];
 
+/** 当天合计达此秒数才算「读过书的一天」：连续阅读 / 累计阅读天数的门槛，热力图的空格也按它（两层共用）。 */
+export const STREAK_MIN_SECONDS = 60;
+
+/** 统计页取数窗口上限：热力图 53 周 × 7 天（spec 2026-10-12-reading-stats-charts-design §4）。 */
+export const MAX_DAILY_DAYS = 371;
+
 /** 统计页取数；dailyDays 控制每日柱图窗口（省略时由 handler 兜底 30——
  * 不在此用 .default()：本仓库 invoker 的入参类型取 z.infer=output，default 会令该字段对调用方变必填）。 */
 export const statsGetInput = z.object({
-  dailyDays: z.number().int().positive().max(366).optional(),
+  dailyDays: z.number().int().positive().max(MAX_DAILY_DAYS).optional(),
 });
 export type StatsGetInput = z.infer<typeof statsGetInput>;
 

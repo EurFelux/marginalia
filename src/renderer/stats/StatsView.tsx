@@ -1,15 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { MAX_DAILY_DAYS } from "@shared/stats";
 import { qk } from "@renderer/query/keys";
 import { ScrollArea } from "@renderer/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@renderer/components/ui/tabs";
 import { StatOverview } from "@renderer/stats/StatOverview";
 import { DailyBarChart } from "@renderer/stats/DailyBarChart";
+import { ReadingHeatmap } from "@renderer/stats/ReadingHeatmap";
 import { StreakCard } from "@renderer/stats/StreakCard";
 import { BookRanking } from "@renderer/stats/BookRanking";
 import { UsageStatsView } from "@renderer/stats/usage/UsageStatsView";
 
-const DAILY_DAYS = 30;
+/** 柱状图看最近 30 天；取数窗口按热力图的上限取（spec 2026-10-12-reading-stats-charts-design §4）。 */
+const BAR_DAYS = 30;
 
 /** 统计页：「阅读 / AI 用量」两个标签，默认阅读、切换不记忆（spec 2026-10-12-ai-usage-stats-design §3.1）。 */
 export function StatsView() {
@@ -36,8 +39,8 @@ function ReadingStats() {
   const { t } = useTranslation();
   // staleTime:0 + refetchOnMount：查看统计页时不在 reader、不再累计，切到该 tab 取最新即可，无需轮询。
   const stats = useQuery({
-    queryKey: qk.stats(DAILY_DAYS),
-    queryFn: () => window.api.stats.get({ dailyDays: DAILY_DAYS }),
+    queryKey: qk.stats(MAX_DAILY_DAYS),
+    queryFn: () => window.api.stats.get({ dailyDays: MAX_DAILY_DAYS }),
     staleTime: 0,
     refetchOnMount: "always",
   });
@@ -63,7 +66,8 @@ function ReadingStats() {
         todaySeconds={d.todaySeconds}
         weekSeconds={d.weekSeconds}
       />
-      <DailyBarChart daily={d.daily} />
+      <ReadingHeatmap daily={d.daily} />
+      <DailyBarChart daily={d.daily.slice(-BAR_DAYS)} />
       <StreakCard
         currentStreak={d.currentStreak}
         longestStreak={d.longestStreak}

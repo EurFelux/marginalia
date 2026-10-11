@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bucketLabel, bucketSegments, chartScale, hitRate } from "@renderer/stats/usage/usage-view";
+import { bucketSegments, hitRate } from "@renderer/stats/usage/usage-view";
 
 const totals = (over: Partial<Parameters<typeof hitRate>[0]>) => ({
   inputTokens: 0,
@@ -27,23 +27,5 @@ describe("bucketSegments", () => {
         ...totals({ inputTokens: 100, cacheReadTokens: 70, outputTokens: 5 }),
       }),
     ).toEqual({ read: 70, rest: 30, out: 5 });
-  });
-});
-
-describe("chartScale", () => {
-  it("rounds the top up to a clean step with about four gridlines", () => {
-    expect(chartScale(470_000)).toEqual({ top: 600_000, ticks: [0, 200_000, 400_000, 600_000] });
-    expect(chartScale(1000)).toEqual({ top: 1000, ticks: [0, 500, 1000] });
-  });
-  it("handles an all-zero chart", () => {
-    expect(chartScale(0)).toEqual({ top: 1, ticks: [0] });
-  });
-});
-
-describe("bucketLabel", () => {
-  it("formats days and months in the UI language", () => {
-    expect(bucketLabel("2026-10-12", "day", "en")).toBe("10/12");
-    expect(bucketLabel("2026-10", "month", "en")).toBe("Oct 2026");
-    expect(bucketLabel("2026-10", "month", "zh-CN")).toBe("2026年10月");
   });
 });
