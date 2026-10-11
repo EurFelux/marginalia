@@ -20,6 +20,7 @@ import { maybeConsolidateMemory } from "@main/ai/memory-consolidation";
 import { nameConversation } from "@main/chat/conversation-title";
 import { appendMessage } from "@main/chat/messages";
 import { textOfParts } from "@main/ai/prompt";
+import { summarizeUsage } from "@main/ai/usage";
 import type { ResolvedModel } from "@main/ai/assistant-model";
 import type { SendDeps } from "@main/ai/send";
 import { DEFAULT_STEP_LIMIT } from "@shared/preferences";
@@ -89,7 +90,8 @@ export function streamAssistantReply(
     ...skillTools,
   };
 
-  let capturedUsage: LanguageModelUsage | undefined;
+  // 逐步收集 usage：中止时 SDK 不触发 onEnd，按已完成步骤补算（spec 2026-10-11 message-usage-display §3.4）。
+  const stepUsages: LanguageModelUsage[] = [];
   // 流级错误标志：仅由 streamText 的 onError 置位——它只在流中出现 error chunk 时触发。
   // 工具层错误（非法 JSON / 参数不合 schema / 未知工具 / execute 抛错）走 tool-error part，
   // SDK 将其作为工具结果喂回模型、循环继续，不算流级错误（spec 2026-09-24 chat-turn-outcome）。
@@ -116,10 +118,6 @@ export function streamAssistantReply(
     providerOptions: providerCallOptions(resolved.providerType),
     stopWhen: limit === 0 ? () => false : isStepCount(limit),
     abortSignal: opts?.abortSignal,
-    // v7: onFinish→onEnd；事件的 usage 现为全步累计（= v6 的 totalUsage），语义不变。
-    onEnd: ({ usage }) => {
-      capturedUsage = usage;
-    },
     onError: ({ error }) => {
       streamHadError = true;
       errorInfo = {
@@ -128,8 +126,9 @@ export function streamAssistantReply(
       };
       log.warn("stream/model error", error);
     },
-    onStepEnd: ({ finishReason, rawFinishReason, toolCalls, text }) => {
+    onStepEnd: ({ finishReason, rawFinishReason, toolCalls, text, usage }) => {
       lastFinish = { finishReason, rawFinishReason };
+      stepUsages.push(usage);
       log.debug(
         `step finished (finishReason=${finishReason}, toolCalls=${toolCalls.length}, textChars=${text.length})`,
       );
@@ -170,10 +169,6 @@ export function streamAssistantReply(
           : isAborted
             ? "aborted"
             : "complete";
-      const usage =
-        capturedUsage?.inputTokens != null && capturedUsage.outputTokens != null
-          ? { inputTokens: capturedUsage.inputTokens, outputTokens: capturedUsage.outputTokens }
-          : undefined;
       appendMessage(db, {
         conversationId,
         role: "assistant",
@@ -181,7 +176,7 @@ export function streamAssistantReply(
         status,
         metadata: {
           model: resolved.modelId,
-          usage,
+          usage: summarizeUsage(stepUsages),
           error: streamHadError ? errorInfo : undefined,
           finish:
             feedback && lastFinish

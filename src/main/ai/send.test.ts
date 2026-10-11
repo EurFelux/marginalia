@@ -2,6 +2,7 @@
 import path from "node:path";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { UIMessageChunk } from "ai";
+import type { LanguageModelV4Usage } from "@ai-sdk/provider";
 import { MockLanguageModelV4, simulateReadableStream } from "ai/test";
 import { makeFixtureEpub } from "@marginalia/epub-parser";
 import { makeTextPdf } from "@marginalia/pdf-parser/fixture";
@@ -29,7 +30,7 @@ const passThrough: RunBackground = (fn) => fn();
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
 
 // V3 流分片形状（与 summary.test.ts 的 genModel 同源）。usage 嵌套、finishReason 为对象。
-const USAGE = {
+const USAGE: LanguageModelV4Usage = {
   inputTokens: { total: 1, noCache: undefined, cacheRead: undefined, cacheWrite: undefined },
   outputTokens: { total: 1, text: undefined, reasoning: undefined },
 };
@@ -66,8 +67,32 @@ function namingOnlyModel(namingTitle: string) {
   });
 }
 
-// 两步 agent mock：第1步发 getToc 工具调用，第2步发文本。
-function tocThenTextModel(text: string) {
+/** 带缓存拆分的 V3 usage 分片。 */
+function detailedUsage(u: {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  noCache: number;
+}): LanguageModelV4Usage {
+  return {
+    inputTokens: {
+      total: u.input,
+      noCache: u.noCache,
+      cacheRead: u.cacheRead,
+      cacheWrite: u.cacheWrite,
+    },
+    outputTokens: { total: u.output, text: u.output, reasoning: undefined },
+  };
+}
+
+// 两步 agent mock：第1步发 getToc 工具调用，第2步发文本。可按步指定 usage；
+// onSecondCall 在第2步开流前调用（中止测试借此在第1步完成后、第2步途中 abort）。
+function tocThenTextModel(
+  text: string,
+  usages: [LanguageModelV4Usage, LanguageModelV4Usage] = [USAGE, USAGE],
+  opts?: { onSecondCall?: () => void; secondStepDelayMs?: number },
+) {
   let call = 0;
   return new MockLanguageModelV4({
     doStream: async () => {
@@ -77,18 +102,20 @@ function tocThenTextModel(text: string) {
           stream: simulateReadableStream({
             chunks: [
               { type: "tool-call" as const, toolCallId: "c1", toolName: "getToc", input: "{}" },
-              finishChunk("tool-calls"),
+              { ...finishChunk("tool-calls"), usage: usages[0] },
             ],
           }),
         };
       }
+      opts?.onSecondCall?.();
       return {
         stream: simulateReadableStream({
+          chunkDelayInMs: opts?.secondStepDelayMs,
           chunks: [
             { type: "text-start", id: "t1" },
             { type: "text-delta", id: "t1", delta: text },
             { type: "text-end", id: "t1" },
-            finishChunk("stop"),
+            { ...finishChunk("stop"), usage: usages[1] },
           ],
         }),
       };
@@ -217,7 +244,39 @@ describe("runSend", () => {
       .join("");
     expect(assistantText).toContain("It means hello.");
     expect(msgs[1].status).toBe("complete");
-    expect(msgs[1].metadata?.usage).toEqual({ inputTokens: 1, outputTokens: 1 });
+    expect(msgs[1].metadata?.usage).toEqual({
+      inputTokens: 1,
+      outputTokens: 1,
+      stepCount: 1,
+      lastStepInputTokens: 1,
+    });
+  });
+
+  it("persists the summed usage breakdown of a multi-step turn", async () => {
+    const { db, book, deps } = await setup({
+      ok: true,
+      model: tocThenTextModel("Done.", [
+        detailedUsage({ input: 100, output: 10, cacheRead: 0, cacheWrite: 80, noCache: 20 }),
+        detailedUsage({ input: 150, output: 20, cacheRead: 120, cacheWrite: 10, noCache: 20 }),
+      ]),
+      modelId: "mock",
+    });
+    const convo = createConversation(db, { bookId: book.id });
+    const r = await runSend(deps, input(book.id, convo.id));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    await r.finished;
+
+    const assistant = listMessages(db, r.conversationId).find((m) => m.role === "assistant")!;
+    expect(assistant.metadata?.usage).toEqual({
+      inputTokens: 250,
+      outputTokens: 30,
+      cacheReadTokens: 120,
+      cacheWriteTokens: 90,
+      noCacheTokens: 40,
+      stepCount: 2,
+      lastStepInputTokens: 150,
+    });
   });
 
   it("runs the tool-calling agent loop and persists tool parts in the assistant message", async () => {
@@ -299,6 +358,38 @@ describe("runSend", () => {
     await r.finished;
     const assistant = listMessages(db, r.conversationId).find((m) => m.role === "assistant");
     expect(assistant?.status).toBe("aborted");
+    // 一步都没完成：不存 usage
+    expect(assistant?.metadata?.usage).toBeUndefined();
+  });
+
+  it("persists the usage of completed steps when aborted mid-turn", async () => {
+    const controller = new AbortController();
+    const model = tocThenTextModel(
+      "never finished",
+      [
+        detailedUsage({ input: 100, output: 10, cacheRead: 60, cacheWrite: 30, noCache: 10 }),
+        detailedUsage({ input: 999, output: 999, cacheRead: 0, cacheWrite: 0, noCache: 999 }),
+      ],
+      { onSecondCall: () => controller.abort(), secondStepDelayMs: 50 },
+    );
+    const { db, book, deps } = await setup({ ok: true, model, modelId: "mock" });
+    const convo = createConversation(db, { bookId: book.id });
+    const r = await runSend(deps, input(book.id, convo.id), { abortSignal: controller.signal });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    await r.finished;
+
+    const assistant = listMessages(db, r.conversationId).find((m) => m.role === "assistant");
+    expect(assistant?.status).toBe("aborted");
+    expect(assistant?.metadata?.usage).toEqual({
+      inputTokens: 100,
+      outputTokens: 10,
+      cacheReadTokens: 60,
+      cacheWriteTokens: 30,
+      noCacheTokens: 10,
+      stepCount: 1,
+      lastStepInputTokens: 100,
+    });
   });
 
   it("drops the assistant persist when the conversation is deleted mid-stream", async () => {

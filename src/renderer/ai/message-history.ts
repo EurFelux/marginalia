@@ -23,12 +23,18 @@ function hydrateChip(snapshot: ChipSnapshot): Chip {
  * 持久化 MessageDto → useChat 的 ChatUIMessage。
  * parts 本就是 UIMessage["parts"]，role(MessageRole) ⊆ UIMessage role；
  * metadata.contextChips 由快照水合回 live Chip，使重开会话后历史用户气泡重渲 chip 徽标；
- * createdAt 一并带上，供气泡渲染时间戳与日期分隔（#108）。
+ * createdAt 一并带上，供气泡渲染时间戳与日期分隔（#108）；
+ * assistant 行另带 usage / model / status，供操作栏的用量卡（spec 2026-10-11 message-usage-display §4.3）。
  */
 export function messageDtoToUIMessage(dto: MessageDto): ChatUIMessage {
   const chips = dto.metadata?.contextChips;
   const metadata: ChatUIMessage["metadata"] = { createdAt: dto.createdAt };
   if (chips && chips.length > 0) metadata.contextChips = chips.map(hydrateChip);
+  if (dto.role === "assistant") {
+    metadata.status = dto.status;
+    if (dto.metadata?.usage) metadata.usage = dto.metadata.usage;
+    if (dto.metadata?.model) metadata.model = dto.metadata.model;
+  }
   return { id: dto.id, role: dto.role, parts: dto.parts, metadata };
 }
 

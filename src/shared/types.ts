@@ -22,6 +22,27 @@ export const tocNodeSchema: z.ZodType<TocNode> = z.lazy(() =>
   }),
 );
 
+const tokenCount = z.number().int().nonnegative();
+
+/**
+ * 一轮 assistant 回复的 token 用量（spec 2026-10-11 message-usage-display §4.1）。
+ * 输入/输出为已完成各步之和（计费口径）；拆分项只在 provider 报了时存在。
+ */
+export const messageUsageSchema = z.object({
+  inputTokens: tokenCount,
+  outputTokens: tokenCount,
+  cacheReadTokens: tokenCount.optional(),
+  cacheWriteTokens: tokenCount.optional(),
+  noCacheTokens: tokenCount.optional(),
+  reasoningTokens: tokenCount.optional(),
+  /** 已完成的步数（本功能上线前的旧消息没有）。 */
+  stepCount: tokenCount.optional(),
+  /** 最后一个已完成步骤的输入，即当时上下文的大小。 */
+  lastStepInputTokens: tokenCount.optional(),
+});
+
+export type MessageUsage = z.infer<typeof messageUsageSchema>;
+
 /** 消息附带的 app 元数据（存入 UIMessage.metadata） */
 export const messageMetadataSchema = z.object({
   contextChips: z
@@ -34,12 +55,7 @@ export const messageMetadataSchema = z.object({
     )
     .optional(),
   model: z.string().optional(),
-  usage: z
-    .object({
-      inputTokens: z.number().int().nonnegative(),
-      outputTokens: z.number().int().nonnegative(),
-    })
-    .optional(),
+  usage: messageUsageSchema.optional(),
   // error 终态的原因（透传 provider 真实 name/message；不编造、不分类——结构化 reason 是 ma5-deferred #6）。
   error: z
     .object({
