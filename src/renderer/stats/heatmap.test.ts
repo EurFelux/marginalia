@@ -1,17 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { HEATMAP_WEEKS, heatLevel, heatmapGrid } from "@renderer/stats/heatmap";
+import { HEATMAP_WEEKS, heatLevel, heatmapGrid, heatThresholds } from "@renderer/stats/heatmap";
 
 const TODAY = "2026-10-12"; // 周一
 
+describe("heatThresholds", () => {
+  it("takes the 25th, 50th and 75th percentile of read days, ignoring days under a minute", () => {
+    expect(heatThresholds([30, 600, 1200, 1800, 2400, 0])).toEqual([600, 1200, 1800]);
+    expect(heatThresholds([100, 200, 300, 400, 500, 600, 700, 800])).toEqual([200, 400, 600]);
+  });
+  it("is null when nothing was read", () => {
+    expect(heatThresholds([0, 30])).toBeNull();
+  });
+});
+
 describe("heatLevel", () => {
-  it("leaves days under a minute empty and splits the rest by the longest day", () => {
-    expect(heatLevel(30, 3600)).toBe(0);
-    expect(heatLevel(60, 3600)).toBe(1);
-    expect(heatLevel(900, 3600)).toBe(1);
-    expect(heatLevel(901, 3600)).toBe(2);
-    expect(heatLevel(2700, 3600)).toBe(3);
-    expect(heatLevel(3600, 3600)).toBe(4);
-    expect(heatLevel(0, 0)).toBe(0);
+  const q = [600, 1200, 1800] as const;
+  it("leaves days under a minute empty and puts boundary days in the lighter level", () => {
+    expect(heatLevel(30, q)).toBe(0);
+    expect(heatLevel(60, q)).toBe(1);
+    expect(heatLevel(600, q)).toBe(1);
+    expect(heatLevel(601, q)).toBe(2);
+    expect(heatLevel(1800, q)).toBe(3);
+    expect(heatLevel(1801, q)).toBe(4);
+    expect(heatLevel(3600, null)).toBe(0);
+  });
+  it("makes a single read day the lightest level", () => {
+    expect(heatLevel(5000, heatThresholds([5000]))).toBe(1);
   });
 });
 
@@ -44,23 +58,27 @@ describe("heatmapGrid", () => {
     ).toEqual(["2026-10-11", "2026-10-12", null]);
   });
 
-  it("levels each day against the longest day in range and counts read days", () => {
+  it("levels days by quartile so one extreme day does not wash out the rest", () => {
     const grid = heatmapGrid(
       [
-        { day: "2026-10-12", seconds: 3600 },
-        { day: "2026-10-11", seconds: 1000 },
-        { day: "2026-10-10", seconds: 30 },
-        { day: "2024-01-01", seconds: 99999 }, // 范围外，不参与最长值
+        { day: "2026-10-12", seconds: 11 * 3600 }, // 极端值
+        { day: "2026-10-11", seconds: 3600 },
+        { day: "2026-10-10", seconds: 1800 },
+        { day: "2026-10-09", seconds: 600 },
+        { day: "2026-10-08", seconds: 30 },
+        { day: "2024-01-01", seconds: 99999 }, // 范围外，不参与分界
       ],
       TODAY,
       1,
     );
     const cell = (day: string) => grid.weeks.flat().find((c) => c?.day === day);
     expect(cell("2026-10-12")?.level).toBe(4);
-    expect(cell("2026-10-11")?.level).toBe(2);
-    expect(cell("2026-10-10")?.level).toBe(0);
-    expect(grid.readDays).toBe(2);
-    expect(grid.totalSeconds).toBe(4630);
+    expect(cell("2026-10-11")?.level).toBe(3);
+    expect(cell("2026-10-10")?.level).toBe(2);
+    expect(cell("2026-10-09")?.level).toBe(1);
+    expect(cell("2026-10-08")?.level).toBe(0);
+    expect(grid.readDays).toBe(4);
+    expect(grid.totalSeconds).toBe(11 * 3600 + 3600 + 1800 + 600 + 30);
   });
 
   it("labels each month on the first column that starts in it", () => {

@@ -23,12 +23,26 @@ export interface HeatmapGrid {
   totalSeconds: number;
 }
 
+/** 三条分界：第 25、50、75 百分位的时长（秒）。 */
+export type HeatThresholds = readonly [number, number, number];
+
 /**
- * 档位（§3.2）：不足 1 分钟为空格；其余按范围内单日最长时长均分四档，⌈时长 ÷ 最长 × 4⌉。
+ * 四分位分界（§3.2）：读过（≥ 1 分钟）的日子按时长排序后，用最近秩法取第 25、50、75 百分位，
+ * 取的是样本里的实际值。按分位而非最大值分档，个别极长的日子不会把其他日子压浅。
+ * 没有读过的日子时返回 null（所有格子都是空格）。
  */
-export function heatLevel(seconds: number, maxSeconds: number): HeatLevel {
-  if (seconds < STREAK_MIN_SECONDS || maxSeconds <= 0) return 0;
-  return Math.min(4, Math.max(1, Math.ceil((seconds / maxSeconds) * 4))) as HeatLevel;
+export function heatThresholds(seconds: readonly number[]): HeatThresholds | null {
+  const read = seconds.filter((s) => s >= STREAK_MIN_SECONDS).sort((a, b) => a - b);
+  if (read.length === 0) return null;
+  const at = (p: number) => read[Math.ceil(p * read.length) - 1];
+  return [at(0.25), at(0.5), at(0.75)];
+}
+
+/** 档位：不足 1 分钟为空格；其余不超过第一条分界为第 1 档，依此类推；等于分界归较浅一档。 */
+export function heatLevel(seconds: number, thresholds: HeatThresholds | null): HeatLevel {
+  if (seconds < STREAK_MIN_SECONDS || thresholds == null) return 0;
+  const [q1, q2, q3] = thresholds;
+  return seconds <= q1 ? 1 : seconds <= q2 ? 2 : seconds <= q3 ? 3 : 4;
 }
 
 /** 最左一列的月份标签与下一个标签至少隔这么多列，否则不标，免得文字重叠。 */
@@ -54,8 +68,8 @@ export function heatmapGrid(
     const day = d.toString();
     inRange.push({ day, seconds: secondsOf.get(day) ?? 0 });
   }
-  const maxSeconds = inRange.reduce((m, d) => Math.max(m, d.seconds), 0);
-  const level = new Map(inRange.map((d) => [d.day, heatLevel(d.seconds, maxSeconds)]));
+  const thresholds = heatThresholds(inRange.map((d) => d.seconds));
+  const level = new Map(inRange.map((d) => [d.day, heatLevel(d.seconds, thresholds)]));
 
   const weeks: (HeatCell | null)[][] = [];
   for (let col = 0; col < HEATMAP_WEEKS; col++) {
