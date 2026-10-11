@@ -3,7 +3,12 @@ import { useTranslation } from "react-i18next";
 import type { MessageStatus, MessageUsage } from "@shared/types";
 import { Button } from "@renderer/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@renderer/components/ui/hover-card";
-import { usageCardView, type InputSegment, type UsageRowKind } from "@renderer/ai/usage-card";
+import {
+  formatTokens,
+  usageCardView,
+  type InputSegment,
+  type UsageRowKind,
+} from "@renderer/ai/usage-card";
 import { cn } from "@renderer/lib/utils";
 
 /** 比例条与子行色点：只用前景色的不同深浅，与 app 的单色调一致。 */
@@ -32,7 +37,6 @@ export function MessageUsageCard({
 }) {
   const { t, i18n } = useTranslation();
   const view = usageCardView(usage, model, status);
-  const fmt = new Intl.NumberFormat(i18n.language);
   const rowLabel: Record<UsageRowKind, string> = {
     input: t("ai.usage.input", "输入"),
     cacheRead: t("ai.usage.cacheRead", "缓存命中"),
@@ -104,7 +108,7 @@ export function MessageUsageCard({
                 <dd
                   className={cn("text-end", main && "font-medium", r.kind === "output" && "mt-1.5")}
                 >
-                  {fmt.format(r.tokens)}
+                  {formatTokens(r.tokens, i18n.language)}
                 </dd>
               </div>
             );
@@ -113,7 +117,7 @@ export function MessageUsageCard({
         {view.contextTokens != null && (
           <div className="flex justify-between gap-3 border-t border-dashed border-border pt-2 text-muted-foreground">
             <span>{t("ai.usage.context", "上下文")}</span>
-            <span>{fmt.format(view.contextTokens)}</span>
+            <span>{formatTokens(view.contextTokens, i18n.language)}</span>
           </div>
         )}
         {view.note && (
