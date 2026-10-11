@@ -89,6 +89,26 @@ describe("messageDtoToUIMessage", () => {
       messageDtoToUIMessage({ ...dto, metadata: { contextChips: [] } }).metadata?.contextChips,
     ).toBeUndefined();
   });
+  it("carries usage, model and status on assistant rows for the usage card", () => {
+    const usage = { inputTokens: 10, outputTokens: 2, cacheReadTokens: 8, stepCount: 1 };
+    const assistant: MessageDto = {
+      ...dto,
+      role: "assistant",
+      status: "aborted",
+      metadata: { model: "claude-sonnet-5-5", usage },
+    };
+    expect(messageDtoToUIMessage(assistant).metadata).toEqual({
+      createdAt: 1,
+      status: "aborted",
+      model: "claude-sonnet-5-5",
+      usage,
+    });
+    // 旧消息 / 未拿到用量：只带 status
+    expect(messageDtoToUIMessage({ ...assistant, metadata: null }).metadata).toEqual({
+      createdAt: 1,
+      status: "aborted",
+    });
+  });
   it("messagesToUI maps a list in order", () => {
     expect(messagesToUI([dto, { ...dto, id: "m2", role: "assistant" }]).map((m) => m.id)).toEqual([
       "m1",

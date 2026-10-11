@@ -2,11 +2,12 @@ import { Pencil, RefreshCw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@renderer/components/ui/button";
 import { CopyButton } from "@renderer/ai/CopyButton";
+import { MessageUsageCard } from "@renderer/ai/MessageUsageCard";
 import { useChatActions } from "@renderer/ai/chat-actions";
 import { textOf } from "@renderer/ai/message-text";
 import type { ChatUIMessage } from "@renderer/ai/types";
 
-/** 气泡下方 hover/focus 揭示的动作行。Copy(#67) + 按 role 的 Edit/Resend/Regenerate。 */
+/** 气泡下方 hover/focus 揭示的动作行。Copy(#67) + 按 role 的 Edit/Resend/Regenerate + assistant 用量卡。 */
 export function MessageToolbar({ m, onEdit }: { m: ChatUIMessage; onEdit?: () => void }) {
   const { t } = useTranslation();
   const actions = useChatActions();
@@ -48,6 +49,13 @@ export function MessageToolbar({ m, onEdit }: { m: ChatUIMessage; onEdit?: () =>
         >
           <RefreshCw className="size-3.5" />
         </Button>
+      )}
+      {m.role === "assistant" && m.metadata?.usage && (
+        <MessageUsageCard
+          usage={m.metadata.usage}
+          model={m.metadata.model}
+          status={m.metadata.status}
+        />
       )}
     </div>
   );
