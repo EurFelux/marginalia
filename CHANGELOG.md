@@ -1,5 +1,13 @@
 # marginalia
 
+## 0.23.0
+
+### Minor Changes
+
+- 3266e36: The Stats page has a new AI usage tab next to Reading. For the last 7 days, the last 30 days or all time, it shows how many tokens you've used, how much of the input was served from the prompt cache, and how many requests were made. A chart shows usage by day (by month for all time), split into cache reads, other input and output. Below the chart, usage is broken down by purpose (chat, summaries, reading reports, context compaction, memory consolidation, conversation naming), by model, and by book. Usage is now recorded for every AI request, including background work, and stays in the totals when you delete a conversation or regenerate a reply. Chat usage from before this update is added once from your existing conversations; usage from background work before this update and from messages already deleted can't be recovered.
+- 1b35df2: Each AI reply now has a token usage icon next to Copy and Regenerate. Hover over it, or move keyboard focus to it, to see the model, how many steps the reply took, its input and output tokens, how much of the input was read from or written to the prompt cache, reasoning tokens, and how large the context was at the last step. Only the figures your provider reports are listed. A reply you stopped early or that failed shows the usage of the steps that finished. Replies from before this update show input and output totals only.
+- 254ed61: The Reading tab on the Stats page now has a past-year heatmap: one square per day, darker for days you read longer than usual, with the week starting on the day your language uses. Hover over a square to see the date and how long you read. The daily reading chart now has a time axis, and hovering over a bar (or focusing it with the keyboard) shows that day's reading time.
+
 ## 0.22.1
 
 ### Patch Changes
