@@ -145,6 +145,7 @@ export function createApi(d: PreloadDeps) {
     stats: {
       readingState: inv(C.statsReadingState),
       get: inv(C.statsGet),
+      usage: inv(C.statsUsage),
     },
 
     backup: {

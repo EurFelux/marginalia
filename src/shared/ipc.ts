@@ -55,8 +55,8 @@ import type { BookNoteDto } from "@shared/book-notes";
 import { bookNoteIdInput, createBookNoteInput, updateBookNoteInput } from "@shared/book-notes";
 import type { PreferencesSnapshot } from "@shared/preferences";
 import { setPreferenceInput } from "@shared/preferences";
-import type { ReadingStatsDto } from "@shared/stats";
-import { statsGetInput, statsReadingStateInput } from "@shared/stats";
+import type { ReadingStatsDto, UsageStatsDto } from "@shared/stats";
+import { statsGetInput, statsReadingStateInput, statsUsageInput } from "@shared/stats";
 import type { BackupExportResult, BackupInspection } from "@shared/backup";
 import { backupExportInput, backupRestoreInput } from "@shared/backup";
 import type { BookSearchResult } from "@shared/search";
@@ -372,6 +372,8 @@ export const C = {
   // stats（阅读时长）
   statsReadingState: def("stats:reading-state", "invoke", statsReadingStateInput, out<void>()),
   statsGet: def("stats:get", "invoke", statsGetInput, out<ReadingStatsDto>()),
+  // stats（AI 用量，spec 2026-10-12-ai-usage-stats-design）
+  statsUsage: def("stats:usage", "invoke", statsUsageInput, out<UsageStatsDto>()),
 
   // backup
   backupExport: def("backup:export", "invoke", backupExportInput, out<BackupExportResult | null>()),

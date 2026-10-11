@@ -1,3 +1,5 @@
+import type { UsageRange } from "@shared/stats";
+
 /** 查询键工厂——与 spec §6.3 约定一致。 */
 export const qk = {
   library: ["library"] as const,
@@ -19,6 +21,7 @@ export const qk = {
   conversations: (bookId: string) => ["conversations", bookId] as const,
   messages: (conversationId: string) => ["messages", conversationId] as const,
   stats: (dailyDays: number) => ["stats", dailyDays] as const,
+  statsUsage: (range: UsageRange) => ["stats-usage", range] as const,
   memories: ["memories"] as const,
   permissionRules: ["permission-rules"] as const,
   bashWorkdir: ["bash-workdir"] as const,

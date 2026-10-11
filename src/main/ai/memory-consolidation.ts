@@ -24,6 +24,7 @@ import type { MemoryDto } from "@shared/memory";
 import type { ResolvedModel } from "@main/ai/assistant-model";
 import type { RunBackground } from "@main/ai/background-limiter";
 import type { AppNotification } from "@shared/chat";
+import { meteredModel } from "@main/usage/metered-model";
 import { createLogger } from "@main/logger";
 
 const log = createLogger("memory");
@@ -206,7 +207,7 @@ export async function maybeConsolidateMemory(
   if (consolidatingConversations.has(conversationId)) return; // 并发去重
 
   const convo = db
-    .select({ through: conversations.memoryThroughSeq })
+    .select({ through: conversations.memoryThroughSeq, bookId: conversations.bookId })
     .from(conversations)
     .where(eq(conversations.id, conversationId))
     .get();
@@ -235,7 +236,7 @@ export async function maybeConsolidateMemory(
     );
     const { text } = await runBackground(() =>
       generateText({
-        model: resolved.model,
+        model: meteredModel(resolved, { db, purpose: "memory", bookId: convo.bookId }),
         reasoning: resolved.reasoningEffort, // v7 顶层 reasoning；undefined = provider 默认
         instructions: CONSOLIDATION_SYSTEM,
         prompt: input,

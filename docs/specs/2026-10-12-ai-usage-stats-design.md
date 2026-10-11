@@ -57,7 +57,7 @@
 
 ### 3.5 按用途
 
-六行，按用量从大到小排，每行一条横向比例条，后面跟用量和占比。没有用量的用途不显示。
+六行，按用量从大到小排，每行一条横向比例条，后面跟用量和占比。没有用量的用途不显示。占比四舍五入为 0% 但确有用量时写「<1%」（按书同理）。
 
 | 用途       | 来源                          |
 | ---------- | ----------------------------- |
@@ -156,7 +156,7 @@
 - `src/main/db/schema.ts` 加表并生成迁移；`app-meta/repository.ts` 加键 `usageLedgerBackfilled`。
 - 新模块 `src/main/usage/`：账本写入、计量中间件、回填、聚合纯函数。
 - 用量换算：把 `ai/usage.ts` 中单个数值的校验抽出来，供逐步汇总（消息）和单次请求（账本）共用。
-- §4.3 的八处调用点（`summary.ts` 里有两处）改用 `meteredModel`。
+- §4.3 的八处调用点（`summary.ts` 里有两处）改用 `meteredModel`。阅读报告的两处共用 `reading-report/service.ts` 里同一个模型，在那里包一次即可同时覆盖。
 - 启动流程：在 `initDb` 之后调用回填。
 - IPC：`src/shared/stats.ts`、`src/shared/ipc.ts`、`stats-handlers.ts`、`preload.ts`。
 - 渲染层：`StatsView.tsx` 加标签；新组件放在 `src/renderer/stats/usage/`。

@@ -3,12 +3,8 @@ import { useTranslation } from "react-i18next";
 import type { MessageStatus, MessageUsage } from "@shared/types";
 import { Button } from "@renderer/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@renderer/components/ui/hover-card";
-import {
-  formatTokens,
-  usageCardView,
-  type InputSegment,
-  type UsageRowKind,
-} from "@renderer/ai/usage-card";
+import { usageCardView, type InputSegment, type UsageRowKind } from "@renderer/ai/usage-card";
+import { formatTokens } from "@renderer/lib/format-tokens";
 import { cn } from "@renderer/lib/utils";
 
 /** 比例条与子行色点：只用前景色的不同深浅，与 app 的单色调一致。 */

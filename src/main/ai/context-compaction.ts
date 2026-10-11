@@ -9,6 +9,7 @@ import { listMessagesAfterSeq } from "@main/chat/messages";
 import { estimateTokens } from "@shared/tokens";
 import type { ResolvedModel } from "@main/ai/assistant-model";
 import type { RunBackground } from "@main/ai/background-limiter";
+import { meteredModel } from "@main/usage/metered-model";
 import { createLogger } from "@main/logger";
 
 const log = createLogger("summary");
@@ -129,6 +130,7 @@ export async function maybeCompactConversation(
       .select({
         summary: conversations.contextSummary,
         through: conversations.summarizedThroughSeq,
+        bookId: conversations.bookId,
       })
       .from(conversations)
       .where(eq(conversations.id, conversationId))
@@ -143,7 +145,7 @@ export async function maybeCompactConversation(
     const transcript = renderFoldedTranscript(plan.foldedTurns);
     const { text } = await deps.runBackground(() =>
       generateText({
-        model: resolved.model,
+        model: meteredModel(resolved, { db, purpose: "compaction", bookId: convo.bookId }),
         reasoning: resolved.reasoningEffort, // v7 顶层 reasoning；undefined = provider 默认
         instructions: COMPACTION_SYSTEM,
         prompt: `${prior}New exchanges:\n${transcript}`,
