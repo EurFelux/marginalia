@@ -605,8 +605,10 @@ export default {
   "settings.reasoningEffort.none": "Off",
   "settings.selection": "Selection",
   "settings.selection.actions": "Selection actions",
-  "settings.selection.actionsDesc":
-    "AI actions on the toolbar that appears when you select text. The first {{n}} show directly; the rest go under More.",
+  "settings.selection.actionsDesc_one":
+    "AI actions on the toolbar that appears when you select text. The first {{count}} shows directly; the rest go under More.",
+  "settings.selection.actionsDesc_other":
+    "AI actions on the toolbar that appears when you select text. The first {{count}} show directly; the rest go under More.",
   "settings.selection.add": "Add action",
   "settings.selection.askPlaceholder":
     "Empty: only attaches the selected text so you can ask your own question",
@@ -630,7 +632,8 @@ export default {
   "settings.selection.label": "Label",
   "settings.selection.labelEmpty": "Label can't be empty",
   "settings.selection.labelPlaceholder": "e.g. Find rebuttals",
-  "settings.selection.limit": "Up to {{max}} actions",
+  "settings.selection.limit_one": "Up to {{count}} action",
+  "settings.selection.limit_other": "Up to {{count}} actions",
   "settings.selection.moreDivider": "Under More",
   "settings.selection.prompt": "Prompt",
   "settings.selection.promptDefaultDesc": "Leave empty to use the default prompt.",
@@ -638,7 +641,8 @@ export default {
     "The selected text is attached as context; no need to include it in the prompt.",
   "settings.selection.promptEmpty": "Prompt can't be empty",
   "settings.selection.promptPlaceholder": "e.g. What are the strongest objections to this passage?",
-  "settings.selection.promptTooLong": "Prompts can be at most {{max}} characters",
+  "settings.selection.promptTooLong_one": "Prompts can be at most {{count}} character",
+  "settings.selection.promptTooLong_other": "Prompts can be at most {{count}} characters",
   "settings.selection.saveFailed": "Couldn't save: {{message}}",
   "settings.selection.show": "Show",
   "settings.selection.showLabels": "Show labels on toolbar",

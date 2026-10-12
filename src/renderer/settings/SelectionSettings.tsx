@@ -226,8 +226,8 @@ export function SelectionSettings() {
             <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
               {t(
                 "settings.selection.actionsDesc",
-                "选中文字后，工具栏上的 AI 指令。前 {{n}} 个直接显示，其余收进「更多」。",
-                { n: inlineCount },
+                "选中文字后，工具栏上的 AI 指令。前 {{count}} 个直接显示，其余收进「更多」。",
+                { count: inlineCount },
               )}
             </p>
           </div>
@@ -273,8 +273,8 @@ export function SelectionSettings() {
                 </Button>
                 {full && (
                   <p className="text-center text-[11px] text-muted-foreground">
-                    {t("settings.selection.limit", "最多 {{max}} 个指令", {
-                      max: SELECTION_ACTION_MAX,
+                    {t("settings.selection.limit", "最多 {{count}} 个指令", {
+                      count: SELECTION_ACTION_MAX,
                     })}
                   </p>
                 )}
@@ -531,8 +531,8 @@ function ActionEditor({
     ? errors.has("promptEmpty")
       ? t("settings.selection.promptEmpty", "提示语不能为空")
       : errors.has("promptTooLong")
-        ? t("settings.selection.promptTooLong", "提示语最多 {{max}} 字", {
-            max: SELECTION_ACTION_PROMPT_MAX,
+        ? t("settings.selection.promptTooLong", "提示语最多 {{count}} 字", {
+            count: SELECTION_ACTION_PROMPT_MAX,
           })
         : null
     : null;

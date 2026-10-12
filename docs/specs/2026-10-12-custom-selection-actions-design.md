@@ -219,37 +219,39 @@ export const SELECTION_ACTION_INLINE_ICONS = 8; // 只显示图标时平铺几�
 
 新增的界面文字（中 / 英）：
 
-| key（示意）        | 中文                                                                    | English                                                                                                             |
-| ------------------ | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| 分类名             | 划词                                                                    | Selection                                                                                                           |
-| 显示文字开关       | 工具栏显示文字                                                          | Show labels on toolbar                                                                                              |
-| 显示文字说明       | 关掉后只显示图标，鼠标悬停时显示文字。                                  | When off, the toolbar shows icons only; hover to see the label.                                                     |
-| 节标题             | 划词指令                                                                | Selection actions                                                                                                   |
-| 节说明             | 选中文字后，工具栏上的 AI 指令。前 {{n}} 个直接显示，其余收进「更多」。 | AI actions on the toolbar that appears when you select text. The first {{n}} show directly; the rest go under More. |
-| 分隔线             | 以下收进「更多」                                                        | Under More                                                                                                          |
-| 工具栏按钮         | 更多                                                                    | More                                                                                                                |
-| 添加               | 添加指令                                                                | Add action                                                                                                          |
-| 上限说明           | 最多 {{max}} 个指令                                                     | Up to {{max}} actions                                                                                               |
-| 草稿名             | 未命名                                                                  | Untitled                                                                                                            |
-| 显示开关           | 显示                                                                    | Show                                                                                                                |
-| 行内标记 / 开关    | 直接发送                                                                | Send directly                                                                                                       |
-| 字段               | 文字 / 图标 / 提示语（文字、图标只作无障碍标签，界面上不显示标题）      | Label / Icon / Prompt                                                                                               |
-| 文字占位           | 比如：找反驳                                                            | e.g. Find rebuttals                                                                                                 |
-| 字段校验           | 文字不能为空 / 提示语不能为空                                           | Label can't be empty / Prompt can't be empty                                                                        |
-| 提示语说明         | 选中的文字会作为上下文附在消息上，提示语里不用再写。                    | The selected text is attached as context; no need to include it in the prompt.                                      |
-| 直接发送说明       | 点了就发给 AI，不再填进输入框等你补充。                                 | Sends to the AI right away instead of filling the input box.                                                        |
-| 直接发送不可开     | 要先写提示语才能开启：没有提示语，就没有可以直接发出去的内容。          | Write a prompt first to turn this on — without one, there's nothing to send.                                        |
-| 内置提示语说明     | 留空则使用默认提示语。                                                  | Leave empty to use the default prompt.                                                                              |
-| 询问占位文字       | 留空：只附上选中的文字，由你自己提问                                    | Empty: only attaches the selected text so you can ask your own question                                             |
-| 自动保存说明       | 改动会自动保存                                                          | Changes are saved automatically                                                                                     |
-| 删除               | 删除指令                                                                | Delete action                                                                                                       |
-| 删除确认           | 删除指令「{{label}}」？                                                 | Delete action "{{label}}"?                                                                                          |
-| 删除确认说明       | 删除后不能恢复。                                                        | This cannot be undone.                                                                                              |
-| 内置提示           | 内置指令，文字和图标不可改                                              | Built-in action; label and icon can't be changed                                                                    |
-| 提示语超长         | 提示语最多 {{max}} 字                                                   | Prompts can be at most {{max}} characters                                                                           |
-| 保存失败           | 没能保存：{{message}}                                                   | Couldn't save: {{message}}                                                                                          |
-| 拖动手柄（无障碍） | 拖动排序                                                                | Drag to reorder                                                                                                     |
-| 图标分组           | 阅读与语言 / 思考与提问 / 结构与比较 / 学科与主题 / 其他                | Reading & language / Thinking & questions / Structure & comparison / Subjects & topics / Other                      |
+| key（示意）        | 中文                                                                        | English                                                                                                                 |
+| ------------------ | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| 分类名             | 划词                                                                        | Selection                                                                                                               |
+| 显示文字开关       | 工具栏显示文字                                                              | Show labels on toolbar                                                                                                  |
+| 显示文字说明       | 关掉后只显示图标，鼠标悬停时显示文字。                                      | When off, the toolbar shows icons only; hover to see the label.                                                         |
+| 节标题             | 划词指令                                                                    | Selection actions                                                                                                       |
+| 节说明             | 选中文字后，工具栏上的 AI 指令。前 {{count}} 个直接显示，其余收进「更多」。 | AI actions on the toolbar that appears when you select text. The first {{count}} show directly; the rest go under More. |
+| 分隔线             | 以下收进「更多」                                                            | Under More                                                                                                              |
+| 工具栏按钮         | 更多                                                                        | More                                                                                                                    |
+| 添加               | 添加指令                                                                    | Add action                                                                                                              |
+| 上限说明           | 最多 {{count}} 个指令                                                       | Up to {{count}} actions                                                                                                 |
+| 草稿名             | 未命名                                                                      | Untitled                                                                                                                |
+| 显示开关           | 显示                                                                        | Show                                                                                                                    |
+| 行内标记 / 开关    | 直接发送                                                                    | Send directly                                                                                                           |
+| 字段               | 文字 / 图标 / 提示语（文字、图标只作无障碍标签，界面上不显示标题）          | Label / Icon / Prompt                                                                                                   |
+| 文字占位           | 比如：找反驳                                                                | e.g. Find rebuttals                                                                                                     |
+| 字段校验           | 文字不能为空 / 提示语不能为空                                               | Label can't be empty / Prompt can't be empty                                                                            |
+| 提示语说明         | 选中的文字会作为上下文附在消息上，提示语里不用再写。                        | The selected text is attached as context; no need to include it in the prompt.                                          |
+| 直接发送说明       | 点了就发给 AI，不再填进输入框等你补充。                                     | Sends to the AI right away instead of filling the input box.                                                            |
+| 直接发送不可开     | 要先写提示语才能开启：没有提示语，就没有可以直接发出去的内容。              | Write a prompt first to turn this on — without one, there's nothing to send.                                            |
+| 内置提示语说明     | 留空则使用默认提示语。                                                      | Leave empty to use the default prompt.                                                                                  |
+| 询问占位文字       | 留空：只附上选中的文字，由你自己提问                                        | Empty: only attaches the selected text so you can ask your own question                                                 |
+| 自动保存说明       | 改动会自动保存                                                              | Changes are saved automatically                                                                                         |
+| 删除               | 删除指令                                                                    | Delete action                                                                                                           |
+| 删除确认           | 删除指令「{{label}}」？                                                     | Delete action "{{label}}"?                                                                                              |
+| 删除确认说明       | 删除后不能恢复。                                                            | This cannot be undone.                                                                                                  |
+| 内置提示           | 内置指令，文字和图标不可改                                                  | Built-in action; label and icon can't be changed                                                                        |
+| 提示语超长         | 提示语最多 {{count}} 字                                                     | Prompts can be at most {{count}} characters                                                                             |
+| 保存失败           | 没能保存：{{message}}                                                       | Couldn't save: {{message}}                                                                                              |
+| 拖动手柄（无障碍） | 拖动排序                                                                    | Drag to reorder                                                                                                         |
+| 图标分组           | 阅读与语言 / 思考与提问 / 结构与比较 / 学科与主题 / 其他                    | Reading & language / Thinking & questions / Structure & comparison / Subjects & topics / Other                          |
+
+带数字的三条（节说明、上限说明、提示语超长）用 `count` 插值：英文分 `_one` / `_other` 两种形式，中文只有一种。数字目前都不会是 1，但常量以后可能改，不靠碰巧的取值保证语法。
 
 内置指令的出厂文字和提示语沿用现有的 `reader.selection.*` 和 `ai.action.*` 两组 key，不新增。
 
