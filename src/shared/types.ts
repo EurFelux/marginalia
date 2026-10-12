@@ -70,6 +70,9 @@ export const messageMetadataSchema = z.object({
       raw: z.string().optional(),
     })
     .optional(),
+  // assistant 行：本轮从开始调用模型到结束（完成 / 停止 / 出错）的毫秒数，含等待批准的时间
+  // （spec 2026-10-12 assistant-process-fold §3.3）。本功能上线前的旧消息没有。
+  durationMs: z.number().int().nonnegative().optional(),
 });
 
 export type MessageMetadata = z.infer<typeof messageMetadataSchema>;

@@ -100,6 +100,34 @@ export function toolStepLabel(part: ToolPart, chapters: ChapterRefDto[], t: TFun
           })
         : t("ai.toolStep.loadSkill", "加载技能「{{name}}」", { name: skill });
     }
+    case "readMemory":
+      return t("ai.toolStep.readMemory", "读取记忆");
+    case "saveMemory": {
+      const title = input?.title;
+      return typeof title === "string"
+        ? t("ai.toolStep.saveMemory", "保存记忆「{{title}}」", { title })
+        : t("ai.toolStep.saveMemoryFallback", "保存记忆");
+    }
+    case "updateMemory": {
+      // 只改正文时没有 title；slug 是英文短名，不给用户看
+      const title = input?.title;
+      return typeof title === "string"
+        ? t("ai.toolStep.updateMemory", "更新记忆「{{title}}」", { title })
+        : t("ai.toolStep.updateMemoryFallback", "更新记忆");
+    }
+    case "deleteMemory":
+      return t("ai.toolStep.deleteMemory", "删除记忆");
+    case "updateSoul":
+      return t("ai.toolStep.updateSoul", "更新人设");
+    case "bash": {
+      // 折叠区收起时的进行中形态只给一行：heredoc、多行脚本的换行折成空格
+      const command = typeof input?.command === "string" ? input.command.trim() : "";
+      return command !== ""
+        ? t("ai.toolStep.bash", "运行命令：{{command}}", {
+            command: command.replace(/\s+/g, " "),
+          })
+        : t("ai.toolStep.bashFallback", "运行命令");
+    }
     default:
       return name;
   }

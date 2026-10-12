@@ -84,6 +84,7 @@ export function makeSendDeps(): SendDeps {
           })
         : {},
     notify: notifyRenderer,
+    now: () => Temporal.Now.instant(),
   };
 }
 

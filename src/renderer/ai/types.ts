@@ -14,6 +14,8 @@ export interface ChatMetadata {
   usage?: MessageUsage;
   model?: string;
   status?: MessageStatus;
+  /** assistant 行：本轮用时（毫秒），折叠区标题行显示「用时 N 秒」；生成中与旧消息没有。 */
+  durationMs?: number;
 }
 
 /** useChat / transport 全程使用的消息类型。 */
