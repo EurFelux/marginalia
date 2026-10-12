@@ -5,11 +5,16 @@ import { useQuery } from "@tanstack/react-query";
 import type { LucideIcon } from "lucide-react";
 import {
   BookOpen,
+  Brain,
+  ChevronRight,
   FileText,
+  Globe,
   List,
   ScrollText,
   Search,
   Sparkles,
+  SquareTerminal,
+  UserPen,
   WandSparkles,
   Wrench,
 } from "lucide-react";
@@ -24,12 +29,19 @@ import { textOf } from "@renderer/ai/message-text";
 import { dayKind, messageCreatedAt, startsNewDay } from "@renderer/ai/message-time";
 import { MessageTimestamp } from "@renderer/ai/MessageTimestamp";
 import { MessageToolbar } from "@renderer/ai/MessageToolbar";
-import { segments, type ToolPart } from "@renderer/ai/segments";
+import {
+  assistantLayout,
+  hasToolCall,
+  runningStep,
+  turnDurationParts,
+} from "@renderer/ai/process-fold";
+import { segments, type Segment, type ToolPart } from "@renderer/ai/segments";
 import { toolStepLabel, toolStepStatus } from "@renderer/ai/tool-step-label";
 import type { ChatUIMessage } from "@renderer/ai/types";
 import { LocalizedStreamdown } from "@renderer/components/LocalizedStreamdown";
 import { cn } from "@renderer/lib/utils";
 import { qk } from "@renderer/query/keys";
+import { usePermissionStore } from "@renderer/store/permission-store";
 import { usePrefsStore } from "@renderer/store/prefs-store";
 import type { ChapterRefDto } from "@shared/library";
 
@@ -294,7 +306,14 @@ function AssistantBubble({
   groupHead: boolean;
 }) {
   const segs = segments(m.parts);
+  const pendingRequests = usePermissionStore((s) => s.pending);
   if (segs.length === 0 && !streaming) return null;
+
+  // 最后一次过程类工具调用及其之前的内容收进折叠区；待批 bash 留在外面（spec 2026-10-12 §3.1、§3.5）。
+  const layout = assistantLayout(
+    segs,
+    (p) => getToolName(p) === "bash" && pendingRequests[p.toolCallId] !== undefined,
+  );
 
   return (
     <AssistantShell
@@ -309,16 +328,31 @@ function AssistantBubble({
       }
     >
       <div className="max-w-full space-y-2 rounded-2xl rounded-bl-sm bg-muted px-3.5 py-2 text-sm leading-relaxed text-foreground">
-        {segs.map((s, i) =>
+        {hasToolCall(layout.process) ? (
+          <ProcessFold
+            process={layout.process}
+            durationMs={m.metadata?.durationMs}
+            chapters={chapters}
+            streaming={streaming}
+          />
+        ) : (
+          // 没有工具调用可收（待批块前只剩几句话）：不出折叠区，文本照常显示
+          layout.process.map(
+            (s, i) =>
+              s.kind === "text" && <LocalizedStreamdown key={i}>{s.text}</LocalizedStreamdown>,
+          )
+        )}
+        {layout.awaiting.map((p) => (
+          <BashBlock key={p.toolCallId} part={p} streaming={streaming} />
+        ))}
+        {layout.answer.map((s, i) =>
           s.kind === "text" ? (
             // Streamdown 自带 markdown 排版（经 @source 由 Tailwind 生成其类）；不叠 prose 以免边距打架
             <LocalizedStreamdown key={i} animated={STREAM_ANIMATION} isAnimating={streaming}>
               {s.text}
             </LocalizedStreamdown>
-          ) : getToolName(s.part) === "bash" ? (
-            // bash 不走灰色单行步骤：渲染为终端块（含审批操作栏，spec 2026-10-03 §6.4）
-            <BashBlock key={i} part={s.part} streaming={streaming} />
           ) : (
+            // 常显区里只会有记忆类步骤（§3.1），照常显示为灰色步骤行
             <ToolStepRow key={i} part={s.part} chapters={chapters} streaming={streaming} />
           ),
         )}
@@ -329,8 +363,100 @@ function AssistantBubble({
   );
 }
 
+/** 过程里的一段：中间文本（灰色）、bash 终端块或灰色步骤行。 */
+function SegmentView({
+  segment,
+  chapters,
+  streaming,
+}: {
+  segment: Segment;
+  chapters: ChapterRefDto[];
+  streaming: boolean;
+}) {
+  if (segment.kind === "text") {
+    // 后面已跟着工具调用，这段话不会再增长：不带逐字淡入
+    return (
+      <div className="text-muted-foreground">
+        <LocalizedStreamdown>{segment.text}</LocalizedStreamdown>
+      </div>
+    );
+  }
+  return getToolName(segment.part) === "bash" ? (
+    // bash 不走灰色单行步骤：渲染为终端块（含审批操作栏，spec 2026-10-03 §6.4）
+    <BashBlock part={segment.part} streaming={streaming} />
+  ) : (
+    <ToolStepRow part={segment.part} chapters={chapters} streaming={streaming} />
+  );
+}
+
+/**
+ * 回答之前的过程，默认收起成一行（spec 2026-10-12-assistant-process-fold §3.2–§3.4）：
+ * 有工具在执行时显示这一步，否则显示本轮用时；还没有用时（生成中 / 旧消息）显示「查看过程」。
+ */
+function ProcessFold({
+  process,
+  durationMs,
+  chapters,
+  streaming,
+}: {
+  process: Segment[];
+  durationMs: number | undefined;
+  chapters: ChapterRefDto[];
+  streaming: boolean;
+}) {
+  const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+  // 展开后进行中的那一步已列在下面，标题行不再重复
+  const running = expanded ? null : runningStep(process, streaming);
+  let label: string;
+  if (durationMs === undefined) {
+    label = expanded ? t("ai.process.hide", "收起过程") : t("ai.process.show", "查看过程");
+  } else {
+    const { min, sec } = turnDurationParts(durationMs);
+    label =
+      min === 0
+        ? t("ai.process.durationSec", "用时 {{sec}} 秒", { sec })
+        : t("ai.process.durationMin", "用时 {{min}} 分 {{sec}} 秒", { min, sec });
+  }
+
+  return (
+    <div>
+      <button
+        type="button"
+        aria-expanded={expanded}
+        onClick={() => setExpanded(!expanded)}
+        className="flex max-w-full items-center gap-1.5 rounded text-start text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+      >
+        {running ? (
+          <ToolStepRow part={running} chapters={chapters} streaming={streaming} />
+        ) : (
+          <span className="shrink-0">{label}</span>
+        )}
+        <ChevronRight
+          className={cn("size-3.5 shrink-0 transition-transform", expanded && "rotate-90")}
+          aria-hidden
+        />
+      </button>
+      {expanded && (
+        <div className="ms-1.5 mt-2 space-y-2 border-s-2 border-foreground/10 ps-3">
+          {process.map((s, i) => (
+            <SegmentView key={i} segment={s} chapters={chapters} streaming={streaming} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** 步骤行图标：lucide 按工具映射，未知工具兜底扳手。 */
 const TOOL_ICONS: Record<string, LucideIcon> = {
+  bash: SquareTerminal,
+  web_search: Globe,
+  readMemory: Brain,
+  saveMemory: Brain,
+  updateMemory: Brain,
+  deleteMemory: Brain,
+  updateSoul: UserPen,
   getToc: List,
   getChapterSummary: ScrollText,
   readChapterText: BookOpen,
@@ -351,8 +477,9 @@ function ToolStepRow({
   const { t } = useTranslation();
   const status = toolStepStatus(part, streaming);
   const Icon = TOOL_ICONS[getToolName(part)] ?? Wrench;
+  // span 而非 div：折叠区标题行把它放进 <button>（只能含短语内容）
   return (
-    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+    <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
       <Icon className="size-3.5 shrink-0" aria-hidden />
       <span className="min-w-0 truncate">{toolStepLabel(part, chapters, t)}</span>
       {/* i18next-instrument-ignore */}
@@ -370,8 +497,10 @@ function ToolStepRow({
             ? t("ai.toolStep.done", "完成")
             : status === "not-executed"
               ? t("ai.toolStep.notExecuted", "未执行")
-              : t("ai.toolStep.loading", "读取中…")}
+              : getToolName(part) === "bash"
+                ? t("ai.toolStep.running", "运行中")
+                : t("ai.toolStep.loading", "读取中…")}
       </span>
-    </div>
+    </span>
   );
 }

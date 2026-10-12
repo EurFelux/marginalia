@@ -140,6 +140,7 @@ async function setup(
     resolveSummaryModel: () => summaryModel,
     runBackground: passThrough,
     notify: () => {},
+    now: () => Temporal.Now.instant(),
   };
   return { db, book, deps };
 }
@@ -166,6 +167,7 @@ function makeDeps(db: ReturnType<typeof freshDb>): SendDeps {
     resolveSummaryModel: () => ({ ok: false as const, reason: "summary model unset" }),
     runBackground: passThrough,
     notify: () => {},
+    now: () => Temporal.Now.instant(),
   };
 }
 
@@ -744,6 +746,7 @@ describe("pdf system prompt injection", () => {
       resolveSummaryModel: () => ({ ok: false, reason: "unset" }),
       runBackground: passThrough,
       notify: () => {},
+      now: () => Temporal.Now.instant(),
     };
     const convo = createConversation(db, { bookId: book.id });
     const r = await runSend(deps, {
@@ -1137,6 +1140,75 @@ async function runTurn(steps: StepChunks[]) {
   const assistant = listMessages(db, r.conversationId).find((m) => m.role === "assistant")!;
   return { assistant, chunks, types: chunks.map((c) => c.type) };
 }
+
+/** 每读一次前进 stepMs 的假时钟：一轮只在开始、结束各读一次，用时恰为 stepMs。 */
+function steppingClock(stepMs: number) {
+  let ms = 1_760_000_000_000;
+  return () => {
+    const instant = Temporal.Instant.fromEpochMilliseconds(ms);
+    ms += stepMs;
+    return instant;
+  };
+}
+
+describe("turn duration", () => {
+  beforeAll(() => initMainI18n("en"));
+
+  async function runWithClock(model: MockLanguageModelV4, abort = false) {
+    const { db, book, deps } = await setup({ ok: true, model, modelId: "mock" });
+    deps.now = steppingClock(12_345);
+    const convo = createConversation(db, { bookId: book.id });
+    const controller = new AbortController();
+    const r = await runSend(deps, input(book.id, convo.id), { abortSignal: controller.signal });
+    if (!r.ok) throw new Error(r.reason);
+    if (abort) controller.abort();
+    for await (const _chunk of r.stream) {
+      // drain
+    }
+    await r.finished;
+    return listMessages(db, r.conversationId).find((m) => m.role === "assistant")!;
+  }
+
+  it("records how long a completed turn took", async () => {
+    const assistant = await runWithClock(scriptedModel([textStep("Done.")]));
+    expect(assistant.status).toBe("complete");
+    expect(assistant.metadata?.durationMs).toBe(12_345);
+  });
+
+  it("records the duration of a turn the user stopped", async () => {
+    const slowModel = new MockLanguageModelV4({
+      doStream: async () => ({
+        stream: simulateReadableStream({
+          chunkDelayInMs: 50,
+          chunks: [
+            { type: "text-start", id: "t1" },
+            { type: "text-delta", id: "t1", delta: "partial" },
+            { type: "text-end", id: "t1" },
+            finishChunk("stop"),
+          ],
+        }),
+      }),
+    });
+    const assistant = await runWithClock(slowModel, true);
+    expect(assistant.status).toBe("aborted");
+    expect(assistant.metadata?.durationMs).toBe(12_345);
+  });
+
+  it("records the duration of a turn that ended in a stream error", async () => {
+    const assistant = await runWithClock(
+      scriptedModel([
+        [
+          { type: "text-start", id: "t1" },
+          { type: "text-delta", id: "t1", delta: "Half" },
+          { type: "error", error: new Error("socket hang up") },
+          { type: "finish", finishReason: { unified: "error", raw: undefined }, usage: USAGE },
+        ],
+      ]),
+    );
+    expect(assistant.status).toBe("error");
+    expect(assistant.metadata?.durationMs).toBe(12_345);
+  });
+});
 
 describe("turn outcome", () => {
   beforeAll(() => initMainI18n("en"));

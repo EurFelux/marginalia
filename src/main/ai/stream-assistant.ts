@@ -60,8 +60,9 @@ export function streamAssistantReply(
   systemPrompt: string | undefined,
   opts?: { abortSignal?: AbortSignal },
 ): OkSendResult {
-  const { db, loadBytes, resolveSummaryModel, stepLimit, runBackground, notify } = deps;
+  const { db, loadBytes, resolveSummaryModel, stepLimit, runBackground, notify, now } = deps;
   const { conversationId, bookId, resolved } = ctx;
+  const startedAt = now();
   const imageToolResults = supportsImageToolResults(resolved.providerType);
   const memoryTools = createMemoryTools({ db });
 
@@ -183,6 +184,7 @@ export function streamAssistantReply(
             feedback && lastFinish
               ? { reason: lastFinish.finishReason, raw: lastFinish.rawFinishReason }
               : undefined,
+          durationMs: now().epochMilliseconds - startedAt.epochMilliseconds,
         },
       });
       if (status === "complete") {

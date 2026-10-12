@@ -109,6 +109,18 @@ describe("messageDtoToUIMessage", () => {
       status: "aborted",
     });
   });
+  it("carries the turn duration on assistant rows for the fold header", () => {
+    const assistant: MessageDto = {
+      ...dto,
+      role: "assistant",
+      metadata: { model: "m", durationMs: 12_345 },
+    };
+    expect(messageDtoToUIMessage(assistant).metadata?.durationMs).toBe(12_345);
+    // 本功能上线前的旧消息没有用时
+    expect(
+      messageDtoToUIMessage({ ...assistant, metadata: { model: "m" } }).metadata,
+    ).not.toHaveProperty("durationMs");
+  });
   it("messagesToUI maps a list in order", () => {
     expect(messagesToUI([dto, { ...dto, id: "m2", role: "assistant" }]).map((m) => m.id)).toEqual([
       "m1",

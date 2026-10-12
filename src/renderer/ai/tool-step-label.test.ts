@@ -119,6 +119,34 @@ describe("toolStepLabel", () => {
     expect(toolStepLabel(part("tool-getToc"), chapters, t)).toBe("读取目录");
   });
 
+  it("labels bash with the command folded onto one line", () => {
+    const p = part("tool-bash", { input: { command: "cat <<EOF\n  hello\nEOF" } });
+    expect(toolStepLabel(p, chapters, t)).toBe("运行命令：cat <<EOF hello EOF");
+  });
+
+  it("falls back to a generic bash label while the command is still streaming", () => {
+    expect(toolStepLabel(part("tool-bash", { input: undefined }), chapters, t)).toBe("运行命令");
+    expect(toolStepLabel(part("tool-bash", { input: { command: "  " } }), chapters, t)).toBe(
+      "运行命令",
+    );
+  });
+
+  it("labels memory tools in plain words, with the title when there is one", () => {
+    const label = (name: string, input?: Record<string, unknown>) =>
+      toolStepLabel(part(`tool-${name}`, { input }), chapters, t);
+    expect(label("readMemory", { slug: "reading-style" })).toBe("读取记忆");
+    expect(label("saveMemory", { title: "读法", description: "d", body: "b" })).toBe(
+      "保存记忆「读法」",
+    );
+    expect(label("saveMemory", undefined)).toBe("保存记忆");
+    expect(label("updateMemory", { slug: "reading-style", title: "读法" })).toBe(
+      "更新记忆「读法」",
+    );
+    expect(label("updateMemory", { slug: "reading-style", body: "b" })).toBe("更新记忆");
+    expect(label("deleteMemory", { slug: "reading-style" })).toBe("删除记忆");
+    expect(label("updateSoul", { name: "x" })).toBe("更新人设");
+  });
+
   it("unknown dynamic tool falls back to raw toolName", () => {
     const dyn = part("dynamic-tool", { toolName: "webSearch", input: {} });
     expect(toolStepLabel(dyn, chapters, t)).toBe("webSearch");

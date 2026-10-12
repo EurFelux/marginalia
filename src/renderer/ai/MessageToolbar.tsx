@@ -4,16 +4,19 @@ import { Button } from "@renderer/components/ui/button";
 import { CopyButton } from "@renderer/ai/CopyButton";
 import { MessageUsageCard } from "@renderer/ai/MessageUsageCard";
 import { useChatActions } from "@renderer/ai/chat-actions";
-import { textOf } from "@renderer/ai/message-text";
+import { answerTextOf } from "@renderer/ai/message-text";
 import type { ChatUIMessage } from "@renderer/ai/types";
 
-/** 气泡下方 hover/focus 揭示的动作行。Copy(#67) + 按 role 的 Edit/Resend/Regenerate + assistant 用量卡。 */
+/**
+ * 气泡下方 hover/focus 揭示的动作行。Copy(#67) + 按 role 的 Edit/Resend/Regenerate + assistant 用量卡。
+ * Copy 只复制常显区的文本，与照常显示的回答一致（spec 2026-10-12 assistant-process-fold §3.7）。
+ */
 export function MessageToolbar({ m, onEdit }: { m: ChatUIMessage; onEdit?: () => void }) {
   const { t } = useTranslation();
   const actions = useChatActions();
   return (
     <div role="toolbar" aria-label={t("ai.messageActions", "消息操作")} className="flex gap-0.5">
-      <CopyButton text={textOf(m)} />
+      <CopyButton text={answerTextOf(m)} />
       {m.role === "user" && (
         <>
           <Button

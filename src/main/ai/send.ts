@@ -57,6 +57,8 @@ export interface SendDeps {
   createSkillTools?: () => Record<string, unknown>;
   /** main→renderer 通知端口（后台记忆整理完成的 toast）。 */
   notify: (n: AppNotification) => void;
+  /** 时钟：给每轮回复计时（spec 2026-10-12 assistant-process-fold §3.3）。 */
+  now: () => Temporal.Instant;
 }
 
 export type SendResult = OkSendResult | { ok: false; reason: string };
