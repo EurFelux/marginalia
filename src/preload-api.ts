@@ -174,6 +174,14 @@ export function createApi(d: PreloadDeps) {
       openWorkdir: inv(C.bashOpenWorkdir),
     },
 
+    selectionActions: {
+      list: inv(C.selectionActionsList),
+      create: inv(C.selectionActionsCreate),
+      update: inv(C.selectionActionsUpdate),
+      delete: inv(C.selectionActionsDelete),
+      reorder: inv(C.selectionActionsReorder),
+    },
+
     skills: {
       list: inv(C.skillsList),
       scanImportable: inv(C.skillsScanImportable),

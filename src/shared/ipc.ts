@@ -78,6 +78,13 @@ import {
   permissionRespondInput,
   permissionRuleIdInput,
 } from "@shared/permissions";
+import type { SelectionActionDto } from "@shared/selection-actions";
+import {
+  createSelectionActionInput,
+  reorderSelectionActionsInput,
+  selectionActionIdInput,
+  updateSelectionActionInput,
+} from "@shared/selection-actions";
 import type {
   CancelReadingReportResult,
   GenerateReadingReportResult,
@@ -411,6 +418,38 @@ export const C = {
     "invoke",
     permissionRuleIdInput,
     out<void>(),
+  ),
+
+  // 划词指令（spec 2026-10-12-custom-selection-actions-design §3.2）
+  selectionActionsList: def(
+    "selectionActions:list",
+    "invoke",
+    z.void(),
+    out<SelectionActionDto[]>(),
+  ),
+  selectionActionsCreate: def(
+    "selectionActions:create",
+    "invoke",
+    createSelectionActionInput,
+    out<SelectionActionDto>(),
+  ),
+  selectionActionsUpdate: def(
+    "selectionActions:update",
+    "invoke",
+    updateSelectionActionInput,
+    out<SelectionActionDto>(),
+  ),
+  selectionActionsDelete: def(
+    "selectionActions:delete",
+    "invoke",
+    selectionActionIdInput,
+    out<void>(),
+  ),
+  selectionActionsReorder: def(
+    "selectionActions:reorder",
+    "invoke",
+    reorderSelectionActionsInput,
+    out<SelectionActionDto[]>(),
   ),
 
   // bash（命令工作目录；spec 2026-10-03-bash-skills-permissions-design §8）

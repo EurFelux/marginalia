@@ -108,6 +108,9 @@ export const DEFAULT_AUTO_SCROLL_SPEED = 10;
  */
 export const DEFAULT_BASH_ENABLED = true;
 
+/** 划词工具栏显示文字（关 = 整条只显示图标）：默认开，即改版前的样子（spec 2026-10-12-custom-selection-actions-design §3.4）。 */
+export const DEFAULT_SELECTION_TOOLBAR_LABELS = true;
+
 /** 命令工作目录：绝对路径或 null（= 默认工作区）。 */
 export const bashWorkdirSchema = z.string().startsWith("/").nullable();
 
@@ -146,6 +149,8 @@ export const PREFERENCE_SCHEMAS = {
   bashWorkdir: bashWorkdirSchema,
   /** 停用的 skill（存 name）；不在列表里即启用，新放进来的 skill 默认启用（spec 2026-10-03 §7.3）。 */
   disabledSkills: z.array(z.string()),
+  /** 划词工具栏显示文字；未存 = DEFAULT_SELECTION_TOOLBAR_LABELS（开）。 */
+  selectionToolbarLabels: z.boolean(),
 } as const;
 
 export type PreferenceKey = keyof typeof PREFERENCE_SCHEMAS;
@@ -190,5 +195,6 @@ export const setPreferenceInput = z.discriminatedUnion("key", [
   z.object({ key: z.literal("bashAlwaysApprove"), value: z.boolean() }),
   z.object({ key: z.literal("bashWorkdir"), value: bashWorkdirSchema }),
   z.object({ key: z.literal("disabledSkills"), value: z.array(z.string()) }),
+  z.object({ key: z.literal("selectionToolbarLabels"), value: z.boolean() }),
 ]);
 export type SetPreferenceInput = z.infer<typeof setPreferenceInput>;

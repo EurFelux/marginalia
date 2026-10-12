@@ -25,6 +25,7 @@ import { registerReadingSessionHandlers } from "@main/ipc/reading-sessions-handl
 import { registerPermissionHandlers } from "@main/ipc/permission-handlers";
 import { registerBashHandlers } from "@main/ipc/bash-handlers";
 import { registerSkillsHandlers } from "@main/ipc/skills-handlers";
+import { registerSelectionActionsHandlers } from "@main/ipc/selection-actions-handlers";
 import { getPermissionGate } from "@main/permissions/instance";
 import { initReadingClock, bindWindowToClock } from "@main/stats/clock-wiring";
 import { registerCoverProtocol, registerCoverProtocolScheme } from "@main/library/cover-protocol";
@@ -180,6 +181,7 @@ app.on("ready", async () => {
   registerPermissionHandlers();
   registerBashHandlers();
   registerSkillsHandlers();
+  registerSelectionActionsHandlers();
   registerLogHandlers();
   registerStatsHandlers();
   registerBackupHandlers();

@@ -1,4 +1,5 @@
 import { flushSync } from "react-dom";
+import type { Chip } from "@shared/chat";
 import { usePrefsStore } from "@renderer/store/prefs-store";
 
 /**
@@ -25,4 +26,21 @@ export function focusComposer(): void {
 export function openPanelAndFocusComposer(): void {
   flushSync(() => usePrefsStore.getState().updateLayout({ panelOpen: true }));
   focusComposer();
+}
+
+let submitFn: ((text: string, chips: Chip[]) => boolean) | null = null;
+
+/** Composer 挂载时注册「直接发送」能力（与手动发送同一路径），卸载时传 null 注销。 */
+export function registerComposerSubmit(
+  fn: ((text: string, chips: Chip[]) => boolean) | null,
+): void {
+  submitFn = fn;
+}
+
+/**
+ * 以 Composer 的发送路径直接发出一条消息（划词「直接发送」，spec 2026-10-12 §3.5）：
+ * 带上已打开的摘要 chip，不动草稿文字。没有已挂载的 Composer 或 AI 正在回复时返回 false。
+ */
+export function submitComposer(text: string, chips: Chip[]): boolean {
+  return submitFn?.(text, chips) ?? false;
 }

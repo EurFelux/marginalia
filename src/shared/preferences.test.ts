@@ -39,6 +39,7 @@ describe("preferences schemas", () => {
       "pdfZoom",
       "readerLayout",
       "readerPrefs",
+      "selectionToolbarLabels",
       "showAgentAvatar",
       "soul",
       "stepLimit",

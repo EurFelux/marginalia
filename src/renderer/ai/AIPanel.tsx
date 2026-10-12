@@ -52,6 +52,12 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
       onError: (err) => log.warn("chat stream error", err),
     });
   const agentName = usePrefsStore((s) => s.soul.name);
+  // 回复进行中的状态同步给 chat-store：划词工具栏据此停用「直接发送」指令（spec 2026-10-12 §3.4）。
+  const replying = status === "streaming" || status === "submitted";
+  useEffect(() => {
+    useChatStore.getState().setAiReplying(replying);
+  }, [replying]);
+  useEffect(() => () => useChatStore.getState().setAiReplying(false), []);
   const openCommand = useChatStore((s) => s.openCommand);
   const activeConversationId = useActiveConversationId(context);
   const bookId = context.kind === "book" ? context.bookId : null;

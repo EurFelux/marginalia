@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import i18next from "i18next";
 import en from "@shared/i18n/locales/en";
 import zhCN from "@shared/i18n/locales/zh-CN";
 
@@ -144,5 +145,36 @@ describe("locale completeness", () => {
     }
     for (const key of englishRestoreConfirmationKeys) expectNonEmptyString(en, key);
     for (const key of chineseRestoreConfirmationKeys) expectNonEmptyString(zhCN, key);
+  });
+});
+
+describe("selection settings plural copy", () => {
+  const keys = [
+    "settings.selection.actionsDesc",
+    "settings.selection.limit",
+    "settings.selection.promptTooLong",
+  ] as const;
+
+  it("has one/other forms in English and a single form in Chinese", () => {
+    for (const key of keys) {
+      expect(en).toHaveProperty([`${key}_one`]);
+      expect(en).toHaveProperty([`${key}_other`]);
+      expect(zhCN).toHaveProperty([key]);
+      expect(zhCN).not.toHaveProperty([`${key}_one`]);
+    }
+  });
+
+  it("picks the singular form for a count of 1", async () => {
+    const i18n = i18next.createInstance();
+    await i18n.init({
+      lng: "en",
+      resources: { en: { translation: en }, "zh-CN": { translation: zhCN } },
+      keySeparator: false,
+      nsSeparator: false,
+    });
+    expect(i18n.t("settings.selection.limit", { count: 1 })).toBe("Up to 1 action");
+    expect(i18n.t("settings.selection.limit", { count: 20 })).toBe("Up to 20 actions");
+    await i18n.changeLanguage("zh-CN");
+    expect(i18n.t("settings.selection.limit", { count: 1 })).toBe("最多 1 个指令");
   });
 });

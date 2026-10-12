@@ -14,6 +14,7 @@ import { MemorySettings } from "./MemorySettings";
 import { WebSearchSettings } from "./WebSearchSettings";
 import { CommandSettings } from "./CommandSettings";
 import { SkillSettings } from "./SkillSettings";
+import { SelectionSettings } from "./SelectionSettings";
 
 export function SettingsShell() {
   const { t } = useTranslation();
@@ -26,6 +27,7 @@ export function SettingsShell() {
     { key: "models", label: t("settings.models", "模型") },
     { key: "appearance", label: t("settings.appearance", "外观") },
     { key: "reading", label: t("settings.reading", "阅读") },
+    { key: "selection", label: t("settings.selection", "划词") },
     { key: "agent", label: t("settings.agent", "助手") },
     { key: "memory", label: t("settings.memory", "记忆") },
     { key: "webSearch", label: t("settings.webSearch", "联网搜索") },
@@ -84,6 +86,7 @@ export function SettingsShell() {
             {active === "models" && <ModelsSettings />}
             {active === "appearance" && <AppearanceSettings />}
             {active === "reading" && <ReadingSettings />}
+            {active === "selection" && <SelectionSettings />}
             {active === "agent" && <AgentSettings />}
             {active === "memory" && <MemorySettings />}
             {active === "webSearch" && <WebSearchSettings />}
