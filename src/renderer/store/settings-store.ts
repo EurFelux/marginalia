@@ -4,6 +4,7 @@ export type SettingsCategory =
   | "models"
   | "appearance"
   | "reading"
+  | "selection"
   | "agent"
   | "memory"
   | "webSearch"

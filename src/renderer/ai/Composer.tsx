@@ -8,7 +8,7 @@ import { Button } from "@renderer/components/ui/button";
 import { isSubmitEnter } from "@renderer/lib/keyboard";
 import { useChatStore } from "@renderer/store/chat-store";
 import { useNavigationStore } from "@renderer/store/navigation-store";
-import { registerComposerFocus } from "@renderer/ai/composer-focus";
+import { registerComposerFocus, registerComposerSubmit } from "@renderer/ai/composer-focus";
 import { ContextPillBar } from "@renderer/ai/ContextPillBar";
 import { type ChatContext } from "@renderer/ai/chat-context";
 import { materializeSummaryChips } from "@renderer/ai/summary-chips";
@@ -52,23 +52,43 @@ export function Composer({ status, onSend, onStop, context }: Props) {
   });
   const bookSummary = useQuery({ ...bookSummaryQuery(bookId ?? ""), enabled: !!bookId });
 
-  const send = () => {
-    const text = draftText.trim();
-    if (!text || isStreaming) return;
+  // 发出一条消息并带上已打开的摘要 chip。手动发送与划词「直接发送」共用这一条路径。
+  const dispatch = (text: string, chips: Chip[]) => {
     const summaryExtras = materializeSummaryChips(
       summaryChips,
       chapterSummary.data,
       bookSummary.data,
     );
-    onSend(text, [...summaryExtras, ...draftChips]);
-    setDraftText("");
-    setDraftChips([]);
+    onSend(text, [...summaryExtras, ...chips]);
     // 已随本条发送的摘要回落 off（一段对话只输入一次）；未 ready 被 materialize 跳过的保持 on
     const sent = new Set(summaryExtras.map((c) => c.id));
     const { setSummaryChip } = useChatStore.getState();
     if (sent.has("chapter-summary")) setSummaryChip("chapter", false);
     if (sent.has("book-summary")) setSummaryChip("book", false);
   };
+
+  const send = () => {
+    const text = draftText.trim();
+    if (!text || isStreaming) return;
+    dispatch(text, draftChips);
+    setDraftText("");
+    setDraftChips([]);
+  };
+
+  // 「直接发送」句柄：注册一个稳定的转发函数，实际逻辑每次渲染刷新到最新闭包（status / 摘要 / onSend）。
+  // 不动草稿文字与草稿 chip；AI 正在回复时返回 false，由调用方退回「填入」。
+  const submitRef = useRef<(text: string, chips: Chip[]) => boolean>(() => false);
+  useEffect(() => {
+    submitRef.current = (text, chips) => {
+      if (isStreaming) return false;
+      dispatch(text, chips);
+      return true;
+    };
+  });
+  useEffect(() => {
+    registerComposerSubmit((text, chips) => submitRef.current(text, chips));
+    return () => registerComposerSubmit(null);
+  }, []);
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (isSubmitEnter(e)) {

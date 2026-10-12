@@ -17,6 +17,7 @@ import { readingSessionBindings } from "@main/ipc/reading-sessions-handlers";
 import { permissionBindings } from "@main/ipc/permission-handlers";
 import { bashBindings } from "@main/ipc/bash-handlers";
 import { skillsBindings } from "@main/ipc/skills-handlers";
+import { selectionActionsBindings } from "@main/ipc/selection-actions-handlers";
 
 const allBindings = [
   ...appBindings,
@@ -36,6 +37,7 @@ const allBindings = [
   ...permissionBindings,
   ...bashBindings,
   ...skillsBindings,
+  ...selectionActionsBindings,
 ];
 
 describe("ipc bindings coverage", () => {

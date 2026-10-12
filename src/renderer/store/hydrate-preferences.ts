@@ -56,4 +56,7 @@ export function hydratePreferences(): void {
   }
   if (snap.bashWorkdir !== undefined) usePrefsStore.setState({ bashWorkdir: snap.bashWorkdir });
   if (snap.disabledSkills) usePrefsStore.setState({ disabledSkills: snap.disabledSkills });
+  if (snap.selectionToolbarLabels !== undefined) {
+    usePrefsStore.setState({ selectionToolbarLabels: snap.selectionToolbarLabels });
+  }
 }

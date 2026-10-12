@@ -83,7 +83,7 @@ export function MessageList({
         <Sparkles className="size-7 text-primary/50" />
         <p className="leading-relaxed">
           {bookId
-            ? t("ai.emptyHint", "划选正文后点「AI 问」，或直接在下方提问。")
+            ? t("ai.emptyHint", "划选正文后点「询问」，或直接在下方提问。")
             : t("ai.emptyHintLibrary", "直接在下方向 {{name}} 提问吧～", { name: agentName })}
         </p>
       </div>

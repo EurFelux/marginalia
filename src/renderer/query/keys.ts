@@ -24,6 +24,7 @@ export const qk = {
   statsUsage: (range: UsageRange) => ["stats-usage", range] as const,
   memories: ["memories"] as const,
   permissionRules: ["permission-rules"] as const,
+  selectionActions: ["selection-actions"] as const,
   bashWorkdir: ["bash-workdir"] as const,
   skills: ["skills"] as const,
   skillCandidates: ["skill-candidates"] as const,

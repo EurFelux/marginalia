@@ -333,6 +333,38 @@ export const permissionRules = sqliteTable(
   ],
 );
 
+// 划词指令（spec 2026-10-12-custom-selection-actions-design §3.2）：一行一个指令，逐行校验——
+// 某行不合当前规则只跳过这一行，不会像整份 JSON 偏好那样一次作废全部。
+// 内置指令（id 为 ask / explain / translate / summarize）按需落行：没有行 = 出厂状态。
+export const selectionActions = sqliteTable(
+  "selection_actions",
+  {
+    id: pkUuid(),
+    kind: text("kind", { enum: ["builtin", "custom"] }).notNull(),
+    /** 内置为空（文字走 i18n）；自建必填。 */
+    label: text("label"),
+    /** 内置为空（图标固定）；自建必填。 */
+    icon: text("icon"),
+    /** 内置为空 = 用默认；自建必填。 */
+    prompt: text("prompt"),
+    enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+    autoSend: integer("auto_send", { mode: "boolean" }).notNull().default(false),
+    /** 排序位；每次拖拽排序整表重写为 0..n-1（同 books.position）。 */
+    position: integer("position").notNull(),
+    createdAt: nowMs(),
+    updatedAt: integer("updated_at")
+      .notNull()
+      .$defaultFn(() => Date.now()),
+  },
+  (t) => [
+    check("selection_actions_kind_check", sql`${t.kind} in ('builtin','custom')`),
+    check(
+      "selection_actions_shape_check",
+      sql`(${t.kind} = 'builtin' and ${t.label} is null and ${t.icon} is null) or (${t.kind} = 'custom' and ${t.label} is not null and ${t.icon} is not null and ${t.prompt} is not null)`,
+    ),
+  ],
+);
+
 // AI 用量账本（spec 2026-10-12-ai-usage-stats-design §4.1）：只追加，一次模型请求一行（回填的旧对话一轮一行）。
 // book_id 刻意不设外键：为空 = 不属于某本书；有值但 books 查无 = 书已删除。删书置空会让两者混在一起。
 export const aiUsage = sqliteTable(

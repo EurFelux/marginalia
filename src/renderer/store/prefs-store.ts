@@ -11,6 +11,7 @@ import {
   type SummaryModel,
   type TtsPrefs,
   DEFAULT_BASH_ENABLED,
+  DEFAULT_SELECTION_TOOLBAR_LABELS,
 } from "@shared/preferences";
 import { DEFAULT_WEB_SEARCH, type WebSearchConfig } from "@shared/web-search";
 import type { ReaderLayout, ReaderPrefs } from "@renderer/types";
@@ -65,6 +66,8 @@ interface PrefsState {
   bashWorkdir: string | null;
   /** 停用的 skill（存 name）；不在列表里即启用（§7.3）。 */
   disabledSkills: string[];
+  /** 划词工具栏显示文字；关 = 整条只显示图标（spec 2026-10-12-custom-selection-actions-design §3.4）。 */
+  selectionToolbarLabels: boolean;
 }
 interface PrefsActions {
   setAutoSummarize: (v: boolean) => void;
@@ -91,6 +94,7 @@ interface PrefsActions {
   setBashAlwaysApprove: (v: boolean) => void;
   setBashWorkdir: (v: string | null) => void;
   setSkillEnabled: (name: string, enabled: boolean) => void;
+  setSelectionToolbarLabels: (v: boolean) => void;
 }
 
 export const PREFS_INITIAL: PrefsState = {
@@ -118,6 +122,7 @@ export const PREFS_INITIAL: PrefsState = {
   bashAlwaysApprove: false,
   bashWorkdir: null,
   disabledSkills: [],
+  selectionToolbarLabels: DEFAULT_SELECTION_TOOLBAR_LABELS,
 };
 
 /**
@@ -228,4 +233,8 @@ export const usePrefsStore = create<PrefsState & PrefsActions>()((set) => ({
       persistPreference({ key: "disabledSkills", value: disabledSkills });
       return { disabledSkills };
     }),
+  setSelectionToolbarLabels: (selectionToolbarLabels) => {
+    persistPreference({ key: "selectionToolbarLabels", value: selectionToolbarLabels });
+    set({ selectionToolbarLabels });
+  },
 }));
