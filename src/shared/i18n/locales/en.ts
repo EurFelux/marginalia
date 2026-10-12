@@ -348,6 +348,7 @@ export default {
   "reader.sectionMissing": "(This section does not exist)",
   "reader.selection.addNote": "Add note",
   "reader.selection.askAi": "Ask AI",
+  "reader.selection.busy": "The AI is still replying. Try again when it's done.",
   "reader.selection.explain": "Explain",
   "reader.selection.highlight": "Highlight",
   "reader.selection.more": "More",

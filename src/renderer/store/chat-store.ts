@@ -28,6 +28,8 @@ interface ChatState {
    * 书库伴侣（library 上下文）的 active 会话（持久化）。
    */
   activeLibraryConversation: string | null;
+  /** AI 面板正在生成回复（streaming / submitted）；不持久化。划词工具栏据此停用「直接发送」指令。 */
+  aiReplying: boolean;
 }
 interface ChatActions {
   /** 设指定上下文的 active（写记忆槽）；id=null 同时清 openCommand（其载入命令失效）。 */
@@ -43,6 +45,7 @@ interface ChatActions {
   setSummaryChipsPreset: () => void;
   /** 回落全 off。 */
   resetSummaryChips: () => void;
+  setAiReplying: (replying: boolean) => void;
   /** 切书重置：仅清残留 openCommand（避免 AIPanel 重挂重放上本书会话）；保留 activeByBook 与草稿。 */
   resetForBookSwitch: () => void;
 }
@@ -54,6 +57,7 @@ export const CHAT_INITIAL: ChatState = {
   summaryChips: { chapter: false, book: false },
   activeByBook: {},
   activeLibraryConversation: null,
+  aiReplying: false,
 };
 
 export const useChatStore = create<ChatState & ChatActions>()(
@@ -96,6 +100,7 @@ export const useChatStore = create<ChatState & ChatActions>()(
         set((s) => ({ summaryChips: { ...s.summaryChips, [kind]: on } })),
       setSummaryChipsPreset: () => set({ summaryChips: { chapter: true, book: true } }),
       resetSummaryChips: () => set({ summaryChips: { chapter: false, book: false } }),
+      setAiReplying: (aiReplying) => set({ aiReplying }),
       resetForBookSwitch: () => set({ openCommand: null }),
     }),
     {

@@ -333,6 +333,7 @@ export default {
   "reader.sectionMissing": "（本节不存在）",
   "reader.selection.addNote": "添加笔记",
   "reader.selection.askAi": "询问",
+  "reader.selection.busy": "AI 正在回复，等这轮回复结束再用",
   "reader.selection.explain": "解释",
   "reader.selection.highlight": "高亮标记",
   "reader.selection.more": "更多",

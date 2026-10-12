@@ -10,6 +10,8 @@ import { useNavigationStore } from "@renderer/store/navigation-store";
 import { useAnnotationStore } from "@renderer/store/annotation-store";
 import { usePrefsStore } from "@renderer/store/prefs-store";
 import { useAiActions } from "@renderer/ai/use-ai-actions";
+import { isBlockedWhileReplying } from "@renderer/ai/ai-action-draft";
+import { useChatStore } from "@renderer/store/chat-store";
 import { useSelectionActionViews } from "@renderer/ai/use-selection-actions";
 import { SELECTION_ACTION_ICON_COMPONENTS } from "@renderer/ai/selection-action-icons";
 import { inlineCountFor, splitToolbarActions } from "@renderer/ai/selection-action-layout";
@@ -57,6 +59,9 @@ function ToolbarPanel({
   const bookId = useNavigationStore((s) => s.currentBookId);
   const lastStyle = usePrefsStore((s) => s.lastHighlightStyle);
   const showLabels = usePrefsStore((s) => s.selectionToolbarLabels);
+  // AI 正在回复时，开着直接发送的指令不可用（spec 2026-10-12 §3.4）；回复一结束立即恢复。
+  const replying = useChatStore((s) => s.aiReplying);
+  const busyReason = t("reader.selection.busy", "AI 正在回复，等这轮回复结束再用");
   const { startAiAction } = useAiActions();
   const qc = useQueryClient();
   const createM = useMutation({
@@ -136,6 +141,7 @@ function ToolbarPanel({
           onClick={() => void startAiAction(a)}
           icon={SELECTION_ACTION_ICON_COMPONENTS[a.icon]}
           label={a.label}
+          unavailableReason={isBlockedWhileReplying(a, replying) ? busyReason : undefined}
         />
       ))}
       {overflow.length > 0 && (
@@ -155,7 +161,12 @@ function ToolbarPanel({
               className="absolute end-0 top-full mt-2 flex min-w-40 flex-col rounded-xl border border-border bg-popover p-1 shadow-lg"
             >
               {overflow.map((a) => (
-                <MoreItem key={a.id} action={a} onClick={() => void startAiAction(a)} />
+                <MoreItem
+                  key={a.id}
+                  action={a}
+                  onClick={() => void startAiAction(a)}
+                  unavailableReason={isBlockedWhileReplying(a, replying) ? busyReason : undefined}
+                />
               ))}
             </div>
           )}
@@ -166,6 +177,13 @@ function ToolbarPanel({
 }
 
 /** 工具栏按钮：显示文字 = 图标 + 文字；只显示图标 = 图标按钮，悬停用 Tooltip 显示文字。 */
+/** 不可用时的样式：变淡、「不可用」光标、无悬停底色；不用 disabled 属性，好让悬停仍能显示原因。 */
+const UNAVAILABLE = "cursor-not-allowed opacity-50 hover:bg-transparent dark:hover:bg-transparent";
+
+/**
+ * 工具栏按钮：显示文字 = 图标 + 文字；只显示图标 = 图标按钮，悬停用 Tooltip 显示文字。
+ * unavailableReason 非空 = 暂不可用（AI 正在回复时的直接发送指令）：点了没反应，悬停显示原因。
+ */
 function ToolBtn({
   showLabel,
   icon: Icon,
@@ -174,6 +192,7 @@ function ToolBtn({
   primary,
   active,
   ariaExpanded,
+  unavailableReason,
 }: {
   showLabel: boolean;
   icon: LucideIcon;
@@ -182,53 +201,58 @@ function ToolBtn({
   primary?: boolean;
   active?: boolean;
   ariaExpanded?: boolean;
+  unavailableReason?: string;
 }) {
-  const className = cn(primary && "text-primary", active && "bg-accent");
-  if (showLabel) {
-    return (
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={onClick}
-        aria-expanded={ariaExpanded}
-        className={className}
-      >
-        <Icon className="size-3.5" />
-        <span className="max-w-40 truncate">{label}</span>
-      </Button>
-    );
-  }
+  const unavailable = unavailableReason !== undefined;
+  const button = (
+    <Button
+      variant="ghost"
+      size={showLabel ? "sm" : "icon-sm"}
+      onClick={unavailable ? undefined : onClick}
+      aria-label={showLabel ? undefined : label}
+      aria-disabled={unavailable || undefined}
+      aria-expanded={ariaExpanded}
+      className={cn(primary && "text-primary", active && "bg-accent", unavailable && UNAVAILABLE)}
+    >
+      <Icon className="size-3.5" />
+      {showLabel && <span className="max-w-40 truncate">{label}</span>}
+    </Button>
+  );
+  const tip = showLabel
+    ? unavailableReason
+    : unavailable
+      ? `${label}：${unavailableReason}`
+      : label;
+  if (tip === undefined) return button;
   return (
     <Tooltip>
-      <TooltipTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={onClick}
-            aria-label={label}
-            aria-expanded={ariaExpanded}
-            className={className}
-          >
-            <Icon className="size-3.5" />
-          </Button>
-        }
-      />
-      <TooltipContent>{label}</TooltipContent>
+      <TooltipTrigger render={button} />
+      <TooltipContent>{tip}</TooltipContent>
     </Tooltip>
   );
 }
 
-function MoreItem({ action, onClick }: { action: SelectionActionView; onClick: () => void }) {
+function MoreItem({
+  action,
+  onClick,
+  unavailableReason,
+}: {
+  action: SelectionActionView;
+  onClick: () => void;
+  unavailableReason?: string;
+}) {
   const Icon = SELECTION_ACTION_ICON_COMPONENTS[action.icon];
   const primary = action.id === "ask";
-  return (
+  const unavailable = unavailableReason !== undefined;
+  const item = (
     <button
       type="button"
       role="menuitem"
-      onClick={onClick}
+      onClick={unavailable ? undefined : onClick}
+      aria-disabled={unavailable || undefined}
       className={cn(
-        "flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-start text-[0.8rem] hover:bg-accent",
+        "flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-start text-[0.8rem]",
+        unavailable ? "cursor-not-allowed opacity-50" : "hover:bg-accent",
         primary && "text-primary",
       )}
     >
@@ -236,5 +260,12 @@ function MoreItem({ action, onClick }: { action: SelectionActionView; onClick: (
       <span className="min-w-0 max-w-48 flex-1 truncate">{action.label}</span>
       {action.autoSend && <Send className="size-3 shrink-0 text-muted-foreground" />}
     </button>
+  );
+  if (!unavailable) return item;
+  return (
+    <Tooltip>
+      <TooltipTrigger render={item} />
+      <TooltipContent>{unavailableReason}</TooltipContent>
+    </Tooltip>
   );
 }

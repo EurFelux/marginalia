@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { planSelectionAction } from "@renderer/ai/ai-action-draft";
+import { isBlockedWhileReplying, planSelectionAction } from "@renderer/ai/ai-action-draft";
 
 describe("planSelectionAction", () => {
   it("keeps the existing draft when there is no prompt (Ask without a written prompt)", () => {
@@ -13,5 +13,13 @@ describe("planSelectionAction", () => {
 
   it("sends right away when auto-send is on", () => {
     expect(planSelectionAction({ prompt: "Explain.", autoSend: true })).toBe("send");
+  });
+});
+
+describe("isBlockedWhileReplying", () => {
+  it("blocks only auto-send actions, and only while the AI is replying", () => {
+    expect(isBlockedWhileReplying({ autoSend: true }, true)).toBe(true);
+    expect(isBlockedWhileReplying({ autoSend: false }, true)).toBe(false);
+    expect(isBlockedWhileReplying({ autoSend: true }, false)).toBe(false);
   });
 });
