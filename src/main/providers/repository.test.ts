@@ -4,6 +4,7 @@ import { createDb, runMigrations } from "@main/db/client";
 import { providers } from "@main/db/schema";
 import type { ProviderTester } from "@main/secrets/tester";
 import {
+  findBuiltinDeepseekKey,
   getProviderRow,
   listProviders,
   removeProvider,
@@ -395,5 +396,35 @@ describe("builtin provider immutability", () => {
     const ok = upsertProvider(db, { id: row.id, type: "anthropic" });
     expect(ok.type).toBe("anthropic"); // 切到 compatibleApis 内 → 成功
     expect(() => upsertProvider(db, { id: row.id, type: "google-generate-content" })).toThrow(); // 切到 compatibleApis 外 → 抛
+  });
+});
+
+describe("findBuiltinDeepseekKey", () => {
+  function insert(db: ReturnType<typeof freshDb>, values: { isBuiltin: boolean; apiKey?: string }) {
+    db.insert(providers)
+      .values({
+        type: "openai-chat-completions",
+        label: "DeepSeek",
+        baseUrl: values.isBuiltin ? null : "https://proxy.example.com",
+        models: [],
+        isBuiltin: values.isBuiltin,
+        apiKey: values.apiKey ?? null,
+      })
+      .run();
+  }
+
+  it("returns the built-in DeepSeek provider's key", () => {
+    const db = freshDb();
+    insert(db, { isBuiltin: true, apiKey: "sk-builtin" });
+    expect(findBuiltinDeepseekKey(db)).toBe("sk-builtin");
+  });
+  it("ignores a user-created provider with the same label", () => {
+    const db = freshDb();
+    insert(db, { isBuiltin: false, apiKey: "sk-user" });
+    insert(db, { isBuiltin: true });
+    expect(findBuiltinDeepseekKey(db)).toBeUndefined();
+  });
+  it("returns undefined when there is no built-in DeepSeek provider", () => {
+    expect(findBuiltinDeepseekKey(freshDb())).toBeUndefined();
   });
 });

@@ -12,6 +12,8 @@ import {
   DEFAULT_STEP_LIMIT,
 } from "@shared/preferences";
 import { createSearchTools } from "@main/ai/search/web-search-tool";
+import { getOutboundFetch } from "@main/net/outbound-fetch";
+import { findBuiltinDeepseekKey } from "@main/providers/repository";
 import { createBashTool } from "@main/ai/bash-tool";
 import { createSkillTools } from "@main/ai/skill-tools";
 import { enabledSkills } from "@main/ai/agent-context";
@@ -59,7 +61,12 @@ export function makeSendDeps(): SendDeps {
     resolveSummaryModel: () => resolveSummaryModel(db),
     runBackground: backgroundLimiter.run,
     stepLimit: getPreference(db, "stepLimit") ?? DEFAULT_STEP_LIMIT,
-    createSearchTools,
+    // 每次发送现读 key：用户刚在「模型」设置里配好 DeepSeek key 即生效。
+    createSearchTools: (cfg, turnEnabled) =>
+      createSearchTools(cfg, turnEnabled, {
+        fetch: getOutboundFetch(),
+        deepseekApiKey: findBuiltinDeepseekKey(db),
+      }),
     webSearchConfig: getPreference(db, "webSearch") ?? DEFAULT_WEB_SEARCH,
     createBashTools:
       (getPreference(db, "bashEnabled") ?? DEFAULT_BASH_ENABLED)

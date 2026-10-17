@@ -25,6 +25,7 @@ import { meteredModel } from "@main/usage/metered-model";
 import type { ResolvedModel } from "@main/ai/assistant-model";
 import type { SendDeps } from "@main/ai/send";
 import { DEFAULT_STEP_LIMIT } from "@shared/preferences";
+import { webToolNames } from "@shared/web-search";
 import { createLogger } from "@main/logger";
 
 const log = createLogger("send");
@@ -69,7 +70,7 @@ export function streamAssistantReply(
   let closeSearch: (() => Promise<unknown>) | undefined;
   const wsCfg = deps.webSearchConfig;
   const searchTools =
-    deps.createSearchTools && wsCfg?.backends.length
+    deps.createSearchTools && wsCfg && webToolNames(wsCfg).length > 0
       ? (() => {
           const s = deps.createSearchTools!(wsCfg, ctx.webSearchTurn);
           closeSearch = s.close;

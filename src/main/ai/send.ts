@@ -11,7 +11,7 @@ import { supportsImageToolResults } from "@main/ai/model-factory";
 import { getBook } from "@main/library/repository";
 import type { ResolvedModel } from "@main/ai/assistant-model";
 import type { RunBackground } from "@main/ai/background-limiter";
-import type { WebSearchConfig } from "@shared/web-search";
+import { webToolNames, type WebSearchConfig } from "@shared/web-search";
 import {
   appendMessage,
   getMessage,
@@ -117,10 +117,9 @@ export async function runSend(
     });
     systemPromptText = `${systemPromptText}\n\n${note}`;
   }
-  const cfg = deps.webSearchConfig;
-  const searchRegistered = Boolean(cfg?.backends.length);
+  const webTools = deps.webSearchConfig ? webToolNames(deps.webSearchConfig) : [];
   const webSearchTurn = input.webSearch ?? false;
-  const webSearchEnabled = searchRegistered ? webSearchTurn : undefined;
+  const webSearchEnabled = webTools.length > 0 ? webSearchTurn : undefined;
 
   const allMessages: ModelMessage[] = await assemblePrompt({
     systemPrompt: systemPromptText,
@@ -132,6 +131,7 @@ export async function runSend(
       readingContext: input.readingContext,
       currentDateTime: formatCurrentDateTime(Temporal.Now.zonedDateTimeISO()),
       webSearchEnabled,
+      webTools,
     },
   });
 
@@ -223,10 +223,9 @@ export async function runResend(
     systemPromptText = `${systemPromptText}\n\n${note}`;
   }
 
-  const cfg = deps.webSearchConfig;
-  const searchRegistered = Boolean(cfg?.backends.length);
+  const webTools = deps.webSearchConfig ? webToolNames(deps.webSearchConfig) : [];
   const webSearchTurn = input.webSearch ?? false;
-  const webSearchEnabled = searchRegistered ? webSearchTurn : undefined;
+  const webSearchEnabled = webTools.length > 0 ? webSearchTurn : undefined;
 
   const allMessages: ModelMessage[] = await assemblePrompt({
     systemPrompt: systemPromptText,
@@ -238,6 +237,7 @@ export async function runResend(
       readingContext: null,
       currentDateTime: formatCurrentDateTime(Temporal.Now.zonedDateTimeISO()),
       webSearchEnabled,
+      webTools,
     },
   });
 

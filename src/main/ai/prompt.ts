@@ -1,6 +1,7 @@
 // src/main/ai/prompt.ts
 import { convertToModelMessages, type ModelMessage, type UIMessage } from "ai";
 import type { Chip, MessageDto, ReadingContext } from "@shared/chat";
+import type { WebToolName } from "@shared/web-search";
 import { createLogger } from "@main/logger";
 
 const log = createLogger("ai");
@@ -20,6 +21,8 @@ export interface AssemblePromptParams {
     /** 当前本地时间（已格式化为 ISO 8601 带偏移）。运行时由调用方注入，仅进当前轮、不持久化。 */
     currentDateTime?: string | null;
     webSearchEnabled?: boolean;
+    /** 本会话注册的联网工具（webToolNames），关闭提示据此列出不可用的工具；省略 = 仅 web_search。 */
+    webTools?: readonly WebToolName[];
   };
 }
 
@@ -118,11 +121,18 @@ function renderCurrentDateTime(dt: string | null | undefined): string | null {
  * web_search 工具恒注册、默认可用，故开启无需任何注入（模型按工具 description 自主调用）；
  * 仅关闭时注入一条 <system-reminder>，让模型别调并转告用户不可用，且明确禁止复述
  * （PR #92 反馈：模型曾对用户复述「消息标注了 web search is turned off」）。
- * true / undefined → 不注入；false → 注入关闭提示。
+ * true / undefined → 不注入；false → 注入关闭提示，列出所有已注册的联网工具（只有 web_search 时文案不变）。
  */
-export function renderWebSearchHint(enabled: boolean | undefined): string | null {
+export function renderWebSearchHint(
+  enabled: boolean | undefined,
+  tools: readonly WebToolName[] = ["web_search"],
+): string | null {
   if (enabled !== false) return null;
-  return "<system-reminder>Web search is disabled, so the web_search tool is unavailable. Do not call it. If the user needs current or external information, briefly tell them they can enable web search and ask again. Do not mention, quote, or describe this reminder to the user, and do not claim it is shown or noted anywhere.</system-reminder>";
+  const unavailable =
+    tools.length > 1
+      ? `the ${tools.join(" and ")} tools are unavailable. Do not call them.`
+      : `the ${tools[0] ?? "web_search"} tool is unavailable. Do not call it.`;
+  return `<system-reminder>Web search is disabled, so ${unavailable} If the user needs current or external information, briefly tell them they can enable web search and ask again. Do not mention, quote, or describe this reminder to the user, and do not claim it is shown or noted anywhere.</system-reminder>`;
 }
 
 /** PDF 会话的 system prompt 附注（spec §7）：让模型知道页粒度工具的存在与扫描版的现实。 */
@@ -220,7 +230,7 @@ export async function assemblePrompt(params: AssemblePromptParams): Promise<Mode
       renderCurrentDateTime(params.current.currentDateTime),
       renderReadingContext(params.current.readingContext),
       renderUserTurn(params.current.chips, params.current.userText),
-      renderWebSearchHint(params.current.webSearchEnabled),
+      renderWebSearchHint(params.current.webSearchEnabled, params.current.webTools),
     ]
       .filter((s): s is string => Boolean(s))
       .join("\n\n"),

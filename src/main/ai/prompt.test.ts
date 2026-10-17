@@ -571,6 +571,17 @@ describe("renderWebSearchHint", () => {
   it("returns null when undefined", () => {
     expect(renderWebSearchHint(undefined)).toBeNull();
   });
+  it("keeps the single-tool wording unchanged", () => {
+    expect(renderWebSearchHint(false, ["web_search"])).toBe(renderWebSearchHint(false));
+    expect(renderWebSearchHint(false)).toContain(
+      "Web search is disabled, so the web_search tool is unavailable. Do not call it. If the user",
+    );
+  });
+  it("lists web_fetch too when it is registered", () => {
+    expect(renderWebSearchHint(false, ["web_search", "web_fetch"])).toContain(
+      "Web search is disabled, so the web_search and web_fetch tools are unavailable. Do not call them. If the user",
+    );
+  });
 });
 
 describe("assemblePrompt web search hint", () => {

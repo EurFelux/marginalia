@@ -38,3 +38,45 @@ describe("SearchService", () => {
     expect(close2).toHaveBeenCalled();
   });
 });
+
+describe("SearchService error message", () => {
+  it("includes the last backend's error message", async () => {
+    const { b: b1 } = backend("a", vi.fn().mockRejectedValue(new Error("x")));
+    const { b: b2 } = backend("b", vi.fn().mockRejectedValue(new Error("HTTP 429: too fast")));
+    await expect(new SearchService([b1, b2]).search("q", {})).rejects.toThrow(
+      "all web search backends failed: HTTP 429: too fast",
+    );
+  });
+});
+
+describe("SearchService.fetchPage", () => {
+  const page = { title: "T", content: "C" };
+
+  it("skips backends without fetchPage and falls back in order", async () => {
+    const plain = backend("plain", vi.fn()).b;
+    const failing: SearchBackend = {
+      ...backend("f1", vi.fn()).b,
+      fetchPage: vi.fn().mockRejectedValue(new Error("404")),
+    };
+    const fetchPage = vi.fn().mockResolvedValue(page);
+    const working: SearchBackend = { ...backend("f2", vi.fn()).b, fetchPage };
+    await expect(
+      new SearchService([plain, failing, working]).fetchPage("https://x", {}),
+    ).resolves.toEqual(page);
+    expect(fetchPage).toHaveBeenCalledWith("https://x", {});
+  });
+  it("rejects when no backend can fetch pages", async () => {
+    await expect(
+      new SearchService([backend("plain", vi.fn()).b]).fetchPage("https://x", {}),
+    ).rejects.toThrow(/can fetch pages/);
+  });
+  it("aggregates the failure reason when every fetcher fails", async () => {
+    const failing: SearchBackend = {
+      ...backend("f1", vi.fn()).b,
+      fetchPage: vi.fn().mockRejectedValue(new Error("HTTP 403: blocked")),
+    };
+    await expect(new SearchService([failing]).fetchPage("https://x", {})).rejects.toThrow(
+      "all web search backends failed: HTTP 403: blocked",
+    );
+  });
+});

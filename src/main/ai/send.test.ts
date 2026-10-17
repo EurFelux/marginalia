@@ -20,6 +20,8 @@ import { appendMessage, getMessage, listMessages } from "@main/chat/messages";
 import { buildChips } from "@main/ai/chips";
 import type { ResolvedModel } from "@main/ai/assistant-model";
 import type { LoadBytes } from "@main/ai/tools";
+import { createSearchTools } from "@main/ai/search/web-search-tool";
+import type { WebSearchConfig } from "@shared/web-search";
 import { createBashTool } from "@main/ai/bash-tool";
 import { runResend, runSend, type SendDeps, type SendInput } from "@main/ai/send";
 import { __resetNamingRuntime } from "@main/chat/conversation-title";
@@ -998,6 +1000,57 @@ describe("bash tool registration", () => {
     await res.finished;
     expect(factory).toHaveBeenCalledWith({ conversationId: convo.id });
     expect(seen.tools).toContain("bash");
+  });
+});
+
+describe("web tool registration", () => {
+  beforeEach(() => __resetNamingRuntime());
+
+  function capturingModel() {
+    const seen = { tools: [] as string[], prompt: "" };
+    const model = new MockLanguageModelV4({
+      doStream: async ({ tools, prompt }) => {
+        seen.tools = (tools ?? []).map((candidate) => candidate.name);
+        seen.prompt = JSON.stringify(prompt);
+        return {
+          stream: simulateReadableStream({
+            chunks: [
+              { type: "text-start", id: "t1" },
+              { type: "text-delta", id: "t1", delta: "ok" },
+              { type: "text-end", id: "t1" },
+              finishChunk("stop"),
+            ],
+          }),
+        };
+      },
+    });
+    return { model, seen };
+  }
+
+  async function sendWith(webSearchConfig: WebSearchConfig, webSearch: boolean) {
+    const { model, seen } = capturingModel();
+    const { db, book, deps } = await setup({ ok: true, model, modelId: "mock" });
+    const convo = createConversation(db, { bookId: book.id });
+    const res = await runSend(
+      { ...deps, createSearchTools, webSearchConfig },
+      input(book.id, convo.id, { webSearch }),
+    );
+    if (!res.ok) throw new Error(res.reason);
+    await res.finished;
+    return seen;
+  }
+
+  it("registers no web tools and injects no reminder when every backend is disabled", async () => {
+    const seen = await sendWith({ backends: [{ kind: "exa-mcp", enabled: false }] }, false);
+    expect(seen.tools).not.toContain("web_search");
+    expect(seen.tools).not.toContain("web_fetch");
+    expect(seen.prompt).not.toMatch(/system-reminder/);
+  });
+
+  it("registers web_fetch with DeepSeek and lists both tools when web search is off", async () => {
+    const seen = await sendWith({ backends: [{ kind: "exa-mcp" }, { kind: "deepseek" }] }, false);
+    expect(seen.tools).toEqual(expect.arrayContaining(["web_search", "web_fetch"]));
+    expect(seen.prompt).toContain("the web_search and web_fetch tools are unavailable");
   });
 });
 

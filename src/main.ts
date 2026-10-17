@@ -3,7 +3,7 @@ import path from "node:path";
 import started from "electron-squirrel-startup";
 import { initDb, getDb } from "@main/db/instance";
 import { initAppService } from "@main/app/app-service";
-import { setModelFetch } from "@main/ai/model-factory";
+import { setOutboundFetch } from "@main/net/outbound-fetch";
 import { getPreference } from "@main/preferences/repository";
 import { initMainI18n } from "@main/i18n";
 import { resolveInitialLanguage } from "@shared/i18n/language";
@@ -166,7 +166,7 @@ app.on("ready", async () => {
   initMainI18n(lang);
   // AI 出站请求默认走系统代理：Electron net.fetch 经 Chromium 网络栈，默认采用系统代理设置。
   // （部分地区直连 api.anthropic.com 会被 403「Request not allowed」按区域拦截，须经系统代理出网。）
-  setModelFetch((input, init) => net.fetch(input instanceof URL ? input.toString() : input, init));
+  setOutboundFetch((input, init) => net.fetch(input instanceof URL ? input.toString() : input, init));
   registerCoverProtocol(); // cover:// handler 需 getDb()，故在 initDb 后
   registerMediaProtocol(); // media:// handler 需 getDb()，故在 initDb 后
   registerAppHandlers();
