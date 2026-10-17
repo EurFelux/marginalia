@@ -13,6 +13,16 @@ export function isErrorShape(output: unknown): boolean {
   return typeof output === "object" && output !== null && "error" in output;
 }
 
+/** 取 URL 的 host（流式中 input 可能不完整或非法 → null，调用方回退通用标题）。 */
+function hostOf(url: unknown): string | null {
+  if (typeof url !== "string") return null;
+  try {
+    return new URL(url).host || null;
+  } catch {
+    return null;
+  }
+}
+
 export type ToolStepStatus = "loading" | "done" | "failed" | "not-executed";
 
 /**
@@ -88,6 +98,12 @@ export function toolStepLabel(part: ToolPart, chapters: ChapterRefDto[], t: TFun
       return typeof query === "string"
         ? t("ai.toolStep.webSearch", "联网搜索：{{query}}", { query })
         : t("ai.toolStep.webSearchFallback", "联网搜索");
+    }
+    case "web_fetch": {
+      const host = hostOf(input?.url);
+      return host
+        ? t("ai.toolStep.webFetch", "读取网页：{{host}}", { host })
+        : t("ai.toolStep.webFetchFallback", "读取网页");
     }
     case "loadSkill": {
       const skill = input?.name;

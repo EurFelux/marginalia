@@ -10,6 +10,14 @@ export interface SearchHit {
   publishedDate?: string;
 }
 
+/** 读取到的网页。 */
+export interface FetchedPage {
+  /** 页面标题（来源未提供时为空串）。 */
+  title: string;
+  /** 页面正文，Markdown。 */
+  content: string;
+}
+
 /**
  * 搜索后端接口。SearchService 通过此接口与各具体后端（如 Exa MCP）交互，
  * 支持按顺序回退：第一个后端失败时依次尝试后续后端。
@@ -20,8 +28,11 @@ export interface SearchBackend {
   /**
    * 执行搜索并返回命中列表。
    * 失败时抛出错误，由 SearchService 捕获并触发回退逻辑。
+   * signal 来自 tool execute 的 abortSignal：用户停止回复时取消进行中的请求。
    */
-  search(query: string, opts: { numResults?: number }): Promise<SearchHit[]>;
+  search(query: string, opts: { numResults?: number; signal?: AbortSignal }): Promise<SearchHit[]>;
+  /** 可选能力：读取网页。未实现的后端在 fetchPage 回退链中跳过。 */
+  fetchPage?: (url: string, opts: { signal?: AbortSignal }) => Promise<FetchedPage>;
   /** 释放后端持有的网络连接等资源。 */
   close(): Promise<void>;
 }

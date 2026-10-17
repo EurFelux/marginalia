@@ -165,6 +165,25 @@ describe("toolStepLabel", () => {
     expect(toolStepLabel(p, [], t)).toBeTruthy();
   });
 
+  it("labels web_fetch with the page host", () => {
+    const p = part("tool-web_fetch", {
+      input: { url: "https://en.wikipedia.org/wiki/Marginalia" },
+      state: "input-available",
+    }) as any;
+    expect(toolStepLabel(p, [], t)).toMatch(/en\.wikipedia\.org/);
+    expect(toolStepLabel(p, [], t)).not.toMatch(/wiki\/Marginalia/);
+  });
+
+  it("falls back when the web_fetch url is missing or partial", () => {
+    const missing = part("tool-web_fetch", { input: {}, state: "input-streaming" }) as any;
+    const partial = part("tool-web_fetch", {
+      input: { url: "https:" },
+      state: "input-streaming",
+    }) as any;
+    expect(toolStepLabel(missing, [], t)).toBeTruthy();
+    expect(toolStepLabel(partial, [], t)).toBe(toolStepLabel(missing, [], t));
+  });
+
   it("labels searchBook with the query", () => {
     const p = part("tool-searchBook", {
       input: { query: "unreliable narrator" },

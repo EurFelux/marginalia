@@ -115,8 +115,10 @@ export function genericBackendOpts(
   };
 }
 
-/** 根据偏好配置选取合适的 opts 构造函数。 */
-export function backendOptsFor(cfg: WebSearchBackendConfig): McpBackendOpts {
+/** 根据偏好配置选取合适的 opts 构造函数（仅 MCP 类后端；deepseek 走 deepseek-backend）。 */
+export function backendOptsFor(
+  cfg: Extract<WebSearchBackendConfig, { kind: "exa-mcp" | "mcp" }>,
+): McpBackendOpts {
   return cfg.kind === "exa-mcp" ? exaBackendOpts(cfg.apiKey) : genericBackendOpts(cfg);
 }
 
@@ -150,12 +152,16 @@ export function makeMcpBackend(opts: McpBackendOpts): SearchBackend {
 
   return {
     id: opts.id,
-    async search(query, { numResults }) {
+    async search(query, { numResults, signal }) {
       const c = await ensure();
-      const raw = await c.callTool({
-        name: opts.toolName,
-        arguments: { query, ...(numResults != null ? { numResults } : {}) },
-      });
+      const raw = await c.callTool(
+        {
+          name: opts.toolName,
+          arguments: { query, ...(numResults != null ? { numResults } : {}) },
+        },
+        undefined,
+        { signal },
+      );
       return opts.mapResult(raw);
     },
     async close() {

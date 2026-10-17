@@ -5,7 +5,12 @@ import type { ProviderTester } from "@main/secrets/tester";
 import { maskKey } from "@main/providers/mask";
 import { createProvider, type Provider } from "@main/providers/provider-factory";
 import { t } from "@main/i18n";
-import type { ProviderDto, TestResult, UpsertProviderInput } from "@shared/providers";
+import {
+  isDeepseekProvider,
+  type ProviderDto,
+  type TestResult,
+  type UpsertProviderInput,
+} from "@shared/providers";
 
 export type ProviderRow = typeof providers.$inferSelect;
 
@@ -137,6 +142,20 @@ export function removeProvider(db: DB, id: string): void {
   // chatModel / summaryModel 偏好按 providerId 引用（无 FK，存 JSON）：删 provider 后留作悬空引用，
   // 由 resolveChatModel / resolveSummaryModel 在解析时报「未找到 provider」优雅降级，无需在此清理。
   db.delete(providers).where(eq(providers.id, id)).run();
+}
+
+/**
+ * 内置 DeepSeek provider 的 API key（联网搜索的 DeepSeek 后端复用它；与该 provider 选用哪种 API type 无关）。
+ * 只认内置那一行，同名的用户自建 provider 不算；未配置返回 undefined。
+ */
+export function findBuiltinDeepseekKey(db: DB): string | undefined {
+  const row = db
+    .select()
+    .from(providers)
+    .where(eq(providers.isBuiltin, true))
+    .all()
+    .find(isDeepseekProvider);
+  return row?.apiKey ?? undefined;
 }
 
 export function revealProviderKey(db: DB, id: string): string {

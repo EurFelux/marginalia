@@ -4,7 +4,9 @@ import { BookOpen, FileText, Globe, Loader2, TextSelect, X } from "lucide-react"
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import type { SummaryStatus } from "@shared/library";
+import { backendDisplayName, enabledBackends, webToolNames } from "@shared/web-search";
 import { cn } from "@renderer/lib/utils";
+import { formatList } from "@renderer/lib/list-format";
 import { ScrollArea } from "@renderer/components/ui/scroll-area";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@renderer/components/ui/hover-card";
 import { useChatStore } from "@renderer/store/chat-store";
@@ -110,7 +112,7 @@ function SummaryHover({ view }: { view: SummaryView | undefined }) {
  * （主进程 inFlight 幂等兜底）；自动预亮不触发。
  */
 export function ContextPillBar({ context }: { context: ChatContext }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const qc = useQueryClient();
   // 书相关 pill（章节/全书摘要、选区）只在 book 上下文出现；库上下文 bookId=null，仅留联网开关。
   const bookId = context.kind === "book" ? context.bookId : null;
@@ -121,7 +123,13 @@ export function ContextPillBar({ context }: { context: ChatContext }) {
   const setDraftChips = useChatStore((s) => s.setDraftChips);
   const webSearchEnabled = usePrefsStore((s) => s.webSearchEnabled);
   const setWebSearchEnabled = usePrefsStore((s) => s.setWebSearchEnabled);
-  const webSearchConfigured = usePrefsStore((s) => Boolean(s.webSearch?.backends.length));
+  const webSearchConfig = usePrefsStore((s) => s.webSearch);
+  // 与主进程工具注册同一判定（webToolNames）：有启用的引擎才显示联网开关。
+  const webTools = webSearchConfig ? webToolNames(webSearchConfig) : [];
+  const webSearchConfigured = webTools.length > 0;
+  const webEngines = webSearchConfig
+    ? formatList(enabledBackends(webSearchConfig).map(backendDisplayName), i18n.language)
+    : "";
 
   const chapter = useQuery({
     ...chapterSummaryQuery(bookId ?? "", chapterId ?? ""),
@@ -139,7 +147,13 @@ export function ContextPillBar({ context }: { context: ChatContext }) {
       ariaPressed={webSearchEnabled}
       hover={
         <p className="text-muted-foreground">
-          {t("ai.webSearch.hover", "启用后 AI 可联网搜索（Exa）")}
+          {webTools.includes("web_fetch")
+            ? t("ai.webSearch.hoverWithFetch", "启用后 AI 可联网搜索与读取网页（{{engines}}）", {
+                engines: webEngines,
+              })
+            : t("ai.webSearch.hover", "启用后 AI 可联网搜索（{{engines}}）", {
+                engines: webEngines,
+              })}
         </p>
       }
     />

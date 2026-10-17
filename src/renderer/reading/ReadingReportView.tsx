@@ -148,7 +148,7 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
   };
 
   if (sessions.isPending || detail.isPending) {
-    return <ReportMessage>{t("reading.routeLoading", "载入阅读档案中…")}</ReportMessage>;
+    return <ReportMessage>{t("readingReport.loading", "载入阅读档案中…")}</ReportMessage>;
   }
   if (sessions.isError || detail.isError || !selectedSession || !detail.data) {
     return <ReportMessage>{t("readingReport.loadFailed")}</ReportMessage>;
@@ -177,7 +177,7 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
       <div className="mx-auto flex max-w-6xl flex-col gap-6">
         <Button variant="ghost" className="w-fit" onClick={backToLibrary}>
           <ArrowLeft data-icon="inline-start" />
-          {t("reader.backToLibrary", "返回书库")}
+          {t("reader.backToLibrary", "书库")}
         </Button>
 
         <div className="grid items-start gap-6 lg:grid-cols-[17rem_minmax(0,1fr)]">
