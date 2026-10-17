@@ -57,10 +57,13 @@ async function fetchRun(
   tool: ReturnType<typeof makeWebFetchTool>,
   input: { url: string; offset?: number; maxChars?: number },
 ) {
-  return (tool.execute as (i: unknown, o: unknown) => Promise<FetchOut | { error: string }>)(input, {
-    toolCallId: "t1",
-    messages: [],
-  });
+  return (tool.execute as (i: unknown, o: unknown) => Promise<FetchOut | { error: string }>)(
+    input,
+    {
+      toolCallId: "t1",
+      messages: [],
+    },
+  );
 }
 
 describe("wrapUntrustedPage", () => {
@@ -101,7 +104,9 @@ describe("wrapUntrustedPage", () => {
       { url: "https://a", title: "", text: "x", hasMore: false, nextOffset: 1 },
       "id",
     );
-    expect(noTitle.content).toBe('<untrusted_web_content id="id">\nURL: https://a\n\nx\n</untrusted_web_content id="id">');
+    expect(noTitle.content).toBe(
+      '<untrusted_web_content id="id">\nURL: https://a\n\nx\n</untrusted_web_content id="id">',
+    );
   });
   it("generates a fresh 16-hex-char id each time", () => {
     const a = newBoundaryId();
@@ -158,9 +163,9 @@ describe("createSearchTools registration", () => {
   const names = (cfg: WebSearchConfig) => Object.keys(createSearchTools(cfg, true).tools);
 
   it("registers only web_search for Exa", () => {
-    expect(names({ backends: [{ kind: "exa-mcp" }, { kind: "deepseek", enabled: false }] })).toEqual([
-      "web_search",
-    ]);
+    expect(
+      names({ backends: [{ kind: "exa-mcp" }, { kind: "deepseek", enabled: false }] }),
+    ).toEqual(["web_search"]);
   });
   it("adds web_fetch when DeepSeek is enabled", () => {
     expect(names({ backends: [{ kind: "exa-mcp" }, { kind: "deepseek" }] })).toEqual([

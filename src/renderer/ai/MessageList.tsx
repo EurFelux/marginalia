@@ -4,6 +4,7 @@ import { getToolName } from "ai";
 import { useQuery } from "@tanstack/react-query";
 import type { LucideIcon } from "lucide-react";
 import {
+  AppWindow,
   BookOpen,
   Brain,
   ChevronRight,
@@ -452,6 +453,7 @@ function ProcessFold({
 const TOOL_ICONS: Record<string, LucideIcon> = {
   bash: SquareTerminal,
   web_search: Globe,
+  web_fetch: AppWindow,
   readMemory: Brain,
   saveMemory: Brain,
   updateMemory: Brain,

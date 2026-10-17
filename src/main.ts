@@ -166,7 +166,9 @@ app.on("ready", async () => {
   initMainI18n(lang);
   // AI 出站请求默认走系统代理：Electron net.fetch 经 Chromium 网络栈，默认采用系统代理设置。
   // （部分地区直连 api.anthropic.com 会被 403「Request not allowed」按区域拦截，须经系统代理出网。）
-  setOutboundFetch((input, init) => net.fetch(input instanceof URL ? input.toString() : input, init));
+  setOutboundFetch((input, init) =>
+    net.fetch(input instanceof URL ? input.toString() : input, init),
+  );
   registerCoverProtocol(); // cover:// handler 需 getDb()，故在 initDb 后
   registerMediaProtocol(); // media:// handler 需 getDb()，故在 initDb 后
   registerAppHandlers();
