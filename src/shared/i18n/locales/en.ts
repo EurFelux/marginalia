@@ -381,6 +381,7 @@ export default {
     "There are not enough reading traces yet. You can write this report yourself.",
   "readingReport.keepCurrent": "Keep current report",
   "readingReport.loadFailed": "Unable to load this reading report.",
+  "readingReport.loading": "Loading reading report…",
   "readingReport.progress.count_one": "{{count}} item",
   "readingReport.progress.count_other": "{{count}} items",
   "readingReport.progress.elapsed": "{{elapsed}} elapsed",
